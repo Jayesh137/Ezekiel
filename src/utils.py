@@ -19,15 +19,23 @@ def load_config():
 
 # --- Hyperliquid API ---
 
-def hl_post(request_body: dict) -> dict | list:
-    """POST to Hyperliquid info endpoint."""
+def hl_post(request_body: dict, retries: int = 3) -> dict | list:
+    """POST to Hyperliquid info endpoint with retry on rate limit."""
     config = load_config()
-    resp = requests.post(
-        config["hyperliquid_api"],
-        json=request_body,
-        headers={"Content-Type": "application/json"},
-        timeout=30,
-    )
+    for attempt in range(retries):
+        resp = requests.post(
+            config["hyperliquid_api"],
+            json=request_body,
+            headers={"Content-Type": "application/json"},
+            timeout=30,
+        )
+        if resp.status_code == 429:
+            wait = 2 ** (attempt + 1)
+            print(f"[api] Rate limited, waiting {wait}s...")
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        return resp.json()
     resp.raise_for_status()
     return resp.json()
 

@@ -17,7 +17,7 @@ from src.utils import (
 def backfill_fills(wallet: str) -> int:
     """Backfill all available fills using time-windowed pagination."""
     total = 0
-    window_ms = 24 * 60 * 60 * 1000  # 24 hours
+    window_ms = 7 * 24 * 60 * 60 * 1000  # 7 days
     start_time = 0
     max_time = int(time.time() * 1000)
 
@@ -44,7 +44,7 @@ def backfill_fills(wallet: str) -> int:
                 continue
 
         start_time = end_time + 1
-        time.sleep(0.1)
+        time.sleep(0.5)
 
     all_fills = []
     for fp in sorted((DATA_DIR / "fills").glob("*.json")):
@@ -61,9 +61,9 @@ def backfill_fills(wallet: str) -> int:
 
 
 def backfill_funding(wallet: str) -> int:
-    """Backfill all funding payments using 7-day windows."""
+    """Backfill all funding payments using 30-day windows."""
     total = 0
-    window_ms = 7 * 24 * 60 * 60 * 1000  # 7 days
+    window_ms = 30 * 24 * 60 * 60 * 1000  # 30 days
     start_time = 0
     max_time = int(time.time() * 1000)
 
@@ -89,7 +89,7 @@ def backfill_funding(wallet: str) -> int:
                 continue
 
         start_time = end_time + 1
-        time.sleep(0.1)
+        time.sleep(0.5)
 
     if total > 0:
         all_funding = []
@@ -107,7 +107,7 @@ def backfill_funding(wallet: str) -> int:
 def backfill_ledger(wallet: str) -> int:
     """Backfill all non-funding ledger updates (deposits, withdrawals, transfers)."""
     total = 0
-    window_ms = 7 * 24 * 60 * 60 * 1000
+    window_ms = 30 * 24 * 60 * 60 * 1000  # 30 days
     start_time = 0
     max_time = int(time.time() * 1000)
 
@@ -133,7 +133,7 @@ def backfill_ledger(wallet: str) -> int:
                 continue
 
         start_time = end_time + 1
-        time.sleep(0.1)
+        time.sleep(0.5)
 
     if total > 0:
         all_ledger = []
