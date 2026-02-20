@@ -1,7 +1,7 @@
 // src/lib/api.js
 // Data fetching utility — reads JSON from GitHub raw content
 
-const OWNER = 'jayeshxcode';
+const OWNER = 'Jayesh137';
 const REPO = 'Ezekiel';
 const BRANCH = 'main';
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}`;
