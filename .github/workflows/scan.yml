@@ -1,0 +1,24 @@
+name: Scan for Matching Wallets
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python src/scanner.py
+        env:
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "data: scanner results [automated]"
+          file_pattern: "data/scans/** profile/**"

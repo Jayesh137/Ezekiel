@@ -1,0 +1,31 @@
+name: Daily Analysis & Fingerprint Rebuild
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Rebuild fingerprint
+        run: python src/fingerprint.py
+      - name: Build trader profile
+        run: python src/profile_builder.py
+      - name: Fetch new tweets
+        run: python src/twitter_monitor.py
+      - name: Run correlation analysis
+        run: python src/twitter_correlator.py
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "analysis: rebuild fingerprint + daily report [automated]"
+          file_pattern: "profile/** reports/** data/twitter/**"
+        env:
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
