@@ -24,7 +24,11 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
       - name: Pull latest before committing
-        run: git pull --rebase origin main
+        run: |
+          git add data/
+          git stash
+          git pull --rebase origin main
+          git stash pop || true
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "data: trace fund flows [automated]"
