@@ -2,6 +2,10 @@ name: Historical Backfill
 on:
   workflow_dispatch:
 
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
 jobs:
   backfill:
     runs-on: ubuntu-latest
@@ -13,7 +17,10 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - run: python src/backfill.py
+      - name: Pull latest before committing
+        run: git pull --rebase origin main
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "data: historical backfill [automated]"
           file_pattern: "data/**"
+          push_options: "--force-with-lease"
