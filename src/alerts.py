@@ -19,7 +19,7 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = "Ezekiel Alerts <ezekiel@alerts.dev>"
+    msg["From"] = f"Ezekiel Alerts <{alert_email}>"
     msg["To"] = alert_email
 
     msg.attach(MIMEText(body, "plain"))
