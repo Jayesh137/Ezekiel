@@ -20,8 +20,9 @@ def collect_positions(wallet: str) -> None:
     save_latest(str(DATA_DIR / "positions"), state)
 
     spot = hl_post({"type": "spotClearinghouseState", "user": wallet})
+    save_latest(str(DATA_DIR / "spot"), spot)
+
     save_snapshot(str(DATA_DIR / "account"), {"perp": state, "spot": spot})
-    save_latest(str(DATA_DIR / "account"), {"perp": state, "spot": spot})
 
 
 def collect_fills(wallet: str) -> int:
@@ -135,7 +136,7 @@ def collect_referral(wallet: str) -> None:
 def collect_portfolio(wallet: str) -> None:
     """Collect portfolio (historical account value + PnL)."""
     portfolio = hl_post({"type": "portfolio", "user": wallet})
-    save_latest(str(DATA_DIR / "account"), portfolio)
+    save_latest(str(DATA_DIR / "portfolio"), portfolio)
 
 
 def main():

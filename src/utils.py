@@ -171,7 +171,7 @@ def update_index() -> None:
         "stats": {},
     }
     for data_type in ["positions", "fills", "orders", "funding", "ledger",
-                       "account", "scans", "l1_transactions"]:
+                       "account", "spot", "portfolio", "scans", "l1_transactions"]:
         type_dir = DATA_DIR / data_type
         if type_dir.exists():
             dates = sorted([

@@ -3,15 +3,15 @@
 	import { fetchLatest, fetchFingerprint, fetchIndex, formatUSD, shortAddr } from '$lib/api.js';
 
 	let positions = null;
-	let account = null;
+	let spot = null;
 	let fingerprint = null;
 	let index = null;
 	let loading = true;
 
 	onMount(async () => {
-		[positions, account, fingerprint, index] = await Promise.all([
+		[positions, spot, fingerprint, index] = await Promise.all([
 			fetchLatest('positions'),
-			fetchLatest('account'),
+			fetchLatest('spot'),
 			fetchFingerprint(),
 			fetchIndex(),
 		]);
@@ -24,6 +24,12 @@
 		return ap
 			.map(a => a.position)
 			.filter(p => p && parseFloat(p.szi) !== 0);
+	}
+
+	function getSpotBalances(data) {
+		if (!data) return [];
+		const balances = data.balances || [];
+		return balances.filter(b => parseFloat(b.total || b.hold || 0) > 0);
 	}
 
 	function getAccountValue(data) {
@@ -115,6 +121,33 @@
 	{:else}
 		<div class="card" style="margin-top:24px; text-align:center; padding:48px">
 			<p class="text-muted">No open positions — wallet may be idle or data not yet collected.</p>
+		</div>
+	{/if}
+
+	{@const spotBalances = getSpotBalances(spot)}
+	{#if spotBalances.length > 0}
+		<div class="card" style="margin-top:24px">
+			<h2 style="margin-bottom:16px; font-size:1.1rem">Spot Positions</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Token</th>
+						<th>Total</th>
+						<th>Hold</th>
+						<th>Entry Price</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each spotBalances as bal}
+						<tr>
+							<td><strong>{bal.coin}</strong></td>
+							<td>{parseFloat(bal.total || 0).toFixed(4)}</td>
+							<td>{parseFloat(bal.hold || 0).toFixed(4)}</td>
+							<td>{bal.entryNtl ? formatUSD(parseFloat(bal.entryNtl) / parseFloat(bal.total || 1)) : '—'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	{/if}
 
