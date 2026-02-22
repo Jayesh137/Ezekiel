@@ -4,14 +4,16 @@
 
 	let positions = null;
 	let spot = null;
+	let hip3Xyz = null;
 	let fingerprint = null;
 	let index = null;
 	let loading = true;
 
 	onMount(async () => {
-		[positions, spot, fingerprint, index] = await Promise.all([
+		[positions, spot, hip3Xyz, fingerprint, index] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('spot'),
+			fetchLatest('positions_hip3_xyz'),
 			fetchFingerprint(),
 			fetchIndex(),
 		]);
@@ -124,6 +126,49 @@
 	{:else}
 		<div class="card" style="margin-top:24px; text-align:center; padding:48px">
 			<p class="text-muted">No open positions — wallet may be idle or data not yet collected.</p>
+		</div>
+	{/if}
+
+	{@const hip3Positions = getPositions(hip3Xyz)}
+	{#if hip3Positions.length > 0}
+		<div class="card" style="margin-top:24px">
+			<h2 style="margin-bottom:16px; font-size:1.1rem">HIP-3 Positions (XYZ)</h2>
+			<table>
+				<thead>
+					<tr>
+						<th>Asset</th>
+						<th>Side</th>
+						<th>Size</th>
+						<th>Entry Price</th>
+						<th>Mark Price</th>
+						<th>Leverage</th>
+						<th>Unrealized PnL</th>
+						<th>Liq. Price</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each hip3Positions as pos}
+						{@const size = parseFloat(pos.szi)}
+						{@const pnl = parseFloat(pos.unrealizedPnl || 0)}
+						<tr>
+							<td><strong>{pos.coin}</strong></td>
+							<td>
+								<span class="badge" class:badge-green={size > 0} class:badge-red={size < 0}>
+									{size > 0 ? 'LONG' : 'SHORT'}
+								</span>
+							</td>
+							<td>{Math.abs(size).toFixed(4)}</td>
+							<td>{formatUSD(parseFloat(pos.entryPx || 0))}</td>
+							<td>{formatUSD(parseFloat(pos.positionValue || 0) / Math.abs(size) || 0)}</td>
+							<td>{pos.leverage?.value || '—'}x</td>
+							<td class:text-green={pnl >= 0} class:text-red={pnl < 0}>
+								{pnl >= 0 ? '+' : ''}{formatUSD(pnl)}
+							</td>
+							<td class="text-muted">{pos.liquidationPx ? formatUSD(parseFloat(pos.liquidationPx)) : '—'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	{/if}
 

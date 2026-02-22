@@ -15,6 +15,8 @@ from src.utils import (
 
 def collect_positions(wallet: str) -> None:
     """Snapshot current positions and account state."""
+    config = load_config()
+
     state = hl_post({"type": "clearinghouseState", "user": wallet})
     save_snapshot(str(DATA_DIR / "positions"), state)
     save_latest(str(DATA_DIR / "positions"), state)
@@ -22,7 +24,15 @@ def collect_positions(wallet: str) -> None:
     spot = hl_post({"type": "spotClearinghouseState", "user": wallet})
     save_latest(str(DATA_DIR / "spot"), spot)
 
-    save_snapshot(str(DATA_DIR / "account"), {"perp": state, "spot": spot})
+    # Fetch HIP-3 dex positions (e.g. xyz:XYZ100, xyz:SILVER)
+    hip3_positions = {}
+    for dex in config.get("hip3_dexes", []):
+        dex_state = hl_post({"type": "clearinghouseState", "user": wallet, "dex": dex})
+        if dex_state:
+            hip3_positions[dex] = dex_state
+            save_latest(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
+
+    save_snapshot(str(DATA_DIR / "account"), {"perp": state, "spot": spot, "hip3": hip3_positions})
 
 
 def collect_fills(wallet: str) -> int:
