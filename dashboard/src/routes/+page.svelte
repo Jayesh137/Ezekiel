@@ -23,13 +23,16 @@
 		const ap = data.assetPositions || data?.perp?.assetPositions || [];
 		return ap
 			.map(a => a.position)
-			.filter(p => p && parseFloat(p.szi) !== 0);
+			.filter(p => p && parseFloat(p.szi) !== 0)
+			.sort((a, b) => parseFloat(b.positionValue || 0) - parseFloat(a.positionValue || 0));
 	}
 
 	function getSpotBalances(data) {
 		if (!data) return [];
 		const balances = data.balances || [];
-		return balances.filter(b => parseFloat(b.total || b.hold || 0) > 0);
+		return balances
+			.filter(b => parseFloat(b.total || b.hold || 0) > 0)
+			.sort((a, b) => parseFloat(b.entryNtl || 0) - parseFloat(a.entryNtl || 0));
 	}
 
 	function getAccountValue(data) {
