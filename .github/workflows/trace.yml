@@ -1,12 +1,12 @@
 name: Trace Fund Flows
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 concurrency:
   group: trace
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   trace:
