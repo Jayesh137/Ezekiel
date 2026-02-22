@@ -175,26 +175,27 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     else:
         dimensions["hold_duration"] = 0.0
 
-    # Weighted average
+    # Weighted average (sum to 1.0)
     weights = {
-        "asset_preferences": 0.15,
-        "timing_profile": 0.15,
-        "leverage_profile": 0.15,
-        "entry_exit_style": 0.10,
-        "hold_duration": 0.10,
+        "asset_preferences": 0.25,
+        "timing_profile": 0.25,
+        "leverage_profile": 0.20,
+        "entry_exit_style": 0.15,
+        "hold_duration": 0.15,
     }
 
-    total_weight = sum(weights.values())
     weighted_sum = sum(dimensions.get(k, 0) * w for k, w in weights.items())
-    overall_score = weighted_sum / total_weight if total_weight else 0
 
-    return round(overall_score, 4), dimensions
+    return round(weighted_sum, 4), dimensions
 
 
 def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
     """Build a mini-fingerprint for a candidate wallet from their data."""
-    positions = state
+    from src.fingerprint import (
+        compute_leverage_profile, compute_hold_duration, compute_entry_exit_style
+    )
 
+    positions = state
     if isinstance(positions, dict) and "assetPositions" not in positions:
         if "perp" in positions:
             positions = positions["perp"]
@@ -202,19 +203,9 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
     return {
         "asset_preferences": compute_asset_preferences(fills),
         "timing_profile": compute_timing_profile(fills),
-        "leverage_profile": {
-            "weight": 0.15,
-            "per_coin": {},
-            "overall": {},
-        },
-        "entry_exit_style": {
-            "weight": 0.10,
-            "order_type_ratio": {
-                "market": round(sum(1 for f in fills if f.get("crossed")) / max(len(fills), 1), 4),
-                "limit": round(sum(1 for f in fills if not f.get("crossed")) / max(len(fills), 1), 4),
-            }
-        },
-        "hold_duration": {"weight": 0.10, "distribution_buckets": {}},
+        "leverage_profile": compute_leverage_profile(fills, positions),
+        "entry_exit_style": compute_entry_exit_style(fills),
+        "hold_duration": compute_hold_duration(fills),
     }
 
 
@@ -244,6 +235,7 @@ def scan_leaderboard():
     lookback_days = scanner_config["fills_lookback_days"]
 
     results = []
+    top_scores = []  # Track all scores for diagnostics
     scanned = 0
 
     for entry in leaderboard[:max_wallets]:
@@ -273,6 +265,11 @@ def scan_leaderboard():
             "scanned_at": datetime.now(timezone.utc).isoformat(),
         }
 
+        # Track top 10 scores regardless of threshold
+        top_scores.append({"wallet": wallet[:10], "score": score})
+        top_scores.sort(key=lambda x: x["score"], reverse=True)
+        top_scores = top_scores[:10]
+
         if score >= thresholds["similarity_low"]:
             results.append(result)
 
@@ -284,12 +281,15 @@ def scan_leaderboard():
 
         time.sleep(0.1)  # Rate limiting
 
+    # Log top scores for diagnostics
+    print(f"[scanner] Top 5 scores (any threshold): {top_scores[:5]}")
+
     # Save results
     scan_result = {
         "scan_time": datetime.now(timezone.utc).isoformat(),
         "wallets_scanned": scanned,
         "matches_found": len(results),
-        "results": sorted(results, key=lambda r: r["score"], reverse=True),
+        "results": all_scored,
     }
 
     append_records(str(DATA_DIR / "scans"), [scan_result], key_field="scan_time")

@@ -25,10 +25,12 @@ CRYPTO_TICKERS = {
 
 # RSS bridge URLs to try (in priority order)
 RSS_BRIDGES = [
-    "https://nitter.net/{account}/rss",
-    "https://nitter.privacydev.net/{account}/rss",
     "https://nitter.poast.org/{account}/rss",
-    "https://rss.app/feeds/v1.1/twitter/{account}",
+    "https://nitter.privacydev.net/{account}/rss",
+    "https://nitter.net/{account}/rss",
+    "https://twiiit.com/{account}/rss",
+    "https://nitter.1d4.us/{account}/rss",
+    "https://nitter.kavin.rocks/{account}/rss",
 ]
 
 BULLISH_KEYWORDS = {
@@ -46,10 +48,23 @@ BEARISH_KEYWORDS = {
 
 def fetch_tweets_rss(account: str) -> list[dict]:
     """Fetch tweets for an account via RSS bridges."""
+    import requests as req
+
+    errors = []
     for bridge_template in RSS_BRIDGES:
         url = bridge_template.format(account=account)
         try:
-            feed = feedparser.parse(url)
+            # Use requests for timeout control, then parse with feedparser
+            resp = req.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code != 200:
+                errors.append(f"{url} -> HTTP {resp.status_code}")
+                continue
+
+            feed = feedparser.parse(resp.text)
+            if feed.bozo and not feed.entries:
+                errors.append(f"{url} -> parse error: {feed.bozo_exception}")
+                continue
+
             if feed.entries:
                 tweets = []
                 for entry in feed.entries:
@@ -63,10 +78,16 @@ def fetch_tweets_rss(account: str) -> list[dict]:
                     tweets.append(tweet)
                 print(f"[twitter] Fetched {len(tweets)} tweets from @{account} via {url}")
                 return tweets
+            else:
+                errors.append(f"{url} -> no entries")
+        except req.exceptions.Timeout:
+            errors.append(f"{url} -> timeout")
         except Exception as e:
-            continue
+            errors.append(f"{url} -> {type(e).__name__}: {e}")
 
-    print(f"[twitter] Could not fetch tweets for @{account} from any RSS bridge")
+    print(f"[twitter] Could not fetch tweets for @{account}. Tried {len(RSS_BRIDGES)} bridges:")
+    for err in errors:
+        print(f"[twitter]   {err}")
     return []
 
 

@@ -27,9 +27,19 @@ def get_usdc_transfers(address: str, start_block: int = 0) -> list[dict]:
         "offset": 1000,
         "sort": "desc",
     })
-    if result.get("status") == "1" and result.get("result"):
-        return result["result"]
-    return []
+    status = result.get("status")
+    message = result.get("message", "")
+    transfers = result.get("result", [])
+
+    if status == "1" and isinstance(transfers, list):
+        print(f"[tracer] Etherscan: {len(transfers)} USDC transfers found for {address[:10]}...")
+        return transfers
+    elif status == "0" and message == "No transactions found":
+        print(f"[tracer] Etherscan: No USDC transfers for {address[:10]}... (confirmed empty)")
+        return []
+    else:
+        print(f"[tracer] Etherscan API issue: status={status}, message={message}, result_type={type(transfers).__name__}")
+        return []
 
 
 def get_normal_transactions(address: str, start_block: int = 0) -> list[dict]:
@@ -83,13 +93,17 @@ def trace_outbound_transfers(wallet: str) -> list[dict]:
 
 def trace_fund_flow(wallet: str) -> None:
     """Main tracing logic: detect outbound transfers and follow the money."""
+    import os
     config = load_config()
+
+    api_key = os.environ.get("ETHERSCAN_API_KEY", "")
     print(f"[tracer] Checking fund flows for {wallet}")
+    print(f"[tracer] Etherscan API key: {'configured (' + api_key[:6] + '...)' if api_key else 'MISSING!'}")
 
     outbound = trace_outbound_transfers(wallet)
 
     if not outbound:
-        print("[tracer] No new outbound transfers detected.")
+        print("[tracer] No new outbound transfers detected. Wallet has not moved USDC on L1.")
         return
 
     for transfer in outbound:

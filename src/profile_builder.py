@@ -29,21 +29,41 @@ def parse_docx(filepath: str) -> str:
 
 def parse_pdf(filepath: str) -> str:
     """Extract text from a PDF document."""
+    text = ""
+
+    # Try PyPDF2 first
     try:
         from PyPDF2 import PdfReader
         reader = PdfReader(filepath)
         text_parts = []
         for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                text_parts.append(text)
-        return "\n".join(text_parts)
+            page_text = page.extract_text()
+            if page_text:
+                text_parts.append(page_text)
+        text = "\n".join(text_parts)
+        if len(text) > 50:
+            return text
+        print(f"[profile] PyPDF2 extracted only {len(text)} chars, trying fallback...")
     except ImportError:
-        print(f"[profile] PyPDF2 not installed, skipping {filepath}")
-        return ""
+        print(f"[profile] PyPDF2 not installed")
     except Exception as e:
-        print(f"[profile] Error reading {filepath}: {e}")
-        return ""
+        print(f"[profile] PyPDF2 error: {e}")
+
+    # Fallback: try pdfminer
+    try:
+        from pdfminer.high_level import extract_text as pdfminer_extract
+        text = pdfminer_extract(filepath)
+        if text.strip():
+            print(f"[profile] pdfminer extracted {len(text)} chars")
+            return text
+    except ImportError:
+        print(f"[profile] pdfminer not installed, skipping fallback for {filepath}")
+    except Exception as e:
+        print(f"[profile] pdfminer error: {e}")
+
+    if not text:
+        print(f"[profile] WARNING: Could not extract text from {filepath} — may be image-only PDF")
+    return text
 
 
 def extract_trading_patterns(text: str) -> dict:
@@ -64,12 +84,25 @@ def extract_trading_patterns(text: str) -> dict:
         "BTC", "ETH", "SOL", "AVAX", "ARB", "OP", "MATIC", "DOGE",
         "LINK", "UNI", "AAVE", "DOT", "ADA", "ATOM", "NEAR", "FTM",
         "APT", "SUI", "SEI", "TIA", "JUP", "XRP", "LTC", "BNB",
+        "WIF", "PEPE", "BONK", "ONDO", "ENA", "PENDLE", "INJ", "TAO",
+        "RENDER", "FET", "STX", "TON", "TRX", "EIGEN", "STRK",
+    }
+
+    # HIP-3 / stock perp tickers
+    hip3_tickers = {
+        "XYZ100", "SILVER", "COPPER", "MU", "SNDK", "GOLD", "OIL",
+        "SPX", "NDX", "TSLA", "AAPL", "NVDA", "MSFT", "AMZN", "META",
     }
 
     # Find mentioned coins
     for ticker in tickers:
         if re.search(rf'\b{ticker}\b', text.upper()):
             patterns["mentioned_coins"].append(ticker)
+
+    # Find HIP-3 mentions (with or without xyz: prefix)
+    for ticker in hip3_tickers:
+        if re.search(rf'\b{ticker}\b', text.upper()):
+            patterns["mentioned_coins"].append(f"xyz:{ticker}")
 
     # Extract strategy keywords
     strategy_keywords = [

@@ -22,41 +22,56 @@ def load_config():
 def hl_post(request_body: dict, retries: int = 3) -> dict | list:
     """POST to Hyperliquid info endpoint with retry on rate limit."""
     config = load_config()
+    last_error = None
     for attempt in range(retries):
-        resp = requests.post(
-            config["hyperliquid_api"],
-            json=request_body,
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
-        if resp.status_code == 429:
-            wait = 2 ** (attempt + 1)
-            print(f"[api] Rate limited, waiting {wait}s...")
-            time.sleep(wait)
-            continue
-        resp.raise_for_status()
-        return resp.json()
-    resp.raise_for_status()
-    return resp.json()
+        try:
+            resp = requests.post(
+                config["hyperliquid_api"],
+                json=request_body,
+                headers={"Content-Type": "application/json"},
+                timeout=30,
+            )
+            if resp.status_code == 429:
+                wait = 2 ** (attempt + 1)
+                print(f"[api] Rate limited, waiting {wait}s...")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.Timeout:
+            last_error = f"Timeout on attempt {attempt + 1}"
+            print(f"[api] {last_error} for {request_body.get('type', 'unknown')}")
+        except requests.exceptions.RequestException as e:
+            last_error = str(e)
+            print(f"[api] Error on attempt {attempt + 1}: {e}")
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+    print(f"[api] All {retries} attempts failed for {request_body.get('type', 'unknown')}: {last_error}")
+    return [] if "user" in str(request_body.get("type", "")) else {}
 
 # --- Etherscan V2 API ---
 
 def etherscan_get(params: dict) -> dict:
     """GET from Etherscan V2 API for Arbitrum."""
     config = load_config()
+    api_key = os.environ.get("ETHERSCAN_API_KEY", "")
     base_params = {
         "chainid": config["arbitrum_chain_id"],
-        "apikey": os.environ.get("ETHERSCAN_API_KEY", ""),
+        "apikey": api_key,
     }
     base_params.update(params)
     time.sleep(0.25)  # Rate limit: 5 req/sec
-    resp = requests.get(
-        config["etherscan_v2_base"],
-        params=base_params,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        resp = requests.get(
+            config["etherscan_v2_base"],
+            params=base_params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        print(f"[etherscan] API error: {e}")
+        return {"status": "0", "message": str(e), "result": []}
 
 # --- Cursor Management ---
 
@@ -170,8 +185,16 @@ def update_index() -> None:
         "files": {},
         "stats": {},
     }
-    for data_type in ["positions", "fills", "orders", "funding", "ledger",
-                       "account", "spot", "portfolio", "scans", "l1_transactions"]:
+
+    # Data types that use daily JSON files (date.json)
+    daily_types = ["fills", "orders", "funding", "ledger", "fees",
+                   "rate_limit", "scans", "l1_transactions"]
+
+    # Data types that use dated subdirectories (date/HH-MM.json snapshots)
+    snapshot_types = ["positions", "account", "spot", "portfolio",
+                      "positions_hip3_xyz"]
+
+    for data_type in daily_types:
         type_dir = DATA_DIR / data_type
         if type_dir.exists():
             dates = sorted([
@@ -182,6 +205,20 @@ def update_index() -> None:
             if data_type in ["fills", "funding", "ledger"]:
                 all_recs = load_all_records(str(type_dir))
                 index["stats"][f"total_{data_type}"] = len(all_recs)
+
+    for data_type in snapshot_types:
+        type_dir = DATA_DIR / data_type
+        if type_dir.exists():
+            # Find dated subdirectories (e.g. 2026-02-20/)
+            dates = sorted([
+                d.name for d in type_dir.iterdir()
+                if d.is_dir() and len(d.name) == 10  # YYYY-MM-DD
+            ])
+            snapshot_count = sum(
+                len(list((type_dir / d).glob("*.json"))) for d in dates
+            )
+            index["files"][data_type] = dates
+            index["stats"][f"total_{data_type}_snapshots"] = snapshot_count
 
     index_path = DATA_DIR / "index.json"
     with open(index_path, "w") as f:
