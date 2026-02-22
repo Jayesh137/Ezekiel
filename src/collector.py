@@ -22,6 +22,7 @@ def collect_positions(wallet: str) -> None:
     save_latest(str(DATA_DIR / "positions"), state)
 
     spot = hl_post({"type": "spotClearinghouseState", "user": wallet})
+    save_snapshot(str(DATA_DIR / "spot"), spot)
     save_latest(str(DATA_DIR / "spot"), spot)
 
     # Fetch HIP-3 dex positions (e.g. xyz:XYZ100, xyz:SILVER)
@@ -30,6 +31,7 @@ def collect_positions(wallet: str) -> None:
         dex_state = hl_post({"type": "clearinghouseState", "user": wallet, "dex": dex})
         if dex_state:
             hip3_positions[dex] = dex_state
+            save_snapshot(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
             save_latest(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
 
     save_snapshot(str(DATA_DIR / "account"), {"perp": state, "spot": spot, "hip3": hip3_positions})
