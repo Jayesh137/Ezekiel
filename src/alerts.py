@@ -39,30 +39,30 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
 
 
 def alert_fund_movement(wallet: str, amount: str, destination: str, tx_hash: str) -> bool:
-    subject = "[EZEKIEL] CRITICAL: Fund Movement Detected"
+    subject = "[EZEKIEL] CRITICAL: GCR Fund Movement Detected"
     body = (
-        f"Wallet: {wallet}\n"
+        f"GCR Wallet: {wallet}\n"
         f"Event: Withdrawal of {amount} USDC\n"
         f"Destination: {destination}\n"
         f"TX Hash: {tx_hash}\n"
-        f"\nTracing destination wallet..."
+        f"\nTracing destination wallet for potential new GCR wallet..."
     )
     return send_alert(subject, body)
 
 
 def alert_new_wallet_found(source_wallet: str, new_wallet: str, method: str, confidence: float) -> bool:
-    subject = f"[EZEKIEL] {'CRITICAL' if method == 'fund_trace' else 'HIGH'}: New Wallet Detected"
+    subject = f"[EZEKIEL] {'CRITICAL' if method == 'fund_trace' else 'HIGH'}: Potential New GCR Wallet"
     body = (
         f"New Wallet: {new_wallet}\n"
         f"Detection Method: {method}\n"
         f"Confidence: {confidence:.0%}\n"
-        f"Source Wallet: {source_wallet}\n"
+        f"GCR Source Wallet: {source_wallet}\n"
     )
     return send_alert(subject, body)
 
 
 def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bool:
-    subject = f"[EZEKIEL] HIGH: Potential Ezekiel Wallet ({score:.0%} match)"
+    subject = f"[EZEKIEL] HIGH: Potential GCR Wallet ({score:.0%} match)"
     dim_lines = "\n".join(
         f"  - {k}: {v:.2f}" for k, v in sorted(dimensions.items(), key=lambda x: -x[1])
     )

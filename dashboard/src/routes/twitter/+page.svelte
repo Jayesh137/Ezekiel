@@ -27,7 +27,7 @@
 
 <div class="page-header">
 	<h1>Twitter Intelligence</h1>
-	<p class="text-muted">Correlation analysis: wallet trades vs. @GiganticRebirth / @GCRClassic tweets</p>
+	<p class="text-muted">Correlating GCR's trades with @GiganticRebirth / @GCRClassic tweets</p>
 </div>
 
 {#if loading}
@@ -43,12 +43,12 @@
 {:else}
 	<div class="card" style="margin-bottom:24px">
 		<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-			<h2 style="font-size:1.1rem">Hypothesis</h2>
+			<h2 style="font-size:1.1rem">Correlation Summary</h2>
 			<span class="badge {getConfidenceBadge(correlation.confidence)}">
 				{correlation.confidence}
 			</span>
 		</div>
-		<p style="font-size:0.95rem">{correlation.hypothesis}</p>
+		<p style="font-size:0.95rem">{correlation.summary || correlation.hypothesis || '—'}</p>
 	</div>
 
 	<div class="grid-3" style="margin-bottom:24px">

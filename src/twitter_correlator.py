@@ -1,5 +1,5 @@
 # src/twitter_correlator.py
-"""Correlates tweets against wallet trades to test the GCR hypothesis."""
+"""Correlates GCR's tweets against wallet trades to measure timing alignment."""
 
 import json
 import sys
@@ -210,7 +210,7 @@ def correlate():
         time_range = f"{first.strftime('%Y-%m-%d')} to {last.strftime('%Y-%m-%d')}"
 
     result = {
-        "hypothesis": "Wallet owner is @GiganticRebirth / @GCRClassic",
+        "summary": "GCR's trades correlated with @GiganticRebirth / @GCRClassic tweets",
         "confidence": confidence,
         "evidence": {
             "timing_correlation": timing_corr,

@@ -72,7 +72,8 @@
 <div class="page-header">
 	<h1>Dashboard</h1>
 	<p class="text-muted">
-		Tracking <span class="mono text-blue">{shortAddr('0x45d26f28196d226497130c4bac709d808fed4029')}</span>
+		Tracking <strong>GCR</strong> <span class="mono text-blue">{shortAddr('0x45d26f28196d226497130c4bac709d808fed4029')}</span>
+		<span class="text-muted" style="font-size:0.8rem">(@GiganticRebirth / @GCRClassic)</span>
 	</p>
 </div>
 
