@@ -1,21 +1,25 @@
 <script>
 	import { onMount } from 'svelte';
-	import { fetchLatest, fetchFingerprint, fetchIndex, formatUSD, shortAddr } from '$lib/api.js';
+	import { fetchLatest, fetchFingerprint, fetchIndex, fetchScanResults, formatUSD, shortAddr } from '$lib/api.js';
 
 	let positions = null;
 	let spot = null;
 	let hip3Xyz = null;
 	let fingerprint = null;
 	let index = null;
+	let fees = null;
+	let scan = null;
 	let loading = true;
 
 	onMount(async () => {
-		[positions, spot, hip3Xyz, fingerprint, index] = await Promise.all([
+		[positions, spot, hip3Xyz, fingerprint, index, fees, scan] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('spot'),
 			fetchLatest('positions_hip3_xyz'),
 			fetchFingerprint(),
 			fetchIndex(),
+			fetchLatest('fees'),
+			fetchScanResults(),
 		]);
 		loading = false;
 	});
@@ -51,6 +55,18 @@
 	function getTotalPnl(positions) {
 		return positions.reduce((sum, p) => sum + parseFloat(p.unrealizedPnl || 0), 0);
 	}
+
+	function getMarginUsed(data) {
+		if (!data) return 0;
+		const ms = data.marginSummary || data?.perp?.marginSummary || {};
+		return parseFloat(ms.totalMarginUsed || 0);
+	}
+
+	function getTotalNotional(data) {
+		if (!data) return 0;
+		const ms = data.marginSummary || data?.perp?.marginSummary || {};
+		return parseFloat(ms.totalNtlPos || 0);
+	}
 </script>
 
 <div class="page-header">
@@ -66,6 +82,10 @@
 	{@const openPositions = getPositions(positions, hip3Xyz)}
 	{@const accountValue = getAccountValue(positions) + getAccountValue(hip3Xyz)}
 	{@const totalPnl = getTotalPnl(openPositions)}
+
+	{@const marginUsed = getMarginUsed(positions) + getMarginUsed(hip3Xyz)}
+	{@const totalNotional = getTotalNotional(positions) + getTotalNotional(hip3Xyz)}
+	{@const marginUtil = accountValue > 0 ? (marginUsed / accountValue * 100) : 0}
 
 	<div class="grid-4 stats-row">
 		<div class="card">
@@ -83,8 +103,29 @@
 			<div class="stat-label">Open Positions</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-purple">{index?.stats?.total_fills ?? '—'}</div>
+			<div class="stat-value text-purple">{formatUSD(totalNotional)}</div>
+			<div class="stat-label">Total Notional</div>
+		</div>
+	</div>
+
+	<div class="grid-4 stats-row">
+		<div class="card">
+			<div class="stat-value" class:text-green={marginUtil < 50} class:text-yellow={marginUtil >= 50 && marginUtil < 80} class:text-red={marginUtil >= 80}>
+				{marginUtil.toFixed(1)}%
+			</div>
+			<div class="stat-label">Margin Utilization</div>
+		</div>
+		<div class="card">
+			<div class="stat-value text-muted">{index?.stats?.total_fills?.toLocaleString() ?? '—'}</div>
 			<div class="stat-label">Total Fills</div>
+		</div>
+		<div class="card">
+			<div class="stat-value text-muted">{index?.stats?.total_funding?.toLocaleString() ?? '—'}</div>
+			<div class="stat-label">Funding Events</div>
+		</div>
+		<div class="card">
+			<div class="stat-value text-muted">{scan?.matches_found ?? '—'}</div>
+			<div class="stat-label">Scanner Matches</div>
 		</div>
 	</div>
 
@@ -190,6 +231,70 @@
 				<div>
 					<div class="stat-label">Computed</div>
 					<div class="mono text-muted">{fingerprint.computed_at?.split('T')[0] ?? '—'}</div>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if scan?.results?.length > 0}
+		<div class="card" style="margin-top:24px">
+			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+				<h2 style="font-size:1.1rem">Top Scanner Matches</h2>
+				<a href="scanner" class="text-muted" style="font-size:0.8rem">View all →</a>
+			</div>
+			<table>
+				<thead>
+					<tr>
+						<th>Wallet</th>
+						<th>Score</th>
+						<th>Assets</th>
+						<th>Timing</th>
+						<th>Leverage</th>
+						<th>Style</th>
+						<th>Duration</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each scan.results.slice(0, 5) as r}
+						{@const s = r.score}
+						<tr>
+							<td>
+								<a href="https://app.hyperliquid.xyz/explorer/address/{r.wallet}" target="_blank" class="text-blue">
+									{shortAddr(r.wallet)}
+								</a>
+							</td>
+							<td>
+								<strong class:text-red={s >= 0.70} class:text-yellow={s >= 0.50 && s < 0.70} class:text-muted={s < 0.50}>
+									{(s * 100).toFixed(1)}%
+								</strong>
+							</td>
+							<td class="mono">{r.dimensions?.asset_preferences ? (r.dimensions.asset_preferences * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="mono">{r.dimensions?.timing_profile ? (r.dimensions.timing_profile * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="mono">{r.dimensions?.leverage_profile ? (r.dimensions.leverage_profile * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="mono">{r.dimensions?.entry_exit_style ? (r.dimensions.entry_exit_style * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="mono">{r.dimensions?.hold_duration ? (r.dimensions.hold_duration * 100).toFixed(0) + '%' : '—'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+
+	{#if fees}
+		<div class="card" style="margin-top:24px">
+			<h2 style="margin-bottom:16px; font-size:1.1rem">Fee Schedule</h2>
+			<div class="grid-3">
+				<div>
+					<div class="stat-label">Daily Volume</div>
+					<div class="mono">{formatUSD(parseFloat(fees.dailyVlm || 0))}</div>
+				</div>
+				<div>
+					<div class="stat-label">Maker Rate</div>
+					<div class="mono">{fees.userMakerRate ? (parseFloat(fees.userMakerRate) * 100).toFixed(4) + '%' : '—'}</div>
+				</div>
+				<div>
+					<div class="stat-label">Taker Rate</div>
+					<div class="mono">{fees.userTakerRate ? (parseFloat(fees.userTakerRate) * 100).toFixed(4) + '%' : '—'}</div>
 				</div>
 			</div>
 		</div>

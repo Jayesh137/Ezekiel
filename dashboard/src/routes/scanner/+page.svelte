@@ -11,14 +11,14 @@
 	});
 
 	function getConfidenceClass(score) {
-		if (score >= 0.85) return 'badge-red';
-		if (score >= 0.70) return 'badge-yellow';
+		if (score >= 0.70) return 'badge-red';
+		if (score >= 0.50) return 'badge-yellow';
 		return 'badge-blue';
 	}
 
 	function getConfidenceLabel(score) {
-		if (score >= 0.85) return 'HIGH';
-		if (score >= 0.70) return 'MEDIUM';
+		if (score >= 0.70) return 'HIGH';
+		if (score >= 0.50) return 'MEDIUM';
 		return 'LOW';
 	}
 </script>
@@ -63,7 +63,8 @@
 						<th>Assets</th>
 						<th>Timing</th>
 						<th>Leverage</th>
-						<th>Scanned</th>
+						<th>Style</th>
+						<th>Duration</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -76,7 +77,8 @@
 							<td>{r.dimensions?.asset_preferences ? (r.dimensions.asset_preferences * 100).toFixed(0) + '%' : '—'}</td>
 							<td>{r.dimensions?.timing_profile ? (r.dimensions.timing_profile * 100).toFixed(0) + '%' : '—'}</td>
 							<td>{r.dimensions?.leverage_profile ? (r.dimensions.leverage_profile * 100).toFixed(0) + '%' : '—'}</td>
-							<td class="text-muted">{r.scanned_at?.split('T')[0] ?? '—'}</td>
+							<td>{r.dimensions?.entry_exit_style ? (r.dimensions.entry_exit_style * 100).toFixed(0) + '%' : '—'}</td>
+							<td>{r.dimensions?.hold_duration ? (r.dimensions.hold_duration * 100).toFixed(0) + '%' : '—'}</td>
 						</tr>
 					{/each}
 				</tbody>

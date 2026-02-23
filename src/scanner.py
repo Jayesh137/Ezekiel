@@ -279,7 +279,7 @@ def scan_leaderboard():
         elif score >= thresholds["similarity_medium"]:
             print(f"[scanner] MEDIUM MATCH: {wallet} (score={score:.4f})")
 
-        time.sleep(0.1)  # Rate limiting
+        time.sleep(0.5)  # Rate limiting (avoid 429s)
 
     # Log top scores for diagnostics
     print(f"[scanner] Top 5 scores (any threshold): {top_scores[:5]}")
