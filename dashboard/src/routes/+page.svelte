@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import {
 		fetchLatest, fetchFingerprint, fetchIndex, fetchScanResults,
-		fetchAccountHistory, fetchAllFunding,
+		fetchPortfolio, fetchAllFunding,
 		formatUSD, shortAddr
 	} from '$lib/api.js';
 	import Chart from 'chart.js/auto';
@@ -17,7 +17,7 @@
 	let scan = null;
 	let loading = true;
 
-	let accountHistory = [];
+	let portfolio = null;
 	let fundingData = [];
 	let chartsLoading = true;
 
@@ -43,16 +43,14 @@
 		loading = false;
 
 		// Load chart data in background
-		if (index) {
-			const [ah, fd] = await Promise.all([
-				fetchAccountHistory(index),
-				fetchAllFunding(index),
-			]);
-			accountHistory = ah;
-			fundingData = fd;
-			chartsLoading = false;
-			await renderCharts();
-		}
+		const [pf, fd] = await Promise.all([
+			fetchPortfolio(),
+			index ? fetchAllFunding(index) : Promise.resolve([]),
+		]);
+		portfolio = pf;
+		fundingData = fd;
+		chartsLoading = false;
+		await renderCharts();
 	});
 
 	const CHART_COLORS = {
@@ -102,14 +100,17 @@
 	async function renderCharts() {
 		await new Promise(r => setTimeout(r, 0)); // wait for DOM
 
-		// Account Value chart
-		if (accountChartEl && accountHistory.length > 0) {
+		const avh = portfolio?.accountValueHistory || [];
+		const pnlh = portfolio?.pnlHistory || [];
+
+		// Account Value chart (from portfolio API — hourly data)
+		if (accountChartEl && avh.length > 0) {
 			accountChart?.destroy();
 			accountChart = new Chart(accountChartEl, {
 				type: 'line',
 				data: {
 					datasets: [{
-						data: accountHistory.map(s => ({ x: s.time, y: s.accountValue })),
+						data: avh.map(([ts, val]) => ({ x: ts, y: parseFloat(val) })),
 						borderColor: CHART_COLORS.cyan,
 						backgroundColor: CHART_COLORS.cyanFill,
 						borderWidth: 2,
@@ -144,18 +145,15 @@
 			});
 		}
 
-		// PnL chart
-		if (pnlChartEl && accountHistory.length > 0) {
+		// PnL chart (from portfolio API — cumulative PnL)
+		if (pnlChartEl && pnlh.length > 0) {
 			pnlChart?.destroy();
 			pnlChart = new Chart(pnlChartEl, {
 				type: 'line',
 				data: {
 					datasets: [{
-						data: accountHistory.map(s => ({ x: s.time, y: s.totalPnl })),
-						borderColor: ctx => {
-							const v = ctx.raw?.y;
-							return v >= 0 ? CHART_COLORS.green : CHART_COLORS.red;
-						},
+						data: pnlh.map(([ts, val]) => ({ x: ts, y: parseFloat(val) })),
+						borderColor: CHART_COLORS.green,
 						backgroundColor: CHART_COLORS.greenFill,
 						borderWidth: 2,
 						fill: true,
@@ -421,13 +419,13 @@
 			<div class="card chart-card">
 				<div class="chart-header">
 					<h2>Account Value</h2>
-					{#if !chartsLoading && accountHistory.length > 0}
-						<span class="chart-badge">{accountHistory.length} snapshots</span>
+					{#if !chartsLoading && portfolio?.accountValueHistory?.length > 0}
+						<span class="chart-badge">{portfolio.accountValueHistory.length} data points</span>
 					{/if}
 				</div>
 				{#if chartsLoading}
 					<div class="chart-loading">Loading chart data...</div>
-				{:else if accountHistory.length === 0}
+				{:else if !portfolio?.accountValueHistory?.length}
 					<div class="chart-loading">No snapshot data available</div>
 				{/if}
 				<div class="chart-container">

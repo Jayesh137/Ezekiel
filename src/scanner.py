@@ -209,6 +209,39 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
     }
 
 
+def _summarize_fingerprint(fp: dict) -> dict:
+    """Extract comparison-relevant data from a candidate fingerprint.
+    Kept compact — only fields needed for dashboard drill-down."""
+    ap = fp.get("asset_preferences", {})
+    tp = fp.get("timing_profile", {})
+    lp = fp.get("leverage_profile", {})
+    ee = fp.get("entry_exit_style", {})
+    hd = fp.get("hold_duration", {})
+
+    return {
+        "asset_preferences": {
+            "coins_traded": ap.get("coins_traded", []),
+            "coin_frequency": ap.get("coin_frequency", {}),
+            "top_5_by_volume": ap.get("top_5_by_volume", []),
+        },
+        "timing_profile": {
+            "hourly_distribution": tp.get("hourly_distribution", []),
+            "most_active_hours_utc": tp.get("most_active_hours_utc", []),
+        },
+        "leverage_profile": {
+            "overall": lp.get("overall", {}),
+        },
+        "entry_exit_style": {
+            "order_type_ratio": ee.get("order_type_ratio", {}),
+            "win_rate": ee.get("win_rate", 0),
+        },
+        "hold_duration": {
+            "overall_minutes": hd.get("overall_minutes", {}),
+            "distribution_buckets": hd.get("distribution_buckets", {}),
+        },
+    }
+
+
 def scan_leaderboard():
     """Main scanning loop: check leaderboard wallets against fingerprint."""
     config = load_config()
@@ -263,6 +296,7 @@ def scan_leaderboard():
             "dimensions": dimensions,
             "fills_count": len(fills),
             "scanned_at": datetime.now(timezone.utc).isoformat(),
+            "fingerprint": _summarize_fingerprint(candidate_fp),
         }
 
         # Track top 10 scores regardless of threshold
@@ -284,12 +318,20 @@ def scan_leaderboard():
     # Log top scores for diagnostics
     print(f"[scanner] Top 5 scores (any threshold): {top_scores[:5]}")
 
+    # Sort by score descending
+    results.sort(key=lambda r: r["score"], reverse=True)
+
+    # Only keep full fingerprint data for top 20 (saves file size)
+    for i, r in enumerate(results):
+        if i >= 20:
+            r.pop("fingerprint", None)
+
     # Save results
     scan_result = {
         "scan_time": datetime.now(timezone.utc).isoformat(),
         "wallets_scanned": scanned,
         "matches_found": len(results),
-        "results": sorted(results, key=lambda r: r["score"], reverse=True),
+        "results": results,
     }
 
     append_records(str(DATA_DIR / "scans"), [scan_result], key_field="scan_time")

@@ -69,6 +69,29 @@ export async function fetchScanResults() {
 }
 
 /**
+ * Fetch scan history across all dates to track wallet score trends.
+ * @param {object} index - Data index with files.scans dates
+ */
+export async function fetchScanHistory(index) {
+	const dates = index?.files?.scans || [];
+	if (!dates.length) return [];
+	const all = await Promise.all(dates.map(d => fetchDaily('scans', d)));
+	return all.filter(Boolean).flat();
+}
+
+/**
+ * Fetch portfolio data (hourly account value + PnL history from HL API).
+ */
+export async function fetchPortfolio() {
+	const data = await fetchJSON('data/portfolio/latest.json');
+	if (!data || !Array.isArray(data)) return null;
+	// Structure: [["day", { accountValueHistory: [[ts, val], ...], pnlHistory: [[ts, val], ...] }]]
+	const entry = data.find(d => d[0] === 'day');
+	if (!entry) return null;
+	return entry[1];
+}
+
+/**
  * Fetch account snapshots across all dates using index.account_snapshots.
  * Fetches in batches to avoid overwhelming GitHub.
  * @param {object} index - The data index with account_snapshots map
