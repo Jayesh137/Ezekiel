@@ -22,10 +22,12 @@ jobs:
         run: python src/fingerprint.py
       - name: Build trader profile
         run: python src/profile_builder.py
-      - name: Fetch new tweets
-        run: python src/twitter_monitor.py
-      - name: Run correlation analysis
-        run: python src/twitter_correlator.py
+      # Twitter monitoring disabled — all nitter RSS bridges are down.
+      # Re-enable when a working Twitter data source is configured.
+      # - name: Fetch new tweets
+      #   run: python src/twitter_monitor.py
+      # - name: Run correlation analysis
+      #   run: python src/twitter_correlator.py
       - name: Pull latest before committing
         run: |
           git add profile/ reports/ data/
@@ -35,7 +37,7 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "analysis: rebuild fingerprint + daily report [automated]"
-          file_pattern: "profile/** reports/** data/twitter/**"
+          file_pattern: "profile/** reports/** data/**"
         env:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}

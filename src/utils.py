@@ -220,6 +220,17 @@ def update_index() -> None:
             index["files"][data_type] = dates
             index["stats"][f"total_{data_type}_snapshots"] = snapshot_count
 
+            # Include per-date snapshot filenames for account data (used by dashboard charts)
+            if data_type == "account":
+                snapshots_by_date = {}
+                for d in dates:
+                    files = sorted([
+                        f.name for f in (type_dir / d).glob("*.json")
+                    ])
+                    if files:
+                        snapshots_by_date[d] = files
+                index["account_snapshots"] = snapshots_by_date
+
     index_path = DATA_DIR / "index.json"
     with open(index_path, "w") as f:
         json.dump(index, f, indent=2)

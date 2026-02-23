@@ -8,8 +8,6 @@
 		{ href: `${base}/fills`, label: 'Fills', icon: '⬢' },
 		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: '⬣' },
 		{ href: `${base}/scanner`, label: 'Scanner', icon: '◎' },
-		{ href: `${base}/fundflow`, label: 'Fund Flow', icon: '⟁' },
-		{ href: `${base}/twitter`, label: 'Twitter', icon: '◈' },
 	];
 </script>
 

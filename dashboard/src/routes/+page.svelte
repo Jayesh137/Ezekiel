@@ -1,6 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
-	import { fetchLatest, fetchFingerprint, fetchIndex, fetchScanResults, formatUSD, shortAddr } from '$lib/api.js';
+	import {
+		fetchLatest, fetchFingerprint, fetchIndex, fetchScanResults,
+		fetchAccountHistory, fetchAllFunding,
+		formatUSD, shortAddr
+	} from '$lib/api.js';
+	import Chart from 'chart.js/auto';
+	import 'chartjs-adapter-date-fns';
 
 	let positions = null;
 	let spot = null;
@@ -10,6 +16,19 @@
 	let fees = null;
 	let scan = null;
 	let loading = true;
+
+	let accountHistory = [];
+	let fundingData = [];
+	let chartsLoading = true;
+
+	let accountChartEl;
+	let pnlChartEl;
+	let fundingChartEl;
+	let allocChartEl;
+	let accountChart;
+	let pnlChart;
+	let fundingChart;
+	let allocChart;
 
 	onMount(async () => {
 		[positions, spot, hip3Xyz, fingerprint, index, fees, scan] = await Promise.all([
@@ -22,7 +41,275 @@
 			fetchScanResults(),
 		]);
 		loading = false;
+
+		// Load chart data in background
+		if (index) {
+			const [ah, fd] = await Promise.all([
+				fetchAccountHistory(index),
+				fetchAllFunding(index),
+			]);
+			accountHistory = ah;
+			fundingData = fd;
+			chartsLoading = false;
+			await renderCharts();
+		}
 	});
+
+	const CHART_COLORS = {
+		cyan: 'rgba(0, 204, 221, 1)',
+		cyanFill: 'rgba(0, 204, 221, 0.08)',
+		green: 'rgba(0, 255, 136, 1)',
+		greenFill: 'rgba(0, 255, 136, 0.08)',
+		red: 'rgba(255, 51, 85, 1)',
+		redFill: 'rgba(255, 51, 85, 0.08)',
+		purple: 'rgba(170, 102, 255, 1)',
+		purpleFill: 'rgba(170, 102, 255, 0.08)',
+		yellow: 'rgba(255, 170, 0, 1)',
+		blue: 'rgba(68, 136, 255, 1)',
+		grid: 'rgba(42, 42, 74, 0.5)',
+		gridZero: 'rgba(42, 42, 74, 0.8)',
+		tick: 'rgba(136, 136, 160, 0.8)',
+	};
+
+	const baseScales = {
+		x: {
+			type: 'time',
+			time: { unit: 'hour', displayFormats: { hour: 'MMM d HH:mm' } },
+			grid: { color: CHART_COLORS.grid, drawBorder: false },
+			ticks: { color: CHART_COLORS.tick, font: { family: "'JetBrains Mono', monospace", size: 10 }, maxTicksLimit: 8 },
+			border: { display: false },
+		},
+		y: {
+			grid: { color: CHART_COLORS.grid, drawBorder: false },
+			ticks: { color: CHART_COLORS.tick, font: { family: "'JetBrains Mono', monospace", size: 10 } },
+			border: { display: false },
+		},
+	};
+
+	const basePlugins = {
+		legend: { display: false },
+		tooltip: {
+			backgroundColor: 'rgba(18, 18, 26, 0.95)',
+			borderColor: 'rgba(42, 42, 74, 0.8)',
+			borderWidth: 1,
+			titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+			bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+			padding: 10,
+			cornerRadius: 6,
+		},
+	};
+
+	async function renderCharts() {
+		await new Promise(r => setTimeout(r, 0)); // wait for DOM
+
+		// Account Value chart
+		if (accountChartEl && accountHistory.length > 0) {
+			accountChart?.destroy();
+			accountChart = new Chart(accountChartEl, {
+				type: 'line',
+				data: {
+					datasets: [{
+						data: accountHistory.map(s => ({ x: s.time, y: s.accountValue })),
+						borderColor: CHART_COLORS.cyan,
+						backgroundColor: CHART_COLORS.cyanFill,
+						borderWidth: 2,
+						fill: true,
+						tension: 0.3,
+						pointRadius: 0,
+						pointHitRadius: 8,
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					interaction: { intersect: false, mode: 'index' },
+					scales: {
+						...baseScales,
+						y: {
+							...baseScales.y,
+							ticks: {
+								...baseScales.y.ticks,
+								callback: v => `$${(v / 1e6).toFixed(1)}M`,
+							}
+						}
+					},
+					plugins: {
+						...basePlugins,
+						tooltip: {
+							...basePlugins.tooltip,
+							callbacks: { label: ctx => `Account: ${formatUSD(ctx.parsed.y)}` },
+						},
+					},
+				}
+			});
+		}
+
+		// PnL chart
+		if (pnlChartEl && accountHistory.length > 0) {
+			pnlChart?.destroy();
+			pnlChart = new Chart(pnlChartEl, {
+				type: 'line',
+				data: {
+					datasets: [{
+						data: accountHistory.map(s => ({ x: s.time, y: s.totalPnl })),
+						borderColor: ctx => {
+							const v = ctx.raw?.y;
+							return v >= 0 ? CHART_COLORS.green : CHART_COLORS.red;
+						},
+						backgroundColor: CHART_COLORS.greenFill,
+						borderWidth: 2,
+						fill: true,
+						tension: 0.3,
+						pointRadius: 0,
+						pointHitRadius: 8,
+						segment: {
+							borderColor: ctx => ctx.p1.parsed.y < 0 ? CHART_COLORS.red : CHART_COLORS.green,
+						},
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					interaction: { intersect: false, mode: 'index' },
+					scales: {
+						...baseScales,
+						y: {
+							...baseScales.y,
+							ticks: {
+								...baseScales.y.ticks,
+								callback: v => v >= 0 ? `+$${(v / 1e6).toFixed(2)}M` : `-$${(Math.abs(v) / 1e6).toFixed(2)}M`,
+							},
+						}
+					},
+					plugins: {
+						...basePlugins,
+						tooltip: {
+							...basePlugins.tooltip,
+							callbacks: {
+								label: ctx => {
+									const v = ctx.parsed.y;
+									return `PnL: ${v >= 0 ? '+' : ''}${formatUSD(v)}`;
+								}
+							},
+						},
+					},
+				}
+			});
+		}
+
+		// Cumulative Funding chart
+		if (fundingChartEl && fundingData.length > 0) {
+			fundingChart?.destroy();
+			let cumulative = 0;
+			const fundingPoints = [];
+			for (const f of fundingData) {
+				cumulative += parseFloat(f.delta?.usdc || 0);
+				fundingPoints.push({ x: f.time, y: cumulative });
+			}
+			// Downsample if too many points
+			const step = fundingPoints.length > 200 ? Math.ceil(fundingPoints.length / 200) : 1;
+			const sampled = fundingPoints.filter((_, i) => i % step === 0);
+
+			fundingChart = new Chart(fundingChartEl, {
+				type: 'line',
+				data: {
+					datasets: [{
+						data: sampled,
+						borderColor: CHART_COLORS.purple,
+						backgroundColor: CHART_COLORS.purpleFill,
+						borderWidth: 2,
+						fill: true,
+						tension: 0.3,
+						pointRadius: 0,
+						pointHitRadius: 8,
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					interaction: { intersect: false, mode: 'index' },
+					scales: {
+						...baseScales,
+						y: {
+							...baseScales.y,
+							ticks: {
+								...baseScales.y.ticks,
+								callback: v => `$${(v / 1e3).toFixed(1)}K`,
+							},
+						},
+					},
+					plugins: {
+						...basePlugins,
+						tooltip: {
+							...basePlugins.tooltip,
+							callbacks: { label: ctx => `Cumulative: ${formatUSD(ctx.parsed.y)}` },
+						},
+					},
+				}
+			});
+		}
+
+		// Position Allocation doughnut
+		if (allocChartEl) {
+			allocChart?.destroy();
+			const openPos = getPositions(positions, hip3Xyz);
+			if (openPos.length > 0) {
+				const sorted = openPos
+					.map(p => ({
+						coin: p.coin,
+						notional: Math.abs(parseFloat(p.positionValue || 0)),
+					}))
+					.sort((a, b) => b.notional - a.notional);
+
+				const palette = [
+					CHART_COLORS.cyan, CHART_COLORS.green, CHART_COLORS.purple,
+					CHART_COLORS.yellow, CHART_COLORS.blue, CHART_COLORS.red,
+					'rgba(0, 180, 180, 1)', 'rgba(180, 120, 255, 1)',
+					'rgba(255, 200, 0, 1)', 'rgba(100, 200, 100, 1)',
+				];
+
+				allocChart = new Chart(allocChartEl, {
+					type: 'doughnut',
+					data: {
+						labels: sorted.map(p => p.coin),
+						datasets: [{
+							data: sorted.map(p => p.notional),
+							backgroundColor: sorted.map((_, i) => palette[i % palette.length]),
+							borderColor: 'rgba(26, 26, 46, 1)',
+							borderWidth: 2,
+						}]
+					},
+					options: {
+						responsive: true,
+						maintainAspectRatio: false,
+						cutout: '65%',
+						plugins: {
+							legend: {
+								position: 'right',
+								labels: {
+									color: CHART_COLORS.tick,
+									font: { family: "'JetBrains Mono', monospace", size: 10 },
+									padding: 8,
+									usePointStyle: true,
+									pointStyleWidth: 8,
+								},
+							},
+							tooltip: {
+								...basePlugins.tooltip,
+								callbacks: {
+									label: ctx => {
+										const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+										const pct = ((ctx.raw / total) * 100).toFixed(1);
+										return ` ${ctx.label}: ${formatUSD(ctx.raw)} (${pct}%)`;
+									},
+								},
+							},
+						},
+					},
+				});
+			}
+		}
+	}
 
 	function getPositions(...datasets) {
 		const all = [];
@@ -82,7 +369,6 @@
 	{@const openPositions = getPositions(positions, hip3Xyz)}
 	{@const accountValue = getAccountValue(positions) + getAccountValue(hip3Xyz)}
 	{@const totalPnl = getTotalPnl(openPositions)}
-
 	{@const marginUsed = getMarginUsed(positions) + getMarginUsed(hip3Xyz)}
 	{@const totalNotional = getTotalNotional(positions) + getTotalNotional(hip3Xyz)}
 	{@const marginUtil = accountValue > 0 ? (marginUsed / accountValue * 100) : 0}
@@ -126,6 +412,57 @@
 		<div class="card">
 			<div class="stat-value text-muted">{scan?.matches_found ?? '—'}</div>
 			<div class="stat-label">Scanner Matches</div>
+		</div>
+	</div>
+
+	<!-- Charts Section -->
+	<div class="charts-section">
+		<div class="chart-row">
+			<div class="card chart-card">
+				<div class="chart-header">
+					<h2>Account Value</h2>
+					{#if !chartsLoading && accountHistory.length > 0}
+						<span class="chart-badge">{accountHistory.length} snapshots</span>
+					{/if}
+				</div>
+				{#if chartsLoading}
+					<div class="chart-loading">Loading chart data...</div>
+				{:else if accountHistory.length === 0}
+					<div class="chart-loading">No snapshot data available</div>
+				{/if}
+				<div class="chart-container">
+					<canvas bind:this={accountChartEl}></canvas>
+				</div>
+			</div>
+			<div class="card chart-card chart-card-sm">
+				<div class="chart-header">
+					<h2>Position Allocation</h2>
+				</div>
+				<div class="chart-container">
+					<canvas bind:this={allocChartEl}></canvas>
+				</div>
+			</div>
+		</div>
+		<div class="chart-row">
+			<div class="card chart-card">
+				<div class="chart-header">
+					<h2>Unrealized PnL</h2>
+				</div>
+				<div class="chart-container">
+					<canvas bind:this={pnlChartEl}></canvas>
+				</div>
+			</div>
+			<div class="card chart-card">
+				<div class="chart-header">
+					<h2>Cumulative Funding</h2>
+					{#if !chartsLoading && fundingData.length > 0}
+						<span class="chart-badge">{fundingData.length} events</span>
+					{/if}
+				</div>
+				<div class="chart-container">
+					<canvas bind:this={fundingChartEl}></canvas>
+				</div>
+			</div>
 		</div>
 	</div>
 
@@ -316,5 +653,63 @@
 	}
 	.stats-row {
 		margin-bottom: 8px;
+	}
+	.charts-section {
+		margin-top: 24px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.chart-row {
+		display: flex;
+		gap: 16px;
+	}
+	.chart-card {
+		flex: 1;
+		min-width: 0;
+	}
+	.chart-card-sm {
+		flex: 0 0 340px;
+	}
+	.chart-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 16px;
+	}
+	.chart-header h2 {
+		font-size: 1.1rem;
+		font-weight: 600;
+	}
+	.chart-badge {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--text-muted);
+		background: rgba(255,255,255,0.04);
+		padding: 3px 8px;
+		border-radius: 4px;
+	}
+	.chart-container {
+		position: relative;
+		height: 220px;
+	}
+	.chart-loading {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		z-index: 1;
+	}
+
+	@media (max-width: 1024px) {
+		.chart-row {
+			flex-direction: column;
+		}
+		.chart-card-sm {
+			flex: 1;
+		}
 	}
 </style>

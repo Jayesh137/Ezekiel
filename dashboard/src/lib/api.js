@@ -62,17 +62,63 @@ export async function fetchProfile() {
 }
 
 /**
- * Fetch Twitter correlation data.
- */
-export async function fetchCorrelation() {
-	return fetchJSON('data/twitter/correlation/latest.json');
-}
-
-/**
  * Fetch scanner results.
  */
 export async function fetchScanResults() {
 	return fetchJSON('data/scans/latest.json');
+}
+
+/**
+ * Fetch account snapshots across all dates using index.account_snapshots.
+ * Fetches in batches to avoid overwhelming GitHub.
+ * @param {object} index - The data index with account_snapshots map
+ * @returns {Promise<Array<{time, accountValue, totalPnl, marginUsed, totalNotional}>>}
+ */
+export async function fetchAccountHistory(index) {
+	const snapMap = index?.account_snapshots;
+	if (!snapMap) return [];
+
+	const tasks = [];
+	for (const [date, files] of Object.entries(snapMap)) {
+		// Sample: take every Nth snapshot to keep requests reasonable
+		const step = files.length > 20 ? Math.ceil(files.length / 20) : 1;
+		for (let i = 0; i < files.length; i += step) {
+			tasks.push({ date, file: files[i] });
+		}
+	}
+
+	const results = await Promise.all(
+		tasks.map(async ({ date, file }) => {
+			const data = await fetchJSON(`data/account/${date}/${file}`);
+			if (!data) return null;
+			const perp = data.perp || data;
+			const ms = perp.marginSummary || perp.crossMarginSummary || {};
+			const positions = perp.assetPositions || [];
+			const totalPnl = positions.reduce((sum, ap) => {
+				return sum + parseFloat(ap?.position?.unrealizedPnl || 0);
+			}, 0);
+			const [hh, mm] = file.replace('.json', '').split('-');
+			return {
+				time: new Date(`${date}T${hh}:${mm}:00Z`).getTime(),
+				accountValue: parseFloat(ms.accountValue || 0),
+				totalPnl,
+				marginUsed: parseFloat(ms.totalMarginUsed || 0),
+				totalNotional: parseFloat(ms.totalNtlPos || 0),
+			};
+		})
+	);
+	return results.filter(Boolean).sort((a, b) => a.time - b.time);
+}
+
+/**
+ * Fetch all funding data across all available dates.
+ * @param {object} index - The data index object
+ */
+export async function fetchAllFunding(index) {
+	const dates = index?.files?.funding || [];
+	if (!dates.length) return [];
+	const all = await Promise.all(dates.map(d => fetchDaily('funding', d)));
+	return all.flat().filter(Boolean).sort((a, b) => (a.time || 0) - (b.time || 0));
 }
 
 /**
