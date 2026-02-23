@@ -289,7 +289,7 @@ def scan_leaderboard():
         "scan_time": datetime.now(timezone.utc).isoformat(),
         "wallets_scanned": scanned,
         "matches_found": len(results),
-        "results": all_scored,
+        "results": sorted(results, key=lambda r: r["score"], reverse=True),
     }
 
     append_records(str(DATA_DIR / "scans"), [scan_result], key_field="scan_time")
