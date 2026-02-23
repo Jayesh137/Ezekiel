@@ -27,7 +27,7 @@
 
 <div class="page-header">
 	<h1>Twitter Intelligence</h1>
-	<p class="text-muted">Correlating GCR's trades with @GiganticRebirth / @GCRClassic tweets</p>
+	<p class="text-muted">Correlating wallet trades with monitored Twitter accounts</p>
 </div>
 
 {#if loading}
@@ -36,7 +36,7 @@
 	<div class="card" style="text-align:center;padding:48px">
 		<p class="text-muted">No Twitter correlation data yet. Run the analyze workflow.</p>
 		<p class="text-muted" style="margin-top:8px;font-size:0.85rem">
-			The system monitors @GiganticRebirth and @GCRClassic via RSS bridges,
+			The system monitors linked Twitter accounts via RSS bridges,
 			then correlates tweet timestamps against wallet fills.
 		</p>
 	</div>

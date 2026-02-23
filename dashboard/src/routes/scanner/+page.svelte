@@ -25,7 +25,7 @@
 
 <div class="page-header">
 	<h1>Wallet Scanner</h1>
-	<p class="text-muted">Scanning for GCR's other wallets via behavioral fingerprint matching</p>
+	<p class="text-muted">Scanning for linked wallets via behavioral fingerprint matching</p>
 </div>
 
 {#if loading}

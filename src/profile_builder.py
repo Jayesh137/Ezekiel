@@ -156,7 +156,6 @@ def build_profile():
 
     profile = {
         "codename": "Ezekiel",
-        "identity": "GCR (@GiganticRebirth / @GCRClassic)",
         "built_at": datetime.now(timezone.utc).isoformat(),
         "sources": [],
         "aggregated_patterns": {

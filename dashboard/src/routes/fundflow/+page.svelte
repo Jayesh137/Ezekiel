@@ -28,7 +28,7 @@
 
 <div class="page-header">
 	<h1>Fund Flow Tracing</h1>
-	<p class="text-muted">Monitoring GCR's Arbitrum L1 transactions for wallet migrations</p>
+	<p class="text-muted">Monitoring Arbitrum L1 transactions for wallet migrations</p>
 </div>
 
 {#if loading}

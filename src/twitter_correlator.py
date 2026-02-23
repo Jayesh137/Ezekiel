@@ -1,5 +1,5 @@
 # src/twitter_correlator.py
-"""Correlates GCR's tweets against wallet trades to measure timing alignment."""
+"""Correlates monitored tweets against wallet trades to measure timing alignment."""
 
 import json
 import sys
@@ -210,7 +210,7 @@ def correlate():
         time_range = f"{first.strftime('%Y-%m-%d')} to {last.strftime('%Y-%m-%d')}"
 
     result = {
-        "summary": "GCR's trades correlated with @GiganticRebirth / @GCRClassic tweets",
+        "summary": "Trade-tweet timing correlation analysis",
         "confidence": confidence,
         "evidence": {
             "timing_correlation": timing_corr,
