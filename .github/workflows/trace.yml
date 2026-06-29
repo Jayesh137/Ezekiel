@@ -1,9 +1,7 @@
 name: Trace Fund Flows
 on:
-  # Disabled scheduled runs — no L1 transfers found yet, was generating noise.
-  # Re-enable when on-chain fund movement is expected.
-  # schedule:
-  #   - cron: '0 */6 * * *'
+  schedule:
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 concurrency:

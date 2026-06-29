@@ -599,7 +599,7 @@
 								</a>
 							</td>
 							<td>
-								<strong class:text-red={s >= 0.70} class:text-yellow={s >= 0.50 && s < 0.70} class:text-muted={s < 0.50}>
+								<strong class:text-green={s >= 0.90} class:text-yellow={s >= 0.80 && s < 0.90} class:text-muted={s < 0.80}>
 									{(s * 100).toFixed(1)}%
 								</strong>
 							</td>

@@ -69,6 +69,20 @@ export async function fetchScanResults() {
 }
 
 /**
+ * Fetch persisted candidate wallet watchlist.
+ */
+export async function fetchCandidates() {
+	return fetchJSON('data/candidates/latest.json');
+}
+
+/**
+ * Fetch fund-flow tracing findings.
+ */
+export async function fetchFundFlows() {
+	return fetchJSON('data/fund_flows/latest.json');
+}
+
+/**
  * Fetch scan history across all dates to track wallet score trends.
  * @param {object} index - Data index with files.scans dates
  */

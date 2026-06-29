@@ -4,10 +4,11 @@
 	import { base } from '$app/paths';
 
 	const navItems = [
-		{ href: `${base}/`, label: 'Dashboard', icon: '⬡' },
-		{ href: `${base}/fills`, label: 'Fills', icon: '⬢' },
-		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: '⬣' },
-		{ href: `${base}/scanner`, label: 'Scanner', icon: '◎' },
+		{ href: `${base}/`, label: 'Dashboard', icon: 'D' },
+		{ href: `${base}/recovery`, label: 'Recovery', icon: 'R' },
+		{ href: `${base}/fills`, label: 'Fills', icon: 'F' },
+		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'P' },
+		{ href: `${base}/scanner`, label: 'Scanner', icon: 'S' },
 	];
 </script>
 
@@ -105,6 +106,8 @@
 		font-size: 1rem;
 		width: 20px;
 		text-align: center;
+		font-family: var(--font-mono);
+		font-weight: 700;
 	}
 	.sidebar-footer {
 		padding: 16px 20px;

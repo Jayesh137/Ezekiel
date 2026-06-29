@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { fetchScanResults, fetchFingerprint, fetchScanHistory, fetchIndex, formatPct, shortAddr } from '$lib/api.js';
+	import { fetchScanResults, fetchFingerprint, fetchScanHistory, fetchIndex, shortAddr } from '$lib/api.js';
 	import Chart from 'chart.js/auto';
 
 	let scan = null;
@@ -19,6 +19,7 @@
 		leverage_profile: 'Leverage',
 		entry_exit_style: 'Style',
 		hold_duration: 'Duration',
+		account_size: 'Size',
 	};
 	const DIM_KEYS = Object.keys(DIM_LABELS);
 
@@ -37,15 +38,15 @@
 	});
 
 	function getConfidenceClass(score) {
-		if (score >= 0.70) return 'badge-red';
-		if (score >= 0.50) return 'badge-yellow';
+		if (score >= 0.90) return 'badge-green';
+		if (score >= 0.80) return 'badge-yellow';
 		return 'badge-blue';
 	}
 
 	function getConfidenceLabel(score) {
-		if (score >= 0.70) return 'HIGH';
-		if (score >= 0.50) return 'MEDIUM';
-		return 'LOW';
+		if (score >= 0.90) return 'CONFIRMED';
+		if (score >= 0.80) return 'WATCH';
+		return 'LEAD';
 	}
 
 	function getWalletHistory(wallet) {
@@ -108,7 +109,7 @@
 					datasets: [
 						{
 							label: 'Target',
-							data: [100, 100, 100, 100, 100],
+							data: DIM_KEYS.map(() => 100),
 							borderColor: 'rgba(0, 204, 221, 0.9)',
 							backgroundColor: 'rgba(0, 204, 221, 0.1)',
 							borderWidth: 2,
@@ -296,7 +297,7 @@
 								{/if}
 							</div>
 							<div class="result-score">
-								<strong class:text-red={r.score >= 0.70} class:text-yellow={r.score >= 0.50 && r.score < 0.70} class:text-muted={r.score < 0.50}>
+								<strong class:text-green={r.score >= 0.90} class:text-yellow={r.score >= 0.80 && r.score < 0.90} class:text-muted={r.score < 0.80}>
 									{(r.score * 100).toFixed(1)}%
 								</strong>
 								<span class="badge {getConfidenceClass(r.score)}">{getConfidenceLabel(r.score)}</span>
@@ -311,6 +312,9 @@
 							</div>
 							<div class="result-meta">
 								<span class="mono">{r.fills_count} fills</span>
+								{#if r.evidence?.warnings?.length}
+									<span class="trend-badge trend-down">{r.evidence.warnings[0]}</span>
+								{/if}
 								{#if trend.appearances > 1}
 									<span class="trend-badge" class:trend-up={trend.trend === 'up'} class:trend-down={trend.trend === 'down'} class:trend-stable={trend.trend === 'stable'}>
 										{trend.trend === 'up' ? '↑' : trend.trend === 'down' ? '↓' : '→'} {trend.appearances}x
@@ -342,6 +346,28 @@
 								</div>
 
 								<div class="comparison-details">
+									<div class="detail-section">
+										<h4>Evidence</h4>
+										<div class="coin-tags">
+											{#each (r.evidence?.reasons || []).slice(0, 5) as reason}
+												<span class="coin-tag coin-match">{reason}</span>
+											{/each}
+											{#if !(r.evidence?.reasons || []).length}
+												<span class="text-muted">No strong positive evidence</span>
+											{/if}
+										</div>
+									</div>
+									<div class="detail-section">
+										<h4>Warnings</h4>
+										<div class="coin-tags">
+											{#each (r.evidence?.warnings || []) as warning}
+												<span class="coin-tag coin-candidate">{warning}</span>
+											{/each}
+											{#if !(r.evidence?.warnings || []).length}
+												<span class="text-muted">None</span>
+											{/if}
+										</div>
+									</div>
 									<div class="detail-section">
 										<h4>Shared Assets ({coins.overlap.length})</h4>
 										<div class="coin-tags">

@@ -101,11 +101,39 @@ def compare_asset_preferences(fp_a: dict, fp_b: dict) -> float:
     return (jaccard + freq_sim) / 2
 
 
+def get_asset_overlap(fp_a: dict, fp_b: dict) -> dict:
+    """Return overlap details for candidate evidence and penalties."""
+    coins_a = set(fp_a.get("coins_traded", []))
+    coins_b = set(fp_b.get("coins_traded", []))
+    overlap = sorted(coins_a & coins_b)
+    target_only = sorted(coins_a - coins_b)
+    candidate_only = sorted(coins_b - coins_a)
+    rare_overlap = [c for c in overlap if c.startswith("xyz:")]
+    return {
+        "overlap": overlap,
+        "target_only": target_only,
+        "candidate_only": candidate_only,
+        "overlap_count": len(overlap),
+        "rare_overlap": rare_overlap,
+        "jaccard": round(jaccard_similarity(coins_a, coins_b), 4),
+    }
+
+
 def compare_timing_profiles(fp_a: dict, fp_b: dict) -> float:
     """Compare timing profile dimensions using cosine similarity."""
     hourly_a = fp_a.get("hourly_distribution", [0]*24)
     hourly_b = fp_b.get("hourly_distribution", [0]*24)
     return cosine_similarity(hourly_a, hourly_b)
+
+
+def compare_account_size(fp_a: dict, fp_b: dict) -> float:
+    """Compare current account value bracket without overfitting exact balances."""
+    val_a = float(fp_a.get("account_value_usd", 0) or 0)
+    val_b = float(fp_b.get("account_value_usd", 0) or 0)
+    if val_a <= 0 or val_b <= 0:
+        return 0.0
+    ratio = min(val_a, val_b) / max(val_a, val_b)
+    return float(np.sqrt(ratio))
 
 
 def compare_leverage(fp_a: dict, fp_b: dict) -> float:
@@ -129,7 +157,54 @@ def compare_leverage(fp_a: dict, fp_b: dict) -> float:
     return 1.0 - abs(mean_a - mean_b) / max_val
 
 
-def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dict]:
+def classify_match(score: float) -> str:
+    if score >= 0.90:
+        return "CONFIRMED_CANDIDATE"
+    if score >= 0.80:
+        return "WATCH_CLOSELY"
+    if score >= 0.65:
+        return "WEAK_LEAD"
+    return "BACKGROUND"
+
+
+def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score: float) -> dict:
+    """Explain the score so the dashboard can rank leads by evidence."""
+    asset_overlap = get_asset_overlap(
+        ezekiel_fp.get("asset_preferences", {}),
+        candidate_fp.get("asset_preferences", {}),
+    )
+    reasons = []
+    warnings = []
+
+    if asset_overlap["rare_overlap"]:
+        reasons.append(f"Shares rare HIP-3 markets: {', '.join(asset_overlap['rare_overlap'][:5])}")
+    if dimensions.get("asset_preferences", 0) >= 0.65:
+        reasons.append("Strong asset mix overlap")
+    if dimensions.get("timing_profile", 0) >= 0.80:
+        reasons.append("Trades in similar active UTC hours")
+    if dimensions.get("entry_exit_style", 0) >= 0.85:
+        reasons.append("Similar market/limit execution style")
+    if dimensions.get("hold_duration", 0) >= 0.85:
+        reasons.append("Similar holding-duration profile")
+    if dimensions.get("account_size", 0) >= 0.70:
+        reasons.append("Similar account-size bracket")
+
+    if asset_overlap["overlap_count"] < 3:
+        warnings.append("Weak asset overlap")
+    if dimensions.get("timing_profile", 0) < 0.35:
+        warnings.append("Different active trading hours")
+    if dimensions.get("account_size", 0) < 0.25:
+        warnings.append("Very different account-size bracket")
+
+    return {
+        "tier": classify_match(score),
+        "reasons": reasons,
+        "warnings": warnings,
+        "asset_overlap": asset_overlap,
+    }
+
+
+def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dict, dict]:
     """Compute weighted similarity between Ezekiel and a candidate fingerprint."""
     dimensions = {}
 
@@ -175,18 +250,42 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     else:
         dimensions["hold_duration"] = 0.0
 
+    dim_score = compare_account_size(
+        ezekiel_fp.get("account_characteristics", {}),
+        candidate_fp.get("account_characteristics", {}),
+    )
+    dimensions["account_size"] = round(dim_score, 4)
+
     # Weighted average (sum to 1.0)
     weights = {
-        "asset_preferences": 0.25,
-        "timing_profile": 0.25,
-        "leverage_profile": 0.20,
-        "entry_exit_style": 0.15,
-        "hold_duration": 0.15,
+        "asset_preferences": 0.30,
+        "timing_profile": 0.20,
+        "leverage_profile": 0.15,
+        "entry_exit_style": 0.12,
+        "hold_duration": 0.13,
+        "account_size": 0.10,
     }
 
     weighted_sum = sum(dimensions.get(k, 0) * w for k, w in weights.items())
 
-    return round(weighted_sum, 4), dimensions
+    # Apply conservative penalties for mismatches that are especially useful
+    # when trying to identify a migrated human rather than a similar trader.
+    overlap = get_asset_overlap(
+        ezekiel_fp.get("asset_preferences", {}),
+        candidate_fp.get("asset_preferences", {}),
+    )
+    penalty = 0.0
+    if overlap["overlap_count"] < 3:
+        penalty += 0.12
+    if dimensions["timing_profile"] < 0.30:
+        penalty += 0.08
+    if dimensions["account_size"] < 0.20:
+        penalty += 0.05
+
+    score = max(0.0, weighted_sum - penalty)
+    score = round(score, 4)
+    evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score)
+    return score, dimensions, evidence
 
 
 def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
@@ -206,6 +305,10 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
         "leverage_profile": compute_leverage_profile(fills, positions),
         "entry_exit_style": compute_entry_exit_style(fills),
         "hold_duration": compute_hold_duration(fills),
+        "account_characteristics": {
+            "account_value_usd": round(float(positions.get("marginSummary", {}).get("accountValue", 0) or 0), 2)
+            if isinstance(positions, dict) else 0
+        },
     }
 
 
@@ -239,7 +342,49 @@ def _summarize_fingerprint(fp: dict) -> dict:
             "overall_minutes": hd.get("overall_minutes", {}),
             "distribution_buckets": hd.get("distribution_buckets", {}),
         },
+        "account_characteristics": fp.get("account_characteristics", {}),
     }
+
+
+def persist_candidate(result: dict) -> None:
+    """Save a promoted candidate for persistent review across scan runs."""
+    candidate_dir = DATA_DIR / "candidates"
+    candidate_dir.mkdir(parents=True, exist_ok=True)
+    path = candidate_dir / f"{result['wallet'].lower()}.json"
+    history = []
+    existing = {}
+    if path.exists():
+        with open(path) as f:
+            existing = json.load(f)
+        history = existing.get("score_history", [])
+
+    history.append({
+        "scan_time": result["scanned_at"],
+        "score": result["score"],
+        "tier": result.get("evidence", {}).get("tier"),
+        "dimensions": result.get("dimensions", {}),
+    })
+    history = history[-100:]
+
+    candidate = {
+        "wallet": result["wallet"],
+        "first_seen": existing.get("first_seen", result["scanned_at"]),
+        "last_seen": result["scanned_at"],
+        "best_score": max(float(existing.get("best_score", 0)), result["score"]),
+        "latest_score": result["score"],
+        "latest_tier": result.get("evidence", {}).get("tier"),
+        "latest_evidence": result.get("evidence", {}),
+        "score_history": history,
+    }
+    with open(path, "w") as f:
+        json.dump(candidate, f, indent=2)
+
+    latest = []
+    for fp in candidate_dir.glob("0x*.json"):
+        with open(fp) as f:
+            latest.append(json.load(f))
+    latest.sort(key=lambda c: c.get("best_score", 0), reverse=True)
+    save_latest(str(candidate_dir), {"candidates": latest[:50]})
 
 
 def scan_leaderboard():
@@ -288,12 +433,13 @@ def scan_leaderboard():
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
 
-        score, dimensions = compute_similarity(ezekiel_fp, candidate_fp)
+        score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp)
 
         result = {
             "wallet": wallet,
             "score": score,
             "dimensions": dimensions,
+            "evidence": evidence,
             "fills_count": len(fills),
             "scanned_at": datetime.now(timezone.utc).isoformat(),
             "fingerprint": _summarize_fingerprint(candidate_fp),
@@ -306,6 +452,9 @@ def scan_leaderboard():
 
         if score >= thresholds["similarity_low"]:
             results.append(result)
+
+        if score >= scanner_config.get("candidate_threshold", thresholds["similarity_medium"]):
+            persist_candidate(result)
 
         if score >= thresholds["similarity_high"]:
             print(f"[scanner] HIGH MATCH: {wallet} (score={score:.4f})")
@@ -331,6 +480,8 @@ def scan_leaderboard():
         "scan_time": datetime.now(timezone.utc).isoformat(),
         "wallets_scanned": scanned,
         "matches_found": len(results),
+        "thresholds": thresholds,
+        "top_scores": top_scores,
         "results": results,
     }
 

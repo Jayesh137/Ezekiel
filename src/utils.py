@@ -188,11 +188,13 @@ def update_index() -> None:
 
     # Data types that use daily JSON files (date.json)
     daily_types = ["fills", "orders", "funding", "ledger", "fees",
-                   "rate_limit", "scans", "l1_transactions"]
+                   "rate_limit", "scans", "l1_transactions", "fund_flows"]
 
     # Data types that use dated subdirectories (date/HH-MM.json snapshots)
     snapshot_types = ["positions", "account", "spot", "portfolio",
                       "positions_hip3_xyz"]
+
+    singleton_types = ["candidates"]
 
     for data_type in daily_types:
         type_dir = DATA_DIR / data_type
@@ -230,6 +232,16 @@ def update_index() -> None:
                     if files:
                         snapshots_by_date[d] = files
                 index["account_snapshots"] = snapshots_by_date
+
+    for data_type in singleton_types:
+        type_dir = DATA_DIR / data_type
+        if type_dir.exists():
+            files = sorted([
+                f.name for f in type_dir.glob("*.json")
+                if f.name != "latest.json"
+            ])
+            index["files"][data_type] = files
+            index["stats"][f"total_{data_type}"] = len(files)
 
     index_path = DATA_DIR / "index.json"
     with open(index_path, "w") as f:
