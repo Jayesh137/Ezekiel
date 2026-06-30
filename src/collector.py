@@ -151,6 +151,63 @@ def collect_portfolio(wallet: str) -> None:
     save_latest(str(DATA_DIR / "portfolio"), portfolio)
 
 
+def check_silence() -> None:
+    """Alert if the target has not traded in 3+ days. Cooldown: once per 24h."""
+    last_fill_ts = read_cursor("last_fill_time")
+    if not last_fill_ts:
+        return
+
+    days_silent = (now_ms() - last_fill_ts) / (24 * 60 * 60 * 1000)
+    if days_silent < 3:
+        return
+
+    last_alert = read_cursor("last_silence_alert")
+    if last_alert and (now_ms() - last_alert) < 24 * 60 * 60 * 1000:
+        return
+
+    from src.alerts import alert_target_silence
+    if alert_target_silence(round(days_silent, 1)):
+        write_cursor("last_silence_alert", now_ms())
+
+
+def check_account_value_drop() -> None:
+    """Alert if account value dropped >40% since last collection. Cooldown: once per 1h."""
+    import json as _json
+
+    latest_path = DATA_DIR / "account" / "latest.json"
+    if not latest_path.exists():
+        return
+
+    try:
+        with open(latest_path) as f:
+            latest = _json.load(f)
+        perp = latest.get("perp", latest) or {}
+        ms_data = perp.get("marginSummary", {}) or {}
+        current_value = float(ms_data.get("accountValue", 0))
+    except Exception:
+        return
+
+    if current_value <= 0:
+        return
+
+    current_cents = int(current_value * 100)
+    prev_cents = read_cursor("prev_account_value_cents")
+
+    if prev_cents and prev_cents > 1_000_000:  # Only check if previous reading was > $10k
+        prev_value = prev_cents / 100.0
+        drop_pct = (prev_value - current_value) / prev_value
+        if drop_pct > 0.40:
+            last_alert = read_cursor("last_drop_alert")
+            if not last_alert or (now_ms() - last_alert) > 60 * 60 * 1000:
+                from src.alerts import alert_account_value_drop
+                if alert_account_value_drop(current_value, prev_value, drop_pct):
+                    write_cursor("last_drop_alert", now_ms())
+
+    # Track high-water mark: only update upward so transient dips still trigger the alert
+    if not prev_cents or current_cents > prev_cents:
+        write_cursor("prev_account_value_cents", current_cents)
+
+
 def main():
     config = load_config()
     wallet = config["target_wallet"]
@@ -195,6 +252,10 @@ def main():
 
     print("[collector] Updating index...")
     update_index()
+
+    print("[collector] Checking for anomalies...")
+    check_silence()
+    check_account_value_drop()
 
     print("[collector] Collection complete.")
 

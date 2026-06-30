@@ -59,6 +59,18 @@
 	</main>
 </div>
 
+<nav class="mobile-nav">
+	{#each navItems as item}
+		<a
+			href={item.href}
+			class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
+		>
+			<span class="mobile-nav-icon">{item.icon}</span>
+			<span class="mobile-nav-label">{item.label}</span>
+		</a>
+	{/each}
+</nav>
+
 <style>
 	.app-shell {
 		display: flex;
@@ -153,6 +165,46 @@
 
 	@media (max-width: 768px) {
 		.sidebar { display: none; }
-		.main-content { margin-left: 0; padding: 16px; }
+		.main-content { margin-left: 0; padding: 16px; padding-bottom: 80px; }
+	}
+
+	.mobile-nav {
+		display: none;
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		z-index: 20;
+		background: var(--bg-secondary);
+		border-top: 1px solid var(--border);
+		padding: 6px 0 env(safe-area-inset-bottom, 6px);
+		justify-content: space-around;
+		align-items: center;
+	}
+	@media (max-width: 768px) {
+		.mobile-nav { display: flex; }
+	}
+	.mobile-nav a {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+		color: var(--text-secondary);
+		padding: 4px 10px;
+		border-radius: 6px;
+		text-decoration: none;
+		min-width: 44px;
+	}
+	.mobile-nav a:hover { text-decoration: none; }
+	.mobile-nav a.active { color: var(--accent-cyan); }
+	.mobile-nav-icon {
+		font-size: 1rem;
+		font-family: var(--font-mono);
+		font-weight: 700;
+	}
+	.mobile-nav-label {
+		font-size: 0.6rem;
+		font-family: var(--font-mono);
+		letter-spacing: 0.02em;
 	}
 </style>

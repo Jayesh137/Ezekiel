@@ -2,7 +2,9 @@
 """Computes behavioral fingerprint from all collected trading data."""
 
 import json
+import shutil
 import sys
+import time as _time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -464,22 +466,74 @@ def build_fingerprint() -> dict:
     return fingerprint
 
 
+def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict:
+    """Build a fingerprint from only the most recent fills.
+    Used by the scanner for fair apples-to-apples comparison with candidate mini-fingerprints
+    (which are also built from a short lookback window)."""
+    cutoff_ms = (_time.time() - lookback_days * 86400) * 1000
+    recent = [f for f in fills if f.get("time", 0) >= cutoff_ms]
+    if len(recent) < 20:
+        return {}
+
+    positions = load_positions_latest()
+    if isinstance(positions, dict) and "assetPositions" not in positions:
+        if "perp" in positions:
+            positions = positions["perp"]
+
+    return {
+        "version": "1.0-recent",
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "lookback_days": lookback_days,
+        "data_range": {"total_fills": len(recent)},
+        "asset_preferences": compute_asset_preferences(recent),
+        "leverage_profile": compute_leverage_profile(recent, positions),
+        "position_sizing": compute_position_sizing(recent, positions),
+        "timing_profile": compute_timing_profile(recent),
+        "hold_duration": compute_hold_duration(recent),
+        "entry_exit_style": compute_entry_exit_style(recent),
+        "trade_sequencing": compute_trade_sequencing(recent),
+        "account_characteristics": compute_account_characteristics(positions, recent),
+    }
+
+
 def main():
     config = load_config()
     print(f"[fingerprint] Building fingerprint for {config['target_wallet']}")
 
     fingerprint = build_fingerprint()
+    fills = load_fills()  # Reuse for recent fingerprint (already loaded inside build_fingerprint)
 
-    # Save fingerprint
-    profile_dir = str(DATA_DIR.parent / "profile")
-    save_latest(profile_dir, fingerprint)
+    profile_dir = Path(DATA_DIR.parent / "profile")
+    profile_dir.mkdir(exist_ok=True)
+    fp_path = profile_dir / "fingerprint.json"
 
-    # Also save as fingerprint.json specifically
-    fp_path = Path(profile_dir) / "fingerprint.json"
+    # Archive the existing fingerprint before overwriting
+    if fp_path.exists():
+        history_dir = profile_dir / "history"
+        history_dir.mkdir(exist_ok=True)
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        archive_path = history_dir / f"fingerprint_{today}.json"
+        if not archive_path.exists():
+            shutil.copy(fp_path, archive_path)
+        archives = sorted(history_dir.glob("fingerprint_*.json"))
+        for old in archives[:-30]:
+            old.unlink()
+
+    save_latest(str(profile_dir), fingerprint)
     with open(fp_path, "w") as f:
         json.dump(fingerprint, f, indent=2)
+    print(f"[fingerprint] Full fingerprint saved ({len(fills)} fills)")
 
-    print(f"[fingerprint] Fingerprint saved to {fp_path}")
+    # Build and save recent fingerprint for fair scanner comparisons (last 21 days only)
+    recent_fp = build_fingerprint_recent(fills, lookback_days=21)
+    if recent_fp:
+        recent_path = profile_dir / "fingerprint_recent.json"
+        with open(recent_path, "w") as f:
+            json.dump(recent_fp, f, indent=2)
+        print(f"[fingerprint] Recent fingerprint saved ({recent_fp['data_range']['total_fills']} fills, last 21 days)")
+    else:
+        print("[fingerprint] Not enough recent fills for recent fingerprint (need >=20)")
+
     print(f"[fingerprint] Dimensions computed: {len([k for k in fingerprint if k not in ['version', 'computed_at', 'data_range']])}")
 
 

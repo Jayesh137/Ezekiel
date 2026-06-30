@@ -1,5 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
+	import Chart from 'chart.js/auto';
 	import {
 		fetchLatest,
 		fetchIndex,
@@ -20,6 +21,9 @@
 	let fundFlows = null;
 	let loading = true;
 
+	let timelineChartEl;
+	let timelineChart;
+
 	onMount(async () => {
 		[positions, hip3Xyz, index, scan, candidates, fundFlows] = await Promise.all([
 			fetchLatest('positions'),
@@ -30,7 +34,110 @@
 			fetchFundFlows(),
 		]);
 		loading = false;
+		await new Promise(r => setTimeout(r, 0));
+		const tlData = buildTimeline(index, candidates);
+		if (tlData.candidateScores.some(s => s !== null)) {
+			renderTimeline(tlData);
+		}
 	});
+
+	function buildTimeline(idx, cands) {
+		const fillDates = new Set(idx?.files?.fills || []);
+		const topCandidate = (cands?.candidates || [])[0];
+		const scoreHistory = topCandidate?.score_history || [];
+
+		const end = new Date();
+		const dates = [];
+		for (let i = 59; i >= 0; i--) {
+			const d = new Date(end);
+			d.setDate(d.getDate() - i);
+			dates.push(d.toISOString().split('T')[0]);
+		}
+
+		const fillActivity = dates.map(d => fillDates.has(d) ? 1 : 0);
+
+		const scoreByDate = {};
+		for (const h of scoreHistory) {
+			const date = h.scan_time?.split('T')[0];
+			if (date) scoreByDate[date] = Math.max(scoreByDate[date] ?? 0, h.score);
+		}
+		const candidateScores = dates.map(d => scoreByDate[d] ?? null);
+
+		return { dates, fillActivity, candidateScores, wallet: topCandidate?.wallet };
+	}
+
+	function renderTimeline(data) {
+		if (!timelineChartEl || !data) return;
+		timelineChart?.destroy();
+		timelineChart = new Chart(timelineChartEl, {
+			data: {
+				labels: data.dates.map(d => d.slice(5)),
+				datasets: [
+					{
+						type: 'bar',
+						label: 'Target Active',
+						data: data.fillActivity,
+						backgroundColor: 'rgba(0, 204, 221, 0.2)',
+						borderColor: 'rgba(0, 204, 221, 0.45)',
+						borderWidth: 1,
+						yAxisID: 'y2',
+						order: 2,
+					},
+					{
+						type: 'line',
+						label: `Top Candidate Score${data.wallet ? ' (' + data.wallet.slice(0, 8) + '...)' : ''}`,
+						data: data.candidateScores,
+						borderColor: 'rgba(255, 170, 0, 0.9)',
+						backgroundColor: 'rgba(255, 170, 0, 0.07)',
+						borderWidth: 2,
+						fill: true,
+						pointRadius: 2,
+						tension: 0.3,
+						spanGaps: true,
+						yAxisID: 'y',
+						order: 1,
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				interaction: { mode: 'index', intersect: false },
+				scales: {
+					x: {
+						ticks: { color: 'rgba(136,136,160,0.6)', font: { size: 8, family: "'JetBrains Mono', monospace" }, maxTicksLimit: 15 },
+						grid: { display: false },
+						border: { display: false },
+					},
+					y: {
+						min: 0, max: 1, position: 'left',
+						ticks: { color: 'rgba(255,170,0,0.7)', font: { size: 9, family: "'JetBrains Mono', monospace" }, callback: v => (v * 100).toFixed(0) + '%' },
+						grid: { color: 'rgba(42,42,74,0.3)' },
+						border: { display: false },
+					},
+					y2: { min: 0, max: 1, position: 'right', display: false },
+				},
+				plugins: {
+					legend: {
+						labels: { color: 'rgba(136,136,160,0.8)', font: { size: 10, family: "'JetBrains Mono', monospace" }, usePointStyle: true, pointStyleWidth: 8 }
+					},
+					tooltip: {
+						backgroundColor: 'rgba(18,18,26,0.95)',
+						borderColor: 'rgba(42,42,74,0.8)',
+						borderWidth: 1,
+						titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+						bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+						callbacks: {
+							label: ctx => {
+								if (ctx.datasetIndex === 0) return ` Target: ${ctx.raw === 1 ? 'Active' : 'Silent'}`;
+								return ` Candidate: ${ctx.raw != null ? (ctx.raw * 100).toFixed(1) + '%' : '—'}`;
+							}
+						}
+					}
+				}
+			}
+		});
+	}
 
 	function getPositions(...datasets) {
 		const all = [];
@@ -186,6 +293,9 @@
 							<tr>
 								<td>
 									<a href="https://app.hyperliquid.xyz/explorer/address/{c.wallet}" target="_blank">{shortAddr(c.wallet)}</a>
+									{#if c.status === 'COOLING'}
+										<span class="badge badge-yellow" style="font-size:0.6rem">cooling</span>
+									{/if}
 								</td>
 								<td class="mono">{scorePct(c.best_score)}</td>
 								<td class="mono">{scorePct(c.latest_score)}</td>
@@ -232,6 +342,24 @@
 			{/if}
 		</section>
 	</div>
+
+	{#if watchlist.length > 0}
+		<section class="card" style="margin-bottom:16px">
+			<div class="panel-title">
+				<div>
+					<div class="section-kicker">Migration Correlation</div>
+					<h2>Target Activity vs Candidate Score</h2>
+				</div>
+				<span class="text-muted" style="font-size:0.72rem">last 60 days</span>
+			</div>
+			<p class="text-muted" style="font-size:0.78rem;margin-bottom:12px">
+				Cyan bars = target active days. Orange line = top candidate similarity. Correlation between target silence and rising score indicates migration.
+			</p>
+			<div style="height:180px;position:relative">
+				<canvas bind:this={timelineChartEl}></canvas>
+			</div>
+		</section>
+	{/if}
 
 	<section class="card">
 		<div class="panel-title">

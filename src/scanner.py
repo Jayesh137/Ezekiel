@@ -13,10 +13,13 @@ import numpy as np
 import requests
 
 from src.utils import (
-    load_config, hl_post, append_records, save_latest, DATA_DIR, etherscan_get
+    load_config, hl_post, append_records, save_latest, DATA_DIR, etherscan_get, read_cursor
 )
-from src.fingerprint import build_fingerprint, compute_asset_preferences, compute_timing_profile
-from src.alerts import alert_behavioral_match, alert_combined_match
+from src.fingerprint import (
+    build_fingerprint, compute_asset_preferences, compute_timing_profile,
+    compute_trade_sequencing, compute_position_sizing,
+)
+from src.alerts import alert_behavioral_match, alert_combined_match, alert_vault_match, alert_migration_correlation
 
 
 def fetch_leaderboard() -> list[dict]:
@@ -127,13 +130,53 @@ def compare_timing_profiles(fp_a: dict, fp_b: dict) -> float:
 
 
 def compare_account_size(fp_a: dict, fp_b: dict) -> float:
-    """Compare current account value bracket without overfitting exact balances."""
+    """Compare account value bracket and weekly volume bracket."""
     val_a = float(fp_a.get("account_value_usd", 0) or 0)
     val_b = float(fp_b.get("account_value_usd", 0) or 0)
-    if val_a <= 0 or val_b <= 0:
-        return 0.0
-    ratio = min(val_a, val_b) / max(val_a, val_b)
-    return float(np.sqrt(ratio))
+    vol_a = float(fp_a.get("weekly_volume_usd", 0) or 0)
+    vol_b = float(fp_b.get("weekly_volume_usd", 0) or 0)
+
+    scores = []
+    if val_a > 0 and val_b > 0:
+        scores.append(float(np.sqrt(min(val_a, val_b) / max(val_a, val_b))))
+    if vol_a > 0 and vol_b > 0:
+        scores.append(float(np.sqrt(min(vol_a, vol_b) / max(vol_a, vol_b))))
+
+    return float(np.mean(scores)) if scores else 0.0
+
+
+def compare_trade_sequencing(fp_a: dict, fp_b: dict) -> float:
+    """Compare trade sequencing: inter-fill timing rhythm and buy/sell ratio."""
+    seq_a = fp_a.get("trade_sequencing", {})
+    seq_b = fp_b.get("trade_sequencing", {})
+    if not seq_a or not seq_b:
+        return 0.5  # Neutral when unavailable — never penalise
+
+    scores = []
+    ift_a = seq_a.get("inter_fill_timing", {}).get("mean_minutes", 0)
+    ift_b = seq_b.get("inter_fill_timing", {}).get("mean_minutes", 0)
+    if ift_a > 0 and ift_b > 0:
+        scores.append(float(np.sqrt(min(ift_a, ift_b) / max(ift_a, ift_b))))
+
+    bsr_a = seq_a.get("buy_sell_ratio", {})
+    bsr_b = seq_b.get("buy_sell_ratio", {})
+    if bsr_a and bsr_b:
+        vec_a = [bsr_a.get("buy_pct", 0), bsr_a.get("sell_pct", 0)]
+        vec_b = [bsr_b.get("buy_pct", 0), bsr_b.get("sell_pct", 0)]
+        scores.append(cosine_similarity(vec_a, vec_b))
+
+    return float(np.mean(scores)) if scores else 0.5
+
+
+def compare_position_sizing(fp_a: dict, fp_b: dict) -> float:
+    """Compare position sizing relative to account (size-to-account ratio)."""
+    ps_a = fp_a.get("position_sizing", {})
+    ps_b = fp_b.get("position_sizing", {})
+    ratio_a = float(ps_a.get("size_to_account_ratio", {}).get("mean", 0) or 0)
+    ratio_b = float(ps_b.get("size_to_account_ratio", {}).get("mean", 0) or 0)
+    if ratio_a <= 0 or ratio_b <= 0:
+        return 0.5  # Neutral when unavailable
+    return float(np.sqrt(min(ratio_a, ratio_b) / max(ratio_a, ratio_b)))
 
 
 def compare_leverage(fp_a: dict, fp_b: dict) -> float:
@@ -256,15 +299,23 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     )
     dimensions["account_size"] = round(dim_score, 4)
 
+    dim_score = compare_trade_sequencing(ezekiel_fp, candidate_fp)
+    dimensions["trade_sequencing"] = round(dim_score, 4)
+
+    dim_score = compare_position_sizing(ezekiel_fp, candidate_fp)
+    dimensions["position_sizing"] = round(dim_score, 4)
+
     # Dynamic weights: discount account_size for fresh/small candidate wallets.
     # A migrated trader starts with a new account — size comparison is misleading early on.
     weights = {
-        "asset_preferences": 0.30,
-        "timing_profile": 0.20,
-        "leverage_profile": 0.15,
-        "entry_exit_style": 0.12,
-        "hold_duration": 0.13,
-        "account_size": 0.10,
+        "asset_preferences": 0.25,
+        "timing_profile": 0.18,
+        "leverage_profile": 0.13,
+        "entry_exit_style": 0.10,
+        "hold_duration": 0.11,
+        "account_size": 0.08,
+        "trade_sequencing": 0.08,
+        "position_sizing": 0.07,
     }
 
     candidate_acct_val = float(
@@ -307,8 +358,20 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     return score, dimensions, evidence
 
 
+def _estimate_weekly_volume(fills: list[dict]) -> float:
+    """Estimate weekly trading volume from a list of fills."""
+    if not fills:
+        return 0.0
+    total = sum(float(f.get("sz", 0)) * float(f.get("px", 0)) for f in fills)
+    timestamps = [f.get("time", 0) for f in fills]
+    time_range_ms = max(timestamps) - min(timestamps) if len(timestamps) > 1 else 0
+    weeks = time_range_ms / (7 * 24 * 60 * 60 * 1000) if time_range_ms > 0 else 1
+    return round(total / max(weeks, 1), 2)
+
+
 def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
-    """Build a mini-fingerprint for a candidate wallet from their data."""
+    """Build a mini-fingerprint for a candidate wallet from their data.
+    Now includes all 8 comparable dimensions (trade_sequencing, position_sizing added)."""
     from src.fingerprint import (
         compute_leverage_profile, compute_hold_duration, compute_entry_exit_style
     )
@@ -318,15 +381,20 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
         if "perp" in positions:
             positions = positions["perp"]
 
+    acct_val = round(float(positions.get("marginSummary", {}).get("accountValue", 0) or 0), 2) \
+        if isinstance(positions, dict) else 0
+
     return {
         "asset_preferences": compute_asset_preferences(fills),
         "timing_profile": compute_timing_profile(fills),
         "leverage_profile": compute_leverage_profile(fills, positions),
         "entry_exit_style": compute_entry_exit_style(fills),
         "hold_duration": compute_hold_duration(fills),
+        "trade_sequencing": compute_trade_sequencing(fills),
+        "position_sizing": compute_position_sizing(fills, positions),
         "account_characteristics": {
-            "account_value_usd": round(float(positions.get("marginSummary", {}).get("accountValue", 0) or 0), 2)
-            if isinstance(positions, dict) else 0
+            "account_value_usd": acct_val,
+            "weekly_volume_usd": _estimate_weekly_volume(fills),
         },
     }
 
@@ -361,6 +429,13 @@ def _summarize_fingerprint(fp: dict) -> dict:
             "overall_minutes": hd.get("overall_minutes", {}),
             "distribution_buckets": hd.get("distribution_buckets", {}),
         },
+        "trade_sequencing": {
+            "inter_fill_timing": fp.get("trade_sequencing", {}).get("inter_fill_timing", {}),
+            "buy_sell_ratio": fp.get("trade_sequencing", {}).get("buy_sell_ratio", {}),
+        },
+        "position_sizing": {
+            "size_to_account_ratio": fp.get("position_sizing", {}).get("size_to_account_ratio", {}),
+        },
         "account_characteristics": fp.get("account_characteristics", {}),
     }
 
@@ -385,15 +460,28 @@ def persist_candidate(result: dict) -> None:
     })
     history = history[-100:]
 
+    # Score decay: mark candidates whose recent scores have drifted low
+    recent_window = history[-7:]
+    recent_avg = sum(h["score"] for h in recent_window) / len(recent_window) if len(recent_window) >= 7 else None
+    best_score = max(float(existing.get("best_score", 0)), result["score"])
+    if recent_avg is not None and recent_avg < 0.55 and best_score < 0.85:
+        status = "COOLING"
+    elif recent_avg is not None and recent_avg >= 0.65:
+        status = "ACTIVE"
+    else:
+        status = existing.get("status", "ACTIVE")
+
     candidate = {
         "wallet": result["wallet"],
         "first_seen": existing.get("first_seen", result["scanned_at"]),
         "last_seen": result["scanned_at"],
-        "best_score": max(float(existing.get("best_score", 0)), result["score"]),
+        "best_score": best_score,
         "latest_score": result["score"],
         "latest_tier": result.get("evidence", {}).get("tier"),
         "latest_evidence": result.get("evidence", {}),
         "score_history": history,
+        "status": status,
+        "recent_avg_score": round(recent_avg, 4) if recent_avg is not None else None,
     }
     with open(path, "w") as f:
         json.dump(candidate, f, indent=2)
@@ -482,6 +570,76 @@ def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30) -> li
     return list(depositors.keys())
 
 
+def _load_target_vault_addresses() -> set:
+    """Load vault addresses the target wallet has deposited to."""
+    vaults_path = DATA_DIR / "vaults" / "latest.json"
+    if not vaults_path.exists():
+        return set()
+    try:
+        with open(vaults_path) as f:
+            data = json.load(f)
+        vaults = data if isinstance(data, list) else []
+        return {v.get("vaultAddress", "").lower() for v in vaults if v.get("vaultAddress")}
+    except Exception:
+        return set()
+
+
+def _load_target_referral_addresses() -> set:
+    """Load wallet addresses in the target's referral network."""
+    ref_path = DATA_DIR / "referral" / "latest.json"
+    if not ref_path.exists():
+        return set()
+    try:
+        with open(ref_path) as f:
+            data = json.load(f)
+        addrs = set()
+        if isinstance(data, dict):
+            if data.get("referrerAddress"):
+                addrs.add(data["referrerAddress"].lower())
+            for r in data.get("referredUsers", []):
+                addr = r.get("address", "") or r.get("wallet", "")
+                if addr:
+                    addrs.add(addr.lower())
+        return addrs
+    except Exception:
+        return set()
+
+
+def _check_vault_overlap(wallet: str, target_vaults: set) -> list:
+    """Return shared vault addresses between candidate and target. Empty list = no overlap."""
+    if not target_vaults:
+        return []
+    try:
+        raw = hl_post({"type": "userVaultEquities", "user": wallet})
+        if not isinstance(raw, list):
+            return []
+        candidate_vaults = {v.get("vaultAddress", "").lower() for v in raw if v.get("vaultAddress")}
+        return list(target_vaults & candidate_vaults)
+    except Exception:
+        return []
+
+
+def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
+    """Return True if candidate has a referral link to/from the target's network."""
+    if not target_referral_addrs:
+        return False
+    if wallet.lower() in target_referral_addrs:
+        return True
+    try:
+        ref = hl_post({"type": "referral", "user": wallet})
+        if isinstance(ref, dict):
+            referrer = (ref.get("referrerAddress") or "").lower()
+            if referrer and referrer in target_referral_addrs:
+                return True
+            for r in ref.get("referredUsers", []):
+                addr = (r.get("address", "") or r.get("wallet", "")).lower()
+                if addr in target_referral_addrs:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
 def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
     """Scan high-priority candidates before the leaderboard sweep:
     fund-flow destinations, subaccounts, and recent large bridge depositors.
@@ -534,6 +692,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
         return []
 
     print(f"[scanner] Scanning {len(priority)} priority targets...")
+    target_vaults = _load_target_vault_addresses()
+    target_referral_addrs = _load_target_referral_addresses()
     results = []
 
     for wallet, meta in priority.items():
@@ -544,6 +704,25 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
 
         score = result["score"]
         print(f"[scanner] Priority {wallet[:10]}... ({source}): {score:.4f}")
+
+        # Vault crosslink and referral checks for promising candidates
+        if score >= 0.70:
+            shared_vaults = _check_vault_overlap(wallet, target_vaults)
+            if shared_vaults:
+                result["evidence"]["reasons"].append(
+                    f"Deposits to same HL vault(s): {', '.join(v[:10]+'...' for v in shared_vaults[:2])}"
+                )
+                score = min(1.0, score + 0.08)
+                result["score"] = round(score, 4)
+                print(f"[scanner] Vault overlap for {wallet[:10]}...: {shared_vaults}")
+                alert_vault_match(wallet, shared_vaults)
+
+            if _check_referral_link(wallet, target_referral_addrs):
+                result["evidence"]["reasons"].append("Referral network connection to target wallet")
+                score = min(1.0, score + 0.06)
+                result["score"] = round(score, 4)
+                print(f"[scanner] Referral link for {wallet[:10]}...")
+
         results.append(result)
 
         if score >= candidate_threshold:
@@ -571,12 +750,17 @@ def scan_leaderboard():
     thresholds = config["alert_thresholds"]
     scanner_config = config["scanner"]
 
-    # Load or build Ezekiel fingerprint
+    # Load fingerprint — prefer recent (21-day window) for fair candidate comparison
     fp_path = Path(DATA_DIR.parent / "profile" / "fingerprint.json")
-    if fp_path.exists():
+    recent_fp_path = Path(DATA_DIR.parent / "profile" / "fingerprint_recent.json")
+    if recent_fp_path.exists():
+        with open(recent_fp_path) as f:
+            ezekiel_fp = json.load(f)
+        print("[scanner] Loaded recent fingerprint (21-day window)")
+    elif fp_path.exists():
         with open(fp_path) as f:
             ezekiel_fp = json.load(f)
-        print("[scanner] Loaded existing fingerprint")
+        print("[scanner] Loaded full fingerprint (recent not yet available)")
     else:
         print("[scanner] No fingerprint found, building...")
         ezekiel_fp = build_fingerprint()
@@ -666,6 +850,19 @@ def scan_leaderboard():
 
     append_records(str(DATA_DIR / "scans"), [scan_result], key_field="scan_time")
     save_latest(str(DATA_DIR / "scans"), scan_result)
+
+    # Migration correlation: if target is silent AND a strong new candidate appeared, fire alert
+    try:
+        last_fill_ts = read_cursor("last_fill_time")
+        if last_fill_ts:
+            days_silent = (time.time() * 1000 - last_fill_ts) / (24 * 60 * 60 * 1000)
+            if days_silent >= 5 and results:
+                top = results[0]
+                if top["score"] >= 0.75:
+                    print(f"[scanner] MIGRATION CORRELATION: {days_silent:.1f}d silence + {top['score']:.4f} candidate")
+                    alert_migration_correlation(top["wallet"], top["score"], round(days_silent, 1))
+    except Exception as e:
+        print(f"[scanner] Migration correlation check failed: {e}")
 
     print(f"[scanner] Scan complete: {scanned} leaderboard + {len(priority_wallets)} priority = {scan_result['wallets_scanned']} total, {len(results)} matches")
     return scan_result

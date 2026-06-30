@@ -86,3 +86,52 @@ def alert_combined_match(candidate: str, score: float, flow_amount: str, flow_me
         f"Recommended action: begin monitoring this wallet immediately.\n"
     )
     return send_alert(subject, body)
+
+
+def alert_target_silence(days_silent: float) -> bool:
+    subject = f"[EZEKIEL] WARNING: Target Wallet Silent for {days_silent:.1f} Days"
+    body = (
+        f"The target wallet has made NO fills for {days_silent:.1f} days.\n\n"
+        f"This may indicate migration to a new wallet.\n"
+        f"Action: check Recovery page for behavioral candidates and fund flow activity.\n"
+    )
+    return send_alert(subject, body)
+
+
+def alert_migration_correlation(candidate: str, score: float, days_silent: float) -> bool:
+    subject = "[EZEKIEL] CRITICAL: Migration Correlation — Target Silent + New Candidate"
+    body = (
+        f"HIGH CONFIDENCE MIGRATION SIGNAL\n\n"
+        f"Target wallet has been silent for {days_silent:.1f} days\n"
+        f"AND a new behavioral candidate appeared in the same window:\n\n"
+        f"Candidate: {candidate}\n"
+        f"Behavioral Match: {score:.2f} / 1.00\n\n"
+        f"These two signals together are the strongest possible migration indicator.\n"
+        f"Recommended action: begin monitoring candidate wallet immediately.\n"
+    )
+    return send_alert(subject, body)
+
+
+def alert_vault_match(candidate: str, shared_vaults: list) -> bool:
+    subject = "[EZEKIEL] HIGH: Vault Overlap — Candidate Uses Same HL Vault as Target"
+    vault_lines = "\n".join(f"  - {v}" for v in shared_vaults[:5])
+    body = (
+        f"Candidate wallet deposits to the same Hyperliquid vault(s) as the target.\n"
+        f"This is a strong behavioral link — vault addresses are not widely shared.\n\n"
+        f"Candidate: {candidate}\n"
+        f"Shared Vaults:\n{vault_lines}\n"
+    )
+    return send_alert(subject, body)
+
+
+def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:
+    subject = f"[EZEKIEL] WARNING: Account Value Drop {drop_pct:.0%} — Possible Liquidation"
+    body = (
+        f"The target wallet's account value has dropped significantly.\n\n"
+        f"Previous: ${previous:,.2f}\n"
+        f"Current:  ${current:,.2f}\n"
+        f"Change:   -{drop_pct:.1%}\n\n"
+        f"This may indicate a large loss, liquidation, or withdrawal.\n"
+        f"A trader who has been wiped may migrate to a fresh wallet — monitor Recovery page.\n"
+    )
+    return send_alert(subject, body)
