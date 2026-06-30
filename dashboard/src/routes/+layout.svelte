@@ -1,15 +1,31 @@
 <script>
 	import '../app.css';
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
+	import { fetchIndex, getDataFreshnessMinutes } from '$lib/api.js';
 
 	const navItems = [
-		{ href: `${base}/`, label: 'Dashboard', icon: 'D' },
 		{ href: `${base}/recovery`, label: 'Recovery', icon: 'R' },
+		{ href: `${base}/`, label: 'Dashboard', icon: 'D' },
 		{ href: `${base}/fills`, label: 'Fills', icon: 'F' },
 		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'P' },
 		{ href: `${base}/scanner`, label: 'Scanner', icon: 'S' },
 	];
+
+	let freshnessMinutes = null;
+	$: freshnessStatus = freshnessMinutes === null ? 'ok'
+		: freshnessMinutes > 30 ? 'stale'
+		: freshnessMinutes > 10 ? 'warn'
+		: 'ok';
+	$: freshnessLabel = freshnessMinutes === null ? null
+		: freshnessMinutes < 60 ? `${freshnessMinutes}m ago`
+		: `${Math.floor(freshnessMinutes / 60)}h ago`;
+
+	onMount(async () => {
+		const index = await fetchIndex();
+		freshnessMinutes = getDataFreshnessMinutes(index);
+	});
 </script>
 
 <div class="app-shell">
@@ -33,6 +49,9 @@
 		</ul>
 		<div class="sidebar-footer">
 			<span class="text-muted" style="font-size:0.7rem">Trader Intelligence</span>
+			{#if freshnessLabel}
+				<span class="freshness-pill freshness-{freshnessStatus}">Data: {freshnessLabel}</span>
+			{/if}
 		</div>
 	</nav>
 	<main class="main-content">
@@ -114,6 +133,17 @@
 		border-top: 1px solid var(--border);
 		margin-top: auto;
 	}
+	.freshness-pill {
+		display: inline-block;
+		margin-top: 6px;
+		font-size: 0.65rem;
+		font-family: var(--font-mono);
+		padding: 2px 7px;
+		border-radius: 4px;
+	}
+	.freshness-ok { background: rgba(0,255,136,0.12); color: var(--accent-green); }
+	.freshness-warn { background: rgba(255,170,0,0.12); color: var(--accent-yellow); }
+	.freshness-stale { background: rgba(255,51,85,0.12); color: var(--accent-red); }
 	.main-content {
 		flex: 1;
 		margin-left: 220px;

@@ -204,4 +204,40 @@ export function formatTime(ms) {
 	});
 }
 
+/**
+ * Compute how many minutes ago data/index.json was last updated.
+ * @param {object|null} index
+ * @returns {number|null}
+ */
+export function getDataFreshnessMinutes(index) {
+	if (!index?.last_updated) return null;
+	return Math.max(0, Math.round((Date.now() - new Date(index.last_updated).getTime()) / 60000));
+}
+
+/**
+ * Derive the global alert state from fund flows and candidates.
+ * Returns null when everything is normal, or an object { level, msg, wallet? }.
+ * @param {object|null} fundFlows
+ * @param {object|null} candidates
+ */
+export function getAlertState(fundFlows, candidates) {
+	const findings = fundFlows?.findings || [];
+	const cands = candidates?.candidates || [];
+
+	if (findings.some(f => f.deposited_to_hl)) {
+		return { level: 'critical', msg: 'Fund trace found a wallet that deposited to Hyperliquid.' };
+	}
+	if (findings.length > 0) {
+		return { level: 'warn', msg: 'Outbound USDC transfers detected from target wallet.' };
+	}
+	const top = cands[0];
+	if (top?.best_score >= 0.90) {
+		return { level: 'high', msg: `Confirmed behavioral match at ${(top.best_score * 100).toFixed(1)}%`, wallet: top.wallet };
+	}
+	if (top?.best_score >= 0.80) {
+		return { level: 'medium', msg: `Strong behavioral lead at ${(top.best_score * 100).toFixed(1)}%`, wallet: top.wallet };
+	}
+	return null;
+}
+
 export { RAW_BASE };

@@ -10,6 +10,20 @@
 	let dowEl;
 	let dowChart;
 
+	function getFingerprintHealth(fp) {
+		if (!fp?.computed_at) return null;
+		const ageMs = Date.now() - new Date(fp.computed_at).getTime();
+		const ageDays = ageMs / (1000 * 60 * 60 * 24);
+		const xyzCoins = (fp.asset_preferences?.coins_traded || []).filter(c => c.startsWith('xyz:'));
+		return {
+			ageDays: ageDays.toFixed(1),
+			stale: ageDays > 2,
+			xyzPresent: xyzCoins.length > 0,
+			xyzCoins,
+			computedAt: fp.computed_at?.split('T')[0],
+		};
+	}
+
 	onMount(async () => {
 		fp = await fetchFingerprint();
 		loading = false;
@@ -176,6 +190,13 @@
 		<p class="text-muted">No fingerprint computed yet. Run the analyze workflow.</p>
 	</div>
 {:else}
+	{@const health = getFingerprintHealth(fp)}
+	{#if health?.stale}
+		<div class="fp-health-warning">
+			[STALE] Fingerprint last computed {health.ageDays} days ago ({health.computedAt}). The analyze workflow may have failed — scanner is comparing against outdated patterns.
+		</div>
+	{/if}
+
 	<div class="grid-3" style="margin-bottom:24px">
 		<div class="card">
 			<div class="stat-value text-blue">{fp.data_range?.total_fills?.toLocaleString() ?? '—'}</div>
@@ -190,6 +211,32 @@
 			<div class="stat-label">Unique Coins Traded</div>
 		</div>
 	</div>
+
+	{#if health}
+		<div class="card fp-health-card" style="margin-bottom:24px">
+			<h2 style="font-size:1rem;margin-bottom:12px">Fingerprint Health</h2>
+			<div class="health-row">
+				<div class="health-item">
+					<span class="health-label">Last Computed</span>
+					<span class="mono" class:text-red={health.stale} class:text-green={!health.stale}>
+						{health.computedAt} ({health.ageDays}d ago)
+					</span>
+				</div>
+				<div class="health-item">
+					<span class="health-label">xyz: HIP-3 Markets</span>
+					{#if health.xyzPresent}
+						<span class="text-green mono">Present ({health.xyzCoins.length} markets) — scanner has rare identifiers</span>
+					{:else}
+						<span class="text-red mono">ABSENT — scanner lacks unique HIP-3 market identifiers</span>
+					{/if}
+				</div>
+				<div class="health-item">
+					<span class="health-label">xyz: Coins</span>
+					<span class="mono">{health.xyzCoins.length > 0 ? health.xyzCoins.join(', ') : '—'}</span>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Radar + Key stats -->
 	<div class="chart-row" style="margin-bottom:24px">
@@ -292,6 +339,34 @@
 	.page-header { margin-bottom: 24px; }
 	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
 	.loading { text-align: center; padding: 60px; color: var(--text-muted); }
+
+	.fp-health-warning {
+		background: rgba(255,170,0,0.10);
+		border: 1px solid rgba(255,170,0,0.3);
+		color: var(--accent-yellow);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		padding: 10px 14px;
+		border-radius: 8px;
+		margin-bottom: 20px;
+	}
+	.fp-health-card { }
+	.health-row {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.health-item {
+		display: flex;
+		gap: 12px;
+		align-items: baseline;
+		font-size: 0.82rem;
+	}
+	.health-label {
+		color: var(--text-secondary);
+		min-width: 160px;
+		font-size: 0.78rem;
+	}
 
 	.chart-row {
 		display: flex;

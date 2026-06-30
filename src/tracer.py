@@ -11,7 +11,7 @@ from src.utils import (
     load_config, etherscan_get, read_cursor, write_cursor,
     append_records, save_latest, DATA_DIR
 )
-from src.alerts import alert_fund_movement, alert_new_wallet_found
+from src.alerts import alert_fund_movement, alert_new_wallet_found, alert_combined_match
 
 
 def utc_now() -> str:
@@ -223,6 +223,35 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                         ))
                         pending_recorded = True
             if not pending_recorded:
+                # Hop 3: follow significant transfers from hop-2 destinations
+                for nt in next_transfers[:3]:
+                    next_dest = nt["to"]
+                    if next_dest.lower() == destination.lower():
+                        continue
+                    next2_value = int(nt.get("value", 0)) / 1e6
+                    if next2_value < 10_000:
+                        continue
+                    hop3_transfers = get_usdc_transfers(next_dest)
+                    for nt2 in hop3_transfers[:3]:
+                        final_dest = nt2["to"]
+                        if final_dest.lower() == next_dest.lower():
+                            continue
+                        final_value = int(nt2.get("value", 0)) / 1e6
+                        if final_value < 10_000:
+                            continue
+                        final_deposits = find_hl_deposits(final_dest)
+                        if final_deposits:
+                            print(f"[tracer] !!! NEW WALLET FOUND (3-hop): {final_dest} !!!")
+                            alert_new_wallet_found(wallet, final_dest, "fund_trace_3hop", 0.8)
+                            findings.append(build_finding(
+                                wallet, final_dest, final_value,
+                                nt2.get("hash", tx_hash),
+                                "fund_trace_3hop", 3,
+                                True, final_deposits[0].get("hash"),
+                            ))
+                            pending_recorded = True
+
+            if not pending_recorded:
                 findings.append(build_finding(
                     wallet,
                     destination,
@@ -234,7 +263,41 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                 ))
 
     save_fund_flow_findings(findings)
+    _crossref_findings_with_candidates(findings)
     return findings
+
+
+def _crossref_findings_with_candidates(findings: list[dict]) -> None:
+    """If a fund-flow destination is also a behavioral candidate, fire the combined alert."""
+    import json as _json
+
+    hl_findings = [f for f in findings if f.get("deposited_to_hl")]
+    if not hl_findings:
+        return
+
+    candidates_path = DATA_DIR / "candidates" / "latest.json"
+    if not candidates_path.exists():
+        return
+
+    try:
+        with open(candidates_path) as f:
+            data = _json.load(f)
+        candidates = {c["wallet"].lower(): c for c in data.get("candidates", [])}
+    except Exception:
+        return
+
+    for finding in hl_findings:
+        dest = finding.get("destination", "").lower()
+        if dest in candidates:
+            c = candidates[dest]
+            score = float(c.get("best_score", 0))
+            if score >= 0.65:
+                print(f"[tracer] COMBINED SIGNAL: {dest} is both a fund-flow destination and behavioral candidate (score={score:.2f})")
+                alert_combined_match(
+                    dest, score,
+                    finding.get("amount_usdc", "unknown"),
+                    finding.get("method", "fund_trace"),
+                )
 
 
 def main():

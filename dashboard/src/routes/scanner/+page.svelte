@@ -1,11 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
-	import { fetchScanResults, fetchFingerprint, fetchScanHistory, fetchIndex, shortAddr } from '$lib/api.js';
+	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr } from '$lib/api.js';
 	import Chart from 'chart.js/auto';
 
 	let scan = null;
 	let targetFp = null;
-	let scanHistory = [];
+	let candidates = null;
+	let fundFlows = null;
 	let loading = true;
 	let expandedWallet = null;
 	let radarChartEl;
@@ -24,16 +25,12 @@
 	const DIM_KEYS = Object.keys(DIM_LABELS);
 
 	onMount(async () => {
-		const [scanData, fp, index] = await Promise.all([
+		[scan, targetFp, candidates, fundFlows] = await Promise.all([
 			fetchScanResults(),
 			fetchFingerprint(),
-			fetchIndex(),
+			fetchCandidates(),
+			fetchFundFlows(),
 		]);
-		scan = scanData;
-		targetFp = fp;
-		if (index) {
-			scanHistory = await fetchScanHistory(index);
-		}
 		loading = false;
 	});
 
@@ -49,23 +46,13 @@
 		return 'LEAD';
 	}
 
-	function getWalletHistory(wallet) {
-		const history = [];
-		for (const scanRun of scanHistory) {
-			if (!scanRun?.results) continue;
-			const match = scanRun.results.find(r => r.wallet === wallet);
-			if (match) {
-				history.push({
-					date: scanRun.scan_time?.split('T')[0] || '?',
-					score: match.score,
-				});
-			}
-		}
-		return history;
+	function getCandidateData(wallet) {
+		return (candidates?.candidates || []).find(c => c.wallet?.toLowerCase() === wallet?.toLowerCase());
 	}
 
 	function getScoreTrend(wallet) {
-		const h = getWalletHistory(wallet);
+		const c = getCandidateData(wallet);
+		const h = c?.score_history || [];
 		if (h.length < 2) return { trend: 'new', appearances: h.length };
 		const first = h[0].score;
 		const last = h[h.length - 1].score;
@@ -75,6 +62,32 @@
 			appearances: h.length,
 			delta: diff,
 		};
+	}
+
+	function hasFundFlowLink(wallet) {
+		return (fundFlows?.findings || []).some(
+			f => f.destination?.toLowerCase() === wallet?.toLowerCase()
+		);
+	}
+
+	function getFundFlowFinding(wallet) {
+		return (fundFlows?.findings || []).find(
+			f => f.destination?.toLowerCase() === wallet?.toLowerCase()
+		);
+	}
+
+	function sparklinePoints(scoreHistory, w = 80, h = 20) {
+		if (!scoreHistory || scoreHistory.length < 2) return null;
+		const scores = scoreHistory.map(s => s.score);
+		const min = Math.max(0, Math.min(...scores) - 0.05);
+		const max = Math.min(1, Math.max(...scores) + 0.05);
+		const range = max - min || 0.1;
+		const pad = 2;
+		return scores.map((s, i) => {
+			const x = pad + (i / (scores.length - 1)) * (w - pad * 2);
+			const y = (h - pad) - ((s - min) / range) * (h - pad * 2);
+			return `${x.toFixed(1)},${y.toFixed(1)}`;
+		}).join(' ');
 	}
 
 	async function toggleExpand(wallet) {
@@ -265,7 +278,7 @@
 	<div class="grid-3" style="margin-bottom:24px">
 		<div class="card">
 			<div class="stat-value text-blue">{scan.wallets_scanned ?? 0}</div>
-			<div class="stat-label">Wallets Scanned</div>
+			<div class="stat-label">Wallets Scanned{#if scan.priority_scanned} <span class="text-muted" style="font-size:0.7rem">({scan.priority_scanned} priority)</span>{/if}</div>
 		</div>
 		<div class="card">
 			<div class="stat-value text-yellow">{scan.matches_found ?? 0}</div>
@@ -285,10 +298,19 @@
 					{@const trend = getScoreTrend(r.wallet)}
 					{@const isExpanded = expandedWallet === r.wallet}
 					{@const hasFp = !!r.fingerprint}
+					{@const candidateData = getCandidateData(r.wallet)}
+					{@const flowLink = hasFundFlowLink(r.wallet)}
+					{@const flowFinding = flowLink ? getFundFlowFinding(r.wallet) : null}
+					{@const sparkPts = sparklinePoints(candidateData?.score_history)}
 
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<div class="result-row" class:expanded={isExpanded} on:click={() => hasFp && toggleExpand(r.wallet)}>
+					<div class="result-row" class:expanded={isExpanded} class:has-flow={flowLink} on:click={() => hasFp && toggleExpand(r.wallet)}>
+						{#if flowLink}
+							<div class="flow-link-bar" class:flow-confirmed={flowFinding?.deposited_to_hl}>
+								{flowFinding?.deposited_to_hl ? 'FUND TRACE — HL DEPOSIT CONFIRMED' : 'FUND TRACE — PENDING HL DEPOSIT'}
+							</div>
+						{/if}
 						<div class="result-main">
 							<div class="result-wallet">
 								<a href="https://app.hyperliquid.xyz/explorer/address/{r.wallet}" target="_blank" on:click|stopPropagation>{shortAddr(r.wallet)}</a>
@@ -312,15 +334,26 @@
 							</div>
 							<div class="result-meta">
 								<span class="mono">{r.fills_count} fills</span>
-								{#if r.evidence?.warnings?.length}
-									<span class="trend-badge trend-down">{r.evidence.warnings[0]}</span>
-								{/if}
-								{#if trend.appearances > 1}
+								{#if sparkPts}
+									<svg width="80" height="20" class="sparkline" title="{trend.appearances || 1} scan appearances">
+										<polyline
+											points={sparkPts}
+											fill="none"
+											stroke={r.score >= 0.80 ? 'var(--accent-green)' : 'var(--accent-cyan)'}
+											stroke-width="1.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									</svg>
+								{:else if trend.appearances > 1}
 									<span class="trend-badge" class:trend-up={trend.trend === 'up'} class:trend-down={trend.trend === 'down'} class:trend-stable={trend.trend === 'stable'}>
 										{trend.trend === 'up' ? '↑' : trend.trend === 'down' ? '↓' : '→'} {trend.appearances}x
 									</span>
 								{:else}
 									<span class="trend-badge trend-new">new</span>
+								{/if}
+								{#if r.evidence?.warnings?.length}
+									<span class="trend-badge trend-down">{r.evidence.warnings[0]}</span>
 								{/if}
 							</div>
 						</div>
@@ -448,12 +481,35 @@
 		border-radius: 8px;
 		cursor: pointer;
 		transition: background 0.15s;
+		overflow: hidden;
 	}
 	.result-row:hover {
 		background: var(--bg-card-hover);
 	}
 	.result-row.expanded {
 		background: var(--bg-card-hover);
+	}
+	.result-row.has-flow {
+		border: 1px solid rgba(255,51,85,0.35);
+	}
+	.flow-link-bar {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		padding: 4px 14px;
+		background: rgba(255,170,0,0.12);
+		color: var(--accent-yellow);
+		border-bottom: 1px solid rgba(255,170,0,0.2);
+	}
+	.flow-link-bar.flow-confirmed {
+		background: rgba(255,51,85,0.12);
+		color: var(--accent-red);
+		border-color: rgba(255,51,85,0.2);
+	}
+	.sparkline {
+		display: block;
+		overflow: visible;
 	}
 
 	.result-main {

@@ -72,3 +72,17 @@ def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bo
         f"Matching Dimensions:\n{dim_lines}\n"
     )
     return send_alert(subject, body)
+
+
+def alert_combined_match(candidate: str, score: float, flow_amount: str, flow_method: str) -> bool:
+    """Fire when the same wallet appears in both fund-flow tracing AND behavioral matching."""
+    subject = "[EZEKIEL] CRITICAL: Fund Trace + Behavioral Match on Same Wallet"
+    body = (
+        f"HIGHEST CONFIDENCE SIGNAL — BOTH VECTORS POINT TO SAME WALLET\n\n"
+        f"Candidate Wallet: {candidate}\n"
+        f"Behavioral Similarity: {score:.2f} / 1.00\n"
+        f"Fund Flow: {flow_amount} USDC via {flow_method}\n\n"
+        f"This wallet received funds from the target AND matches the behavioral fingerprint.\n"
+        f"Recommended action: begin monitoring this wallet immediately.\n"
+    )
+    return send_alert(subject, body)

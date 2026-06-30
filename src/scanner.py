@@ -13,10 +13,10 @@ import numpy as np
 import requests
 
 from src.utils import (
-    load_config, hl_post, append_records, save_latest, DATA_DIR
+    load_config, hl_post, append_records, save_latest, DATA_DIR, etherscan_get
 )
 from src.fingerprint import build_fingerprint, compute_asset_preferences, compute_timing_profile
-from src.alerts import alert_behavioral_match
+from src.alerts import alert_behavioral_match, alert_combined_match
 
 
 def fetch_leaderboard() -> list[dict]:
@@ -256,7 +256,8 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     )
     dimensions["account_size"] = round(dim_score, 4)
 
-    # Weighted average (sum to 1.0)
+    # Dynamic weights: discount account_size for fresh/small candidate wallets.
+    # A migrated trader starts with a new account — size comparison is misleading early on.
     weights = {
         "asset_preferences": 0.30,
         "timing_profile": 0.20,
@@ -265,6 +266,18 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
         "hold_duration": 0.13,
         "account_size": 0.10,
     }
+
+    candidate_acct_val = float(
+        candidate_fp.get("account_characteristics", {}).get("account_value_usd", 0) or 0
+    )
+    target_acct_val = float(
+        ezekiel_fp.get("account_characteristics", {}).get("account_value_usd", 0) or 0
+    )
+    if candidate_acct_val < 100_000 and target_acct_val > 500_000:
+        redistributed = weights["account_size"]
+        weights["account_size"] = 0.0
+        weights["asset_preferences"] += redistributed * 0.6
+        weights["timing_profile"] += redistributed * 0.4
 
     weighted_sum = sum(dimensions.get(k, 0) * w for k, w in weights.items())
 
@@ -279,10 +292,16 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
         penalty += 0.12
     if dimensions["timing_profile"] < 0.30:
         penalty += 0.08
-    if dimensions["account_size"] < 0.20:
+    if dimensions["account_size"] < 0.20 and weights["account_size"] > 0:
         penalty += 0.05
 
     score = max(0.0, weighted_sum - penalty)
+
+    # xyz: HIP-3 market bonus — trading these exotic markets is extremely rare.
+    # Any overlap here is near-conclusive behavioral evidence of the same trader.
+    if overlap.get("rare_overlap"):
+        score = min(1.0, score + 0.12)
+
     score = round(score, 4)
     evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score)
     return score, dimensions, evidence
@@ -387,6 +406,164 @@ def persist_candidate(result: dict) -> None:
     save_latest(str(candidate_dir), {"candidates": latest[:50]})
 
 
+def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
+                          source: str = "targeted") -> dict | None:
+    """Score a single wallet against the fingerprint, bypassing the leaderboard.
+    Used for fund-flow destinations, bridge depositors, and subaccounts."""
+    lookback_days = config["scanner"].get("fills_lookback_days", 21)
+    min_fills = config["scanner"].get("min_fills_for_comparison", 20)
+
+    fills = get_candidate_fills(wallet, lookback_days)
+    if len(fills) < min_fills:
+        fills = get_candidate_fills(wallet, lookback_days * 2)
+
+    # Accept thin histories for targeted scans — a fresh wallet won't have many fills yet
+    floor = max(5, min_fills // 4)
+    if len(fills) < floor:
+        print(f"[scanner] {source}: {wallet[:10]}... only {len(fills)} fills, skipping")
+        return None
+
+    state = get_candidate_state(wallet)
+    candidate_fp = build_candidate_fingerprint(fills, state)
+    score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp)
+
+    return {
+        "wallet": wallet,
+        "score": score,
+        "dimensions": dimensions,
+        "evidence": evidence,
+        "fills_count": len(fills),
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "fingerprint": _summarize_fingerprint(candidate_fp),
+        "source": source,
+    }
+
+
+def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30) -> list[str]:
+    """Return wallet addresses that recently made large deposits to the HL bridge on Arbitrum."""
+    import os
+    api_key = os.environ.get("ETHERSCAN_API_KEY", "")
+    if not api_key:
+        print("[scanner] Etherscan API key missing, skipping bridge depositor scan")
+        return []
+
+    config = load_config()
+    result = etherscan_get({
+        "module": "account",
+        "action": "tokentx",
+        "address": config["hl_bridge_contract"],
+        "contractaddress": config["usdc_contract_arbitrum"],
+        "page": 1,
+        "offset": 1000,
+        "sort": "desc",
+    })
+
+    transfers = result.get("result", []) if result.get("status") == "1" else []
+    if not isinstance(transfers, list):
+        return []
+
+    cutoff_ts = int(time.time()) - (days * 86400)
+    target = config["target_wallet"].lower()
+    bridge = config["hl_bridge_contract"].lower()
+
+    depositors: dict[str, float] = {}
+    for t in transfers:
+        if int(t.get("timeStamp", 0)) < cutoff_ts:
+            continue
+        to_addr = t.get("to", "").lower()
+        from_addr = t.get("from", "").lower()
+        if to_addr != bridge or from_addr in (target, bridge):
+            continue
+        amount = int(t.get("value", 0)) / 1e6
+        if amount >= min_usdc:
+            depositors[from_addr] = max(depositors.get(from_addr, 0), amount)
+
+    print(f"[scanner] Bridge depositor scan: {len(depositors)} wallets >= ${min_usdc:,.0f} in last {days}d")
+    return list(depositors.keys())
+
+
+def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
+    """Scan high-priority candidates before the leaderboard sweep:
+    fund-flow destinations, subaccounts, and recent large bridge depositors.
+    Returns scored results and fires combined alerts when both vectors agree."""
+    thresholds = config["alert_thresholds"]
+    candidate_threshold = config["scanner"].get("candidate_threshold", 0.65)
+
+    # Collect priority wallets with their source metadata
+    priority: dict[str, dict] = {}
+
+    # 1. Fund flow destinations (highest priority)
+    fund_flows_path = DATA_DIR / "fund_flows" / "latest.json"
+    if fund_flows_path.exists():
+        try:
+            with open(fund_flows_path) as f:
+                flows = json.load(f)
+            for finding in flows.get("findings", []):
+                dest = finding.get("destination", "").lower()
+                if dest:
+                    priority[dest] = {
+                        "source": "fund_flow",
+                        "deposited_to_hl": finding.get("deposited_to_hl", False),
+                        "amount": finding.get("amount_usdc", "unknown"),
+                        "method": finding.get("method", "fund_trace"),
+                    }
+        except Exception as e:
+            print(f"[scanner] Could not load fund flows: {e}")
+
+    # 2. Subaccounts of the target wallet
+    subaccounts_path = DATA_DIR / "subaccounts" / "latest.json"
+    if subaccounts_path.exists():
+        try:
+            with open(subaccounts_path) as f:
+                subs = json.load(f)
+            sub_list = subs if isinstance(subs, list) else subs.get("subaccounts", [])
+            for sub in sub_list:
+                addr = (sub.get("user", "") or sub.get("address", "")).lower()
+                if addr and addr not in priority:
+                    priority[addr] = {"source": "subaccount"}
+        except Exception as e:
+            print(f"[scanner] Could not load subaccounts: {e}")
+
+    # 3. Recent large bridge depositors
+    for addr in get_recent_bridge_depositors():
+        if addr not in priority:
+            priority[addr] = {"source": "bridge_depositor"}
+
+    if not priority:
+        print("[scanner] No priority targets to scan")
+        return []
+
+    print(f"[scanner] Scanning {len(priority)} priority targets...")
+    results = []
+
+    for wallet, meta in priority.items():
+        source = meta.get("source", "targeted")
+        result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source)
+        if result is None:
+            continue
+
+        score = result["score"]
+        print(f"[scanner] Priority {wallet[:10]}... ({source}): {score:.4f}")
+        results.append(result)
+
+        if score >= candidate_threshold:
+            persist_candidate(result)
+
+        if score >= thresholds["similarity_high"]:
+            alert_behavioral_match(wallet, score, result["dimensions"])
+
+        # Combined alert: fund flow hit + behavioral match on the same wallet
+        if meta.get("deposited_to_hl") and score >= thresholds["similarity_medium"]:
+            alert_combined_match(wallet, score, meta["amount"], meta["method"])
+        elif source == "bridge_depositor" and score >= thresholds["similarity_high"]:
+            alert_combined_match(wallet, score, "large bridge deposit", "bridge_depositor")
+
+        time.sleep(0.5)
+
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results
+
+
 def scan_leaderboard():
     """Main scanning loop: check leaderboard wallets against fingerprint."""
     config = load_config()
@@ -404,35 +581,41 @@ def scan_leaderboard():
         print("[scanner] No fingerprint found, building...")
         ezekiel_fp = build_fingerprint()
 
-    # Fetch leaderboard
+    # Phase 1: priority targets — fund-flow destinations, subaccounts, bridge depositors
+    # These bypass the leaderboard and get scanned regardless of ranking.
+    priority_results = scan_priority_targets(ezekiel_fp, config)
+    priority_wallets = {r["wallet"].lower() for r in priority_results}
+
+    # Phase 2: leaderboard sweep
     leaderboard = fetch_leaderboard()
     print(f"[scanner] Leaderboard: {len(leaderboard)} entries")
 
     max_wallets = scanner_config["max_leaderboard_wallets"]
     min_fills = scanner_config["min_fills_for_comparison"]
     lookback_days = scanner_config["fills_lookback_days"]
+    candidate_threshold = scanner_config.get("candidate_threshold", 0.65)
 
-    results = []
-    top_scores = []  # Track all scores for diagnostics
+    results = list(priority_results)  # Start with priority results
+    top_scores = [{"wallet": r["wallet"][:10], "score": r["score"]} for r in priority_results]
     scanned = 0
 
     for entry in leaderboard[:max_wallets]:
         wallet = entry.get("ethAddress", entry.get("address", ""))
         if not wallet or wallet.lower() == target:
             continue
+        if wallet.lower() in priority_wallets:
+            continue  # Already scanned in priority phase
 
         scanned += 1
         if scanned % 50 == 0:
             print(f"[scanner] Scanned {scanned}/{min(len(leaderboard), max_wallets)}...")
 
-        # Get candidate data
         fills = get_candidate_fills(wallet, lookback_days)
         if len(fills) < min_fills:
             continue
 
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
-
         score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp)
 
         result = {
@@ -445,7 +628,6 @@ def scan_leaderboard():
             "fingerprint": _summarize_fingerprint(candidate_fp),
         }
 
-        # Track top 10 scores regardless of threshold
         top_scores.append({"wallet": wallet[:10], "score": score})
         top_scores.sort(key=lambda x: x["score"], reverse=True)
         top_scores = top_scores[:10]
@@ -453,7 +635,7 @@ def scan_leaderboard():
         if score >= thresholds["similarity_low"]:
             results.append(result)
 
-        if score >= scanner_config.get("candidate_threshold", thresholds["similarity_medium"]):
+        if score >= candidate_threshold:
             persist_candidate(result)
 
         if score >= thresholds["similarity_high"]:
@@ -462,23 +644,20 @@ def scan_leaderboard():
         elif score >= thresholds["similarity_medium"]:
             print(f"[scanner] MEDIUM MATCH: {wallet} (score={score:.4f})")
 
-        time.sleep(0.5)  # Rate limiting (avoid 429s)
+        time.sleep(0.5)
 
-    # Log top scores for diagnostics
-    print(f"[scanner] Top 5 scores (any threshold): {top_scores[:5]}")
+    print(f"[scanner] Top 5 scores: {top_scores[:5]}")
 
-    # Sort by score descending
     results.sort(key=lambda r: r["score"], reverse=True)
 
-    # Only keep full fingerprint data for top 20 (saves file size)
     for i, r in enumerate(results):
         if i >= 20:
             r.pop("fingerprint", None)
 
-    # Save results
     scan_result = {
         "scan_time": datetime.now(timezone.utc).isoformat(),
-        "wallets_scanned": scanned,
+        "wallets_scanned": scanned + len(priority_wallets),
+        "priority_scanned": len(priority_wallets),
         "matches_found": len(results),
         "thresholds": thresholds,
         "top_scores": top_scores,
@@ -488,7 +667,7 @@ def scan_leaderboard():
     append_records(str(DATA_DIR / "scans"), [scan_result], key_field="scan_time")
     save_latest(str(DATA_DIR / "scans"), scan_result)
 
-    print(f"[scanner] Scan complete: {scanned} wallets scanned, {len(results)} matches found")
+    print(f"[scanner] Scan complete: {scanned} leaderboard + {len(priority_wallets)} priority = {scan_result['wallets_scanned']} total, {len(results)} matches")
     return scan_result
 
 

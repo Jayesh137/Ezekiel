@@ -139,6 +139,7 @@
 			{#if flowFindings.length > 0}
 				<div class="flow-list">
 					{#each flowFindings.slice(0, 4) as f}
+						{@const linkedCandidate = watchlist.find(c => c.wallet?.toLowerCase() === f.destination?.toLowerCase())}
 						<div class="flow-item">
 							<div>
 								<a href="https://app.hyperliquid.xyz/explorer/address/{f.destination}" target="_blank">
@@ -147,8 +148,11 @@
 								<span class="badge" class:badge-green={f.deposited_to_hl} class:badge-yellow={!f.deposited_to_hl}>
 									{f.deposited_to_hl ? 'HL deposit' : 'pending'}
 								</span>
+								{#if linkedCandidate}
+									<span class="badge badge-red">Behavioral match {scorePct(linkedCandidate.best_score)}</span>
+								{/if}
 							</div>
-							<div class="text-muted mono">{f.amount_usdc || formatUSD(f.amount_usdc_raw || 0)} USDC | {f.method}</div>
+							<div class="text-muted mono">{f.amount_usdc || formatUSD(f.amount_usdc_raw || 0)} USDC | {f.method}{#if f.hop_count > 1} ({f.hop_count}-hop){/if}</div>
 						</div>
 					{/each}
 				</div>

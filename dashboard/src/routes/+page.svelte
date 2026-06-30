@@ -2,9 +2,10 @@
 	import { onMount } from 'svelte';
 	import {
 		fetchLatest, fetchFingerprint, fetchIndex, fetchScanResults,
-		fetchPortfolio, fetchAllFunding,
-		formatUSD, shortAddr
+		fetchPortfolio, fetchAllFunding, fetchFundFlows, fetchCandidates,
+		formatUSD, shortAddr, getAlertState
 	} from '$lib/api.js';
+	import { base } from '$app/paths';
 	import Chart from 'chart.js/auto';
 	import 'chartjs-adapter-date-fns';
 
@@ -15,6 +16,8 @@
 	let index = null;
 	let fees = null;
 	let scan = null;
+	let fundFlows = null;
+	let candidates = null;
 	let loading = true;
 
 	let portfolio = null;
@@ -31,7 +34,7 @@
 	let allocChart;
 
 	onMount(async () => {
-		[positions, spot, hip3Xyz, fingerprint, index, fees, scan] = await Promise.all([
+		[positions, spot, hip3Xyz, fingerprint, index, fees, scan, fundFlows, candidates] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('spot'),
 			fetchLatest('positions_hip3_xyz'),
@@ -39,6 +42,8 @@
 			fetchIndex(),
 			fetchLatest('fees'),
 			fetchScanResults(),
+			fetchFundFlows(),
+			fetchCandidates(),
 		]);
 		loading = false;
 
@@ -354,6 +359,20 @@
 	}
 </script>
 
+{#if !loading}
+	{@const alertState = getAlertState(fundFlows, candidates)}
+	{#if alertState}
+		<div class="alert-banner alert-{alertState.level}">
+			<span class="alert-label">[{alertState.level.toUpperCase()}]</span>
+			{alertState.msg}
+			{#if alertState.wallet}
+				<span class="mono" style="margin: 0 8px;">{shortAddr(alertState.wallet)}</span>
+			{/if}
+			<a href="{base}/recovery" class="alert-link">View Recovery →</a>
+		</div>
+	{/if}
+{/if}
+
 <div class="page-header">
 	<h1>Dashboard</h1>
 	<p class="text-muted">
@@ -637,6 +656,25 @@
 {/if}
 
 <style>
+	.alert-banner {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 16px;
+		border-radius: 8px;
+		margin-bottom: 20px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		flex-wrap: wrap;
+	}
+	.alert-critical { background: rgba(255,51,85,0.15); border: 1px solid rgba(255,51,85,0.4); color: var(--accent-red); }
+	.alert-high { background: rgba(255,51,85,0.10); border: 1px solid rgba(255,51,85,0.3); color: var(--accent-red); }
+	.alert-warn { background: rgba(255,170,0,0.12); border: 1px solid rgba(255,170,0,0.3); color: var(--accent-yellow); }
+	.alert-medium { background: rgba(255,170,0,0.08); border: 1px solid rgba(255,170,0,0.2); color: var(--accent-yellow); }
+	.alert-label { font-family: var(--font-mono); font-weight: 700; }
+	.alert-link { margin-left: auto; opacity: 0.8; font-size: 0.8rem; }
+	.alert-link:hover { opacity: 1; }
+
 	.page-header {
 		margin-bottom: 28px;
 	}
