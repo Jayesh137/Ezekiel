@@ -132,10 +132,15 @@ def append_records(directory: str, records: list[dict], key_field: str) -> int:
             existing = json.load(f)
 
     existing_keys = {str(r.get(key_field, "")) for r in existing}
-    new_records = [
-        r for r in records
-        if str(r.get(key_field, "")) not in existing_keys
-    ]
+    existing_keys.discard("")
+    new_records = []
+    for r in records:
+        key = str(r.get(key_field, ""))
+        if key and key in existing_keys:
+            continue
+        if key:
+            existing_keys.add(key)  # also dedupe within this batch
+        new_records.append(r)
 
     if new_records:
         combined = existing + new_records

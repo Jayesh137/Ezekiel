@@ -1,7 +1,7 @@
 # Ezekiel: System Architecture
 
 > Technical architecture for the Ezekiel trader intelligence and fingerprinting system.
-> Companion to [PRD.md](../../PRD.md).
+> Companion to [PRD.md](../PRD.md).
 
 ---
 
@@ -74,7 +74,7 @@ Ezekiel/
 │   ├── tracer.py
 │   ├── alerts.py
 │   ├── profile_builder.py
-│   └── utils.py
+│   └── utils.py            # (twitter modules removed 2026-07)
 │
 ├── dashboard/                       # Frontend (SvelteKit + Vite)
 │   ├── package.json
@@ -157,11 +157,12 @@ src/
 ├── fingerprint.py          ─── Reads ALL data/, computes profile/fingerprint.json
 ├── scanner.py              ─── Pulls leaderboard, scores each wallet vs fingerprint
 ├── tracer.py               ─── Monitors Arbitrum L1 for fund movements
-├── alerts.py               ─── Sends email via Brevo SMTP
+├── alerts.py               ─── Sends email via Brevo SMTP (with per-subject cooldowns)
 ├── profile_builder.py      ─── Parses research/*.docx + *.pdf into profile
-├── twitter_monitor.py      ─── Fetches tweets via RSS bridge, extracts trading signals
-├── twitter_correlator.py   ─── Correlates tweet timing/content vs wallet trades
 └── utils.py                ─── Shared: API calls, file I/O, dedup, cursors
+
+Note: twitter_monitor.py / twitter_correlator.py were removed 2026-07 — all free
+nitter RSS bridges are dead. Historical tweet data remains in data/twitter/.
 ```
 
 ### 3.3 Key Design Principle: Separate Entities
@@ -238,20 +239,14 @@ def load_all_records(directory: str) -> list:
 ```
 1. Load ALL data from data/fills/, data/positions/, data/orders/, etc.
 2. Compute each fingerprint dimension (see PRD Section 7)
-3. Write profile/fingerprint.json
-4. Generate reports/daily/YYYY-MM-DD.md
-5. Send daily summary email
+3. Write profile/fingerprint.json (+ fingerprint_recent.json, 21-day window)
 ```
 
 ### 3.4 Python Dependencies
 
-```
-requests>=2.31.0
-numpy>=1.26.0
-scipy>=1.12.0
-python-docx>=1.1.0
-PyPDF2>=3.0.0
-```
+Pinned in `requirements.txt` (core: requests, numpy) and
+`requirements-analysis.txt` (doc parsing: python-docx, pypdf, pdfminer.six —
+installed only by the analyze workflow).
 
 ---
 
@@ -404,20 +399,13 @@ export async function fetchJSON(path) {
 - Highlight any addresses that deposited to Hyperliquid bridge
 - Status badges: TRACED / PENDING / NO HL DEPOSIT
 
-#### Twitter Intel (`/twitter`) — Social Media Correlation
-- Tweet timeline for @GiganticRebirth and @GCRClassic
-- Overlay: tweet timestamps vs trade timestamps on same chart
-- Correlation score dashboard: timing, direction, confidence level
-- **Hypothesis status badge**: LOW / MEDIUM / HIGH confidence that wallet = GCR
-- Individual correlation matches (tweet X → trade Y, N minutes apart)
+#### Recovery (`/recovery`) — Wallet Recovery Intelligence
+- Persistent candidate watchlist (`data/candidates/latest.json`) with score history
+- Fund-flow findings and combined-signal highlights
 
-#### Reports (`/reports`) — Daily Summaries
-- List of daily reports by date
-- Rendered markdown with key metrics:
-  - Trades taken, PnL, new positions, closed positions
-  - Scanner highlights, fund flow events
-  - Fingerprint changes (if any dimensions shifted)
-  - Twitter correlation updates
+> Note: earlier drafts described `/twitter`, `/fund-flow` and `/reports` routes;
+> these were never built. Actual routes: `/`, `/fills`, `/fingerprint`,
+> `/scanner`, `/recovery`.
 
 ### 4.6 Svelte 5 Patterns Used
 

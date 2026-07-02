@@ -48,7 +48,7 @@ def collect_fills(wallet: str) -> int:
     if not fills:
         return 0
 
-    added = append_records(str(DATA_DIR / "fills"), fills, key_field="hash")
+    added = append_records(str(DATA_DIR / "fills"), fills, key_field="tid")
 
     max_ts = max(f["time"] for f in fills)
     write_cursor("last_fill_time", max_ts)
@@ -116,6 +116,8 @@ def collect_ledger(wallet: str) -> int:
 def collect_fees(wallet: str) -> None:
     """Collect fee schedule and rate info."""
     fees = hl_post({"type": "userFees", "user": wallet})
+    if not isinstance(fees, dict) or not fees:
+        return
     save_latest(str(DATA_DIR / "fees"), fees)
     append_records(str(DATA_DIR / "fees"), [{"_ts": now_ms(), **fees}], key_field="_ts")
 
@@ -123,6 +125,8 @@ def collect_fees(wallet: str) -> None:
 def collect_rate_limit(wallet: str) -> None:
     """Collect rate limit / cumulative volume info."""
     rl = hl_post({"type": "userRateLimit", "user": wallet})
+    if not isinstance(rl, dict) or not rl:
+        return
     save_latest(str(DATA_DIR / "rate_limit"), rl)
     append_records(str(DATA_DIR / "rate_limit"), [{"_ts": now_ms(), **rl}], key_field="_ts")
 
@@ -202,6 +206,10 @@ def check_account_value_drop() -> None:
                 from src.alerts import alert_account_value_drop
                 if alert_account_value_drop(current_value, prev_value, drop_pct):
                     write_cursor("last_drop_alert", now_ms())
+                    # Reset high-water mark so we don't re-alert hourly on the same drop;
+                    # a further 40% drop from here will still trigger.
+                    write_cursor("prev_account_value_cents", current_cents)
+                    return
 
     # Track high-water mark: only update upward so transient dips still trigger the alert
     if not prev_cents or current_cents > prev_cents:
@@ -214,50 +222,37 @@ def main():
 
     print(f"[collector] Starting collection for {wallet}")
 
-    print("[collector] Collecting positions...")
-    collect_positions(wallet)
+    # Each step runs independently — one failed API response must not kill the run.
+    steps = [
+        ("positions", lambda: collect_positions(wallet)),
+        ("fills", lambda: print(f"[collector] {collect_fills(wallet)} new fills")),
+        ("orders", lambda: collect_orders(wallet)),
+        ("funding", lambda: print(f"[collector] {collect_funding(wallet)} new funding events")),
+        ("ledger", lambda: print(f"[collector] {collect_ledger(wallet)} new ledger events")),
+        ("fees", lambda: collect_fees(wallet)),
+        ("rate limit", lambda: collect_rate_limit(wallet)),
+        ("subaccounts", lambda: collect_subaccounts(wallet)),
+        ("vault equities", lambda: collect_vault_equities(wallet)),
+        ("referral", lambda: collect_referral(wallet)),
+        ("portfolio", lambda: collect_portfolio(wallet)),
+        ("index", update_index),
+        ("silence check", check_silence),
+        ("account drop check", check_account_value_drop),
+    ]
 
-    print("[collector] Collecting fills...")
-    new_fills = collect_fills(wallet)
-    print(f"[collector] {new_fills} new fills")
+    failed = []
+    for name, step in steps:
+        print(f"[collector] Collecting {name}...")
+        try:
+            step()
+        except Exception as e:
+            failed.append(name)
+            print(f"[collector] WARNING: {name} failed: {e}")
 
-    print("[collector] Collecting orders...")
-    collect_orders(wallet)
-
-    print("[collector] Collecting funding...")
-    new_funding = collect_funding(wallet)
-    print(f"[collector] {new_funding} new funding events")
-
-    print("[collector] Collecting ledger...")
-    new_ledger = collect_ledger(wallet)
-    print(f"[collector] {new_ledger} new ledger events")
-
-    print("[collector] Collecting fees...")
-    collect_fees(wallet)
-
-    print("[collector] Collecting rate limit...")
-    collect_rate_limit(wallet)
-
-    print("[collector] Collecting subaccounts...")
-    collect_subaccounts(wallet)
-
-    print("[collector] Collecting vault equities...")
-    collect_vault_equities(wallet)
-
-    print("[collector] Collecting referral data...")
-    collect_referral(wallet)
-
-    print("[collector] Collecting portfolio...")
-    collect_portfolio(wallet)
-
-    print("[collector] Updating index...")
-    update_index()
-
-    print("[collector] Checking for anomalies...")
-    check_silence()
-    check_account_value_drop()
-
-    print("[collector] Collection complete.")
+    if failed:
+        print(f"[collector] Collection finished with {len(failed)} failed step(s): {', '.join(failed)}")
+    else:
+        print("[collector] Collection complete.")
 
 
 if __name__ == "__main__":

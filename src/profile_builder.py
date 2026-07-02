@@ -31,9 +31,9 @@ def parse_pdf(filepath: str) -> str:
     """Extract text from a PDF document."""
     text = ""
 
-    # Try PyPDF2 first
+    # Try pypdf first
     try:
-        from PyPDF2 import PdfReader
+        from pypdf import PdfReader
         reader = PdfReader(filepath)
         text_parts = []
         for page in reader.pages:
@@ -43,11 +43,11 @@ def parse_pdf(filepath: str) -> str:
         text = "\n".join(text_parts)
         if len(text) > 50:
             return text
-        print(f"[profile] PyPDF2 extracted only {len(text)} chars, trying fallback...")
+        print(f"[profile] pypdf extracted only {len(text)} chars, trying fallback...")
     except ImportError:
-        print(f"[profile] PyPDF2 not installed")
+        print(f"[profile] pypdf not installed")
     except Exception as e:
-        print(f"[profile] PyPDF2 error: {e}")
+        print(f"[profile] pypdf error: {e}")
 
     # Fallback: try pdfminer
     try:

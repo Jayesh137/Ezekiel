@@ -422,9 +422,10 @@ def compute_account_characteristics(positions: dict, fills: list[dict]) -> dict:
     }
 
 
-def build_fingerprint() -> dict:
+def build_fingerprint(fills: list[dict] | None = None) -> dict:
     """Build the complete behavioral fingerprint."""
-    fills = load_fills()
+    if fills is None:
+        fills = load_fills()
     funding = load_funding()
     positions = load_positions_latest()
     account = load_account_latest()
@@ -500,8 +501,8 @@ def main():
     config = load_config()
     print(f"[fingerprint] Building fingerprint for {config['target_wallet']}")
 
-    fingerprint = build_fingerprint()
-    fills = load_fills()  # Reuse for recent fingerprint (already loaded inside build_fingerprint)
+    fills = load_fills()
+    fingerprint = build_fingerprint(fills)
 
     profile_dir = Path(DATA_DIR.parent / "profile")
     profile_dir.mkdir(exist_ok=True)

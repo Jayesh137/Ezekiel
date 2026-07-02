@@ -157,7 +157,7 @@ def trace_fund_flow(wallet: str) -> list[dict]:
 
     api_key = os.environ.get("ETHERSCAN_API_KEY", "")
     print(f"[tracer] Checking fund flows for {wallet}")
-    print(f"[tracer] Etherscan API key: {'configured (' + api_key[:6] + '...)' if api_key else 'MISSING!'}")
+    print(f"[tracer] Etherscan API key: {'configured' if api_key else 'MISSING!'}")
 
     outbound = trace_outbound_transfers(wallet)
     findings = []

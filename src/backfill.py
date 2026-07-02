@@ -34,7 +34,7 @@ def backfill_fills(wallet: str) -> int:
         fills = hl_post(body)
 
         if fills:
-            added = append_records(str(DATA_DIR / "fills"), fills, key_field="hash")
+            added = append_records(str(DATA_DIR / "fills"), fills, key_field="tid")
             total += added
             print(f"[backfill]   window {start_time} -> {end_time}: {len(fills)} fills ({added} new)")
 

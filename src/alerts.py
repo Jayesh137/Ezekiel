@@ -6,6 +6,24 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from src.utils import read_cursor, write_cursor, now_ms
+
+
+def _cooldown_ok(key: str, hours: float) -> bool:
+    """Rate-limit repeat alerts. Cursor is only written after a successful send."""
+    last = read_cursor(f"alert_{key}")
+    return not last or (now_ms() - last) >= hours * 3600 * 1000
+
+
+def _send_with_cooldown(key: str, hours: float, subject: str, body: str) -> bool:
+    if not _cooldown_ok(key, hours):
+        print(f"[alerts] Cooldown active for {key}, skipping: {subject}")
+        return False
+    if send_alert(subject, body):
+        write_cursor(f"alert_{key}", now_ms())
+        return True
+    return False
+
 
 def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
     """Send an email alert. Returns True if sent, False if skipped/failed."""
@@ -47,7 +65,7 @@ def alert_fund_movement(wallet: str, amount: str, destination: str, tx_hash: str
         f"TX Hash: {tx_hash}\n"
         f"\nTracing destination wallet..."
     )
-    return send_alert(subject, body)
+    return _send_with_cooldown(f"fund_movement_{tx_hash.lower()}", 24, subject, body)
 
 
 def alert_new_wallet_found(source_wallet: str, new_wallet: str, method: str, confidence: float) -> bool:
@@ -58,7 +76,7 @@ def alert_new_wallet_found(source_wallet: str, new_wallet: str, method: str, con
         f"Confidence: {confidence:.0%}\n"
         f"Source Wallet: {source_wallet}\n"
     )
-    return send_alert(subject, body)
+    return _send_with_cooldown(f"new_wallet_{new_wallet.lower()}", 72, subject, body)
 
 
 def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bool:
@@ -71,7 +89,7 @@ def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bo
         f"Similarity Score: {score:.2f} / 1.00\n\n"
         f"Matching Dimensions:\n{dim_lines}\n"
     )
-    return send_alert(subject, body)
+    return _send_with_cooldown(f"behavioral_{candidate.lower()}", 24, subject, body)
 
 
 def alert_combined_match(candidate: str, score: float, flow_amount: str, flow_method: str) -> bool:
@@ -85,7 +103,7 @@ def alert_combined_match(candidate: str, score: float, flow_amount: str, flow_me
         f"This wallet received funds from the target AND matches the behavioral fingerprint.\n"
         f"Recommended action: begin monitoring this wallet immediately.\n"
     )
-    return send_alert(subject, body)
+    return _send_with_cooldown(f"combined_{candidate.lower()}", 12, subject, body)
 
 
 def alert_target_silence(days_silent: float) -> bool:
@@ -109,7 +127,7 @@ def alert_migration_correlation(candidate: str, score: float, days_silent: float
         f"These two signals together are the strongest possible migration indicator.\n"
         f"Recommended action: begin monitoring candidate wallet immediately.\n"
     )
-    return send_alert(subject, body)
+    return _send_with_cooldown(f"migration_{candidate.lower()}", 24, subject, body)
 
 
 def alert_vault_match(candidate: str, shared_vaults: list) -> bool:
@@ -121,7 +139,7 @@ def alert_vault_match(candidate: str, shared_vaults: list) -> bool:
         f"Candidate: {candidate}\n"
         f"Shared Vaults:\n{vault_lines}\n"
     )
-    return send_alert(subject, body)
+    return _send_with_cooldown(f"vault_{candidate.lower()}", 72, subject, body)
 
 
 def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:

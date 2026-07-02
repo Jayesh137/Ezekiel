@@ -4,6 +4,10 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+  issues: write
+
 concurrency:
   group: analyze
   cancel-in-progress: false
@@ -17,27 +21,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt
+          cache: 'pip'
+      - run: pip install -r requirements-analysis.txt
       - name: Rebuild fingerprint
         run: python src/fingerprint.py
       - name: Build trader profile
         run: python src/profile_builder.py
-      # Twitter monitoring disabled — all nitter RSS bridges are down.
-      # Re-enable when a working Twitter data source is configured.
-      # - name: Fetch new tweets
-      #   run: python src/twitter_monitor.py
-      # - name: Run correlation analysis
-      #   run: python src/twitter_correlator.py
-      - name: Pull latest before committing
+      - name: Commit and push
         run: |
-          git add profile/ reports/ data/
-          git stash
-          git pull --rebase origin main
-          git stash pop || true
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "analysis: rebuild fingerprint + daily report [automated]"
-          file_pattern: "profile/** reports/** data/**"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profile/ data/
+          if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
+          git commit -m "analysis: rebuild fingerprint [automated]"
+          for i in 1 2 3; do
+            if git push origin main; then exit 0; fi
+            git pull --rebase origin main
+          done
+          git push origin main
+      - name: Open failure issue
+        if: failure()
         env:
-          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
-          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="[pipeline] analyze workflow failing"
+          count=$(gh issue list --state open --search "in:title $title" --json number --jq 'length')
+          if [ "$count" = "0" ]; then
+            gh issue create --title "$title" --body "Failing run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
