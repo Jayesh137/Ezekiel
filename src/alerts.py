@@ -8,6 +8,11 @@ from email.mime.multipart import MIMEMultipart
 
 from src.utils import read_cursor, write_cursor, now_ms
 
+# Once a send fails (e.g. bad SMTP credentials), it will keep failing for the
+# rest of this run. Short-circuit so a batch of alerts doesn't attempt hundreds
+# of dead SMTP connections and blow the job timeout / spam the log.
+_smtp_disabled_this_run = False
+
 
 def _cooldown_ok(key: str, hours: float) -> bool:
     """Rate-limit repeat alerts. Cursor is only written after a successful send."""
@@ -27,6 +32,12 @@ def _send_with_cooldown(key: str, hours: float, subject: str, body: str) -> bool
 
 def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
     """Send an email alert. Returns True if sent, False if skipped/failed."""
+    global _smtp_disabled_this_run
+
+    if _smtp_disabled_this_run:
+        print(f"[alerts] SMTP disabled after earlier failure this run, skipping: {subject}")
+        return False
+
     smtp_key = os.environ.get("BREVO_SMTP_KEY")
     alert_email = os.environ.get("ALERT_EMAIL")
 
@@ -53,6 +64,8 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
         return True
     except Exception as e:
         print(f"[alerts] Failed to send: {e}")
+        _smtp_disabled_this_run = True
+        print("[alerts] Disabling further sends for this run.")
         return False
 
 

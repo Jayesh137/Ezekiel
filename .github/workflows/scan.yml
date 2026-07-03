@@ -32,7 +32,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/scans/ data/candidates/ data/fund_flows/ data/state/ profile/
+          git add data/scans/ data/candidates/ data/state/ profile/
           if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
           git commit -m "data: scanner results [automated]"
           for i in 1 2 3; do

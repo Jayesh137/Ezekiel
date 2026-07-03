@@ -4,6 +4,7 @@ import tempfile
 
 from src.utils import append_records, load_all_records
 from src import alerts
+from src import tracer
 
 
 def test_append_records_dedupes_within_batch():
@@ -40,3 +41,42 @@ def test_alert_cooldown(monkeypatch, tmp_path):
     assert alerts.alert_behavioral_match("0xABC", 0.95, {"timing_profile": 0.9}) is False
     assert alerts.alert_behavioral_match("0xDEF", 0.95, {"timing_profile": 0.9}) is True
     assert len(sent) == 2
+
+
+def test_unique_destinations_dedupes_and_skips_dust():
+    wallet = "0xWALLET"
+    outbound = [
+        {"to": "0xDEST", "value": "0"},          # zero-value dust -> dropped
+        {"to": "0xDEST", "value": "0"},          # more dust to same dest
+        {"to": "0xDEST", "value": "5000000"},    # real 5 USDC -> representative
+        {"to": "0xDEST", "value": "1000000"},    # smaller, same dest -> collapsed
+        {"to": wallet, "value": "9000000"},      # self-transfer -> dropped
+        {"to": "0xOTHER", "value": "2000000"},   # distinct dest
+    ]
+    result = tracer.unique_destinations(outbound, wallet)
+    dests = [t["to"] for t in result]
+    assert dests == ["0xDEST", "0xOTHER"]                 # deduped, value-sorted
+    assert result[0]["value"] == "5000000"                # kept largest per dest
+
+
+def test_unique_destinations_respects_cap():
+    outbound = [{"to": f"0x{i:040x}", "value": "1000000"} for i in range(200)]
+    assert len(tracer.unique_destinations(outbound, "0xWALLET")) == tracer.MAX_DESTINATIONS
+
+
+def test_send_alert_short_circuits_after_failure(monkeypatch):
+    monkeypatch.setattr(alerts, "_smtp_disabled_this_run", False)
+    monkeypatch.setenv("BREVO_SMTP_KEY", "key")
+    monkeypatch.setenv("ALERT_EMAIL", "me@example.com")
+
+    attempts = []
+
+    def boom(*a, **k):
+        attempts.append(1)
+        raise OSError("(535, b'5.7.8 Authentication failed')")
+
+    monkeypatch.setattr(alerts.smtplib, "SMTP", boom)
+
+    assert alerts.send_alert("s1", "b1") is False   # attempts a real connect, fails
+    assert alerts.send_alert("s2", "b2") is False   # short-circuits, no connect
+    assert len(attempts) == 1

@@ -2,6 +2,7 @@
 """Traces fund flows on Arbitrum L1 to detect wallet migrations."""
 
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,12 +15,31 @@ from src.utils import (
 from src.alerts import alert_fund_movement, alert_new_wallet_found, alert_combined_match
 
 
+# Max unique destinations to trace per run — a safety net so a wallet spammed
+# with transfers to many addresses can never blow the job timeout.
+MAX_DESTINATIONS = 50
+
+# Wall-clock budget for the tracing loop. The CI job has a 5-minute hard
+# timeout; stop tracing new destinations after this so partial findings still
+# get saved and committed instead of the job being cancelled.
+TRACE_BUDGET_SECONDS = 240
+
+# Run-scoped cache of Etherscan transfer lookups, keyed by (address, start_block).
+# The same address gets looked up repeatedly (find_hl_deposits + next-hop), so
+# caching avoids redundant rate-limited API calls. Cleared at the start of a run.
+_transfer_cache: dict[tuple[str, int], list[dict]] = {}
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 def get_usdc_transfers(address: str, start_block: int = 0) -> list[dict]:
     """Get all USDC token transfers for an address on Arbitrum."""
+    cache_key = (address.lower(), start_block)
+    if cache_key in _transfer_cache:
+        return _transfer_cache[cache_key]
+
     config = load_config()
     result = etherscan_get({
         "module": "account",
@@ -38,11 +58,14 @@ def get_usdc_transfers(address: str, start_block: int = 0) -> list[dict]:
 
     if status == "1" and isinstance(transfers, list):
         print(f"[tracer] Etherscan: {len(transfers)} USDC transfers found for {address[:10]}...")
+        _transfer_cache[cache_key] = transfers
         return transfers
     elif status == "0" and message == "No transactions found":
         print(f"[tracer] Etherscan: No USDC transfers for {address[:10]}... (confirmed empty)")
+        _transfer_cache[cache_key] = []
         return []
     else:
+        # Transient API error — don't cache, so a later lookup can retry.
         print(f"[tracer] Etherscan API issue: status={status}, message={message}, result_type={type(transfers).__name__}")
         return []
 
@@ -151,10 +174,34 @@ def value_to_display(value: float) -> str:
     return f"{value:,.2f}"
 
 
+def unique_destinations(outbound: list[dict], wallet: str) -> list[dict]:
+    """Collapse outbound transfers to one representative per destination.
+
+    Drops zero-value transfers (address-poisoning dust moves no funds) and
+    self-transfers, and keeps only the highest-value transfer per destination so
+    each destination is traced exactly once. Without this, a wallet spammed with
+    hundreds of 0-USDC transfers to the same address triggers hundreds of
+    identical Etherscan/SMTP round trips and blows the job timeout.
+    """
+    best: dict[str, dict] = {}
+    for t in outbound:
+        dest = t.get("to", "")
+        if not dest or dest.lower() == wallet.lower():
+            continue
+        if int(t.get("value", 0)) <= 0:
+            continue
+        key = dest.lower()
+        if key not in best or int(t.get("value", 0)) > int(best[key].get("value", 0)):
+            best[key] = t
+    ordered = sorted(best.values(), key=lambda t: int(t.get("value", 0)), reverse=True)
+    return ordered[:MAX_DESTINATIONS]
+
+
 def trace_fund_flow(wallet: str) -> list[dict]:
     """Main tracing logic: detect outbound transfers and follow the money."""
     import os
 
+    _transfer_cache.clear()
     api_key = os.environ.get("ETHERSCAN_API_KEY", "")
     print(f"[tracer] Checking fund flows for {wallet}")
     print(f"[tracer] Etherscan API key: {'configured' if api_key else 'MISSING!'}")
@@ -173,7 +220,15 @@ def trace_fund_flow(wallet: str) -> list[dict]:
             })
         return []
 
-    for transfer in outbound:
+    destinations = unique_destinations(outbound, wallet)
+    print(f"[tracer] {len(outbound)} outbound transfers -> {len(destinations)} unique funded destination(s) to trace")
+
+    deadline = time.monotonic() + TRACE_BUDGET_SECONDS
+    for i, transfer in enumerate(destinations):
+        if time.monotonic() > deadline:
+            print(f"[tracer] Time budget ({TRACE_BUDGET_SECONDS}s) reached after {i} destination(s); "
+                  f"saving partial results and stopping.")
+            break
         destination = transfer["to"]
         value_raw = int(transfer.get("value", 0))
         value_usdc = value_raw / 1e6  # USDC has 6 decimals
