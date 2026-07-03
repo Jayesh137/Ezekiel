@@ -2,6 +2,7 @@
 """Traces fund flows on Arbitrum L1 to detect wallet migrations."""
 
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,6 +18,11 @@ from src.alerts import alert_fund_movement, alert_new_wallet_found, alert_combin
 # Max unique destinations to trace per run — a safety net so a wallet spammed
 # with transfers to many addresses can never blow the job timeout.
 MAX_DESTINATIONS = 50
+
+# Wall-clock budget for the tracing loop. The CI job has a 5-minute hard
+# timeout; stop tracing new destinations after this so partial findings still
+# get saved and committed instead of the job being cancelled.
+TRACE_BUDGET_SECONDS = 240
 
 # Run-scoped cache of Etherscan transfer lookups, keyed by (address, start_block).
 # The same address gets looked up repeatedly (find_hl_deposits + next-hop), so
@@ -217,7 +223,12 @@ def trace_fund_flow(wallet: str) -> list[dict]:
     destinations = unique_destinations(outbound, wallet)
     print(f"[tracer] {len(outbound)} outbound transfers -> {len(destinations)} unique funded destination(s) to trace")
 
-    for transfer in destinations:
+    deadline = time.monotonic() + TRACE_BUDGET_SECONDS
+    for i, transfer in enumerate(destinations):
+        if time.monotonic() > deadline:
+            print(f"[tracer] Time budget ({TRACE_BUDGET_SECONDS}s) reached after {i} destination(s); "
+                  f"saving partial results and stopping.")
+            break
         destination = transfer["to"]
         value_raw = int(transfer.get("value", 0))
         value_usdc = value_raw / 1e6  # USDC has 6 decimals
