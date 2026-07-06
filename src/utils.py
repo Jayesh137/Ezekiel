@@ -199,8 +199,14 @@ def update_index() -> None:
     snapshot_types = ["positions", "account", "spot", "portfolio",
                       "positions_hip3_xyz"]
 
-    # hl_transfers keeps only a rolling latest.json (no dated snapshots)
-    singleton_latest_types = ["hl_transfers"]
+    # Types that keep only a rolling latest.json (no dated snapshots).
+    # Maps data type -> the payload key to surface as a stat in the index.
+    singleton_latest_types = {
+        "hl_transfers": "counterparty_count",
+        "correlations": "match_count",
+        "risk": "score",
+        "agents": None,
+    }
 
     singleton_types = ["candidates"]
 
@@ -251,16 +257,17 @@ def update_index() -> None:
             index["files"][data_type] = files
             index["stats"][f"total_{data_type}"] = len(files)
 
-    for data_type in singleton_latest_types:
+    for data_type, stat_key in singleton_latest_types.items():
         latest = DATA_DIR / data_type / "latest.json"
         if latest.exists():
             index["files"][data_type] = ["latest.json"]
-            try:
-                with open(latest) as f:
-                    payload = json.load(f)
-                index["stats"][f"total_{data_type}"] = payload.get("counterparty_count", 0)
-            except Exception:
-                pass
+            if stat_key:
+                try:
+                    with open(latest) as f:
+                        payload = json.load(f)
+                    index["stats"][f"{data_type}_{stat_key}"] = payload.get(stat_key, 0)
+                except Exception:
+                    pass
 
     index_path = DATA_DIR / "index.json"
     with open(index_path, "w") as f:

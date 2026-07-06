@@ -19,7 +19,10 @@ from src.fingerprint import (
     build_fingerprint, compute_asset_preferences, compute_timing_profile,
     compute_trade_sequencing, compute_position_sizing,
 )
-from src.alerts import alert_behavioral_match, alert_combined_match, alert_vault_match, alert_migration_correlation
+from src.alerts import (
+    alert_behavioral_match, alert_combined_match, alert_vault_match,
+    alert_migration_correlation, alert_xyz_signature_match, alert_linkage_match,
+)
 
 
 def fetch_leaderboard() -> list[dict]:
@@ -640,6 +643,31 @@ def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
     return False
 
 
+def _rare_overlap(result: dict) -> list:
+    """xyz: HIP-3 markets the candidate shares with the target (the rarest tell)."""
+    return result.get("evidence", {}).get("asset_overlap", {}).get("rare_overlap", []) or []
+
+
+def _apply_linkage(result: dict, target: str, profile: dict) -> float:
+    """Run L1 clustering heuristics (shared funder / address reuse) on a candidate.
+    Adds evidence + a score bonus and fires the linkage alert. Returns new score."""
+    from src import linkage as linkage_mod
+    wallet = result["wallet"]
+    try:
+        link = linkage_mod.check_candidate(wallet, target, profile)
+    except Exception as e:
+        print(f"[scanner] Linkage check failed for {wallet[:10]}...: {e}")
+        return result["score"]
+
+    if link.get("linkage_bonus", 0) > 0:
+        result["evidence"].setdefault("reasons", []).extend(link["reasons"])
+        result["evidence"]["linkage"] = link
+        result["score"] = round(min(1.0, result["score"] + link["linkage_bonus"]), 4)
+        print(f"[scanner] Linkage for {wallet[:10]}...: +{link['linkage_bonus']} {link['reasons']}")
+        alert_linkage_match(wallet, link["reasons"], result["score"])
+    return result["score"]
+
+
 def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
     """Scan high-priority candidates before the leaderboard sweep:
     fund-flow destinations, subaccounts, and recent large bridge depositors.
@@ -706,7 +734,25 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
         except Exception as e:
             print(f"[scanner] Could not load hl_transfers: {e}")
 
-    # 4. Recent large bridge depositors
+    # 4. Deposit/withdrawal correlation matches — wallets whose fresh bridge deposit
+    # closely matches a target exit in amount + timing (re-linked across a CEX gap).
+    correlations_path = DATA_DIR / "correlations" / "latest.json"
+    if correlations_path.exists():
+        try:
+            with open(correlations_path) as f:
+                corr = json.load(f)
+            for m in corr.get("matches", []):
+                addr = m.get("wallet", "").lower()
+                if addr and addr not in priority:
+                    priority[addr] = {
+                        "source": "correlation",
+                        "confidence": m.get("confidence", 0),
+                        "amount": f"${m.get('deposit_amount_usd', 0):,.0f} deposit ~ ${m.get('exit_amount_usd', 0):,.0f} exit",
+                    }
+        except Exception as e:
+            print(f"[scanner] Could not load correlations: {e}")
+
+    # 5. Recent large bridge depositors
     for addr in get_recent_bridge_depositors():
         if addr not in priority:
             priority[addr] = {"source": "bridge_depositor"}
@@ -718,6 +764,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
     print(f"[scanner] Scanning {len(priority)} priority targets...")
     target_vaults = _load_target_vault_addresses()
     target_referral_addrs = _load_target_referral_addresses()
+    target_l1 = None  # lazily built L1 clustering profile (one Etherscan call)
+    target_addr = config["target_wallet"]
     results = []
 
     for wallet, meta in priority.items():
@@ -729,8 +777,13 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
         score = result["score"]
         print(f"[scanner] Priority {wallet[:10]}... ({source}): {score:.4f}")
 
-        # Vault crosslink and referral checks for promising candidates
-        if score >= 0.70:
+        rare = _rare_overlap(result)
+        if rare:
+            print(f"[scanner] xyz: SIGNATURE MATCH {wallet[:10]}...: {rare}")
+            alert_xyz_signature_match(wallet, rare, score)
+
+        # Vault, referral, and L1-clustering checks for promising candidates
+        if score >= 0.70 or rare:
             shared_vaults = _check_vault_overlap(wallet, target_vaults)
             if shared_vaults:
                 result["evidence"]["reasons"].append(
@@ -747,9 +800,16 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
                 result["score"] = round(score, 4)
                 print(f"[scanner] Referral link for {wallet[:10]}...")
 
+            if target_l1 is None:
+                from src import linkage as linkage_mod
+                target_l1 = linkage_mod.target_l1_profile(target_addr)
+            score = _apply_linkage(result, target_addr, target_l1)
+
         results.append(result)
 
-        if score >= candidate_threshold:
+        # Persist if it clears the threshold OR shares the rare xyz: signature
+        # (an xyz: overlap alone is strong enough to warrant a watchlist slot).
+        if score >= candidate_threshold or rare:
             persist_candidate(result)
 
         if score >= thresholds["similarity_high"]:
@@ -765,6 +825,9 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
             # the strongest possible in-platform migration signal.
             amount = f"${meta.get('out_usd', 0):,.0f} sent in-platform"
             alert_combined_match(wallet, score, amount, f"hl_native_transfer ({source})")
+        elif source == "correlation" and score >= thresholds["similarity_low"]:
+            # Deposit/withdrawal amount+timing correlation AND behavioral match.
+            alert_combined_match(wallet, score, meta.get("amount", "amount match"), "deposit_correlation")
 
         time.sleep(0.5)
 
@@ -845,10 +908,18 @@ def scan_leaderboard():
         top_scores.sort(key=lambda x: x["score"], reverse=True)
         top_scores = top_scores[:10]
 
-        if score >= thresholds["similarity_low"]:
+        # xyz: HIP-3 signature — trading these rare markets is near-conclusive on
+        # its own, so a leaderboard wallet sharing them is auto-promoted and alerted
+        # even if its overall score is modest (it may be a fresh, thin-history wallet).
+        rare = _rare_overlap(result)
+        if rare:
+            print(f"[scanner] xyz: SIGNATURE MATCH (leaderboard): {wallet} {rare}")
+            alert_xyz_signature_match(wallet, rare, score)
+
+        if score >= thresholds["similarity_low"] or rare:
             results.append(result)
 
-        if score >= candidate_threshold:
+        if score >= candidate_threshold or rare:
             persist_candidate(result)
 
         if score >= thresholds["similarity_high"]:

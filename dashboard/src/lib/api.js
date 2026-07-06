@@ -92,6 +92,20 @@ export async function fetchHlTransfers() {
 }
 
 /**
+ * Fetch the unified migration risk score (0-100 with contributing factors).
+ */
+export async function fetchRisk() {
+	return fetchJSON('data/risk/latest.json');
+}
+
+/**
+ * Fetch deposit/withdrawal correlation matches (re-linked across a CEX gap).
+ */
+export async function fetchCorrelations() {
+	return fetchJSON('data/correlations/latest.json');
+}
+
+/**
  * Fetch scan history across all dates to track wallet score trends.
  * @param {object} index - Data index with files.scans dates
  */

@@ -8,6 +8,8 @@
 		fetchCandidates,
 		fetchFundFlows,
 		fetchHlTransfers,
+		fetchRisk,
+		fetchCorrelations,
 		formatUSD,
 		shortAddr
 	} from '$lib/api.js';
@@ -21,13 +23,15 @@
 	let candidates = null;
 	let fundFlows = null;
 	let hlTransfers = null;
+	let risk = null;
+	let correlations = null;
 	let loading = true;
 
 	let timelineChartEl;
 	let timelineChart;
 
 	onMount(async () => {
-		[positions, hip3Xyz, index, scan, candidates, fundFlows, hlTransfers] = await Promise.all([
+		[positions, hip3Xyz, index, scan, candidates, fundFlows, hlTransfers, risk, correlations] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('positions_hip3_xyz'),
 			fetchIndex(),
@@ -35,6 +39,8 @@
 			fetchCandidates(),
 			fetchFundFlows(),
 			fetchHlTransfers(),
+			fetchRisk(),
+			fetchCorrelations(),
 		]);
 		loading = false;
 		await new Promise(r => setTimeout(r, 0));
@@ -198,6 +204,13 @@
 		return score == null ? '-' : `${(score * 100).toFixed(1)}%`;
 	}
 
+	function riskClass(level) {
+		if (level === 'CRITICAL') return 'risk-critical';
+		if (level === 'ELEVATED') return 'risk-elevated';
+		if (level === 'GUARDED') return 'risk-guarded';
+		return 'risk-low';
+	}
+
 	function topLeads() {
 		return (scan?.results || [])
 			.filter(r => r.score >= 0.65)
@@ -219,6 +232,30 @@
 	{@const watchlist = candidates?.candidates || []}
 	{@const linkedWallets = (hlTransfers?.counterparties || []).filter(c => c.total_out_usd > 0 || c.known_self)}
 	{@const lastSeenMinutes = minutesSinceLastSeen()}
+
+	{#if risk}
+		<section class="card risk-banner {riskClass(risk.level)}">
+			<div class="risk-gauge">
+				<div class="risk-score-num">{Math.round(risk.score)}</div>
+				<div class="risk-score-den">/100</div>
+			</div>
+			<div class="risk-body">
+				<div class="risk-head">
+					<span class="section-kicker">Unified Migration Risk</span>
+					<span class="risk-level-badge {riskClass(risk.level)}">{risk.level}</span>
+				</div>
+				{#if (risk.factors || []).length > 0}
+					<div class="risk-factors">
+						{#each risk.factors.slice(0, 6) as f}
+							<span class="risk-factor">{f.label} <b>+{f.points}</b></span>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-muted compact">No active migration signals. Baseline monitoring.</p>
+				{/if}
+			</div>
+		</section>
+	{/if}
 
 	<div class="recovery-grid">
 		<section class="card recovery-status">
@@ -311,6 +348,43 @@
 							<td class="mono text-muted">{formatUSD(c.total_in_usd)}</td>
 							<td class="mono">{c.transfer_count}×</td>
 							<td class="text-muted mono" style="font-size:0.72rem">{c.last_seen?.split('T')[0] || '-'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</section>
+	{/if}
+
+	{#if (correlations?.matches || []).length > 0}
+		<section class="card" style="margin-bottom:16px">
+			<div class="panel-title">
+				<div>
+					<div class="section-kicker">Cross-Gap Re-Linking</div>
+					<h2>Deposit / Withdrawal Correlations</h2>
+				</div>
+				<span class="count-pill">{correlations.matches.length}</span>
+			</div>
+			<p class="text-muted" style="font-size:0.78rem;margin-bottom:12px">
+				Fresh wallets whose Hyperliquid deposit closely matches a target exit in <strong>amount + timing</strong> — consistent with cashing out and re-entering on a new wallet through a CEX. Odd (non-round) amounts score highest.
+			</p>
+			<table>
+				<thead>
+					<tr>
+						<th>Wallet</th>
+						<th>Confidence</th>
+						<th>Deposit ≈ Exit</th>
+						<th>Gap</th>
+						<th>Exit via</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each correlations.matches.slice(0, 10) as m}
+						<tr>
+							<td><a href="https://app.hyperliquid.xyz/explorer/address/{m.wallet}" target="_blank">{shortAddr(m.wallet)}</a></td>
+							<td class="mono"><span class="badge" class:badge-red={m.confidence >= 0.7} class:badge-yellow={m.confidence < 0.7}>{scorePct(m.confidence)}</span></td>
+							<td class="mono">{formatUSD(m.deposit_amount_usd)} ≈ {formatUSD(m.exit_amount_usd)}</td>
+							<td class="mono text-muted">{m.gap_hours}h</td>
+							<td class="text-muted mono" style="font-size:0.72rem">{m.exit_source}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -452,6 +526,55 @@
 <style>
 	.page-header { margin-bottom: 24px; }
 	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
+
+	.risk-banner {
+		display: flex;
+		align-items: center;
+		gap: 20px;
+		margin-bottom: 16px;
+		border-left: 4px solid var(--border);
+	}
+	.risk-banner.risk-critical { border-left-color: var(--accent-red, #ff4d4d); }
+	.risk-banner.risk-elevated { border-left-color: var(--accent-yellow, #ffaa00); }
+	.risk-banner.risk-guarded { border-left-color: var(--accent-cyan, #00ccdd); }
+	.risk-banner.risk-low { border-left-color: var(--border); }
+
+	.risk-gauge {
+		display: flex;
+		align-items: baseline;
+		font-family: var(--font-mono);
+		min-width: 92px;
+	}
+	.risk-score-num { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+	.risk-critical .risk-score-num { color: var(--accent-red, #ff4d4d); }
+	.risk-elevated .risk-score-num { color: var(--accent-yellow, #ffaa00); }
+	.risk-guarded .risk-score-num { color: var(--accent-cyan, #00ccdd); }
+	.risk-score-den { font-size: 0.9rem; color: var(--text-muted); margin-left: 2px; }
+
+	.risk-body { flex: 1; }
+	.risk-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+	.risk-level-badge {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 700;
+		padding: 2px 8px;
+		border-radius: 999px;
+		letter-spacing: 0.05em;
+	}
+	.risk-level-badge.risk-critical { background: rgba(255,77,77,0.15); color: var(--accent-red, #ff4d4d); }
+	.risk-level-badge.risk-elevated { background: rgba(255,170,0,0.15); color: var(--accent-yellow, #ffaa00); }
+	.risk-level-badge.risk-guarded { background: rgba(0,204,221,0.12); color: var(--accent-cyan, #00ccdd); }
+	.risk-level-badge.risk-low { background: rgba(136,136,160,0.12); color: var(--text-muted); }
+
+	.risk-factors { display: flex; flex-wrap: wrap; gap: 6px; }
+	.risk-factor {
+		font-size: 0.72rem;
+		color: var(--text-secondary);
+		background: rgba(255,255,255,0.04);
+		border-radius: 4px;
+		padding: 2px 7px;
+	}
+	.risk-factor b { color: var(--text-primary, #e8e8f0); }
 	.loading { text-align: center; padding: 60px; color: var(--text-muted); }
 
 	.recovery-grid {

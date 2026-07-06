@@ -176,6 +176,67 @@ def alert_hl_native_transfer(destination: str, out_usd: float, in_usd: float,
     return _send_with_cooldown(f"hl_transfer_{destination.lower()}", 72, subject, body)
 
 
+def alert_deposit_correlation(candidate: str, confidence: float, deposit_usd: float,
+                              exit_usd: float, gap_hours: float, exit_source: str) -> bool:
+    """Fire when a target exit re-appears as a fresh HL bridge deposit (re-linked
+    across a CEX/cross-chain gap by amount + timing)."""
+    subject = "[EZEKIEL] CRITICAL: Deposit/Withdrawal Correlation — Possible Re-entry Wallet"
+    body = (
+        f"A wallet deposited to Hyperliquid an amount closely matching a target exit,\n"
+        f"shortly after — consistent with cashing out and re-entering on a fresh wallet.\n\n"
+        f"Candidate Wallet: {candidate}\n"
+        f"Correlation Confidence: {confidence:.0%}\n"
+        f"Target exit: ${exit_usd:,.2f} ({exit_source})\n"
+        f"This deposit: ${deposit_usd:,.2f}\n"
+        f"Gap: {gap_hours:.1f} hours\n\n"
+        f"This bridges the CEX gap a sophisticated migrator uses. It is being scanned\n"
+        f"behaviorally — check the Recovery page.\n"
+    )
+    return _send_with_cooldown(f"correlation_{candidate.lower()}", 48, subject, body)
+
+
+def alert_xyz_signature_match(candidate: str, shared_markets: list, score: float) -> bool:
+    """Fire when a wallet trades the same rare xyz: HIP-3 markets as the target.
+    Almost nobody trades these, so overlap is near-conclusive."""
+    subject = "[EZEKIEL] CRITICAL: xyz: Signature Match — Same Rare HIP-3 Markets"
+    body = (
+        f"A wallet is trading the same rare HIP-3 (xyz:) markets as the target.\n"
+        f"Almost no one trades these — this is one of the strongest behavioral tells.\n\n"
+        f"Candidate Wallet: {candidate}\n"
+        f"Shared xyz: markets: {', '.join(shared_markets[:8])}\n"
+        f"Behavioral similarity: {score:.0%}\n"
+    )
+    return _send_with_cooldown(f"xyz_sig_{candidate.lower()}", 48, subject, body)
+
+
+def alert_linkage_match(candidate: str, reasons: list, score: float) -> bool:
+    """Fire when L1 clustering (shared funder / address reuse) links a candidate."""
+    subject = "[EZEKIEL] CRITICAL: On-Chain Linkage — Shared Funder / Address Reuse"
+    reason_lines = "\n".join(f"  - {r}" for r in reasons)
+    body = (
+        f"On-chain clustering links a behavioral candidate to the target.\n"
+        f"Address reuse is the highest-confidence heuristic in chain analysis.\n\n"
+        f"Candidate Wallet: {candidate}\n"
+        f"Behavioral similarity: {score:.0%}\n"
+        f"Linkage evidence:\n{reason_lines}\n"
+    )
+    return _send_with_cooldown(f"linkage_{candidate.lower()}", 72, subject, body)
+
+
+def alert_risk_level(score: float, level: str, factors: list, wallet: str | None) -> bool:
+    """Fire when the unified migration risk level rises into ELEVATED/CRITICAL."""
+    subject = f"[EZEKIEL] {level}: Migration Risk {score:.0f}/100"
+    factor_lines = "\n".join(f"  +{f['points']} {f['label']}" for f in factors[:8])
+    body = (
+        f"Unified migration risk has risen to {level} ({score:.0f}/100).\n\n"
+        f"Contributing signals:\n{factor_lines}\n"
+    )
+    if wallet:
+        body += f"\nStrongest lead: {wallet}\n"
+    body += "\nCheck the Recovery page.\n"
+    return _send_with_cooldown(f"risk_{level.lower()}", 12, subject, body)
+
+
 def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:
     subject = f"[EZEKIEL] WARNING: Account Value Drop {drop_pct:.0%} — Possible Liquidation"
     body = (

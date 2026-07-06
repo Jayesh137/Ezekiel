@@ -360,6 +360,16 @@ def main():
     findings = trace_fund_flow(config["target_wallet"])
     print(f"[tracer] Trace complete. Findings: {len(findings)}")
 
+    # Deposit/withdrawal correlation — re-link the target to a fresh wallet across a
+    # CEX/cross-chain gap by matching exit amounts to new bridge deposits. Uses the
+    # same Etherscan budget as tracing, so it belongs in this job.
+    try:
+        from src.correlator import run_correlation
+        corr = run_correlation()
+        print(f"[tracer] Correlation complete. Matches: {corr.get('match_count', 0)}")
+    except Exception as e:
+        print(f"[tracer] Correlation step failed: {e}")
+
 
 if __name__ == "__main__":
     main()

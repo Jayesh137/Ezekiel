@@ -149,6 +149,24 @@ def collect_referral(wallet: str) -> None:
     save_latest(str(DATA_DIR / "referral"), ref)
 
 
+def collect_agents(wallet: str) -> None:
+    """Best-effort collection of approved API/agent wallets — a DIRECT ownership
+    link (an account authorizes agents to trade on its behalf). The exact info
+    endpoint isn't guaranteed across API versions, so try a couple and store
+    whatever returns; failures are harmless."""
+    agents = None
+    for req_type in ("extraAgents", "userToMultiSigSigners"):
+        try:
+            resp = hl_post({"type": req_type, "user": wallet})
+            if resp:
+                agents = {"type": req_type, "data": resp}
+                break
+        except Exception:
+            continue
+    if agents:
+        save_latest(str(DATA_DIR / "agents"), agents)
+
+
 def collect_portfolio(wallet: str) -> None:
     """Collect portfolio (historical account value + PnL)."""
     portfolio = hl_post({"type": "portfolio", "user": wallet})
@@ -164,6 +182,12 @@ def analyze_and_alert_hl_transfers() -> None:
     alerted = check_new_outbound_transfers(result)
     if alerted:
         print(f"[collector] {len(alerted)} new HL-native outbound transfer alert(s)")
+
+
+def compute_migration_risk() -> None:
+    """Recompute the unified migration risk score from all current signals."""
+    from src.risk import run_risk
+    run_risk()
 
 
 def check_silence() -> None:
@@ -245,11 +269,13 @@ def main():
         ("subaccounts", lambda: collect_subaccounts(wallet)),
         ("vault equities", lambda: collect_vault_equities(wallet)),
         ("referral", lambda: collect_referral(wallet)),
+        ("agents", lambda: collect_agents(wallet)),
         ("portfolio", lambda: collect_portfolio(wallet)),
         ("hl transfer analysis", analyze_and_alert_hl_transfers),
-        ("index", update_index),
         ("silence check", check_silence),
         ("account drop check", check_account_value_drop),
+        ("migration risk", compute_migration_risk),
+        ("index", update_index),
     ]
 
     failed = []
