@@ -23,6 +23,68 @@ from src.alerts import (
     alert_behavioral_match, alert_combined_match, alert_vault_match,
     alert_migration_correlation, alert_xyz_signature_match, alert_linkage_match,
 )
+from src import calibration
+
+
+def _effective_thresholds(thresholds: dict) -> dict:
+    """Adapt alert thresholds to what the scorer can actually achieve.
+    The self-match backtest score is the realistic ceiling for the true trader
+    (his own adjacent windows scored it); config thresholds above that ceiling
+    would guarantee missing the migration. Precision is protected by the
+    percentile gate, persistence requirement, and style vetoes instead."""
+    eff = dict(thresholds)
+    try:
+        with open(DATA_DIR.parent / "profile" / "backtest.json") as f:
+            report = json.load(f)
+        if report.get("passed") and report.get("self_score"):
+            achievable = float(report["self_score"])
+            eff["similarity_high"] = max(VETO_SCORE_CAP + 0.01,
+                                         min(eff["similarity_high"], round(achievable - 0.02, 4)))
+            eff["similarity_medium"] = max(VETO_SCORE_CAP,
+                                           min(eff["similarity_medium"], round(achievable - 0.07, 4)))
+            eff["similarity_low"] = max(0.40,
+                                        min(eff["similarity_low"], round(achievable - 0.12, 4)))
+            if eff != thresholds:
+                print(f"[scanner] Backtest-adapted thresholds: high={eff['similarity_high']}, "
+                      f"medium={eff['similarity_medium']}, low={eff['similarity_low']} "
+                      f"(self-match ceiling {achievable})")
+    except Exception:
+        pass
+    return eff
+
+
+def _sustained_high(wallet: str, threshold: float, n: int = 2) -> bool:
+    """True when the candidate's last n persisted scans (including the current
+    one) all cleared the threshold — one lucky window shouldn't page anyone."""
+    path = DATA_DIR / "candidates" / f"{wallet.lower()}.json"
+    if not path.exists():
+        return False
+    try:
+        with open(path) as f:
+            history = json.load(f).get("score_history", [])
+    except Exception:
+        return False
+    return len(history) >= n and all(h.get("score", 0) >= threshold for h in history[-n:])
+
+
+def _should_alert_behavioral(wallet: str, score: float, thresholds: dict,
+                             population: list[float] | None = None,
+                             vetoes: list | None = None) -> bool:
+    """HIGH behavioral alerts need: raw threshold + top-percentile vs the
+    scanned population + persistence across consecutive scans + no style veto."""
+    if vetoes:
+        return False  # style-incompatible wallets never behavioral-alert
+    if score < thresholds["similarity_high"]:
+        return False
+    if not calibration.passes_percentile_gate(score, population):
+        print(f"[scanner] {wallet[:10]}... {score:.4f} clears raw threshold but not "
+              f"the population percentile gate — suppressing behavioral alert")
+        return False
+    if not _sustained_high(wallet, thresholds["similarity_high"]):
+        print(f"[scanner] {wallet[:10]}... {score:.4f} awaiting persistence "
+              f"(needs 2 consecutive high scans) — suppressing behavioral alert")
+        return False
+    return True
 
 
 def fetch_leaderboard() -> list[dict]:
@@ -203,6 +265,115 @@ def compare_leverage(fp_a: dict, fp_b: dict) -> float:
     return 1.0 - abs(mean_a - mean_b) / max_val
 
 
+def _ratio_score(a: float, b: float) -> float | None:
+    """sqrt(min/max) similarity for positive scalars; None when not comparable."""
+    if a <= 0 or b <= 0:
+        return None
+    return float(np.sqrt(min(a, b) / max(a, b)))
+
+
+def compare_activity(sp_a: dict, sp_b: dict) -> float | None:
+    """Decision frequency and cadence — the most discriminative style trait.
+    Episodes/day is primary; raw fills/day is TWAP-inflated and only secondary."""
+    act_a = sp_a.get("activity", {})
+    act_b = sp_b.get("activity", {})
+    scores = []
+    epd = _ratio_score(act_a.get("episodes_per_day", 0), act_b.get("episodes_per_day", 0))
+    if epd is not None:
+        scores.append(epd)
+        scores.append(epd)  # double weight vs the softer components
+    freq = _ratio_score(act_a.get("fills_per_day", 0), act_b.get("fills_per_day", 0))
+    if freq is not None:
+        scores.append(freq)
+    adr_a, adr_b = act_a.get("active_days_ratio", 0), act_b.get("active_days_ratio", 0)
+    if adr_a > 0 and adr_b > 0:
+        scores.append(1.0 - abs(adr_a - adr_b))
+    return float(np.mean(scores)) if scores else None
+
+
+def compare_direction_bias(sp_a: dict, sp_b: dict) -> float | None:
+    """Long/short opening bias. Needs enough opens on both sides to mean anything."""
+    dir_a = sp_a.get("direction", {})
+    dir_b = sp_b.get("direction", {})
+    if dir_a.get("total_opens", 0) < 10 or dir_b.get("total_opens", 0) < 10:
+        return None
+    return 1.0 - abs(dir_a.get("long_open_pct", 0) - dir_b.get("long_open_pct", 0))
+
+
+def compare_position_management(sp_a: dict, sp_b: dict) -> float | None:
+    """Scaling habits, TWAP usage, perp/spot mix, clip-size character."""
+    scores = []
+    pm_a = sp_a.get("position_management", {})
+    pm_b = sp_b.get("position_management", {})
+    fpe = _ratio_score(pm_a.get("mean_fills_per_episode", 0),
+                       pm_b.get("mean_fills_per_episode", 0))
+    if fpe is not None:
+        scores.append(fpe)
+    ex_a, ex_b = sp_a.get("execution", {}), sp_b.get("execution", {})
+    if ex_a and ex_b:
+        scores.append(1.0 - abs(ex_a.get("twap_ratio", 0) - ex_b.get("twap_ratio", 0)))
+        scores.append(1.0 - abs(ex_a.get("spot_fill_ratio", 0) - ex_b.get("spot_fill_ratio", 0)))
+    cs_a, cs_b = sp_a.get("clip_sizes", {}), sp_b.get("clip_sizes", {})
+    cv = _ratio_score(cs_a.get("notional_cv", 0), cs_b.get("notional_cv", 0))
+    if cv is not None:
+        scores.append(cv)
+    return float(np.mean(scores)) if scores else None
+
+
+def compare_loss_handling(sp_a: dict, sp_b: dict) -> float | None:
+    """Cuts losers fast vs holds them; win/loss magnitude character."""
+    lh_a, lh_b = sp_a.get("loss_handling", {}), sp_b.get("loss_handling", {})
+    scores = []
+    hold = _ratio_score(lh_a.get("loser_to_winner_hold_ratio", 0),
+                        lh_b.get("loser_to_winner_hold_ratio", 0))
+    if hold is not None:
+        scores.append(hold)
+    mag = _ratio_score(lh_a.get("win_loss_magnitude_ratio", 0),
+                       lh_b.get("win_loss_magnitude_ratio", 0))
+    if mag is not None:
+        scores.append(mag)
+    return float(np.mean(scores)) if scores else None
+
+
+def check_style_vetoes(ezekiel_fp: dict, candidate_fp: dict) -> list[str]:
+    """Hard incompatibilities: a mismatch on a defining trait means this is a
+    different human no matter how similar the coarse distributions look.
+    Only applied when both sides have enough data to judge."""
+    sp_a = ezekiel_fp.get("style_profile", {})
+    sp_b = candidate_fp.get("style_profile", {})
+    if not (sp_a.get("sufficient_data") and sp_b.get("sufficient_data")):
+        return []
+
+    vetoes = []
+    # Decision frequency, not raw fills: TWAP execution inflates fill counts
+    # ~10x for the same human depending on the period.
+    epd_a = sp_a.get("activity", {}).get("episodes_per_day", 0)
+    epd_b = sp_b.get("activity", {}).get("episodes_per_day", 0)
+    if epd_a > 0 and epd_b > 0:
+        ratio = max(epd_a, epd_b) / min(epd_a, epd_b)
+        if ratio > 5:
+            vetoes.append(f"Decision frequency {ratio:.0f}x apart "
+                          f"({epd_a:.2f} vs {epd_b:.2f} position episodes/day)")
+
+    # Scalper vs swing: dominant sub-1h holding on one side only
+    u1h_a = ezekiel_fp.get("hold_duration", {}).get("distribution_buckets", {}).get("under_1h", 0)
+    u1h_b = candidate_fp.get("hold_duration", {}).get("distribution_buckets", {}).get("under_1h", 0)
+    if (u1h_a > 0.7 and u1h_b < 0.15) or (u1h_b > 0.7 and u1h_a < 0.15):
+        vetoes.append(f"Incompatible hold style: {u1h_a:.0%} vs {u1h_b:.0%} of holds under 1h")
+
+    # NOTE: no shorting/direction veto — the self-match backtest showed the
+    # target flipping from ~all-long to ~all-short between adjacent windows.
+    # Direction tracks market view, not identity; it stays a low-weight dim only.
+
+    return vetoes
+
+
+# A vetoed candidate is capped below the WEAK_LEAD tier; hard on-chain linkage
+# bonuses may lift it slightly but never into alert territory on style alone.
+VETO_SCORE_CAP = 0.45
+VETO_BONUS_CEILING = 0.60
+
+
 def classify_match(score: float) -> str:
     if score >= 0.90:
         return "CONFIRMED_CANDIDATE"
@@ -213,7 +384,8 @@ def classify_match(score: float) -> str:
     return "BACKGROUND"
 
 
-def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score: float) -> dict:
+def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score: float,
+                   vetoes: list[str] | None = None) -> dict:
     """Explain the score so the dashboard can rank leads by evidence."""
     asset_overlap = get_asset_overlap(
         ezekiel_fp.get("asset_preferences", {}),
@@ -235,17 +407,27 @@ def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score
     if dimensions.get("account_size", 0) >= 0.70:
         reasons.append("Similar account-size bracket")
 
+    if (dimensions.get("activity") or 0) >= 0.75:
+        reasons.append("Matching trade frequency and cadence")
+    if (dimensions.get("direction_bias") or 0) >= 0.85:
+        reasons.append("Matching long/short bias")
+    if (dimensions.get("position_management") or 0) >= 0.80:
+        reasons.append("Similar scaling/TWAP/clip-size habits")
+
     if asset_overlap["overlap_count"] < 3:
         warnings.append("Weak asset overlap")
     if dimensions.get("timing_profile", 0) < 0.35:
         warnings.append("Different active trading hours")
     if dimensions.get("account_size", 0) < 0.25:
         warnings.append("Very different account-size bracket")
+    if dimensions.get("activity") is not None and dimensions["activity"] < 0.35:
+        warnings.append("Very different trading frequency")
 
     return {
         "tier": classify_match(score),
         "reasons": reasons,
         "warnings": warnings,
+        "vetoes": vetoes or [],
         "asset_overlap": asset_overlap,
     }
 
@@ -308,17 +490,37 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     dim_score = compare_position_sizing(ezekiel_fp, candidate_fp)
     dimensions["position_sizing"] = round(dim_score, 4)
 
+    # Style dimensions — how the trader trades. These return None when either
+    # side lacks the data to judge; None dims are excluded and weights renormalized
+    # so thin data never fakes a signal in either direction.
+    style_a = ezekiel_fp.get("style_profile", {})
+    style_b = candidate_fp.get("style_profile", {})
+    style_dims = {
+        "activity": compare_activity(style_a, style_b),
+        "direction_bias": compare_direction_bias(style_a, style_b),
+        "position_management": compare_position_management(style_a, style_b),
+        "loss_handling": compare_loss_handling(style_a, style_b),
+    }
+    for name, val in style_dims.items():
+        dimensions[name] = round(val, 4) if val is not None else None
+
     # Dynamic weights: discount account_size for fresh/small candidate wallets.
     # A migrated trader starts with a new account — size comparison is misleading early on.
     weights = {
-        "asset_preferences": 0.25,
-        "timing_profile": 0.18,
-        "leverage_profile": 0.13,
-        "entry_exit_style": 0.10,
-        "hold_duration": 0.11,
-        "account_size": 0.08,
-        "trade_sequencing": 0.08,
-        "position_sizing": 0.07,
+        "asset_preferences": 0.20,
+        "timing_profile": 0.14,
+        "leverage_profile": 0.10,
+        "entry_exit_style": 0.07,
+        "hold_duration": 0.09,
+        "account_size": 0.06,
+        "trade_sequencing": 0.06,
+        "position_sizing": 0.05,
+        # Direction bias is regime-dependent (the target flips long/short with
+        # market view) — kept tiny; activity/management carry the style weight.
+        "activity": 0.11,
+        "direction_bias": 0.03,
+        "position_management": 0.06,
+        "loss_handling": 0.03,
     }
 
     candidate_acct_val = float(
@@ -333,7 +535,10 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
         weights["asset_preferences"] += redistributed * 0.6
         weights["timing_profile"] += redistributed * 0.4
 
-    weighted_sum = sum(dimensions.get(k, 0) * w for k, w in weights.items())
+    # Exclude dims with no data (None) and renormalize the remaining weights
+    usable = {k: w for k, w in weights.items() if dimensions.get(k) is not None and w > 0}
+    total_w = sum(usable.values()) or 1.0
+    weighted_sum = sum(dimensions[k] * (w / total_w) for k, w in usable.items())
 
     # Apply conservative penalties for mismatches that are especially useful
     # when trying to identify a migrated human rather than a similar trader.
@@ -351,13 +556,19 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
 
     score = max(0.0, weighted_sum - penalty)
 
+    # Hard style vetoes: an incompatible defining trait caps the score below
+    # alert tiers regardless of how similar the coarse distributions look.
+    vetoes = check_style_vetoes(ezekiel_fp, candidate_fp)
+    if vetoes:
+        score = min(score, VETO_SCORE_CAP)
+
     # xyz: HIP-3 market bonus — trading these exotic markets is extremely rare.
     # Any overlap here is near-conclusive behavioral evidence of the same trader.
     if overlap.get("rare_overlap"):
-        score = min(1.0, score + 0.12)
+        score = min(VETO_BONUS_CEILING if vetoes else 1.0, score + 0.12)
 
     score = round(score, 4)
-    evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score)
+    evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score, vetoes)
     return score, dimensions, evidence
 
 
@@ -376,7 +587,8 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
     """Build a mini-fingerprint for a candidate wallet from their data.
     Now includes all 8 comparable dimensions (trade_sequencing, position_sizing added)."""
     from src.fingerprint import (
-        compute_leverage_profile, compute_hold_duration, compute_entry_exit_style
+        compute_leverage_profile, compute_hold_duration, compute_entry_exit_style,
+        compute_style_profile,
     )
 
     positions = state
@@ -395,6 +607,7 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
         "hold_duration": compute_hold_duration(fills),
         "trade_sequencing": compute_trade_sequencing(fills),
         "position_sizing": compute_position_sizing(fills, positions),
+        "style_profile": compute_style_profile(fills),
         "account_characteristics": {
             "account_value_usd": acct_val,
             "weekly_volume_usd": _estimate_weekly_volume(fills),
@@ -439,6 +652,7 @@ def _summarize_fingerprint(fp: dict) -> dict:
         "position_sizing": {
             "size_to_account_ratio": fp.get("position_sizing", {}).get("size_to_account_ratio", {}),
         },
+        "style_profile": fp.get("style_profile", {}),
         "account_characteristics": fp.get("account_characteristics", {}),
     }
 
@@ -662,7 +876,8 @@ def _apply_linkage(result: dict, target: str, profile: dict) -> float:
     if link.get("linkage_bonus", 0) > 0:
         result["evidence"].setdefault("reasons", []).extend(link["reasons"])
         result["evidence"]["linkage"] = link
-        result["score"] = round(min(1.0, result["score"] + link["linkage_bonus"]), 4)
+        cap = VETO_BONUS_CEILING if result["evidence"].get("vetoes") else 1.0
+        result["score"] = round(min(cap, result["score"] + link["linkage_bonus"]), 4)
         print(f"[scanner] Linkage for {wallet[:10]}...: +{link['linkage_bonus']} {link['reasons']}")
         alert_linkage_match(wallet, link["reasons"], result["score"])
     return result["score"]
@@ -672,8 +887,9 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
     """Scan high-priority candidates before the leaderboard sweep:
     fund-flow destinations, subaccounts, and recent large bridge depositors.
     Returns scored results and fires combined alerts when both vectors agree."""
-    thresholds = config["alert_thresholds"]
-    candidate_threshold = config["scanner"].get("candidate_threshold", 0.65)
+    thresholds = _effective_thresholds(config["alert_thresholds"])
+    candidate_threshold = min(config["scanner"].get("candidate_threshold", 0.65),
+                              thresholds["similarity_low"])
 
     # Collect priority wallets with their source metadata
     priority: dict[str, dict] = {}
@@ -783,20 +999,21 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
             alert_xyz_signature_match(wallet, rare, score)
 
         # Vault, referral, and L1-clustering checks for promising candidates
+        bonus_cap = VETO_BONUS_CEILING if result["evidence"].get("vetoes") else 1.0
         if score >= 0.70 or rare:
             shared_vaults = _check_vault_overlap(wallet, target_vaults)
             if shared_vaults:
                 result["evidence"]["reasons"].append(
                     f"Deposits to same HL vault(s): {', '.join(v[:10]+'...' for v in shared_vaults[:2])}"
                 )
-                score = min(1.0, score + 0.08)
+                score = min(bonus_cap, score + 0.08)
                 result["score"] = round(score, 4)
                 print(f"[scanner] Vault overlap for {wallet[:10]}...: {shared_vaults}")
                 alert_vault_match(wallet, shared_vaults)
 
             if _check_referral_link(wallet, target_referral_addrs):
                 result["evidence"]["reasons"].append("Referral network connection to target wallet")
-                score = min(1.0, score + 0.06)
+                score = min(bonus_cap, score + 0.06)
                 result["score"] = round(score, 4)
                 print(f"[scanner] Referral link for {wallet[:10]}...")
 
@@ -812,7 +1029,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
         if score >= candidate_threshold or rare:
             persist_candidate(result)
 
-        if score >= thresholds["similarity_high"]:
+        if _should_alert_behavioral(wallet, score, thresholds,
+                                    vetoes=result["evidence"].get("vetoes")):
             alert_behavioral_match(wallet, score, result["dimensions"])
 
         # Combined alert: fund flow hit + behavioral match on the same wallet
@@ -839,7 +1057,7 @@ def scan_leaderboard():
     """Main scanning loop: check leaderboard wallets against fingerprint."""
     config = load_config()
     target = config["target_wallet"].lower()
-    thresholds = config["alert_thresholds"]
+    thresholds = _effective_thresholds(config["alert_thresholds"])
     scanner_config = config["scanner"]
 
     # Load fingerprint — prefer recent (21-day window) for fair candidate comparison
@@ -869,11 +1087,14 @@ def scan_leaderboard():
     max_wallets = scanner_config["max_leaderboard_wallets"]
     min_fills = scanner_config["min_fills_for_comparison"]
     lookback_days = scanner_config["fills_lookback_days"]
-    candidate_threshold = scanner_config.get("candidate_threshold", 0.65)
+    candidate_threshold = min(scanner_config.get("candidate_threshold", 0.65),
+                              thresholds["similarity_low"])
 
     results = list(priority_results)  # Start with priority results
     top_scores = [{"wallet": r["wallet"][:10], "score": r["score"]} for r in priority_results]
     scanned = 0
+    population = calibration.load_population()
+    sweep_scores = []  # this sweep's scores → next sweep's null distribution
 
     for entry in leaderboard[:max_wallets]:
         wallet = entry.get("ethAddress", entry.get("address", ""))
@@ -893,10 +1114,12 @@ def scan_leaderboard():
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
         score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp)
+        sweep_scores.append(score)
 
         result = {
             "wallet": wallet,
             "score": score,
+            "score_percentile": calibration.score_percentile(score, population),
             "dimensions": dimensions,
             "evidence": evidence,
             "fills_count": len(fills),
@@ -924,13 +1147,18 @@ def scan_leaderboard():
 
         if score >= thresholds["similarity_high"]:
             print(f"[scanner] HIGH MATCH: {wallet} (score={score:.4f})")
-            alert_behavioral_match(wallet, score, dimensions)
+            if _should_alert_behavioral(wallet, score, thresholds, population,
+                                        vetoes=evidence.get("vetoes")):
+                alert_behavioral_match(wallet, score, dimensions)
         elif score >= thresholds["similarity_medium"]:
             print(f"[scanner] MEDIUM MATCH: {wallet} (score={score:.4f})")
 
         time.sleep(0.5)
 
     print(f"[scanner] Top 5 scores: {top_scores[:5]}")
+
+    pop_size = calibration.record_population_scores(sweep_scores)
+    print(f"[scanner] Calibration population: {pop_size} samples")
 
     results.sort(key=lambda r: r["score"], reverse=True)
 
@@ -958,7 +1186,10 @@ def scan_leaderboard():
             days_silent = (time.time() * 1000 - last_fill_ts) / (24 * 60 * 60 * 1000)
             if days_silent >= 5 and results:
                 top = results[0]
-                if top["score"] >= 0.75:
+                corr_threshold = min(0.75, thresholds["similarity_medium"])
+                if (top["score"] >= corr_threshold
+                        and not top.get("evidence", {}).get("vetoes")
+                        and calibration.passes_percentile_gate(top["score"], population)):
                     print(f"[scanner] MIGRATION CORRELATION: {days_silent:.1f}d silence + {top['score']:.4f} candidate")
                     alert_migration_correlation(top["wallet"], top["score"], round(days_silent, 1))
     except Exception as e:

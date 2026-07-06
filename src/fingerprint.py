@@ -422,6 +422,142 @@ def compute_account_characteristics(positions: dict, fills: list[dict]) -> dict:
     }
 
 
+def _signed_size(fill: dict) -> float:
+    sz = float(fill.get("sz", 0))
+    return sz if fill.get("side") == "B" else -sz
+
+
+def _position_episodes(fills: list[dict]) -> list[list[dict]]:
+    """Reconstruct position episodes per coin: an episode runs from a flat
+    position until the position returns to (approximately) zero."""
+    coin_fills = defaultdict(list)
+    for f in fills:
+        if f.get("dir") in ("Buy", "Sell"):  # spot fills have no position lifecycle
+            continue
+        coin_fills[f.get("coin", "UNKNOWN")].append(f)
+
+    episodes = []
+    for coin, cf in coin_fills.items():
+        cf.sort(key=lambda t: t.get("time", 0))
+        current = []
+        for f in cf:
+            start_pos = float(f.get("startPosition", 0) or 0)
+            end_pos = start_pos + _signed_size(f)
+            if not current and start_pos == 0 and end_pos == 0:
+                continue
+            current.append(f)
+            # Position flat again (tolerance for float dust relative to fill size)
+            if abs(end_pos) < max(1e-9, abs(_signed_size(f)) * 1e-6):
+                episodes.append(current)
+                current = []
+        if current:
+            episodes.append(current)  # still-open episode
+    return episodes
+
+
+def compute_style_profile(fills: list[dict], min_fills: int = 15) -> dict:
+    """Style traits that distinguish HOW a trader trades — the dimensions a human
+    reads as 'trading style'. Added after a false positive where a matched wallet
+    had strong asset/timing overlap but an obviously different style."""
+    profile = {"sufficient_data": len(fills) >= min_fills}
+    if not fills:
+        return profile
+
+    episodes = _position_episodes(fills)
+
+    # --- Activity: decision frequency is the most discriminative style trait.
+    # Episodes/day (position round-trips) is the primary measure — raw fill
+    # counts are inflated by TWAP execution and vary wildly for the same human.
+    timestamps = sorted(f.get("time", 0) for f in fills if f.get("time"))
+    if timestamps:
+        span_days = max(1.0, (timestamps[-1] - timestamps[0]) / 86_400_000)
+        active_days = len({ts // 86_400_000 for ts in timestamps})
+        profile["activity"] = {
+            "episodes_per_day": round(len(episodes) / span_days, 3),
+            "fills_per_day": round(len(fills) / span_days, 2),
+            "active_days_ratio": round(active_days / max(1, int(span_days) + 1), 4),
+            "span_days": round(span_days, 1),
+        }
+
+    # --- Direction bias: long vs short opens (flips count as opening the new side)
+    long_opens = sum(1 for f in fills if f.get("dir") in ("Open Long", "Short > Long"))
+    short_opens = sum(1 for f in fills if f.get("dir") in ("Open Short", "Long > Short"))
+    total_opens = long_opens + short_opens
+    if total_opens:
+        profile["direction"] = {
+            "long_open_pct": round(long_opens / total_opens, 4),
+            "short_open_pct": round(short_opens / total_opens, 4),
+            "total_opens": total_opens,
+        }
+
+    # --- Position management: scaling in/out habits via episode reconstruction
+    if episodes:
+        fills_per_ep = [len(ep) for ep in episodes]
+        arr = np.array(fills_per_ep)
+        profile["position_management"] = {
+            "episodes": len(episodes),
+            "mean_fills_per_episode": round(float(np.mean(arr)), 2),
+            "median_fills_per_episode": round(float(np.median(arr)), 1),
+        }
+
+    # --- Loss handling: does the trader cut losers fast or hold them?
+    winner_holds, loser_holds, wins, losses = [], [], [], []
+    for ep in episodes:
+        start = ep[0].get("time", 0)
+        for f in ep:
+            pnl = float(f.get("closedPnl", 0) or 0)
+            if pnl == 0:
+                continue
+            hold_min = (f.get("time", 0) - start) / 60000
+            if pnl > 0:
+                wins.append(pnl)
+                winner_holds.append(hold_min)
+            else:
+                losses.append(-pnl)
+                loser_holds.append(hold_min)
+    if wins or losses:
+        lh = {
+            "closed_wins": len(wins),
+            "closed_losses": len(losses),
+        }
+        if winner_holds:
+            lh["median_winner_hold_min"] = round(float(np.median(winner_holds)), 1)
+        if loser_holds:
+            lh["median_loser_hold_min"] = round(float(np.median(loser_holds)), 1)
+        if winner_holds and loser_holds:
+            med_w = max(0.1, float(np.median(winner_holds)))
+            lh["loser_to_winner_hold_ratio"] = round(float(np.median(loser_holds)) / med_w, 3)
+        if wins and losses:
+            lh["win_loss_magnitude_ratio"] = round(
+                float(np.mean(wins)) / max(1e-9, float(np.mean(losses))), 3)
+        profile["loss_handling"] = lh
+
+    # --- Execution habits: TWAP usage and perp/spot mix
+    twap_fills = sum(1 for f in fills if f.get("twapId"))
+    spot_fills = sum(1 for f in fills if f.get("dir") in ("Buy", "Sell"))
+    profile["execution"] = {
+        "twap_ratio": round(twap_fills / len(fills), 4),
+        "spot_fill_ratio": round(spot_fills / len(fills), 4),
+    }
+
+    # --- Clip sizes: account-size-invariant order size habits
+    notionals = [float(f.get("sz", 0)) * float(f.get("px", 0)) for f in fills]
+    notionals = [n for n in notionals if n > 0]
+    if notionals:
+        arr = np.array(notionals)
+        mean_n = float(np.mean(arr))
+        round_pref = sum(
+            1 for f in fills
+            if len(str(f.get("sz", "")).rstrip("0").rstrip(".").replace(".", "").lstrip("0")) <= 2
+        ) / len(fills)
+        profile["clip_sizes"] = {
+            "notional_cv": round(float(np.std(arr)) / max(1e-9, mean_n), 4),
+            "round_size_pref": round(round_pref, 4),
+        }
+
+    return profile
+
+
 def build_fingerprint(fills: list[dict] | None = None) -> dict:
     """Build the complete behavioral fingerprint."""
     if fills is None:
@@ -462,6 +598,7 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         "risk_management": compute_risk_management(fills, positions, funding),
         "trade_sequencing": compute_trade_sequencing(fills),
         "account_characteristics": compute_account_characteristics(positions, fills),
+        "style_profile": compute_style_profile(fills),
     }
 
     return fingerprint
@@ -494,6 +631,7 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
         "entry_exit_style": compute_entry_exit_style(recent),
         "trade_sequencing": compute_trade_sequencing(recent),
         "account_characteristics": compute_account_characteristics(positions, recent),
+        "style_profile": compute_style_profile(recent),
     }
 
 
@@ -536,6 +674,13 @@ def main():
         print("[fingerprint] Not enough recent fills for recent fingerprint (need >=20)")
 
     print(f"[fingerprint] Dimensions computed: {len([k for k in fingerprint if k not in ['version', 'computed_at', 'data_range']])}")
+
+    # Validate the scorer against Ezekiel's own history (non-fatal on failure)
+    try:
+        from src.backtest import run_backtest
+        run_backtest()
+    except Exception as e:
+        print(f"[fingerprint] Backtest failed to run: {e}")
 
 
 if __name__ == "__main__":

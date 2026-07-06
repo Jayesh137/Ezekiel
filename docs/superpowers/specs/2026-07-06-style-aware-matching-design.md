@@ -11,9 +11,10 @@ penalties are too weak to veto; (4) scores are uncalibrated against the populati
 
 `compute_style_profile(fills)` — added to the full, recent, and candidate fingerprints:
 
-- **activity**: fills/day over the active span, active-days ratio.
-- **direction**: share of position-opens that are long vs short (from `dir`); whether the
-  trader shorts at all.
+- **activity**: position episodes/day (decision frequency — primary; raw fill counts are
+  TWAP-inflated ~10x for the same human), fills/day, active-days ratio.
+- **direction**: share of position-opens that are long vs short (from `dir`). Regime-
+  dependent (the target flips all-long ↔ all-short), so low weight and never a veto.
 - **position_management**: avg fills per position episode (scale-in/out habit), avg opens
   and closes per episode.
 - **loss_handling**: median hold minutes for losing vs winning closes, avg win / avg loss
@@ -25,16 +26,18 @@ penalties are too weak to veto; (4) scores are uncalibrated against the populati
 
 ## 2. Scoring changes (`src/scanner.py`)
 
-- New comparison dimensions with weights (total rebalanced to 1.0): activity 0.09,
-  direction_bias 0.07, position_management 0.04, loss_handling 0.03; existing dims reduced
+- New comparison dimensions with weights (total rebalanced to 1.0): activity 0.11,
+  direction_bias 0.03, position_management 0.06, loss_handling 0.03; existing dims reduced
   proportionally (asset_preferences 0.20, timing 0.14, leverage 0.10, hold_duration 0.09,
   entry_exit 0.07, account_size 0.06, trade_sequencing 0.06, position_sizing 0.05).
 - `None` dimensions are dropped and remaining weights renormalized.
 - **Hard vetoes** (applied only when both sides have `sufficient_data`); a veto caps the
-  final score at 0.45 (below WEAK_LEAD) and records the reason in `evidence["vetoes"]`:
-  - fills/day ratio > 5× apart;
-  - scalper/swing incompatibility: one side >70% of closed holds under 1h, other <15%;
-  - shorting incompatibility: one side >25% short opens, other 0% (both with ≥30 opens).
+  final score at 0.45 (below WEAK_LEAD), blocks behavioral alerts entirely, and records
+  the reason in `evidence["vetoes"]`:
+  - decision frequency (episodes/day) > 5× apart;
+  - scalper/swing incompatibility: one side >70% of closed holds under 1h, other <15%.
+  - (No direction/shorting veto: the backtest showed the target flipping all-long ↔
+    all-short between adjacent windows — direction is market view, not identity.)
 - Linkage/vault/xyz bonuses are applied **after** the cap check but a vetoed score stays
   capped at 0.60 max — hard on-chain evidence can still surface it, style mismatch keeps it
   below alert tier.
@@ -56,6 +59,16 @@ penalties are too weak to veto; (4) scores are uncalibrated against the populati
 - **Pass** = self-match ranks #1 with margin ≥ 0.05 over the best stranger. Report saved to
   `profile/backtest.json`; runs automatically at the end of `fingerprint.main()`
   (non-fatal on failure — prints a loud warning instead).
+
+## 4b. Backtest-adapted thresholds
+
+The first real-data backtest showed self-similarity ≈ 0.53 across a regime change —
+config thresholds of 0.90/0.80/0.65 would never fire on the true trader. The scanner now
+derives effective thresholds from the last passing backtest's self-score (high =
+self − 0.02, medium = self − 0.07, low = self − 0.12, floored above the veto cap), so
+alerting tracks what the scorer can actually achieve. Precision comes from the percentile
+gate + persistence + vetoes, not from an unreachable raw bar. Candidate persistence uses
+the effective low threshold too.
 
 ## 5. Alert discipline
 
