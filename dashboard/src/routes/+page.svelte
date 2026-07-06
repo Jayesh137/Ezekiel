@@ -3,7 +3,7 @@
 	import {
 		fetchLatest, fetchFingerprint, fetchIndex, fetchScanResults,
 		fetchPortfolio, fetchAllFunding, fetchFundFlows, fetchCandidates,
-		formatUSD, shortAddr, getAlertState
+		fetchHlTransfers, formatUSD, shortAddr, getAlertState
 	} from '$lib/api.js';
 	import { base } from '$app/paths';
 	import Chart from 'chart.js/auto';
@@ -18,6 +18,7 @@
 	let scan = null;
 	let fundFlows = null;
 	let candidates = null;
+	let hlTransfers = null;
 	let loading = true;
 
 	let portfolio = null;
@@ -34,7 +35,7 @@
 	let allocChart;
 
 	onMount(async () => {
-		[positions, spot, hip3Xyz, fingerprint, index, fees, scan, fundFlows, candidates] = await Promise.all([
+		[positions, spot, hip3Xyz, fingerprint, index, fees, scan, fundFlows, candidates, hlTransfers] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('spot'),
 			fetchLatest('positions_hip3_xyz'),
@@ -44,6 +45,7 @@
 			fetchScanResults(),
 			fetchFundFlows(),
 			fetchCandidates(),
+			fetchHlTransfers(),
 		]);
 		loading = false;
 
@@ -360,7 +362,7 @@
 </script>
 
 {#if !loading}
-	{@const alertState = getAlertState(fundFlows, candidates)}
+	{@const alertState = getAlertState(fundFlows, candidates, hlTransfers)}
 	{#if alertState}
 		<div class="alert-banner alert-{alertState.level}">
 			<span class="alert-label">[{alertState.level.toUpperCase()}]</span>

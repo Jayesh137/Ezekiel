@@ -7,6 +7,7 @@
 		fetchScanResults,
 		fetchCandidates,
 		fetchFundFlows,
+		fetchHlTransfers,
 		formatUSD,
 		shortAddr
 	} from '$lib/api.js';
@@ -19,19 +20,21 @@
 	let scan = null;
 	let candidates = null;
 	let fundFlows = null;
+	let hlTransfers = null;
 	let loading = true;
 
 	let timelineChartEl;
 	let timelineChart;
 
 	onMount(async () => {
-		[positions, hip3Xyz, index, scan, candidates, fundFlows] = await Promise.all([
+		[positions, hip3Xyz, index, scan, candidates, fundFlows, hlTransfers] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('positions_hip3_xyz'),
 			fetchIndex(),
 			fetchScanResults(),
 			fetchCandidates(),
 			fetchFundFlows(),
+			fetchHlTransfers(),
 		]);
 		loading = false;
 		await new Promise(r => setTimeout(r, 0));
@@ -214,6 +217,7 @@
 	{@const accountValue = getAccountValue(positions) + getAccountValue(hip3Xyz)}
 	{@const flowFindings = fundFlows?.findings || []}
 	{@const watchlist = candidates?.candidates || []}
+	{@const linkedWallets = (hlTransfers?.counterparties || []).filter(c => c.total_out_usd > 0 || c.known_self)}
 	{@const lastSeenMinutes = minutesSinceLastSeen()}
 
 	<div class="recovery-grid">
@@ -268,6 +272,51 @@
 			{/if}
 		</section>
 	</div>
+
+	{#if linkedWallets.length > 0}
+		<section class="card" style="margin-bottom:16px">
+			<div class="panel-title">
+				<div>
+					<div class="section-kicker">In-Platform Money Trail</div>
+					<h2>Linked Wallets (HL-native transfers)</h2>
+				</div>
+				<span class="count-pill">{linkedWallets.length}</span>
+			</div>
+			<p class="text-muted" style="font-size:0.78rem;margin-bottom:12px">
+				Wallets the target moved funds to/from <strong>entirely inside Hyperliquid</strong> — the most likely migration path, invisible to L1 tracing. A wallet that receives large outbound funds and then starts trading is the prime new-wallet candidate.
+			</p>
+			<table>
+				<thead>
+					<tr>
+						<th>Wallet</th>
+						<th>Sent to</th>
+						<th>Received from</th>
+						<th>Link</th>
+						<th>Last transfer</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each linkedWallets.slice(0, 10) as c}
+						<tr>
+							<td>
+								<a href="https://app.hyperliquid.xyz/explorer/address/{c.wallet}" target="_blank">{shortAddr(c.wallet)}</a>
+								{#if c.known_self}
+									<span class="badge badge-blue" style="font-size:0.6rem">known linked</span>
+								{/if}
+								{#if c.bidirectional}
+									<span class="badge badge-green" style="font-size:0.6rem">two-way</span>
+								{/if}
+							</td>
+							<td class="mono">{formatUSD(c.total_out_usd)}</td>
+							<td class="mono text-muted">{formatUSD(c.total_in_usd)}</td>
+							<td class="mono">{c.transfer_count}×</td>
+							<td class="text-muted mono" style="font-size:0.72rem">{c.last_seen?.split('T')[0] || '-'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</section>
+	{/if}
 
 	<div class="grid-2 main-panels">
 		<section class="card">

@@ -682,7 +682,31 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
         except Exception as e:
             print(f"[scanner] Could not load subaccounts: {e}")
 
-    # 3. Recent large bridge depositors
+    # 3. HL-native transfer counterparties (send / internalTransfer / spotTransfer).
+    # These are wallets the target moved funds to/from ENTIRELY inside Hyperliquid,
+    # never touching L1 — the most likely migration path and invisible to the tracer.
+    hl_transfers_path = DATA_DIR / "hl_transfers" / "latest.json"
+    if hl_transfers_path.exists():
+        try:
+            with open(hl_transfers_path) as f:
+                hl_data = json.load(f)
+            for cp in hl_data.get("counterparties", []):
+                addr = cp.get("wallet", "").lower()
+                if not addr:
+                    continue
+                src = "known_linked" if cp.get("known_self") else "hl_transfer"
+                # Don't downgrade a higher-signal source already recorded.
+                if addr not in priority:
+                    priority[addr] = {
+                        "source": src,
+                        "out_usd": cp.get("total_out_usd", 0),
+                        "in_usd": cp.get("total_in_usd", 0),
+                        "bidirectional": cp.get("bidirectional", False),
+                    }
+        except Exception as e:
+            print(f"[scanner] Could not load hl_transfers: {e}")
+
+    # 4. Recent large bridge depositors
     for addr in get_recent_bridge_depositors():
         if addr not in priority:
             priority[addr] = {"source": "bridge_depositor"}
@@ -736,6 +760,11 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
             alert_combined_match(wallet, score, meta["amount"], meta["method"])
         elif source == "bridge_depositor" and score >= thresholds["similarity_high"]:
             alert_combined_match(wallet, score, "large bridge deposit", "bridge_depositor")
+        elif source in ("hl_transfer", "known_linked") and score >= thresholds["similarity_medium"]:
+            # Funds moved HL-natively to this wallet AND it trades like the target —
+            # the strongest possible in-platform migration signal.
+            amount = f"${meta.get('out_usd', 0):,.0f} sent in-platform"
+            alert_combined_match(wallet, score, amount, f"hl_native_transfer ({source})")
 
         time.sleep(0.5)
 

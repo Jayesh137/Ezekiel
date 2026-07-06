@@ -155,6 +155,27 @@ def alert_vault_match(candidate: str, shared_vaults: list) -> bool:
     return _send_with_cooldown(f"vault_{candidate.lower()}", 72, subject, body)
 
 
+def alert_hl_native_transfer(destination: str, out_usd: float, in_usd: float,
+                             bidirectional: bool, tokens: list) -> bool:
+    """Fire when the target sends significant funds to a wallet ENTIRELY within
+    Hyperliquid (no L1 footprint). This is the most likely migration path and is
+    invisible to the L1 tracer."""
+    subject = "[EZEKIEL] CRITICAL: HL-Native Transfer to New Wallet"
+    token_str = ", ".join(tokens[:5]) if tokens else "USDC"
+    body = (
+        f"The target moved funds to another wallet ENTIRELY INSIDE Hyperliquid.\n"
+        f"This leaves no Arbitrum L1 trace — it is the most likely migration path.\n\n"
+        f"Destination: {destination}\n"
+        f"Sent to this wallet: ${out_usd:,.2f}\n"
+        f"Received from this wallet: ${in_usd:,.2f}\n"
+        f"Two-way relationship: {'YES — very likely same owner' if bidirectional else 'no'}\n"
+        f"Tokens: {token_str}\n\n"
+        f"Action: this wallet is now a top migration candidate. Check the Recovery "
+        f"page — it is being behaviorally scanned automatically.\n"
+    )
+    return _send_with_cooldown(f"hl_transfer_{destination.lower()}", 72, subject, body)
+
+
 def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:
     subject = f"[EZEKIEL] WARNING: Account Value Drop {drop_pct:.0%} — Possible Liquidation"
     body = (

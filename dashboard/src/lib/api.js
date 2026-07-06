@@ -83,6 +83,15 @@ export async function fetchFundFlows() {
 }
 
 /**
+ * Fetch Hyperliquid-native transfer counterparties (send / internalTransfer /
+ * spotTransfer). These are wallets the target moved funds to/from entirely inside
+ * Hyperliquid — the most likely migration path, invisible to L1 tracing.
+ */
+export async function fetchHlTransfers() {
+	return fetchJSON('data/hl_transfers/latest.json');
+}
+
+/**
  * Fetch scan history across all dates to track wallet score trends.
  * @param {object} index - Data index with files.scans dates
  */
@@ -215,17 +224,25 @@ export function getDataFreshnessMinutes(index) {
 }
 
 /**
- * Derive the global alert state from fund flows and candidates.
+ * Derive the global alert state from fund flows, candidates, and HL-native transfers.
  * Returns null when everything is normal, or an object { level, msg, wallet? }.
  * @param {object|null} fundFlows
  * @param {object|null} candidates
+ * @param {object|null} hlTransfers
  */
-export function getAlertState(fundFlows, candidates) {
+export function getAlertState(fundFlows, candidates, hlTransfers) {
 	const findings = fundFlows?.findings || [];
 	const cands = candidates?.candidates || [];
 
 	if (findings.some(f => f.deposited_to_hl)) {
 		return { level: 'critical', msg: 'Fund trace found a wallet that deposited to Hyperliquid.' };
+	}
+	// Large in-platform outbound transfer to a wallet that isn't already known-linked.
+	const freshOut = (hlTransfers?.counterparties || [])
+		.filter(c => !c.known_self && c.total_out_usd >= 50000)
+		.sort((a, b) => b.total_out_usd - a.total_out_usd)[0];
+	if (freshOut) {
+		return { level: 'critical', msg: `Target sent ${formatUSD(freshOut.total_out_usd)} to a new wallet inside Hyperliquid.`, wallet: freshOut.wallet };
 	}
 	if (findings.length > 0) {
 		return { level: 'warn', msg: 'Outbound USDC transfers detected from target wallet.' };

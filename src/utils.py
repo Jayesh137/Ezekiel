@@ -199,6 +199,9 @@ def update_index() -> None:
     snapshot_types = ["positions", "account", "spot", "portfolio",
                       "positions_hip3_xyz"]
 
+    # hl_transfers keeps only a rolling latest.json (no dated snapshots)
+    singleton_latest_types = ["hl_transfers"]
+
     singleton_types = ["candidates"]
 
     for data_type in daily_types:
@@ -247,6 +250,17 @@ def update_index() -> None:
             ])
             index["files"][data_type] = files
             index["stats"][f"total_{data_type}"] = len(files)
+
+    for data_type in singleton_latest_types:
+        latest = DATA_DIR / data_type / "latest.json"
+        if latest.exists():
+            index["files"][data_type] = ["latest.json"]
+            try:
+                with open(latest) as f:
+                    payload = json.load(f)
+                index["stats"][f"total_{data_type}"] = payload.get("counterparty_count", 0)
+            except Exception:
+                pass
 
     index_path = DATA_DIR / "index.json"
     with open(index_path, "w") as f:

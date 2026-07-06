@@ -155,6 +155,17 @@ def collect_portfolio(wallet: str) -> None:
     save_latest(str(DATA_DIR / "portfolio"), portfolio)
 
 
+def analyze_and_alert_hl_transfers() -> None:
+    """Rebuild the HL-native transfer counterparty map from the freshly-collected
+    ledger and alert on any new large outbound transfer to an unknown wallet."""
+    from src.ledger_analyzer import analyze_hl_transfers, check_new_outbound_transfers
+    result = analyze_hl_transfers()
+    print(f"[collector] HL-native counterparties: {result['counterparty_count']}")
+    alerted = check_new_outbound_transfers(result)
+    if alerted:
+        print(f"[collector] {len(alerted)} new HL-native outbound transfer alert(s)")
+
+
 def check_silence() -> None:
     """Alert if the target has not traded in 3+ days. Cooldown: once per 24h."""
     last_fill_ts = read_cursor("last_fill_time")
@@ -235,6 +246,7 @@ def main():
         ("vault equities", lambda: collect_vault_equities(wallet)),
         ("referral", lambda: collect_referral(wallet)),
         ("portfolio", lambda: collect_portfolio(wallet)),
+        ("hl transfer analysis", analyze_and_alert_hl_transfers),
         ("index", update_index),
         ("silence check", check_silence),
         ("account drop check", check_account_value_drop),
