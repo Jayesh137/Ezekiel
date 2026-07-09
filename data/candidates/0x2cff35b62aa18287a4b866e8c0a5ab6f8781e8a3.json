@@ -1,16 +1,15 @@
 {
   "wallet": "0x2cff35b62aa18287a4b866e8c0a5ab6f8781e8a3",
   "first_seen": "2026-07-09T10:30:24.680779+00:00",
-  "last_seen": "2026-07-09T10:30:24.680779+00:00",
-  "best_score": 0.2316,
-  "latest_score": 0.2316,
+  "last_seen": "2026-07-09T22:25:15.324491+00:00",
+  "best_score": 0.2343,
+  "latest_score": 0.2343,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:BRENTOIL",
       "Similar market/limit execution style",
-      "Matching long/short bias",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
@@ -18,7 +17,8 @@
       "Different active trading hours"
     ],
     "vetoes": [
-      "Decision frequency 8x apart (1.00 vs 8.00 position episodes/day)"
+      "Decision frequency 6x apart (1.00 vs 6.00 position episodes/day)",
+      "Incompatible hold style: 0% vs 100% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -27,17 +27,16 @@
       "target_only": [],
       "candidate_only": [
         "xyz:CL",
-        "xyz:EWY",
         "xyz:MU",
-        "xyz:SILVER",
-        "xyz:SPCX",
-        "xyz:TSM"
+        "xyz:SKHX",
+        "xyz:SNDK",
+        "xyz:SPCX"
       ],
       "overlap_count": 1,
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.1429
+      "jaccard": 0.1667
     }
   },
   "score_history": [
@@ -57,6 +56,25 @@
         "activity": 0.5572,
         "direction_bias": 0.863,
         "position_management": 0.8126,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-07-09T22:25:15.324491+00:00",
+      "score": 0.2343,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1667,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.0,
+        "account_size": 0.4541,
+        "trade_sequencing": 0.7574,
+        "position_sizing": 0.5,
+        "activity": 0.4595,
+        "direction_bias": 0.8263,
+        "position_management": 0.8287,
         "loss_handling": null
       }
     }
