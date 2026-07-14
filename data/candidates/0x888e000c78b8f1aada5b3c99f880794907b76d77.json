@@ -1,9 +1,9 @@
 {
   "wallet": "0x888e000c78b8f1aada5b3c99f880794907b76d77",
   "first_seen": "2026-07-06T11:27:20.885483+00:00",
-  "last_seen": "2026-07-14T18:10:32.983949+00:00",
+  "last_seen": "2026-07-14T20:10:51.536415+00:00",
   "best_score": 0.3945,
-  "latest_score": 0.2634,
+  "latest_score": 0.2838,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -16,7 +16,8 @@
       "Different active trading hours"
     ],
     "vetoes": [
-      "Decision frequency 12x apart (1.00 vs 12.00 position episodes/day)"
+      "Decision frequency 10x apart (1.00 vs 10.00 position episodes/day)",
+      "Incompatible hold style: 0% vs 75% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -29,14 +30,13 @@
         "RESOLV",
         "TAO",
         "WLD",
-        "xyz:CL",
-        "xyz:SNDK"
+        "xyz:CL"
       ],
       "overlap_count": 1,
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.125
+      "jaccard": 0.1429
     }
   },
   "score_history": [
@@ -1882,8 +1882,27 @@
         "position_management": 0.8581,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-14T20:10:51.536415+00:00",
+      "score": 0.2838,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": 0.1169,
+        "leverage_profile": 0.6711,
+        "entry_exit_style": 0.5991,
+        "hold_duration": 0.0,
+        "account_size": 0.3113,
+        "trade_sequencing": 0.7256,
+        "position_sizing": 0.1622,
+        "activity": 0.5385,
+        "direction_bias": 0.5818,
+        "position_management": 0.8646,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2569
+  "recent_avg_score": 0.2624
 }
