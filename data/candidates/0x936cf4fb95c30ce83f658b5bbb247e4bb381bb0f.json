@@ -1,9 +1,9 @@
 {
   "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
   "first_seen": "2026-07-09T16:23:24.091306+00:00",
-  "last_seen": "2026-07-15T13:09:23.414052+00:00",
+  "last_seen": "2026-07-15T15:20:43.200155+00:00",
   "best_score": 0.3899,
-  "latest_score": 0.3882,
+  "latest_score": 0.2358,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -13,11 +13,12 @@
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Different active trading hours"
     ],
     "vetoes": [
-      "Decision frequency 12x apart (1.00 vs 12.00 position episodes/day)",
-      "Incompatible hold style: 0% vs 93% of holds under 1h"
+      "Decision frequency 14x apart (1.00 vs 14.00 position episodes/day)",
+      "Incompatible hold style: 0% vs 87% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -26,23 +27,25 @@
       "target_only": [],
       "candidate_only": [
         "@306",
+        "BTC",
         "CC",
+        "EIGEN",
         "ETH",
         "FARTCOIN",
         "GRASS",
         "JTO",
         "LIT",
         "NEAR",
-        "SOL",
         "VVV",
         "WLD",
+        "XPL",
         "xyz:CL"
       ],
       "overlap_count": 1,
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.0769
+      "jaccard": 0.0667
     }
   },
   "score_history": [
@@ -767,8 +770,27 @@
         "position_management": 0.8213,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-15T15:20:43.200155+00:00",
+      "score": 0.2358,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0667,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.772,
+        "entry_exit_style": 0.1536,
+        "hold_duration": 0.0,
+        "account_size": 0.8553,
+        "trade_sequencing": 0.5484,
+        "position_sizing": 0.5,
+        "activity": 0.389,
+        "direction_bias": 0.1618,
+        "position_management": 0.8028,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3027
+  "recent_avg_score": 0.3008
 }
