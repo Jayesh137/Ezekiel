@@ -1,8 +1,8 @@
 {
-  "scan_time": "2026-07-16T05:04:07.898012+00:00",
+  "scan_time": "2026-07-16T07:29:30.458193+00:00",
   "wallets_scanned": 505,
-  "priority_scanned": 8,
-  "matches_found": 45,
+  "priority_scanned": 6,
+  "matches_found": 44,
   "thresholds": {
     "similarity_high": 0.9,
     "similarity_medium": 0.8,
@@ -11,7 +11,11 @@
   "top_scores": [
     {
       "wallet": "0xdf86c7c9",
-      "score": 0.4714
+      "score": 0.4516
+    },
+    {
+      "wallet": "0xad227f63",
+      "score": 0.4154
     },
     {
       "wallet": "0x196556b3",
@@ -26,12 +30,8 @@
       "score": 0.402
     },
     {
-      "wallet": "0x7717a7a2",
-      "score": 0.3959
-    },
-    {
       "wallet": "0x8eff8ff8",
-      "score": 0.3738
+      "score": 0.3835
     },
     {
       "wallet": "0x4e55f58c",
@@ -39,7 +39,7 @@
     },
     {
       "wallet": "0x577a00a0",
-      "score": 0.3611
+      "score": 0.3619
     },
     {
       "wallet": "0x91fd6db0",
@@ -53,17 +53,17 @@
   "results": [
     {
       "wallet": "0xdf86c7c9069e9bd5bac9d97e21f9aa10f728fb86",
-      "score": 0.4714,
+      "score": 0.4516,
       "score_percentile": null,
       "dimensions": {
         "asset_preferences": 0.125,
         "timing_profile": 0.3902,
-        "leverage_profile": 0.745,
+        "leverage_profile": 0.4257,
         "entry_exit_style": 0.9911,
         "hold_duration": 0.0,
-        "account_size": 0.2235,
+        "account_size": 0.3216,
         "trade_sequencing": 0.7509,
-        "position_sizing": 0.046,
+        "position_sizing": 0.1925,
         "activity": 0.8766,
         "direction_bias": 0.6948,
         "position_management": 0.9211,
@@ -78,8 +78,7 @@
           "Similar scaling/TWAP/clip-size habits"
         ],
         "warnings": [
-          "Weak asset overlap",
-          "Very different account-size bracket"
+          "Weak asset overlap"
         ],
         "vetoes": [],
         "asset_overlap": {
@@ -104,7 +103,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:57:27.894143+00:00",
+      "scanned_at": "2026-07-16T07:23:08.755324+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -174,9 +173,9 @@
         },
         "leverage_profile": {
           "overall": {
-            "mean": 10.0,
-            "median": 10.0,
-            "max": 10.0
+            "mean": 17.5,
+            "median": 20.0,
+            "max": 20.0
           }
         },
         "entry_exit_style": {
@@ -213,9 +212,9 @@
         },
         "position_sizing": {
           "size_to_account_ratio": {
-            "mean": 0.4251,
-            "median": 0.0961,
-            "std": 0.7537
+            "mean": 0.0243,
+            "median": 0.0055,
+            "std": 0.0431
           }
         },
         "style_profile": {
@@ -254,8 +253,225 @@
           }
         },
         "account_characteristics": {
-          "account_value_usd": 24846.5,
+          "account_value_usd": 434783.85,
           "weekly_volume_usd": 21122606.41
+        }
+      }
+    },
+    {
+      "wallet": "0xad227f63d34e7251c1d0ab65e64eeea07aee4e44",
+      "score": 0.4154,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.0909,
+        "timing_profile": 0.4241,
+        "leverage_profile": 0.6439,
+        "entry_exit_style": 0.9752,
+        "hold_duration": 0.0,
+        "account_size": 0.5429,
+        "trade_sequencing": 0.6088,
+        "position_sizing": 0.5071,
+        "activity": 0.3997,
+        "direction_bias": 0.1307,
+        "position_management": 0.8403,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar market/limit execution style",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Weak asset overlap"
+        ],
+        "vetoes": [
+          "Decision frequency 12x apart (1.00 vs 12.00 position episodes/day)"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "BTC",
+            "GRASS",
+            "HYPE",
+            "LIT",
+            "VVV",
+            "XPL",
+            "xyz:CL",
+            "xyz:GOLD",
+            "xyz:PURRDAT",
+            "xyz:STRC"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.0909
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:17:17.373686+00:00",
+      "fingerprint": {
+        "asset_preferences": {
+          "coins_traded": [
+            "BTC",
+            "GRASS",
+            "HYPE",
+            "LIT",
+            "VVV",
+            "XPL",
+            "xyz:BRENTOIL",
+            "xyz:CL",
+            "xyz:GOLD",
+            "xyz:PURRDAT",
+            "xyz:STRC"
+          ],
+          "coin_frequency": {
+            "BTC": 0.4585,
+            "HYPE": 0.1725,
+            "GRASS": 0.171,
+            "VVV": 0.052,
+            "XPL": 0.0435,
+            "xyz:PURRDAT": 0.0285,
+            "LIT": 0.021,
+            "xyz:STRC": 0.017,
+            "xyz:CL": 0.012,
+            "xyz:GOLD": 0.012,
+            "xyz:BRENTOIL": 0.012
+          },
+          "top_5_by_volume": [
+            "BTC",
+            "HYPE",
+            "xyz:GOLD",
+            "xyz:CL",
+            "xyz:PURRDAT"
+          ]
+        },
+        "timing_profile": {
+          "hourly_distribution": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.171,
+            0.215,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.169,
+            0.1945,
+            0.0285,
+            0.0065,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0185,
+            0.0995,
+            0.0975
+          ],
+          "most_active_hours_utc": [
+            7,
+            8,
+            13,
+            14,
+            15,
+            22,
+            23
+          ]
+        },
+        "leverage_profile": {
+          "overall": {
+            "mean": 11.57,
+            "median": 10.0,
+            "max": 40.0
+          }
+        },
+        "entry_exit_style": {
+          "order_type_ratio": {
+            "market": 0.815,
+            "limit": 0.185
+          },
+          "win_rate": 0.5345
+        },
+        "hold_duration": {
+          "overall_minutes": {
+            "mean": 340.3,
+            "median": 340.3,
+            "p25": 340.3,
+            "p75": 340.3
+          },
+          "distribution_buckets": {
+            "under_1h": 0.0,
+            "1h_to_4h": 0.0,
+            "4h_to_24h": 1.0,
+            "1d_to_7d": 0.0,
+            "over_7d": 0.0
+          }
+        },
+        "trade_sequencing": {
+          "inter_fill_timing": {
+            "mean_minutes": 3.3,
+            "median_minutes": 0.0
+          },
+          "buy_sell_ratio": {
+            "buy_pct": 0.397,
+            "sell_pct": 0.603
+          }
+        },
+        "position_sizing": {
+          "size_to_account_ratio": {
+            "mean": 0.0035,
+            "median": 0.0003,
+            "std": 0.0102
+          }
+        },
+        "style_profile": {
+          "sufficient_data": true,
+          "activity": {
+            "episodes_per_day": 12.0,
+            "fills_per_day": 2000.0,
+            "active_days_ratio": 0.5,
+            "span_days": 1.0
+          },
+          "direction": {
+            "long_open_pct": 0.1307,
+            "short_open_pct": 0.8693,
+            "total_opens": 719
+          },
+          "position_management": {
+            "episodes": 12,
+            "mean_fills_per_episode": 166.67,
+            "median_fills_per_episode": 49.5
+          },
+          "loss_handling": {
+            "closed_wins": 1069,
+            "closed_losses": 214,
+            "median_winner_hold_min": 20.1,
+            "median_loser_hold_min": 0.1,
+            "loser_to_winner_hold_ratio": 0.004,
+            "win_loss_magnitude_ratio": 8.529
+          },
+          "execution": {
+            "twap_ratio": 0.0,
+            "spot_fill_ratio": 0.0
+          },
+          "clip_sizes": {
+            "notional_cv": 2.9131,
+            "round_size_pref": 0.243
+          }
+        },
+        "account_characteristics": {
+          "account_value_usd": 3427372.11,
+          "weekly_volume_usd": 23938164.49
         }
       }
     },
@@ -269,9 +485,9 @@
         "leverage_profile": 0.298,
         "entry_exit_style": 0.9586,
         "hold_duration": 0.0,
-        "account_size": 0.3959,
+        "account_size": 0.3954,
         "trade_sequencing": 0.5993,
-        "position_sizing": 0.0614,
+        "position_sizing": 0.0606,
         "activity": 0.66,
         "direction_bias": 0.832,
         "position_management": 0.8018,
@@ -319,7 +535,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:03:06.301091+00:00",
+      "scanned_at": "2026-07-16T07:28:36.444461+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -446,9 +662,9 @@
         },
         "position_sizing": {
           "size_to_account_ratio": {
-            "mean": 0.2384,
-            "median": 0.0475,
-            "std": 0.5871
+            "mean": 0.2453,
+            "median": 0.0489,
+            "std": 0.6042
           }
         },
         "style_profile": {
@@ -487,7 +703,7 @@
           }
         },
         "account_characteristics": {
-          "account_value_usd": 26921.98,
+          "account_value_usd": 26158.74,
           "weekly_volume_usd": 5928237.43
         }
       }
@@ -502,9 +718,9 @@
         "leverage_profile": 0.745,
         "entry_exit_style": 0.5833,
         "hold_duration": 0.0,
-        "account_size": 0.203,
+        "account_size": 0.2015,
         "trade_sequencing": 0.4909,
-        "position_sizing": 0.016,
+        "position_sizing": 0.0146,
         "activity": 0.6687,
         "direction_bias": 0.4881,
         "position_management": 0.8099,
@@ -541,7 +757,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:58:42.883874+00:00",
+      "scanned_at": "2026-07-16T07:24:36.773624+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -646,9 +862,9 @@
         },
         "position_sizing": {
           "size_to_account_ratio": {
-            "mean": 3.5131,
-            "median": 0.7094,
-            "std": 15.2544
+            "mean": 4.2189,
+            "median": 0.8519,
+            "std": 18.3193
           }
         },
         "style_profile": {
@@ -687,7 +903,7 @@
           }
         },
         "account_characteristics": {
-          "account_value_usd": 7752.3,
+          "account_value_usd": 6455.3,
           "weekly_volume_usd": 22719088.35
         }
       }
@@ -702,7 +918,7 @@
         "leverage_profile": 0.6711,
         "entry_exit_style": 0.6038,
         "hold_duration": 0.0,
-        "account_size": 0.4784,
+        "account_size": 0.4788,
         "trade_sequencing": 0.5696,
         "position_sizing": 0.281,
         "activity": 0.7256,
@@ -752,7 +968,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:57:05.200259+00:00",
+      "scanned_at": "2026-07-16T07:23:01.383979+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -883,7 +1099,7 @@
           "size_to_account_ratio": {
             "mean": 0.0114,
             "median": 0.0022,
-            "std": 0.0304
+            "std": 0.0302
           }
         },
         "style_profile": {
@@ -922,655 +1138,26 @@
           }
         },
         "account_characteristics": {
-          "account_value_usd": 422410.41,
+          "account_value_usd": 425205.88,
           "weekly_volume_usd": 6355315.58
         }
       }
     },
     {
-      "wallet": "0x7717a7a245d9f950e586822b8c9b46863ed7bd7e",
-      "score": 0.3959,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.0068,
-        "timing_profile": 0.5781,
-        "leverage_profile": 0.7114,
-        "entry_exit_style": 0.5097,
-        "hold_duration": 0.0,
-        "account_size": 0.718,
-        "trade_sequencing": 0.7727,
-        "position_sizing": 0.5,
-        "activity": 0.2965,
-        "direction_bias": 0.1076,
-        "position_management": 0.7434,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar account-size bracket"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Very different trading frequency"
-        ],
-        "vetoes": [
-          "Decision frequency 148x apart (1.00 vs 148.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 100% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "2Z",
-            "AAVE",
-            "ACE",
-            "ADA",
-            "AERO",
-            "AIXBT",
-            "ALGO",
-            "ALT",
-            "ANIME",
-            "APE",
-            "APT",
-            "AR",
-            "ASTER",
-            "ATOM",
-            "AVNT",
-            "AXS",
-            "BABY",
-            "BANANA",
-            "BCH",
-            "BERA",
-            "BIGTIME",
-            "BIO",
-            "BLUR",
-            "BNB",
-            "BRETT",
-            "BSV",
-            "BTC",
-            "CAKE",
-            "CC",
-            "CHIP",
-            "COMP",
-            "DASH",
-            "DOGE",
-            "DOT",
-            "DYDX",
-            "DYM",
-            "EIGEN",
-            "ENA",
-            "ENS",
-            "ETC",
-            "ETH",
-            "ETHFI",
-            "FARTCOIN",
-            "FET",
-            "FIL",
-            "FOGO",
-            "GALA",
-            "GMT",
-            "GMX",
-            "GOAT",
-            "GRASS",
-            "GRIFFAIN",
-            "HBAR",
-            "HEMI",
-            "HMSTR",
-            "HYPE",
-            "HYPER",
-            "ICP",
-            "INIT",
-            "INJ",
-            "IO",
-            "JTO",
-            "JUP",
-            "KAITO",
-            "KAS",
-            "LAYER",
-            "LDO",
-            "LINK",
-            "LIT",
-            "LTC",
-            "MANTA",
-            "ME",
-            "MEGA",
-            "MERL",
-            "MET",
-            "MON",
-            "MOODENG",
-            "NEAR",
-            "NEO",
-            "NIL",
-            "NOT",
-            "NXPC",
-            "ONDO",
-            "OP",
-            "ORDI",
-            "PENDLE",
-            "PENGU",
-            "PEOPLE",
-            "PNUT",
-            "POL",
-            "POLYX",
-            "POPCAT",
-            "PROVE",
-            "PUMP",
-            "PYTH",
-            "RENDER",
-            "RESOLV",
-            "REZ",
-            "RUNE",
-            "S",
-            "SAGA",
-            "SAND",
-            "SEI",
-            "SKR",
-            "SKY",
-            "SNX",
-            "SOL",
-            "SPX",
-            "STABLE",
-            "STRK",
-            "STX",
-            "SUI",
-            "SUSHI",
-            "SYRUP",
-            "TAO",
-            "TIA",
-            "TNSR",
-            "TRB",
-            "TRUMP",
-            "TURBO",
-            "UNI",
-            "USUAL",
-            "VIRTUAL",
-            "VVV",
-            "W",
-            "WLD",
-            "XAI",
-            "XLM",
-            "XMR",
-            "XPL",
-            "XRP",
-            "YGG",
-            "ZEC",
-            "ZEN",
-            "ZETA",
-            "ZK",
-            "ZORA",
-            "ZRO",
-            "kBONK",
-            "kFLOKI",
-            "kLUNC",
-            "kNEIRO",
-            "kPEPE",
-            "kSHIB",
-            "xyz:GOLD",
-            "xyz:INTC",
-            "xyz:SPCX"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.0068
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:49:14.057502+00:00",
-      "fingerprint": {
-        "asset_preferences": {
-          "coins_traded": [
-            "2Z",
-            "AAVE",
-            "ACE",
-            "ADA",
-            "AERO",
-            "AIXBT",
-            "ALGO",
-            "ALT",
-            "ANIME",
-            "APE",
-            "APT",
-            "AR",
-            "ASTER",
-            "ATOM",
-            "AVNT",
-            "AXS",
-            "BABY",
-            "BANANA",
-            "BCH",
-            "BERA",
-            "BIGTIME",
-            "BIO",
-            "BLUR",
-            "BNB",
-            "BRETT",
-            "BSV",
-            "BTC",
-            "CAKE",
-            "CC",
-            "CHIP",
-            "COMP",
-            "DASH",
-            "DOGE",
-            "DOT",
-            "DYDX",
-            "DYM",
-            "EIGEN",
-            "ENA",
-            "ENS",
-            "ETC",
-            "ETH",
-            "ETHFI",
-            "FARTCOIN",
-            "FET",
-            "FIL",
-            "FOGO",
-            "GALA",
-            "GMT",
-            "GMX",
-            "GOAT",
-            "GRASS",
-            "GRIFFAIN",
-            "HBAR",
-            "HEMI",
-            "HMSTR",
-            "HYPE",
-            "HYPER",
-            "ICP",
-            "INIT",
-            "INJ",
-            "IO",
-            "JTO",
-            "JUP",
-            "KAITO",
-            "KAS",
-            "LAYER",
-            "LDO",
-            "LINK",
-            "LIT",
-            "LTC",
-            "MANTA",
-            "ME",
-            "MEGA",
-            "MERL",
-            "MET",
-            "MON",
-            "MOODENG",
-            "NEAR",
-            "NEO",
-            "NIL",
-            "NOT",
-            "NXPC",
-            "ONDO",
-            "OP",
-            "ORDI",
-            "PENDLE",
-            "PENGU",
-            "PEOPLE",
-            "PNUT",
-            "POL",
-            "POLYX",
-            "POPCAT",
-            "PROVE",
-            "PUMP",
-            "PYTH",
-            "RENDER",
-            "RESOLV",
-            "REZ",
-            "RUNE",
-            "S",
-            "SAGA",
-            "SAND",
-            "SEI",
-            "SKR",
-            "SKY",
-            "SNX",
-            "SOL",
-            "SPX",
-            "STABLE",
-            "STRK",
-            "STX",
-            "SUI",
-            "SUSHI",
-            "SYRUP",
-            "TAO",
-            "TIA",
-            "TNSR",
-            "TRB",
-            "TRUMP",
-            "TURBO",
-            "UNI",
-            "USUAL",
-            "VIRTUAL",
-            "VVV",
-            "W",
-            "WLD",
-            "XAI",
-            "XLM",
-            "XMR",
-            "XPL",
-            "XRP",
-            "YGG",
-            "ZEC",
-            "ZEN",
-            "ZETA",
-            "ZK",
-            "ZORA",
-            "ZRO",
-            "kBONK",
-            "kFLOKI",
-            "kLUNC",
-            "kNEIRO",
-            "kPEPE",
-            "kSHIB",
-            "xyz:BRENTOIL",
-            "xyz:GOLD",
-            "xyz:INTC",
-            "xyz:SPCX"
-          ],
-          "coin_frequency": {
-            "ZEC": 0.0545,
-            "WLD": 0.0465,
-            "LIT": 0.0455,
-            "SPX": 0.0345,
-            "ONDO": 0.027,
-            "HMSTR": 0.025,
-            "ENA": 0.0235,
-            "BTC": 0.023,
-            "xyz:SPCX": 0.0225,
-            "SOL": 0.0225,
-            "ACE": 0.022,
-            "HYPE": 0.0205,
-            "VVV": 0.02,
-            "PUMP": 0.019,
-            "FARTCOIN": 0.019,
-            "EIGEN": 0.0185,
-            "AR": 0.0175,
-            "MANTA": 0.017,
-            "AAVE": 0.017,
-            "LDO": 0.016,
-            "xyz:BRENTOIL": 0.0155,
-            "DYDX": 0.015,
-            "ZETA": 0.0145,
-            "NIL": 0.0115,
-            "ETH": 0.011,
-            "RESOLV": 0.011,
-            "TURBO": 0.0105,
-            "NEAR": 0.01,
-            "ORDI": 0.01,
-            "HYPER": 0.009,
-            "INJ": 0.009,
-            "XPL": 0.0085,
-            "kSHIB": 0.0085,
-            "SAGA": 0.0085,
-            "XLM": 0.0085,
-            "ZORA": 0.008,
-            "kPEPE": 0.008,
-            "REZ": 0.0075,
-            "XAI": 0.0075,
-            "MON": 0.0075,
-            "BCH": 0.0075,
-            "ANIME": 0.007,
-            "DOGE": 0.007,
-            "AERO": 0.0065,
-            "SKY": 0.0065,
-            "GMX": 0.0065,
-            "PNUT": 0.0065,
-            "DOT": 0.006,
-            "FET": 0.006,
-            "XRP": 0.0055,
-            "ALGO": 0.0055,
-            "PEOPLE": 0.0055,
-            "APE": 0.0055,
-            "TIA": 0.0055,
-            "S": 0.0055,
-            "PYTH": 0.005,
-            "MEGA": 0.005,
-            "TRUMP": 0.005,
-            "SUSHI": 0.005,
-            "GMT": 0.005,
-            "kFLOKI": 0.005,
-            "ENS": 0.005,
-            "KAS": 0.005,
-            "CHIP": 0.0045,
-            "GALA": 0.0045,
-            "DASH": 0.0045,
-            "PENDLE": 0.004,
-            "POL": 0.004,
-            "IO": 0.004,
-            "RUNE": 0.004,
-            "GRIFFAIN": 0.004,
-            "NOT": 0.004,
-            "LAYER": 0.0035,
-            "MERL": 0.0035,
-            "PENGU": 0.0035,
-            "HBAR": 0.003,
-            "GRASS": 0.003,
-            "AIXBT": 0.003,
-            "2Z": 0.003,
-            "RENDER": 0.003,
-            "COMP": 0.003,
-            "CC": 0.003,
-            "SAND": 0.0025,
-            "ETC": 0.0025,
-            "UNI": 0.0025,
-            "ME": 0.0025,
-            "AVNT": 0.0025,
-            "FIL": 0.0025,
-            "USUAL": 0.0025,
-            "BANANA": 0.002,
-            "BABY": 0.002,
-            "LINK": 0.002,
-            "TNSR": 0.002,
-            "BIGTIME": 0.002,
-            "SEI": 0.002,
-            "PROVE": 0.002,
-            "SKR": 0.002,
-            "BIO": 0.002,
-            "SNX": 0.002,
-            "VIRTUAL": 0.0015,
-            "BERA": 0.0015,
-            "MOODENG": 0.0015,
-            "KAITO": 0.0015,
-            "JUP": 0.0015,
-            "ADA": 0.0015,
-            "SYRUP": 0.0015,
-            "POPCAT": 0.0015,
-            "STRK": 0.0015,
-            "YGG": 0.0015,
-            "kLUNC": 0.0015,
-            "kNEIRO": 0.0015,
-            "ATOM": 0.0015,
-            "LTC": 0.0015,
-            "NXPC": 0.0015,
-            "MET": 0.0015,
-            "GOAT": 0.0015,
-            "BSV": 0.001,
-            "BRETT": 0.001,
-            "SUI": 0.001,
-            "ZK": 0.001,
-            "xyz:INTC": 0.001,
-            "INIT": 0.001,
-            "ZEN": 0.001,
-            "NEO": 0.001,
-            "STX": 0.001,
-            "TAO": 0.001,
-            "STABLE": 0.001,
-            "POLYX": 0.001,
-            "W": 0.001,
-            "CAKE": 0.001,
-            "APT": 0.001,
-            "TRB": 0.001,
-            "AXS": 0.001,
-            "BLUR": 0.001,
-            "XMR": 0.0005,
-            "kBONK": 0.0005,
-            "FOGO": 0.0005,
-            "DYM": 0.0005,
-            "ETHFI": 0.0005,
-            "ICP": 0.0005,
-            "BNB": 0.0005,
-            "ZRO": 0.0005,
-            "xyz:GOLD": 0.0005,
-            "OP": 0.0005,
-            "HEMI": 0.0005,
-            "ALT": 0.0005,
-            "JTO": 0.0005,
-            "ASTER": 0.0005
-          },
-          "top_5_by_volume": [
-            "BTC",
-            "ZEC",
-            "HYPE",
-            "ETH",
-            "LIT"
-          ]
-        },
-        "timing_profile": {
-          "hourly_distribution": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.4735,
-            0.5265
-          ],
-          "most_active_hours_utc": [
-            0,
-            1,
-            2,
-            3,
-            4,
-            22,
-            23
-          ]
-        },
-        "leverage_profile": {
-          "overall": {
-            "mean": 5.3,
-            "median": 5.0,
-            "max": 20.0
-          }
-        },
-        "entry_exit_style": {
-          "order_type_ratio": {
-            "market": 0.372,
-            "limit": 0.628
-          },
-          "win_rate": 0.233
-        },
-        "hold_duration": {
-          "overall_minutes": {
-            "mean": 6.8,
-            "median": 3.1,
-            "p25": 1.0,
-            "p75": 8.3
-          },
-          "distribution_buckets": {
-            "under_1h": 1.0,
-            "1h_to_4h": 0.0,
-            "4h_to_24h": 0.0,
-            "1d_to_7d": 0.0,
-            "over_7d": 0.0
-          }
-        },
-        "trade_sequencing": {
-          "inter_fill_timing": {
-            "mean_minutes": 0.0,
-            "median_minutes": 0.0
-          },
-          "buy_sell_ratio": {
-            "buy_pct": 0.549,
-            "sell_pct": 0.451
-          }
-        },
-        "position_sizing": {
-          "size_to_account_ratio": {
-            "mean": 0.0,
-            "median": 0.0,
-            "std": 0.0001
-          }
-        },
-        "style_profile": {
-          "sufficient_data": true,
-          "activity": {
-            "episodes_per_day": 148.0,
-            "fills_per_day": 2000.0,
-            "active_days_ratio": 0.5,
-            "span_days": 1.0
-          },
-          "direction": {
-            "long_open_pct": 0.1076,
-            "short_open_pct": 0.8924,
-            "total_opens": 939
-          },
-          "position_management": {
-            "episodes": 148,
-            "mean_fills_per_episode": 13.51,
-            "median_fills_per_episode": 7.0
-          },
-          "loss_handling": {
-            "closed_wins": 466,
-            "closed_losses": 591,
-            "median_winner_hold_min": 18.0,
-            "median_loser_hold_min": 14.2,
-            "loser_to_winner_hold_ratio": 0.789,
-            "win_loss_magnitude_ratio": 0.555
-          },
-          "execution": {
-            "twap_ratio": 0.0,
-            "spot_fill_ratio": 0.0
-          },
-          "clip_sizes": {
-            "notional_cv": 2.8539,
-            "round_size_pref": 0.185
-          }
-        },
-        "account_characteristics": {
-          "account_value_usd": 6664759.35,
-          "weekly_volume_usd": 622068.89
-        }
-      }
-    },
-    {
       "wallet": "0x8eff8ff863c1a54ec6697b7ad98fe30aa344bd5e",
-      "score": 0.3738,
+      "score": 0.3835,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.1,
-        "timing_profile": 0.3892,
+        "asset_preferences": 0.1111,
+        "timing_profile": 0.4029,
         "leverage_profile": 0.2709,
-        "entry_exit_style": 0.9898,
+        "entry_exit_style": 0.9902,
         "hold_duration": 0.0,
-        "account_size": 0.3003,
-        "trade_sequencing": 0.6455,
-        "position_sizing": 0.1369,
-        "activity": 0.6276,
-        "direction_bias": 0.401,
+        "account_size": 0.3004,
+        "trade_sequencing": 0.6259,
+        "position_sizing": 0.1371,
+        "activity": 0.6886,
+        "direction_bias": 0.3902,
         "position_management": 0.7849,
         "loss_handling": null
       },
@@ -1584,7 +1171,7 @@
           "Weak asset overlap"
         ],
         "vetoes": [
-          "Decision frequency 6x apart (1.00 vs 6.39 position episodes/day)"
+          "Decision frequency 6x apart (1.00 vs 5.86 position episodes/day)"
         ],
         "asset_overlap": {
           "overlap": [
@@ -1599,18 +1186,17 @@
             "SOL",
             "XRP",
             "xyz:AAPL",
-            "xyz:SNDK",
             "xyz:SPCX"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.1
+          "jaccard": 0.1111
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:57:32.335264+00:00",
+      "scanned_at": "2026-07-16T07:23:33.053136+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -1622,27 +1208,25 @@
             "XRP",
             "xyz:AAPL",
             "xyz:BRENTOIL",
-            "xyz:SNDK",
             "xyz:SPCX"
           ],
           "coin_frequency": {
-            "BTC": 0.5635,
-            "AAVE": 0.2535,
+            "BTC": 0.5765,
+            "AAVE": 0.241,
             "BCH": 0.1165,
-            "xyz:SPCX": 0.016,
+            "SOL": 0.016,
             "XRP": 0.015,
-            "SOL": 0.012,
+            "xyz:SPCX": 0.012,
             "xyz:AAPL": 0.0095,
             "xyz:BRENTOIL": 0.008,
-            "ETH": 0.0055,
-            "xyz:SNDK": 0.0005
+            "ETH": 0.0055
           },
           "top_5_by_volume": [
             "BTC",
             "AAVE",
             "BCH",
             "xyz:AAPL",
-            "xyz:BRENTOIL"
+            "SOL"
           ]
         },
         "timing_profile": {
@@ -1650,9 +1234,9 @@
             0.0,
             0.0165,
             0.0235,
-            0.0285,
+            0.0315,
             0.013,
-            0.0355,
+            0.016,
             0.0,
             0.083,
             0.011,
@@ -1660,8 +1244,8 @@
             0.0025,
             0.088,
             0.0245,
-            0.144,
-            0.2315,
+            0.1585,
+            0.2335,
             0.1275,
             0.0145,
             0.0185,
@@ -1673,7 +1257,7 @@
             0.0035
           ],
           "most_active_hours_utc": [
-            5,
+            3,
             7,
             11,
             13,
@@ -1691,10 +1275,10 @@
         },
         "entry_exit_style": {
           "order_type_ratio": {
-            "market": 0.874,
-            "limit": 0.126
+            "market": 0.8765,
+            "limit": 0.1235
           },
-          "win_rate": 0.1925
+          "win_rate": 0.1885
         },
         "hold_duration": {
           "overall_minutes": {
@@ -1713,33 +1297,33 @@
         },
         "trade_sequencing": {
           "inter_fill_timing": {
-            "mean_minutes": 29.2,
+            "mean_minutes": 31.9,
             "median_minutes": 0.2
           },
           "buy_sell_ratio": {
-            "buy_pct": 0.561,
-            "sell_pct": 0.439
+            "buy_pct": 0.547,
+            "sell_pct": 0.453
           }
         },
         "position_sizing": {
           "size_to_account_ratio": {
-            "mean": 0.048,
+            "mean": 0.0479,
             "median": 0.0072,
-            "std": 0.1595
+            "std": 0.1592
           }
         },
         "style_profile": {
           "sufficient_data": true,
           "activity": {
-            "episodes_per_day": 6.392,
-            "fills_per_day": 511.33,
-            "active_days_ratio": 1.25,
-            "span_days": 3.9
+            "episodes_per_day": 5.855,
+            "fills_per_day": 468.41,
+            "active_days_ratio": 1.0,
+            "span_days": 4.3
           },
           "direction": {
-            "long_open_pct": 0.401,
-            "short_open_pct": 0.599,
-            "total_opens": 1015
+            "long_open_pct": 0.3902,
+            "short_open_pct": 0.6098,
+            "total_opens": 1043
           },
           "position_management": {
             "episodes": 25,
@@ -1747,25 +1331,25 @@
             "median_fills_per_episode": 33.0
           },
           "loss_handling": {
-            "closed_wins": 385,
-            "closed_losses": 601,
+            "closed_wins": 377,
+            "closed_losses": 581,
             "median_winner_hold_min": 164.3,
             "median_loser_hold_min": 17.7,
             "loser_to_winner_hold_ratio": 0.108,
-            "win_loss_magnitude_ratio": 1.952
+            "win_loss_magnitude_ratio": 1.932
           },
           "execution": {
             "twap_ratio": 0.0,
             "spot_fill_ratio": 0.0
           },
           "clip_sizes": {
-            "notional_cv": 3.3256,
+            "notional_cv": 3.3225,
             "round_size_pref": 0.23
           }
         },
         "account_characteristics": {
-          "account_value_usd": 168987.97,
-          "weekly_volume_usd": 16213078.65
+          "account_value_usd": 168948.54,
+          "weekly_volume_usd": 16194337.65
         }
       }
     },
@@ -1832,7 +1416,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:02:03.127733+00:00",
+      "scanned_at": "2026-07-16T07:27:27.128326+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -2054,7 +1638,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:59:25.628315+00:00",
+      "scanned_at": "2026-07-16T07:25:18.171371+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -2230,7 +1814,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:22.068490+00:00",
+      "scanned_at": "2026-07-16T07:13:42.037386+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -2368,617 +1952,11 @@
           }
         },
         "account_characteristics": {
-          "account_value_usd": 402028.54,
+          "account_value_usd": 402126.88,
           "weekly_volume_usd": 1888061.63
         }
       },
       "source": "bridge_depositor"
-    },
-    {
-      "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
-      "score": 0.3569,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.0714,
-        "timing_profile": 0.4046,
-        "leverage_profile": 0.772,
-        "entry_exit_style": 0.2221,
-        "hold_duration": 0.0,
-        "account_size": 0.8625,
-        "trade_sequencing": 0.3563,
-        "position_sizing": 0.3333,
-        "activity": 0.3941,
-        "direction_bias": 0.0726,
-        "position_management": 0.7872,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar account-size bracket"
-        ],
-        "warnings": [
-          "Weak asset overlap"
-        ],
-        "vetoes": [
-          "Decision frequency 13x apart (1.00 vs 13.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 94% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "@306",
-            "BTC",
-            "EIGEN",
-            "ETH",
-            "FARTCOIN",
-            "GRASS",
-            "JTO",
-            "LIT",
-            "NEAR",
-            "VVV",
-            "WLD",
-            "XPL",
-            "ZEC"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.0714
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:52:05.630261+00:00",
-      "fingerprint": {
-        "asset_preferences": {
-          "coins_traded": [
-            "@306",
-            "BTC",
-            "EIGEN",
-            "ETH",
-            "FARTCOIN",
-            "GRASS",
-            "JTO",
-            "LIT",
-            "NEAR",
-            "VVV",
-            "WLD",
-            "XPL",
-            "ZEC",
-            "xyz:BRENTOIL"
-          ],
-          "coin_frequency": {
-            "GRASS": 0.2725,
-            "BTC": 0.1175,
-            "FARTCOIN": 0.1145,
-            "ZEC": 0.0925,
-            "XPL": 0.078,
-            "ETH": 0.0695,
-            "EIGEN": 0.0545,
-            "VVV": 0.0495,
-            "WLD": 0.038,
-            "xyz:BRENTOIL": 0.0365,
-            "LIT": 0.0285,
-            "JTO": 0.022,
-            "NEAR": 0.0205,
-            "@306": 0.006
-          },
-          "top_5_by_volume": [
-            "BTC",
-            "ETH",
-            "xyz:BRENTOIL",
-            "ZEC",
-            "FARTCOIN"
-          ]
-        },
-        "timing_profile": {
-          "hourly_distribution": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.068,
-            0.041,
-            0.135,
-            0.2985,
-            0.4575,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "most_active_hours_utc": [
-            0,
-            1,
-            9,
-            10,
-            11,
-            12,
-            13
-          ]
-        },
-        "leverage_profile": {
-          "overall": {
-            "mean": 9.65,
-            "median": 10.0,
-            "max": 20.0
-          }
-        },
-        "entry_exit_style": {
-          "order_type_ratio": {
-            "market": 0.1855,
-            "limit": 0.8145
-          },
-          "win_rate": 0.1645
-        },
-        "hold_duration": {
-          "overall_minutes": {
-            "mean": 18.7,
-            "median": 4.5,
-            "p25": 2.8,
-            "p75": 6.3
-          },
-          "distribution_buckets": {
-            "under_1h": 0.9412,
-            "1h_to_4h": 0.0588,
-            "4h_to_24h": 0.0,
-            "1d_to_7d": 0.0,
-            "over_7d": 0.0
-          }
-        },
-        "trade_sequencing": {
-          "inter_fill_timing": {
-            "mean_minutes": 0.2,
-            "median_minutes": 0.0
-          },
-          "buy_sell_ratio": {
-            "buy_pct": 0.396,
-            "sell_pct": 0.604
-          }
-        },
-        "position_sizing": {
-          "size_to_account_ratio": {
-            "mean": 0.0001,
-            "median": 0.0,
-            "std": 0.0006
-          }
-        },
-        "style_profile": {
-          "sufficient_data": true,
-          "activity": {
-            "episodes_per_day": 13.0,
-            "fills_per_day": 2000.0,
-            "active_days_ratio": 0.5,
-            "span_days": 1.0
-          },
-          "direction": {
-            "long_open_pct": 0.0726,
-            "short_open_pct": 0.9274,
-            "total_opens": 978
-          },
-          "position_management": {
-            "episodes": 13,
-            "mean_fills_per_episode": 152.92,
-            "median_fills_per_episode": 109.0
-          },
-          "loss_handling": {
-            "closed_wins": 329,
-            "closed_losses": 686,
-            "median_winner_hold_min": 55.1,
-            "median_loser_hold_min": 36.0,
-            "loser_to_winner_hold_ratio": 0.652,
-            "win_loss_magnitude_ratio": 0.102
-          },
-          "execution": {
-            "twap_ratio": 0.0,
-            "spot_fill_ratio": 0.006
-          },
-          "clip_sizes": {
-            "notional_cv": 4.8686,
-            "round_size_pref": 0.5195
-          }
-        },
-        "account_characteristics": {
-          "account_value_usd": 10541048.01,
-          "weekly_volume_usd": 2756223.75
-        }
-      }
-    },
-    {
-      "wallet": "0xbeccae9ffcb69e9d42a1d4e744abf8056149562d",
-      "score": 0.3329,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.0154,
-        "timing_profile": 0.3986,
-        "leverage_profile": 0.8505,
-        "entry_exit_style": 0.3049,
-        "hold_duration": 0.0,
-        "account_size": 0.4331,
-        "trade_sequencing": 0.4042,
-        "position_sizing": 0.2847,
-        "activity": 0.3179,
-        "direction_bias": 0.3237,
-        "position_management": 0.8075,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar scaling/TWAP/clip-size habits"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Very different trading frequency"
-        ],
-        "vetoes": [
-          "Decision frequency 64x apart (1.00 vs 64.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 96% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "@107",
-            "AAVE",
-            "AZTEC",
-            "BERA",
-            "BTC",
-            "CHIP",
-            "CRV",
-            "ENA",
-            "ETH",
-            "FARTCOIN",
-            "GRAM",
-            "HYPE",
-            "JTO",
-            "LDO",
-            "LINK",
-            "LIT",
-            "MEGA",
-            "MET",
-            "MON",
-            "NEAR",
-            "ONDO",
-            "PAXG",
-            "PENDLE",
-            "PENGU",
-            "PUMP",
-            "SOL",
-            "STRK",
-            "SUI",
-            "TAO",
-            "TRUMP",
-            "UNI",
-            "XLM",
-            "XMR",
-            "XPL",
-            "XRP",
-            "ZEC",
-            "ZRO",
-            "xyz:AMD",
-            "xyz:CBRS",
-            "xyz:CL",
-            "xyz:COIN",
-            "xyz:CRCL",
-            "xyz:DRAM",
-            "xyz:EWY",
-            "xyz:GOLD",
-            "xyz:GOOGL",
-            "xyz:HOOD",
-            "xyz:INTC",
-            "xyz:MRVL",
-            "xyz:MSFT",
-            "xyz:MSTR",
-            "xyz:MU",
-            "xyz:NATGAS",
-            "xyz:NBIS",
-            "xyz:NVDA",
-            "xyz:ORCL",
-            "xyz:PALLADIUM",
-            "xyz:PLATINUM",
-            "xyz:PLTR",
-            "xyz:SILVER",
-            "xyz:SMSN",
-            "xyz:SNDK",
-            "xyz:SPCX",
-            "xyz:TSLA"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.0154
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:49:55.346578+00:00",
-      "fingerprint": {
-        "asset_preferences": {
-          "coins_traded": [
-            "@107",
-            "AAVE",
-            "AZTEC",
-            "BERA",
-            "BTC",
-            "CHIP",
-            "CRV",
-            "ENA",
-            "ETH",
-            "FARTCOIN",
-            "GRAM",
-            "HYPE",
-            "JTO",
-            "LDO",
-            "LINK",
-            "LIT",
-            "MEGA",
-            "MET",
-            "MON",
-            "NEAR",
-            "ONDO",
-            "PAXG",
-            "PENDLE",
-            "PENGU",
-            "PUMP",
-            "SOL",
-            "STRK",
-            "SUI",
-            "TAO",
-            "TRUMP",
-            "UNI",
-            "XLM",
-            "XMR",
-            "XPL",
-            "XRP",
-            "ZEC",
-            "ZRO",
-            "xyz:AMD",
-            "xyz:BRENTOIL",
-            "xyz:CBRS",
-            "xyz:CL",
-            "xyz:COIN",
-            "xyz:CRCL",
-            "xyz:DRAM",
-            "xyz:EWY",
-            "xyz:GOLD",
-            "xyz:GOOGL",
-            "xyz:HOOD",
-            "xyz:INTC",
-            "xyz:MRVL",
-            "xyz:MSFT",
-            "xyz:MSTR",
-            "xyz:MU",
-            "xyz:NATGAS",
-            "xyz:NBIS",
-            "xyz:NVDA",
-            "xyz:ORCL",
-            "xyz:PALLADIUM",
-            "xyz:PLATINUM",
-            "xyz:PLTR",
-            "xyz:SILVER",
-            "xyz:SMSN",
-            "xyz:SNDK",
-            "xyz:SPCX",
-            "xyz:TSLA"
-          ],
-          "coin_frequency": {
-            "BTC": 0.202,
-            "ETH": 0.158,
-            "xyz:BRENTOIL": 0.097,
-            "HYPE": 0.0915,
-            "xyz:CL": 0.0515,
-            "xyz:CRCL": 0.03,
-            "MON": 0.0295,
-            "xyz:SMSN": 0.024,
-            "xyz:COIN": 0.023,
-            "xyz:NBIS": 0.0215,
-            "xyz:ORCL": 0.0215,
-            "xyz:AMD": 0.019,
-            "xyz:MU": 0.0145,
-            "xyz:CBRS": 0.0145,
-            "xyz:NATGAS": 0.014,
-            "xyz:PLTR": 0.0135,
-            "xyz:HOOD": 0.013,
-            "xyz:EWY": 0.011,
-            "ZEC": 0.008,
-            "ENA": 0.0075,
-            "ZRO": 0.0075,
-            "xyz:SPCX": 0.0075,
-            "LDO": 0.007,
-            "PUMP": 0.0065,
-            "xyz:MRVL": 0.0065,
-            "xyz:PALLADIUM": 0.006,
-            "MET": 0.0055,
-            "xyz:GOLD": 0.0055,
-            "NEAR": 0.0055,
-            "SOL": 0.005,
-            "xyz:DRAM": 0.005,
-            "xyz:GOOGL": 0.005,
-            "AAVE": 0.0045,
-            "xyz:INTC": 0.0045,
-            "xyz:SNDK": 0.004,
-            "FARTCOIN": 0.004,
-            "xyz:PLATINUM": 0.004,
-            "XPL": 0.0035,
-            "xyz:MSTR": 0.0035,
-            "LIT": 0.0035,
-            "JTO": 0.003,
-            "UNI": 0.0025,
-            "GRAM": 0.0025,
-            "xyz:MSFT": 0.002,
-            "XMR": 0.002,
-            "SUI": 0.002,
-            "xyz:TSLA": 0.002,
-            "xyz:SILVER": 0.002,
-            "PENGU": 0.0015,
-            "CRV": 0.0015,
-            "CHIP": 0.0015,
-            "TAO": 0.0015,
-            "PAXG": 0.001,
-            "@107": 0.001,
-            "PENDLE": 0.0005,
-            "STRK": 0.0005,
-            "XLM": 0.0005,
-            "ONDO": 0.0005,
-            "TRUMP": 0.0005,
-            "AZTEC": 0.0005,
-            "LINK": 0.0005,
-            "XRP": 0.0005,
-            "xyz:NVDA": 0.0005,
-            "MEGA": 0.0005,
-            "BERA": 0.0005
-          },
-          "top_5_by_volume": [
-            "ETH",
-            "BTC",
-            "HYPE",
-            "xyz:BRENTOIL",
-            "xyz:CL"
-          ]
-        },
-        "timing_profile": {
-          "hourly_distribution": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0545,
-            0.2255,
-            0.2115,
-            0.4235,
-            0.085,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "most_active_hours_utc": [
-            0,
-            1,
-            10,
-            11,
-            12,
-            13,
-            14
-          ]
-        },
-        "leverage_profile": {
-          "overall": {
-            "mean": 8.76,
-            "median": 7.5,
-            "max": 40.0
-          }
-        },
-        "entry_exit_style": {
-          "order_type_ratio": {
-            "market": 0.2425,
-            "limit": 0.7575
-          },
-          "win_rate": 0.2355
-        },
-        "hold_duration": {
-          "overall_minutes": {
-            "mean": 8.4,
-            "median": 2.4,
-            "p25": 0.6,
-            "p75": 9.1
-          },
-          "distribution_buckets": {
-            "under_1h": 0.9633,
-            "1h_to_4h": 0.0367,
-            "4h_to_24h": 0.0,
-            "1d_to_7d": 0.0,
-            "over_7d": 0.0
-          }
-        },
-        "trade_sequencing": {
-          "inter_fill_timing": {
-            "mean_minutes": 0.2,
-            "median_minutes": 0.1
-          },
-          "buy_sell_ratio": {
-            "buy_pct": 0.457,
-            "sell_pct": 0.543
-          }
-        },
-        "position_sizing": {
-          "size_to_account_ratio": {
-            "mean": 0.0111,
-            "median": 0.0016,
-            "std": 0.0206
-          }
-        },
-        "style_profile": {
-          "sufficient_data": true,
-          "activity": {
-            "episodes_per_day": 64.0,
-            "fills_per_day": 2000.0,
-            "active_days_ratio": 0.5,
-            "span_days": 1.0
-          },
-          "direction": {
-            "long_open_pct": 0.3237,
-            "short_open_pct": 0.6763,
-            "total_opens": 1035
-          },
-          "position_management": {
-            "episodes": 64,
-            "mean_fills_per_episode": 31.22,
-            "median_fills_per_episode": 9.5
-          },
-          "loss_handling": {
-            "closed_wins": 471,
-            "closed_losses": 516,
-            "median_winner_hold_min": 117.9,
-            "median_loser_hold_min": 144.9,
-            "loser_to_winner_hold_ratio": 1.229,
-            "win_loss_magnitude_ratio": 0.593
-          },
-          "execution": {
-            "twap_ratio": 0.0,
-            "spot_fill_ratio": 0.001
-          },
-          "clip_sizes": {
-            "notional_cv": 1.8681,
-            "round_size_pref": 0.1785
-          }
-        },
-        "account_characteristics": {
-          "account_value_usd": 353490.13,
-          "weekly_volume_usd": 7812632.4
-        }
-      }
     },
     {
       "wallet": "0x333eb18a325f00a486e0c6d5763fcbef7ec26a47",
@@ -3050,7 +2028,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:00:06.425074+00:00",
+      "scanned_at": "2026-07-16T07:25:41.997170+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -3230,6 +2208,321 @@
       }
     },
     {
+      "wallet": "0x7ab12f7a0925ef24927343d47199e75a91fc78aa",
+      "score": 0.3251,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.0227,
+        "timing_profile": 0.3625,
+        "leverage_profile": 0.745,
+        "entry_exit_style": 0.0878,
+        "hold_duration": 0.0,
+        "account_size": 0.5733,
+        "trade_sequencing": 0.4981,
+        "position_sizing": 0.3216,
+        "activity": 0.4373,
+        "direction_bias": 0.3295,
+        "position_management": 0.6849,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL"
+        ],
+        "warnings": [
+          "Weak asset overlap"
+        ],
+        "vetoes": [
+          "Decision frequency 118x apart (1.00 vs 118.29 position episodes/day)",
+          "Incompatible hold style: 0% vs 99% of holds under 1h"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "AAVE",
+            "ADA",
+            "ARB",
+            "BCH",
+            "BTC",
+            "DOGE",
+            "EIGEN",
+            "ENA",
+            "ETH",
+            "ETHFI",
+            "FARTCOIN",
+            "FIL",
+            "HBAR",
+            "HYPE",
+            "JUP",
+            "LIT",
+            "NEAR",
+            "PENDLE",
+            "POPCAT",
+            "PUMP",
+            "PYTH",
+            "SOL",
+            "SPX",
+            "SYRUP",
+            "UNI",
+            "VIRTUAL",
+            "VVV",
+            "WLD",
+            "XPL",
+            "ZEC",
+            "ZRO",
+            "xyz:AAPL",
+            "xyz:AMD",
+            "xyz:AMZN",
+            "xyz:COIN",
+            "xyz:CRCL",
+            "xyz:HOOD",
+            "xyz:MSTR",
+            "xyz:NATGAS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:SP500",
+            "xyz:SPCX"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.0227
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:16:23.590595+00:00",
+      "fingerprint": {
+        "asset_preferences": {
+          "coins_traded": [
+            "AAVE",
+            "ADA",
+            "ARB",
+            "BCH",
+            "BTC",
+            "DOGE",
+            "EIGEN",
+            "ENA",
+            "ETH",
+            "ETHFI",
+            "FARTCOIN",
+            "FIL",
+            "HBAR",
+            "HYPE",
+            "JUP",
+            "LIT",
+            "NEAR",
+            "PENDLE",
+            "POPCAT",
+            "PUMP",
+            "PYTH",
+            "SOL",
+            "SPX",
+            "SYRUP",
+            "UNI",
+            "VIRTUAL",
+            "VVV",
+            "WLD",
+            "XPL",
+            "ZEC",
+            "ZRO",
+            "xyz:AAPL",
+            "xyz:AMD",
+            "xyz:AMZN",
+            "xyz:BRENTOIL",
+            "xyz:COIN",
+            "xyz:CRCL",
+            "xyz:HOOD",
+            "xyz:MSTR",
+            "xyz:NATGAS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:SP500",
+            "xyz:SPCX"
+          ],
+          "coin_frequency": {
+            "LIT": 0.2395,
+            "HYPE": 0.107,
+            "VIRTUAL": 0.0615,
+            "FIL": 0.054,
+            "ARB": 0.0475,
+            "XPL": 0.038,
+            "xyz:CRCL": 0.034,
+            "ETH": 0.03,
+            "SPX": 0.029,
+            "xyz:BRENTOIL": 0.0285,
+            "FARTCOIN": 0.025,
+            "BTC": 0.0225,
+            "xyz:HOOD": 0.0225,
+            "PUMP": 0.0215,
+            "DOGE": 0.0205,
+            "SOL": 0.018,
+            "JUP": 0.017,
+            "ETHFI": 0.017,
+            "ZEC": 0.014,
+            "UNI": 0.0115,
+            "AAVE": 0.011,
+            "EIGEN": 0.0105,
+            "NEAR": 0.0095,
+            "xyz:NVDA": 0.009,
+            "xyz:AMZN": 0.0085,
+            "xyz:MSTR": 0.008,
+            "PYTH": 0.008,
+            "xyz:SP500": 0.007,
+            "ENA": 0.007,
+            "xyz:NATGAS": 0.0065,
+            "HBAR": 0.006,
+            "SYRUP": 0.0055,
+            "VVV": 0.0055,
+            "xyz:ORCL": 0.0055,
+            "PENDLE": 0.0055,
+            "POPCAT": 0.0055,
+            "WLD": 0.0055,
+            "BCH": 0.005,
+            "xyz:AAPL": 0.004,
+            "ZRO": 0.003,
+            "xyz:SPCX": 0.002,
+            "ADA": 0.0015,
+            "xyz:COIN": 0.001,
+            "xyz:AMD": 0.001
+          },
+          "top_5_by_volume": [
+            "ETH",
+            "HYPE",
+            "LIT",
+            "BTC",
+            "ARB"
+          ]
+        },
+        "timing_profile": {
+          "hourly_distribution": [
+            0.03,
+            0.0555,
+            0.085,
+            0.0095,
+            0.0105,
+            0.0,
+            0.002,
+            0.001,
+            0.0,
+            0.0,
+            0.012,
+            0.0555,
+            0.093,
+            0.1375,
+            0.2535,
+            0.0205,
+            0.0225,
+            0.0255,
+            0.0055,
+            0.054,
+            0.0345,
+            0.028,
+            0.0635,
+            0.001
+          ],
+          "most_active_hours_utc": [
+            1,
+            2,
+            11,
+            12,
+            13,
+            14,
+            22
+          ]
+        },
+        "leverage_profile": {
+          "overall": {
+            "mean": 10.0,
+            "median": 10.0,
+            "max": 10.0
+          }
+        },
+        "entry_exit_style": {
+          "order_type_ratio": {
+            "market": 0.081,
+            "limit": 0.919
+          },
+          "win_rate": 0.4275
+        },
+        "hold_duration": {
+          "overall_minutes": {
+            "mean": 1.5,
+            "median": 0.2,
+            "p25": 0.1,
+            "p75": 0.6
+          },
+          "distribution_buckets": {
+            "under_1h": 0.9932,
+            "1h_to_4h": 0.0068,
+            "4h_to_24h": 0.0,
+            "1d_to_7d": 0.0,
+            "over_7d": 0.0
+          }
+        },
+        "trade_sequencing": {
+          "inter_fill_timing": {
+            "mean_minutes": 1.2,
+            "median_minutes": 0.0
+          },
+          "buy_sell_ratio": {
+            "buy_pct": 0.4245,
+            "sell_pct": 0.5755
+          }
+        },
+        "position_sizing": {
+          "size_to_account_ratio": {
+            "mean": 0.0087,
+            "median": 0.0016,
+            "std": 0.0498
+          }
+        },
+        "style_profile": {
+          "sufficient_data": true,
+          "activity": {
+            "episodes_per_day": 118.29,
+            "fills_per_day": 1702.02,
+            "active_days_ratio": 1.0,
+            "span_days": 1.2
+          },
+          "direction": {
+            "long_open_pct": 0.3295,
+            "short_open_pct": 0.6705,
+            "total_opens": 516
+          },
+          "position_management": {
+            "episodes": 139,
+            "mean_fills_per_episode": 14.39,
+            "median_fills_per_episode": 10.0
+          },
+          "loss_handling": {
+            "closed_wins": 855,
+            "closed_losses": 650,
+            "median_winner_hold_min": 0.6,
+            "median_loser_hold_min": 1.5,
+            "loser_to_winner_hold_ratio": 2.48,
+            "win_loss_magnitude_ratio": 2.193
+          },
+          "execution": {
+            "twap_ratio": 0.0,
+            "spot_fill_ratio": 0.0
+          },
+          "clip_sizes": {
+            "notional_cv": 5.7113,
+            "round_size_pref": 0.2265
+          }
+        },
+        "account_characteristics": {
+          "account_value_usd": 188656.68,
+          "weekly_volume_usd": 3288434.21
+        }
+      }
+    },
+    {
       "wallet": "0x9dead8fffcbf130e7658f672d2c081d91178d617",
       "score": 0.3163,
       "score_percentile": null,
@@ -3284,7 +2577,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:56:12.343074+00:00",
+      "scanned_at": "2026-07-16T07:22:03.164205+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -3434,485 +2727,6 @@
       }
     },
     {
-      "wallet": "0x35f13dc71426d4a429cf8bad69c4b39abbbf9896",
-      "score": 0.302,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.037,
-        "timing_profile": 0.3928,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 0.9056,
-        "hold_duration": 0.0,
-        "account_size": 0.7027,
-        "trade_sequencing": 0.4027,
-        "position_sizing": 0.5,
-        "activity": 0.3516,
-        "direction_bias": 0.7209,
-        "position_management": 0.7824,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar market/limit execution style",
-          "Similar account-size bracket"
-        ],
-        "warnings": [
-          "Weak asset overlap"
-        ],
-        "vetoes": [
-          "Decision frequency 27x apart (1.00 vs 27.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 99% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "xyz:AMD",
-            "xyz:BB",
-            "xyz:CBRS",
-            "xyz:CL",
-            "xyz:COPPER",
-            "xyz:CRCL",
-            "xyz:DELL",
-            "xyz:DRAM",
-            "xyz:EWY",
-            "xyz:GOLD",
-            "xyz:HOOD",
-            "xyz:INTC",
-            "xyz:MRVL",
-            "xyz:MSTR",
-            "xyz:MU",
-            "xyz:NATGAS",
-            "xyz:NVDA",
-            "xyz:QNT",
-            "xyz:RKLB",
-            "xyz:SILVER",
-            "xyz:SKHX",
-            "xyz:SKHY",
-            "xyz:SMSN",
-            "xyz:SNDK",
-            "xyz:SPCX",
-            "xyz:TSLA"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.037
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:50:35.631916+00:00",
-      "fingerprint": {
-        "asset_preferences": {
-          "coins_traded": [
-            "xyz:AMD",
-            "xyz:BB",
-            "xyz:BRENTOIL",
-            "xyz:CBRS",
-            "xyz:CL",
-            "xyz:COPPER",
-            "xyz:CRCL",
-            "xyz:DELL",
-            "xyz:DRAM",
-            "xyz:EWY",
-            "xyz:GOLD",
-            "xyz:HOOD",
-            "xyz:INTC",
-            "xyz:MRVL",
-            "xyz:MSTR",
-            "xyz:MU",
-            "xyz:NATGAS",
-            "xyz:NVDA",
-            "xyz:QNT",
-            "xyz:RKLB",
-            "xyz:SILVER",
-            "xyz:SKHX",
-            "xyz:SKHY",
-            "xyz:SMSN",
-            "xyz:SNDK",
-            "xyz:SPCX",
-            "xyz:TSLA"
-          ],
-          "coin_frequency": {
-            "xyz:MU": 0.173,
-            "xyz:SKHY": 0.1535,
-            "xyz:TSLA": 0.1005,
-            "xyz:SNDK": 0.094,
-            "xyz:INTC": 0.0565,
-            "xyz:MRVL": 0.0535,
-            "xyz:SPCX": 0.051,
-            "xyz:EWY": 0.05,
-            "xyz:NVDA": 0.0465,
-            "xyz:DRAM": 0.033,
-            "xyz:HOOD": 0.026,
-            "xyz:SKHX": 0.0235,
-            "xyz:CRCL": 0.0215,
-            "xyz:CL": 0.021,
-            "xyz:BRENTOIL": 0.0185,
-            "xyz:SMSN": 0.016,
-            "xyz:COPPER": 0.013,
-            "xyz:AMD": 0.01,
-            "xyz:CBRS": 0.0095,
-            "xyz:MSTR": 0.0075,
-            "xyz:RKLB": 0.005,
-            "xyz:DELL": 0.005,
-            "xyz:GOLD": 0.0045,
-            "xyz:SILVER": 0.0035,
-            "xyz:BB": 0.0015,
-            "xyz:QNT": 0.0015,
-            "xyz:NATGAS": 0.001
-          },
-          "top_5_by_volume": [
-            "xyz:MU",
-            "xyz:SKHY",
-            "xyz:SNDK",
-            "xyz:DRAM",
-            "xyz:SPCX"
-          ]
-        },
-        "timing_profile": {
-          "hourly_distribution": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.1985,
-            0.3115,
-            0.464,
-            0.026,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "most_active_hours_utc": [
-            0,
-            1,
-            2,
-            11,
-            12,
-            13,
-            14
-          ]
-        },
-        "leverage_profile": {
-          "overall": {}
-        },
-        "entry_exit_style": {
-          "order_type_ratio": {
-            "market": 0.681,
-            "limit": 0.319
-          },
-          "win_rate": 0.21
-        },
-        "hold_duration": {
-          "overall_minutes": {
-            "mean": 6.0,
-            "median": 1.8,
-            "p25": 0.6,
-            "p75": 5.2
-          },
-          "distribution_buckets": {
-            "under_1h": 0.9852,
-            "1h_to_4h": 0.0148,
-            "4h_to_24h": 0.0,
-            "1d_to_7d": 0.0,
-            "over_7d": 0.0
-          }
-        },
-        "trade_sequencing": {
-          "inter_fill_timing": {
-            "mean_minutes": 0.1,
-            "median_minutes": 0.1
-          },
-          "buy_sell_ratio": {
-            "buy_pct": 0.4875,
-            "sell_pct": 0.5125
-          }
-        },
-        "position_sizing": {
-          "size_to_account_ratio": {}
-        },
-        "style_profile": {
-          "sufficient_data": true,
-          "activity": {
-            "episodes_per_day": 27.0,
-            "fills_per_day": 2000.0,
-            "active_days_ratio": 0.5,
-            "span_days": 1.0
-          },
-          "direction": {
-            "long_open_pct": 0.7209,
-            "short_open_pct": 0.2791,
-            "total_opens": 978
-          },
-          "position_management": {
-            "episodes": 27,
-            "mean_fills_per_episode": 74.07,
-            "median_fills_per_episode": 42.0
-          },
-          "loss_handling": {
-            "closed_wins": 420,
-            "closed_losses": 605,
-            "median_winner_hold_min": 93.9,
-            "median_loser_hold_min": 104.3,
-            "loser_to_winner_hold_ratio": 1.111,
-            "win_loss_magnitude_ratio": 0.4
-          },
-          "execution": {
-            "twap_ratio": 0.0,
-            "spot_fill_ratio": 0.0
-          },
-          "clip_sizes": {
-            "notional_cv": 1.0994,
-            "round_size_pref": 0.2595
-          }
-        },
-        "account_characteristics": {
-          "account_value_usd": 0.0,
-          "weekly_volume_usd": 1549603.15
-        }
-      }
-    },
-    {
-      "wallet": "0xad227f63d34e7251c1d0ab65e64eeea07aee4e44",
-      "score": 0.2976,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.0833,
-        "timing_profile": 0.1813,
-        "leverage_profile": 0.6439,
-        "entry_exit_style": 0.9757,
-        "hold_duration": 0.0,
-        "account_size": 0.5523,
-        "trade_sequencing": 0.6025,
-        "position_sizing": 0.5388,
-        "activity": 0.389,
-        "direction_bias": 0.1054,
-        "position_management": 0.8219,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar market/limit execution style",
-          "Similar scaling/TWAP/clip-size habits"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Different active trading hours"
-        ],
-        "vetoes": [
-          "Decision frequency 14x apart (1.00 vs 14.00 position episodes/day)"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "BTC",
-            "ETH",
-            "GRASS",
-            "HYPE",
-            "LIT",
-            "SOL",
-            "xyz:CL",
-            "xyz:GOLD",
-            "xyz:PURRDAT",
-            "xyz:SP500",
-            "xyz:STRC"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.0833
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:52:01.086287+00:00",
-      "fingerprint": {
-        "asset_preferences": {
-          "coins_traded": [
-            "BTC",
-            "ETH",
-            "GRASS",
-            "HYPE",
-            "LIT",
-            "SOL",
-            "xyz:BRENTOIL",
-            "xyz:CL",
-            "xyz:GOLD",
-            "xyz:PURRDAT",
-            "xyz:SP500",
-            "xyz:STRC"
-          ],
-          "coin_frequency": {
-            "BTC": 0.361,
-            "HYPE": 0.3045,
-            "GRASS": 0.171,
-            "LIT": 0.059,
-            "xyz:PURRDAT": 0.0285,
-            "xyz:STRC": 0.0155,
-            "ETH": 0.0145,
-            "xyz:CL": 0.012,
-            "xyz:GOLD": 0.012,
-            "xyz:BRENTOIL": 0.012,
-            "SOL": 0.0095,
-            "xyz:SP500": 0.0005
-          },
-          "top_5_by_volume": [
-            "BTC",
-            "HYPE",
-            "xyz:GOLD",
-            "xyz:CL",
-            "xyz:PURRDAT"
-          ]
-        },
-        "timing_profile": {
-          "hourly_distribution": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0245,
-            0.341,
-            0.215,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.169,
-            0.1945,
-            0.0285,
-            0.0065,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0185,
-            0.0025,
-            0.0
-          ],
-          "most_active_hours_utc": [
-            6,
-            7,
-            8,
-            13,
-            14,
-            15,
-            21
-          ]
-        },
-        "leverage_profile": {
-          "overall": {
-            "mean": 11.57,
-            "median": 10.0,
-            "max": 40.0
-          }
-        },
-        "entry_exit_style": {
-          "order_type_ratio": {
-            "market": 0.8165,
-            "limit": 0.1835
-          },
-          "win_rate": 0.5585
-        },
-        "hold_duration": {
-          "overall_minutes": {
-            "mean": 385.2,
-            "median": 398.8,
-            "p25": 369.6,
-            "p75": 407.6
-          },
-          "distribution_buckets": {
-            "under_1h": 0.0,
-            "1h_to_4h": 0.0,
-            "4h_to_24h": 1.0,
-            "1d_to_7d": 0.0,
-            "over_7d": 0.0
-          }
-        },
-        "trade_sequencing": {
-          "inter_fill_timing": {
-            "mean_minutes": 3.2,
-            "median_minutes": 0.0
-          },
-          "buy_sell_ratio": {
-            "buy_pct": 0.3955,
-            "sell_pct": 0.6045
-          }
-        },
-        "position_sizing": {
-          "size_to_account_ratio": {
-            "mean": 0.0031,
-            "median": 0.0003,
-            "std": 0.0099
-          }
-        },
-        "style_profile": {
-          "sufficient_data": true,
-          "activity": {
-            "episodes_per_day": 14.0,
-            "fills_per_day": 2000.0,
-            "active_days_ratio": 0.5,
-            "span_days": 1.0
-          },
-          "direction": {
-            "long_open_pct": 0.1054,
-            "short_open_pct": 0.8946,
-            "total_opens": 863
-          },
-          "position_management": {
-            "episodes": 14,
-            "mean_fills_per_episode": 142.86,
-            "median_fills_per_episode": 26.0
-          },
-          "loss_handling": {
-            "closed_wins": 1117,
-            "closed_losses": 23,
-            "median_winner_hold_min": 342.1,
-            "median_loser_hold_min": 0.0,
-            "loser_to_winner_hold_ratio": 0.0,
-            "win_loss_magnitude_ratio": 2.006
-          },
-          "execution": {
-            "twap_ratio": 0.0,
-            "spot_fill_ratio": 0.0
-          },
-          "clip_sizes": {
-            "notional_cv": 3.1643,
-            "round_size_pref": 0.2485
-          }
-        },
-        "account_characteristics": {
-          "account_value_usd": 3390808.43,
-          "weekly_volume_usd": 21211897.66
-        }
-      }
-    },
-    {
       "wallet": "0xd0f9337179d095d744be87b33d569e5c1aa8ce0b",
       "score": 0.271,
       "score_percentile": null,
@@ -3965,7 +2779,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:50:05.225482+00:00",
+      "scanned_at": "2026-07-16T07:15:10.353941+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -4164,7 +2978,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:56:48.615264+00:00",
+      "scanned_at": "2026-07-16T07:22:42.594669+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -4312,6 +3126,461 @@
       }
     },
     {
+      "wallet": "0xecb63caa47c7c4e77f60f1ce858cf28dc2b82b00",
+      "score": 0.2627,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.0111,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.8107,
+        "entry_exit_style": 0.6015,
+        "hold_duration": 0.0,
+        "account_size": 0.6093,
+        "trade_sequencing": 0.8446,
+        "position_sizing": 0.5,
+        "activity": 0.3116,
+        "direction_bias": 0.6993,
+        "position_management": 0.6585,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL"
+        ],
+        "warnings": [
+          "Weak asset overlap",
+          "Different active trading hours",
+          "Very different trading frequency"
+        ],
+        "vetoes": [
+          "Decision frequency 79x apart (1.00 vs 79.00 position episodes/day)",
+          "Incompatible hold style: 0% vs 100% of holds under 1h"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "2Z",
+            "@107",
+            "@142",
+            "@151",
+            "@156",
+            "@162",
+            "@166",
+            "@188",
+            "@194",
+            "@207",
+            "@210",
+            "@272",
+            "ADA",
+            "APT",
+            "ARB",
+            "ASTER",
+            "AVNT",
+            "BCH",
+            "BNB",
+            "CRV",
+            "DOGE",
+            "EIGEN",
+            "ENA",
+            "HYPE",
+            "JUP",
+            "LDO",
+            "LINK",
+            "LIT",
+            "MORPHO",
+            "NEAR",
+            "ONDO",
+            "PAXG",
+            "PENGU",
+            "PUMP",
+            "PYTH",
+            "SEI",
+            "SNX",
+            "SOL",
+            "STBL",
+            "SUI",
+            "TAO",
+            "TIA",
+            "TRUMP",
+            "TRX",
+            "UNI",
+            "VIRTUAL",
+            "VVV",
+            "WIF",
+            "WLD",
+            "XLM",
+            "XPL",
+            "ZEC",
+            "kBONK",
+            "kFLOKI",
+            "kPEPE",
+            "xyz:AAPL",
+            "xyz:AMD",
+            "xyz:AMZN",
+            "xyz:ARM",
+            "xyz:AVGO",
+            "xyz:CL",
+            "xyz:COIN",
+            "xyz:CRCL",
+            "xyz:CRWV",
+            "xyz:DRAM",
+            "xyz:EWY",
+            "xyz:GOLD",
+            "xyz:GOOGL",
+            "xyz:HOOD",
+            "xyz:INTC",
+            "xyz:LITE",
+            "xyz:META",
+            "xyz:MRVL",
+            "xyz:MSFT",
+            "xyz:MSTR",
+            "xyz:MU",
+            "xyz:NATGAS",
+            "xyz:NBIS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:PLTR",
+            "xyz:QCOM",
+            "xyz:SILVER",
+            "xyz:SKHX",
+            "xyz:SKHY",
+            "xyz:SMSN",
+            "xyz:SNDK",
+            "xyz:SPCX",
+            "xyz:TSM"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.0111
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:13:50.085943+00:00",
+      "fingerprint": {
+        "asset_preferences": {
+          "coins_traded": [
+            "2Z",
+            "@107",
+            "@142",
+            "@151",
+            "@156",
+            "@162",
+            "@166",
+            "@188",
+            "@194",
+            "@207",
+            "@210",
+            "@272",
+            "ADA",
+            "APT",
+            "ARB",
+            "ASTER",
+            "AVNT",
+            "BCH",
+            "BNB",
+            "CRV",
+            "DOGE",
+            "EIGEN",
+            "ENA",
+            "HYPE",
+            "JUP",
+            "LDO",
+            "LINK",
+            "LIT",
+            "MORPHO",
+            "NEAR",
+            "ONDO",
+            "PAXG",
+            "PENGU",
+            "PUMP",
+            "PYTH",
+            "SEI",
+            "SNX",
+            "SOL",
+            "STBL",
+            "SUI",
+            "TAO",
+            "TIA",
+            "TRUMP",
+            "TRX",
+            "UNI",
+            "VIRTUAL",
+            "VVV",
+            "WIF",
+            "WLD",
+            "XLM",
+            "XPL",
+            "ZEC",
+            "kBONK",
+            "kFLOKI",
+            "kPEPE",
+            "xyz:AAPL",
+            "xyz:AMD",
+            "xyz:AMZN",
+            "xyz:ARM",
+            "xyz:AVGO",
+            "xyz:BRENTOIL",
+            "xyz:CL",
+            "xyz:COIN",
+            "xyz:CRCL",
+            "xyz:CRWV",
+            "xyz:DRAM",
+            "xyz:EWY",
+            "xyz:GOLD",
+            "xyz:GOOGL",
+            "xyz:HOOD",
+            "xyz:INTC",
+            "xyz:LITE",
+            "xyz:META",
+            "xyz:MRVL",
+            "xyz:MSFT",
+            "xyz:MSTR",
+            "xyz:MU",
+            "xyz:NATGAS",
+            "xyz:NBIS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:PLTR",
+            "xyz:QCOM",
+            "xyz:SILVER",
+            "xyz:SKHX",
+            "xyz:SKHY",
+            "xyz:SMSN",
+            "xyz:SNDK",
+            "xyz:SPCX",
+            "xyz:TSM"
+          ],
+          "coin_frequency": {
+            "xyz:SKHX": 0.198,
+            "@107": 0.08,
+            "@272": 0.052,
+            "XPL": 0.0495,
+            "xyz:SKHY": 0.0475,
+            "MORPHO": 0.032,
+            "HYPE": 0.027,
+            "kBONK": 0.023,
+            "xyz:CL": 0.023,
+            "PUMP": 0.023,
+            "@151": 0.0225,
+            "xyz:ORCL": 0.021,
+            "TRX": 0.0185,
+            "ZEC": 0.0185,
+            "@166": 0.017,
+            "kFLOKI": 0.0145,
+            "SUI": 0.0135,
+            "xyz:SMSN": 0.013,
+            "STBL": 0.013,
+            "xyz:DRAM": 0.0125,
+            "xyz:COIN": 0.0125,
+            "xyz:TSM": 0.0125,
+            "ONDO": 0.012,
+            "@188": 0.012,
+            "xyz:AAPL": 0.0115,
+            "LDO": 0.011,
+            "xyz:NATGAS": 0.01,
+            "xyz:BRENTOIL": 0.01,
+            "UNI": 0.0095,
+            "ENA": 0.009,
+            "xyz:HOOD": 0.009,
+            "WIF": 0.0085,
+            "xyz:ARM": 0.0085,
+            "xyz:GOOGL": 0.008,
+            "@210": 0.007,
+            "@162": 0.0065,
+            "xyz:QCOM": 0.006,
+            "xyz:CRCL": 0.006,
+            "xyz:AMD": 0.0055,
+            "LIT": 0.0055,
+            "TIA": 0.005,
+            "LINK": 0.005,
+            "xyz:SILVER": 0.005,
+            "@156": 0.005,
+            "@142": 0.0045,
+            "PENGU": 0.0045,
+            "DOGE": 0.0045,
+            "xyz:GOLD": 0.004,
+            "SNX": 0.004,
+            "xyz:PLTR": 0.004,
+            "kPEPE": 0.003,
+            "TAO": 0.003,
+            "xyz:SNDK": 0.003,
+            "CRV": 0.0025,
+            "xyz:LITE": 0.0025,
+            "xyz:EWY": 0.002,
+            "xyz:NVDA": 0.002,
+            "xyz:MU": 0.002,
+            "xyz:MRVL": 0.002,
+            "ASTER": 0.002,
+            "ARB": 0.002,
+            "PYTH": 0.002,
+            "EIGEN": 0.0015,
+            "JUP": 0.0015,
+            "xyz:NBIS": 0.0015,
+            "VIRTUAL": 0.0015,
+            "xyz:META": 0.0015,
+            "2Z": 0.0015,
+            "xyz:CRWV": 0.0015,
+            "@207": 0.0015,
+            "PAXG": 0.0015,
+            "WLD": 0.001,
+            "xyz:MSFT": 0.001,
+            "XLM": 0.001,
+            "SEI": 0.001,
+            "ADA": 0.001,
+            "BCH": 0.001,
+            "BNB": 0.001,
+            "VVV": 0.001,
+            "xyz:SPCX": 0.0005,
+            "xyz:INTC": 0.0005,
+            "APT": 0.0005,
+            "AVNT": 0.0005,
+            "xyz:AMZN": 0.0005,
+            "NEAR": 0.0005,
+            "xyz:AVGO": 0.0005,
+            "TRUMP": 0.0005,
+            "@194": 0.0005,
+            "SOL": 0.0005,
+            "xyz:MSTR": 0.0005
+          },
+          "top_5_by_volume": [
+            "@151",
+            "xyz:SKHX",
+            "@107",
+            "xyz:SKHY",
+            "HYPE"
+          ]
+        },
+        "timing_profile": {
+          "hourly_distribution": [
+            0.0,
+            0.0,
+            0.0,
+            0.4245,
+            0.5755,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "most_active_hours_utc": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "leverage_profile": {
+          "overall": {
+            "mean": 6.04,
+            "median": 5.0,
+            "max": 20.0
+          }
+        },
+        "entry_exit_style": {
+          "order_type_ratio": {
+            "market": 0.4295,
+            "limit": 0.5705
+          },
+          "win_rate": 0.2465
+        },
+        "hold_duration": {
+          "overall_minutes": {
+            "mean": 3.2,
+            "median": 1.3,
+            "p25": 0.5,
+            "p75": 3.7
+          },
+          "distribution_buckets": {
+            "under_1h": 1.0,
+            "1h_to_4h": 0.0,
+            "4h_to_24h": 0.0,
+            "1d_to_7d": 0.0,
+            "over_7d": 0.0
+          }
+        },
+        "trade_sequencing": {
+          "inter_fill_timing": {
+            "mean_minutes": 0.0,
+            "median_minutes": 0.0
+          },
+          "buy_sell_ratio": {
+            "buy_pct": 0.612,
+            "sell_pct": 0.388
+          }
+        },
+        "position_sizing": {
+          "size_to_account_ratio": {
+            "mean": 0.0,
+            "median": 0.0,
+            "std": 0.0001
+          }
+        },
+        "style_profile": {
+          "sufficient_data": true,
+          "activity": {
+            "episodes_per_day": 79.0,
+            "fills_per_day": 2000.0,
+            "active_days_ratio": 0.5,
+            "span_days": 1.0
+          },
+          "direction": {
+            "long_open_pct": 0.6993,
+            "short_open_pct": 0.3007,
+            "total_opens": 898
+          },
+          "position_management": {
+            "episodes": 79,
+            "mean_fills_per_episode": 20.04,
+            "median_fills_per_episode": 8.0
+          },
+          "loss_handling": {
+            "closed_wins": 378,
+            "closed_losses": 313,
+            "median_winner_hold_min": 14.0,
+            "median_loser_hold_min": 13.5,
+            "loser_to_winner_hold_ratio": 0.967,
+            "win_loss_magnitude_ratio": 1.722
+          },
+          "execution": {
+            "twap_ratio": 0.0,
+            "spot_fill_ratio": 0.2085
+          },
+          "clip_sizes": {
+            "notional_cv": 4.4891,
+            "round_size_pref": 0.178
+          }
+        },
+        "account_characteristics": {
+          "account_value_usd": 43809776.21,
+          "weekly_volume_usd": 2173174.4
+        }
+      }
+    },
+    {
       "wallet": "0x2c87fd92da54ab1af3683b5e70e6dc065f5df490",
       "score": 0.2619,
       "score_percentile": null,
@@ -4360,7 +3629,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:03:17.411077+00:00",
+      "scanned_at": "2026-07-16T07:29:09.184050+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -4549,7 +3818,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:49:21.474748+00:00",
+      "scanned_at": "2026-07-16T07:14:40.302341+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -4698,20 +3967,20 @@
     },
     {
       "wallet": "0x98d5754c5c552b2cc938e87c6b0400ed7d750aa3",
-      "score": 0.2546,
+      "score": 0.2542,
       "score_percentile": null,
       "dimensions": {
         "asset_preferences": 0.125,
-        "timing_profile": 0.0165,
+        "timing_profile": 0.0166,
         "leverage_profile": 0.3725,
         "entry_exit_style": 1.0,
         "hold_duration": 0.0,
-        "account_size": 0.3017,
-        "trade_sequencing": 0.6479,
-        "position_sizing": 0.0591,
-        "activity": 0.6021,
-        "direction_bias": 0.9574,
-        "position_management": 0.8053,
+        "account_size": 0.3043,
+        "trade_sequencing": 0.6185,
+        "position_sizing": 0.0598,
+        "activity": 0.6084,
+        "direction_bias": 0.9685,
+        "position_management": 0.8097,
         "loss_handling": null
       },
       "evidence": {
@@ -4727,7 +3996,7 @@
           "Different active trading hours"
         ],
         "vetoes": [
-          "Decision frequency 11x apart (1.00 vs 11.18 position episodes/day)"
+          "Decision frequency 11x apart (1.00 vs 10.79 position episodes/day)"
         ],
         "asset_overlap": {
           "overlap": [
@@ -4751,7 +4020,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:55:02.893685+00:00",
+      "scanned_at": "2026-07-16T07:20:20.511955+00:00",
       "fingerprint": {
         "asset_preferences": {
           "coins_traded": [
@@ -4765,13 +4034,13 @@
             "xyz:XYZ100"
           ],
           "coin_frequency": {
-            "BTC": 0.362,
-            "NEAR": 0.2455,
-            "HYPE": 0.175,
+            "BTC": 0.392,
+            "NEAR": 0.2175,
+            "HYPE": 0.1685,
             "CRV": 0.1045,
-            "XPL": 0.0495,
+            "XPL": 0.067,
             "xyz:BRENTOIL": 0.031,
-            "XLM": 0.029,
+            "XLM": 0.016,
             "xyz:XYZ100": 0.0035
           },
           "top_5_by_volume": [
@@ -4788,22 +4057,22 @@
             0.0325,
             0.1365,
             0.025,
-            0.043,
-            0.073,
-            0.059,
-            0.0795,
+            0.031,
+            0.0485,
+            0.055,
+            0.0565,
             0.0745,
             0.0115,
             0.0,
             0.0,
             0.0,
             0.01,
-            0.1895,
+            0.1995,
             0.0805,
             0.017,
-            0.0035,
+            0.0275,
             0.0525,
-            0.0115,
+            0.041,
             0.024,
             0.0015,
             0.0,
@@ -4811,12 +4080,12 @@
           ],
           "most_active_hours_utc": [
             2,
-            5,
             6,
             7,
             8,
             14,
-            15
+            15,
+            23
           ]
         },
         "leverage_profile": {
@@ -4831,111 +4100,112 @@
             "market": 1.0,
             "limit": 0.0
           },
-          "win_rate": 0.196
+          "win_rate": 0.1905
         },
         "hold_duration": {
           "overall_minutes": {
-            "mean": 81.9,
-            "median": 40.2,
-            "p25": 10.4,
-            "p75": 100.4
+            "mean": 72.4,
+            "median": 32.0,
+            "p25": 9.4,
+            "p75": 92.7
           },
           "distribution_buckets": {
-            "under_1h": 0.6316,
-            "1h_to_4h": 0.2895,
-            "4h_to_24h": 0.0789,
+            "under_1h": 0.6667,
+            "1h_to_4h": 0.2778,
+            "4h_to_24h": 0.0556,
             "1d_to_7d": 0.0,
             "over_7d": 0.0
           }
         },
         "trade_sequencing": {
           "inter_fill_timing": {
-            "mean_minutes": 25.9,
-            "median_minutes": 5.6
+            "mean_minutes": 28.4,
+            "median_minutes": 5.8
           },
           "buy_sell_ratio": {
-            "buy_pct": 0.54,
-            "sell_pct": 0.46
+            "buy_pct": 0.514,
+            "sell_pct": 0.486
           }
         },
         "position_sizing": {
           "size_to_account_ratio": {
-            "mean": 0.2579,
-            "median": 0.039,
-            "std": 0.6749
+            "mean": 0.2515,
+            "median": 0.0394,
+            "std": 0.6316
           }
         },
         "style_profile": {
           "sufficient_data": true,
           "activity": {
-            "episodes_per_day": 11.184,
-            "fills_per_day": 828.44,
+            "episodes_per_day": 10.792,
+            "fills_per_day": 799.41,
             "active_days_ratio": 1.0,
-            "span_days": 2.4
+            "span_days": 2.5
           },
           "direction": {
-            "long_open_pct": 0.9574,
-            "short_open_pct": 0.0426,
-            "total_opens": 986
+            "long_open_pct": 0.9685,
+            "short_open_pct": 0.0315,
+            "total_opens": 921
           },
           "position_management": {
             "episodes": 27,
             "mean_fills_per_episode": 74.07,
-            "median_fills_per_episode": 58.0
+            "median_fills_per_episode": 53.0
           },
           "loss_handling": {
-            "closed_wins": 392,
-            "closed_losses": 622,
-            "median_winner_hold_min": 122.7,
-            "median_loser_hold_min": 119.3,
-            "loser_to_winner_hold_ratio": 0.972,
-            "win_loss_magnitude_ratio": 0.877
+            "closed_wins": 381,
+            "closed_losses": 698,
+            "median_winner_hold_min": 50.4,
+            "median_loser_hold_min": 86.0,
+            "loser_to_winner_hold_ratio": 1.706,
+            "win_loss_magnitude_ratio": 0.874
           },
           "execution": {
             "twap_ratio": 0.0,
             "spot_fill_ratio": 0.0
           },
           "clip_sizes": {
-            "notional_cv": 2.6174,
-            "round_size_pref": 0.2025
+            "notional_cv": 2.5115,
+            "round_size_pref": 0.209
           }
         },
         "account_characteristics": {
-          "account_value_usd": 20283.84,
-          "weekly_volume_usd": 10460536.28
+          "account_value_usd": 20414.91,
+          "weekly_volume_usd": 10268432.11
         }
       }
     },
     {
-      "wallet": "0x02cf911889f9d979dde0f27084e25a4ca58efdf1",
-      "score": 0.2511,
+      "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+      "score": 0.253,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.1,
-        "timing_profile": 0.2057,
-        "leverage_profile": 0.3725,
-        "entry_exit_style": 0.7554,
+        "asset_preferences": 0.0714,
+        "timing_profile": 0.2652,
+        "leverage_profile": 0.772,
+        "entry_exit_style": 0.2504,
         "hold_duration": 0.0,
-        "account_size": 0.2584,
-        "trade_sequencing": 0.7453,
-        "position_sizing": 0.0751,
-        "activity": 0.5149,
-        "direction_bias": 0.6419,
-        "position_management": 0.8217,
+        "account_size": 0.887,
+        "trade_sequencing": 0.1605,
+        "position_sizing": 0.4714,
+        "activity": 0.3941,
+        "direction_bias": 0.0202,
+        "position_management": 0.7742,
         "loss_handling": null
       },
       "evidence": {
         "tier": "BACKGROUND",
         "reasons": [
           "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar scaling/TWAP/clip-size habits"
+          "Similar account-size bracket"
         ],
         "warnings": [
           "Weak asset overlap",
           "Different active trading hours"
         ],
         "vetoes": [
-          "Decision frequency 20x apart (1.00 vs 20.17 position episodes/day)"
+          "Decision frequency 13x apart (1.00 vs 13.00 position episodes/day)",
+          "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
           "overlap": [
@@ -4943,55 +4213,228 @@
           ],
           "target_only": [],
           "candidate_only": [
-            "#5030",
-            "#6160",
+            "@306",
             "BTC",
-            "ETH",
-            "HYPE",
-            "SOL",
-            "xyz:EWY",
-            "xyz:SILVER",
-            "xyz:XYZ100"
+            "CC",
+            "EIGEN",
+            "FARTCOIN",
+            "GRASS",
+            "JTO",
+            "LIT",
+            "NEAR",
+            "VVV",
+            "WLD",
+            "XPL",
+            "ZEC"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.1
+          "jaccard": 0.0714
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:56:17.385941+00:00"
+      "scanned_at": "2026-07-16T07:17:23.591090+00:00",
+      "fingerprint": {
+        "asset_preferences": {
+          "coins_traded": [
+            "@306",
+            "BTC",
+            "CC",
+            "EIGEN",
+            "FARTCOIN",
+            "GRASS",
+            "JTO",
+            "LIT",
+            "NEAR",
+            "VVV",
+            "WLD",
+            "XPL",
+            "ZEC",
+            "xyz:BRENTOIL"
+          ],
+          "coin_frequency": {
+            "GRASS": 0.2955,
+            "JTO": 0.163,
+            "LIT": 0.1385,
+            "BTC": 0.0915,
+            "FARTCOIN": 0.0775,
+            "ZEC": 0.061,
+            "EIGEN": 0.054,
+            "xyz:BRENTOIL": 0.033,
+            "VVV": 0.0235,
+            "WLD": 0.0215,
+            "NEAR": 0.016,
+            "XPL": 0.014,
+            "CC": 0.0095,
+            "@306": 0.0015
+          },
+          "top_5_by_volume": [
+            "BTC",
+            "xyz:BRENTOIL",
+            "ZEC",
+            "LIT",
+            "FARTCOIN"
+          ]
+        },
+        "timing_profile": {
+          "hourly_distribution": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.315,
+            0.2365,
+            0.4485,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "most_active_hours_utc": [
+            0,
+            1,
+            2,
+            3,
+            13,
+            14,
+            15
+          ]
+        },
+        "leverage_profile": {
+          "overall": {
+            "mean": 9.65,
+            "median": 10.0,
+            "max": 20.0
+          }
+        },
+        "entry_exit_style": {
+          "order_type_ratio": {
+            "market": 0.2055,
+            "limit": 0.7945
+          },
+          "win_rate": 0.051
+        },
+        "hold_duration": {
+          "overall_minutes": {
+            "mean": 5.5,
+            "median": 5.2,
+            "p25": 3.2,
+            "p75": 5.6
+          },
+          "distribution_buckets": {
+            "under_1h": 1.0,
+            "1h_to_4h": 0.0,
+            "4h_to_24h": 0.0,
+            "1d_to_7d": 0.0,
+            "over_7d": 0.0
+          }
+        },
+        "trade_sequencing": {
+          "inter_fill_timing": {
+            "mean_minutes": 0.1,
+            "median_minutes": 0.0
+          },
+          "buy_sell_ratio": {
+            "buy_pct": 0.173,
+            "sell_pct": 0.827
+          }
+        },
+        "position_sizing": {
+          "size_to_account_ratio": {
+            "mean": 0.0002,
+            "median": 0.0,
+            "std": 0.0009
+          }
+        },
+        "style_profile": {
+          "sufficient_data": true,
+          "activity": {
+            "episodes_per_day": 13.0,
+            "fills_per_day": 2000.0,
+            "active_days_ratio": 0.5,
+            "span_days": 1.0
+          },
+          "direction": {
+            "long_open_pct": 0.0202,
+            "short_open_pct": 0.9798,
+            "total_opens": 1634
+          },
+          "position_management": {
+            "episodes": 13,
+            "mean_fills_per_episode": 153.62,
+            "median_fills_per_episode": 108.0
+          },
+          "loss_handling": {
+            "closed_wins": 102,
+            "closed_losses": 266,
+            "median_winner_hold_min": 12.0,
+            "median_loser_hold_min": 37.3,
+            "loser_to_winner_hold_ratio": 3.101,
+            "win_loss_magnitude_ratio": 0.05
+          },
+          "execution": {
+            "twap_ratio": 0.0,
+            "spot_fill_ratio": 0.0015
+          },
+          "clip_sizes": {
+            "notional_cv": 5.9117,
+            "round_size_pref": 0.653
+          }
+        },
+        "account_characteristics": {
+          "account_value_usd": 10524104.51,
+          "weekly_volume_usd": 3230504.29
+        }
+      }
     },
     {
-      "wallet": "0x7ab12f7a0925ef24927343d47199e75a91fc78aa",
-      "score": 0.2483,
+      "wallet": "0xfc27136e42af1732ddc9ce2605ea9bff1b959d9d",
+      "score": 0.2451,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.0227,
-        "timing_profile": 0.3625,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 0.0878,
+        "asset_preferences": 0.025,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.6829,
+        "entry_exit_style": 0.982,
         "hold_duration": 0.0,
-        "account_size": 0.5733,
-        "trade_sequencing": 0.4981,
-        "position_sizing": 0.3216,
-        "activity": 0.4373,
-        "direction_bias": 0.3295,
-        "position_management": 0.6849,
+        "account_size": 0.7778,
+        "trade_sequencing": 0.1771,
+        "position_sizing": 0.5774,
+        "activity": 0.3335,
+        "direction_bias": 0.0985,
+        "position_management": 0.7913,
         "loss_handling": null
       },
       "evidence": {
         "tier": "BACKGROUND",
         "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL"
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar market/limit execution style",
+          "Similar account-size bracket"
         ],
         "warnings": [
-          "Weak asset overlap"
+          "Weak asset overlap",
+          "Different active trading hours",
+          "Very different trading frequency"
         ],
         "vetoes": [
-          "Decision frequency 118x apart (1.00 vs 118.29 position episodes/day)",
-          "Incompatible hold style: 0% vs 99% of holds under 1h"
+          "Decision frequency 41x apart (1.00 vs 41.00 position episodes/day)",
+          "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
           "overlap": [
@@ -5000,58 +4443,271 @@
           "target_only": [],
           "candidate_only": [
             "AAVE",
-            "ADA",
-            "ARB",
-            "BCH",
             "BTC",
-            "DOGE",
-            "EIGEN",
-            "ENA",
             "ETH",
-            "ETHFI",
-            "FARTCOIN",
-            "FIL",
-            "HBAR",
             "HYPE",
-            "JUP",
-            "LIT",
+            "LINK",
             "NEAR",
-            "PENDLE",
-            "POPCAT",
-            "PUMP",
-            "PYTH",
-            "SOL",
-            "SPX",
-            "SYRUP",
-            "UNI",
-            "VIRTUAL",
-            "VVV",
-            "WLD",
-            "XPL",
+            "XRP",
             "ZEC",
-            "ZRO",
-            "xyz:AAPL",
-            "xyz:AMD",
-            "xyz:AMZN",
+            "xyz:ASML",
+            "xyz:AVGO",
+            "xyz:CBRS",
             "xyz:COIN",
+            "xyz:COST",
             "xyz:CRCL",
+            "xyz:CRWV",
+            "xyz:DELL",
+            "xyz:DRAM",
+            "xyz:EWT",
+            "xyz:EWY",
+            "xyz:EWZ",
+            "xyz:GME",
+            "xyz:HIMS",
             "xyz:HOOD",
-            "xyz:MSTR",
-            "xyz:NATGAS",
+            "xyz:IBM",
+            "xyz:INTC",
+            "xyz:META",
+            "xyz:MU",
+            "xyz:NBIS",
             "xyz:NVDA",
-            "xyz:ORCL",
-            "xyz:SP500",
-            "xyz:SPCX"
+            "xyz:RIVN",
+            "xyz:SKHX",
+            "xyz:SKHY",
+            "xyz:SMSN",
+            "xyz:SNDK",
+            "xyz:SPCX",
+            "xyz:TSM",
+            "xyz:USAR",
+            "xyz:XLE",
+            "xyz:ZM"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.0227
+          "jaccard": 0.025
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:51:06.329558+00:00"
+      "scanned_at": "2026-07-16T07:14:06.624219+00:00",
+      "fingerprint": {
+        "asset_preferences": {
+          "coins_traded": [
+            "AAVE",
+            "BTC",
+            "ETH",
+            "HYPE",
+            "LINK",
+            "NEAR",
+            "XRP",
+            "ZEC",
+            "xyz:ASML",
+            "xyz:AVGO",
+            "xyz:BRENTOIL",
+            "xyz:CBRS",
+            "xyz:COIN",
+            "xyz:COST",
+            "xyz:CRCL",
+            "xyz:CRWV",
+            "xyz:DELL",
+            "xyz:DRAM",
+            "xyz:EWT",
+            "xyz:EWY",
+            "xyz:EWZ",
+            "xyz:GME",
+            "xyz:HIMS",
+            "xyz:HOOD",
+            "xyz:IBM",
+            "xyz:INTC",
+            "xyz:META",
+            "xyz:MU",
+            "xyz:NBIS",
+            "xyz:NVDA",
+            "xyz:RIVN",
+            "xyz:SKHX",
+            "xyz:SKHY",
+            "xyz:SMSN",
+            "xyz:SNDK",
+            "xyz:SPCX",
+            "xyz:TSM",
+            "xyz:USAR",
+            "xyz:XLE",
+            "xyz:ZM"
+          ],
+          "coin_frequency": {
+            "xyz:SMSN": 0.4245,
+            "xyz:SKHX": 0.2425,
+            "xyz:SKHY": 0.2,
+            "xyz:INTC": 0.023,
+            "xyz:SPCX": 0.015,
+            "xyz:IBM": 0.0145,
+            "xyz:ZM": 0.008,
+            "xyz:CBRS": 0.0075,
+            "xyz:EWY": 0.007,
+            "xyz:MU": 0.006,
+            "ETH": 0.0055,
+            "xyz:NBIS": 0.005,
+            "xyz:COST": 0.004,
+            "xyz:EWZ": 0.0035,
+            "xyz:XLE": 0.0025,
+            "xyz:USAR": 0.0025,
+            "ZEC": 0.002,
+            "HYPE": 0.002,
+            "LINK": 0.002,
+            "xyz:HIMS": 0.002,
+            "xyz:RIVN": 0.002,
+            "xyz:AVGO": 0.0015,
+            "xyz:EWT": 0.0015,
+            "xyz:SNDK": 0.0015,
+            "XRP": 0.0015,
+            "xyz:COIN": 0.0015,
+            "BTC": 0.0015,
+            "xyz:DELL": 0.0015,
+            "xyz:NVDA": 0.001,
+            "xyz:CRCL": 0.001,
+            "xyz:ASML": 0.001,
+            "xyz:HOOD": 0.001,
+            "xyz:CRWV": 0.001,
+            "NEAR": 0.0005,
+            "AAVE": 0.0005,
+            "xyz:BRENTOIL": 0.0005,
+            "xyz:META": 0.0005,
+            "xyz:GME": 0.0005,
+            "xyz:DRAM": 0.0005,
+            "xyz:TSM": 0.0005
+          },
+          "top_5_by_volume": [
+            "xyz:SKHX",
+            "xyz:SMSN",
+            "xyz:SKHY",
+            "BTC",
+            "xyz:INTC"
+          ]
+        },
+        "timing_profile": {
+          "hourly_distribution": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "most_active_hours_utc": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            19
+          ]
+        },
+        "leverage_profile": {
+          "overall": {
+            "mean": 10.91,
+            "median": 10.0,
+            "max": 20.0
+          }
+        },
+        "entry_exit_style": {
+          "order_type_ratio": {
+            "market": 0.8385,
+            "limit": 0.1615
+          },
+          "win_rate": 0.068
+        },
+        "hold_duration": {
+          "overall_minutes": {
+            "mean": 0.9,
+            "median": 0.2,
+            "p25": 0.1,
+            "p75": 0.7
+          },
+          "distribution_buckets": {
+            "under_1h": 1.0,
+            "1h_to_4h": 0.0,
+            "4h_to_24h": 0.0,
+            "1d_to_7d": 0.0,
+            "over_7d": 0.0
+          }
+        },
+        "trade_sequencing": {
+          "inter_fill_timing": {
+            "mean_minutes": 0.0,
+            "median_minutes": 0.0
+          },
+          "buy_sell_ratio": {
+            "buy_pct": 0.1525,
+            "sell_pct": 0.8475
+          }
+        },
+        "position_sizing": {
+          "size_to_account_ratio": {
+            "mean": 0.0003,
+            "median": 0.0001,
+            "std": 0.0009
+          }
+        },
+        "style_profile": {
+          "sufficient_data": true,
+          "activity": {
+            "episodes_per_day": 41.0,
+            "fills_per_day": 2000.0,
+            "active_days_ratio": 0.5,
+            "span_days": 1.0
+          },
+          "direction": {
+            "long_open_pct": 0.0985,
+            "short_open_pct": 0.9015,
+            "total_opens": 1564
+          },
+          "position_management": {
+            "episodes": 41,
+            "mean_fills_per_episode": 48.78,
+            "median_fills_per_episode": 4.0
+          },
+          "loss_handling": {
+            "closed_wins": 136,
+            "closed_losses": 301,
+            "median_winner_hold_min": 7.6,
+            "median_loser_hold_min": 25.0,
+            "loser_to_winner_hold_ratio": 3.273,
+            "win_loss_magnitude_ratio": 2.947
+          },
+          "execution": {
+            "twap_ratio": 0.0,
+            "spot_fill_ratio": 0.0
+          },
+          "clip_sizes": {
+            "notional_cv": 2.5345,
+            "round_size_pref": 0.3345
+          }
+        },
+        "account_characteristics": {
+          "account_value_usd": 3303359.45,
+          "weekly_volume_usd": 2240785.56
+        }
+      }
     },
     {
       "wallet": "0x523852be2db1a76a0e088ecbff32e849544054e5",
@@ -5106,137 +4762,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:54:05.565388+00:00"
-    },
-    {
-      "wallet": "0xecb63caa47c7c4e77f60f1ce858cf28dc2b82b00",
-      "score": 0.2426,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.0122,
-        "timing_profile": 0.0,
-        "leverage_profile": 0.8107,
-        "entry_exit_style": 0.5675,
-        "hold_duration": 0.0,
-        "account_size": 0.6084,
-        "trade_sequencing": 0.6163,
-        "position_sizing": 0.5,
-        "activity": 0.3135,
-        "direction_bias": 0.509,
-        "position_management": 0.6901,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Different active trading hours",
-          "Very different trading frequency"
-        ],
-        "vetoes": [
-          "Decision frequency 74x apart (1.00 vs 74.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 100% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "2Z",
-            "@107",
-            "@142",
-            "@151",
-            "@156",
-            "@188",
-            "@193",
-            "@210",
-            "@272",
-            "ADA",
-            "APT",
-            "ARB",
-            "ASTER",
-            "ATOM",
-            "AVNT",
-            "BCH",
-            "BNB",
-            "BTC",
-            "CRV",
-            "DOGE",
-            "ENA",
-            "HYPE",
-            "JUP",
-            "LDO",
-            "LINK",
-            "LIT",
-            "MON",
-            "NEAR",
-            "ONDO",
-            "PAXG",
-            "PENGU",
-            "PUMP",
-            "PYTH",
-            "SEI",
-            "SOL",
-            "STBL",
-            "SUI",
-            "TAO",
-            "TIA",
-            "TRUMP",
-            "UNI",
-            "VIRTUAL",
-            "VVV",
-            "WIF",
-            "WLFI",
-            "XPL",
-            "ZEC",
-            "kFLOKI",
-            "kPEPE",
-            "xyz:AAPL",
-            "xyz:AMD",
-            "xyz:AMZN",
-            "xyz:ARM",
-            "xyz:AVGO",
-            "xyz:CL",
-            "xyz:COIN",
-            "xyz:CRCL",
-            "xyz:CRWV",
-            "xyz:DRAM",
-            "xyz:EWY",
-            "xyz:GOLD",
-            "xyz:GOOGL",
-            "xyz:HOOD",
-            "xyz:INTC",
-            "xyz:LITE",
-            "xyz:MRVL",
-            "xyz:MSFT",
-            "xyz:MU",
-            "xyz:NATGAS",
-            "xyz:NBIS",
-            "xyz:NVDA",
-            "xyz:ORCL",
-            "xyz:QCOM",
-            "xyz:SILVER",
-            "xyz:SKHX",
-            "xyz:SKHY",
-            "xyz:SMSN",
-            "xyz:SNDK",
-            "xyz:SP500",
-            "xyz:TSLA",
-            "xyz:TSM"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.0122
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:31.642006+00:00"
+      "scanned_at": "2026-07-16T07:19:25.775995+00:00"
     },
     {
       "wallet": "0x79f2bb1fc86a1f0592fb30aa6a369a24a7fd2361",
@@ -5308,24 +4834,80 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:57:17.438987+00:00"
+      "scanned_at": "2026-07-16T07:23:16.530762+00:00"
     },
     {
-      "wallet": "0xc30c7ea910a71ce06ae840868b0c7e47616ba4c9",
-      "score": 0.2295,
+      "wallet": "0x02cf911889f9d979dde0f27084e25a4ca58efdf1",
+      "score": 0.2322,
       "score_percentile": null,
       "dimensions": {
         "asset_preferences": 0.1111,
-        "timing_profile": 0.2207,
+        "timing_profile": 0.2051,
         "leverage_profile": 0.0,
-        "entry_exit_style": 0.9993,
+        "entry_exit_style": 0.7554,
         "hold_duration": 0.0,
-        "account_size": 0.5443,
-        "trade_sequencing": 0.7336,
+        "account_size": 0.4216,
+        "trade_sequencing": 0.7086,
         "position_sizing": 0.5,
-        "activity": 0.4481,
-        "direction_bias": 0.0198,
-        "position_management": 0.816,
+        "activity": 0.4849,
+        "direction_bias": 0.6674,
+        "position_management": 0.8204,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Weak asset overlap",
+          "Different active trading hours"
+        ],
+        "vetoes": [
+          "Decision frequency 26x apart (1.00 vs 26.20 position episodes/day)"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "#6160",
+            "BTC",
+            "ETH",
+            "HYPE",
+            "SOL",
+            "xyz:EWY",
+            "xyz:SILVER",
+            "xyz:XYZ100"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.1111
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:22:12.054756+00:00"
+    },
+    {
+      "wallet": "0xc30c7ea910a71ce06ae840868b0c7e47616ba4c9",
+      "score": 0.2275,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.1111,
+        "timing_profile": 0.2182,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 0.9997,
+        "hold_duration": 0.0,
+        "account_size": 0.5392,
+        "trade_sequencing": 0.7531,
+        "position_sizing": 0.5,
+        "activity": 0.4223,
+        "direction_bias": 0.0208,
+        "position_management": 0.8175,
         "loss_handling": null
       },
       "evidence": {
@@ -5340,7 +4922,7 @@
           "Different active trading hours"
         ],
         "vetoes": [
-          "Decision frequency 12x apart (1.00 vs 11.84 position episodes/day)"
+          "Decision frequency 14x apart (1.00 vs 13.98 position episodes/day)"
         ],
         "asset_overlap": {
           "overlap": [
@@ -5365,30 +4947,31 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:56:25.569012+00:00"
+      "scanned_at": "2026-07-16T07:22:21.252813+00:00"
     },
     {
-      "wallet": "0xfc667adba8d4837586078f4fdcdc29804337ca06",
-      "score": 0.2165,
+      "wallet": "0x7717a7a245d9f950e586822b8c9b46863ed7bd7e",
+      "score": 0.226,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.0303,
+        "asset_preferences": 0.0074,
         "timing_profile": 0.0,
-        "leverage_profile": 0.4967,
-        "entry_exit_style": 0.096,
+        "leverage_profile": 0.7114,
+        "entry_exit_style": 0.5258,
         "hold_duration": 0.0,
-        "account_size": 0.5489,
-        "trade_sequencing": 0.9559,
-        "position_sizing": 0.5774,
-        "activity": 0.3424,
-        "direction_bias": 0.7288,
-        "position_management": 0.7738,
+        "account_size": 0.7277,
+        "trade_sequencing": 0.7959,
+        "position_sizing": 0.3333,
+        "activity": 0.2984,
+        "direction_bias": 0.0786,
+        "position_management": 0.735,
         "loss_handling": null
       },
       "evidence": {
         "tier": "BACKGROUND",
         "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL"
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar account-size bracket"
         ],
         "warnings": [
           "Weak asset overlap",
@@ -5396,7 +4979,7 @@
           "Very different trading frequency"
         ],
         "vetoes": [
-          "Decision frequency 33x apart (1.00 vs 33.00 position episodes/day)",
+          "Decision frequency 135x apart (1.00 vs 135.00 position episodes/day)",
           "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
@@ -5405,7 +4988,302 @@
           ],
           "target_only": [],
           "candidate_only": [
+            "0G",
+            "2Z",
+            "AAVE",
+            "ACE",
+            "ADA",
+            "AIXBT",
+            "ALGO",
+            "ALT",
+            "ANIME",
+            "APE",
+            "APT",
+            "AR",
+            "ARB",
+            "AVAX",
+            "AXS",
+            "BANANA",
+            "BERA",
+            "BIGTIME",
+            "BIO",
+            "BLUR",
+            "BNB",
+            "BTC",
+            "CAKE",
+            "CC",
+            "CELO",
+            "CFX",
+            "CHIP",
+            "CRV",
+            "DOGE",
+            "DOT",
+            "DYDX",
+            "EIGEN",
+            "ENA",
+            "ENS",
+            "ETC",
+            "ETH",
+            "ETHFI",
+            "FARTCOIN",
+            "FET",
+            "FIL",
+            "FOGO",
+            "GALA",
+            "GMT",
+            "GMX",
+            "GOAT",
+            "GRASS",
+            "GRIFFAIN",
+            "HBAR",
+            "HEMI",
+            "HMSTR",
             "HYPE",
+            "HYPER",
+            "IMX",
+            "INJ",
+            "IO",
+            "JTO",
+            "JUP",
+            "KAITO",
+            "KAS",
+            "LAYER",
+            "LDO",
+            "LINK",
+            "LIT",
+            "ME",
+            "MEGA",
+            "MET",
+            "MON",
+            "MOODENG",
+            "MORPHO",
+            "MOVE",
+            "NEAR",
+            "NIL",
+            "ONDO",
+            "OP",
+            "ORDI",
+            "PENDLE",
+            "PENGU",
+            "PEOPLE",
+            "PNUT",
+            "POL",
+            "POLYX",
+            "POPCAT",
+            "PUMP",
+            "PYTH",
+            "RENDER",
+            "RESOLV",
+            "REZ",
+            "RUNE",
+            "S",
+            "SAGA",
+            "SAND",
+            "SEI",
+            "SKR",
+            "SKY",
+            "SNX",
+            "SOL",
+            "SPX",
+            "STABLE",
+            "STRK",
+            "STX",
+            "SUI",
+            "SUSHI",
+            "SYRUP",
+            "TAO",
+            "TIA",
+            "TRB",
+            "TRUMP",
+            "TURBO",
+            "UNI",
+            "USUAL",
+            "VVV",
+            "W",
+            "WIF",
+            "WLD",
+            "WLFI",
+            "XAI",
+            "XLM",
+            "XMR",
+            "XPL",
+            "XRP",
+            "YGG",
+            "ZEC",
+            "ZEN",
+            "ZETA",
+            "ZK",
+            "ZORA",
+            "kBONK",
+            "kFLOKI",
+            "kNEIRO",
+            "kPEPE",
+            "kSHIB",
+            "xyz:GOLD",
+            "xyz:SILVER",
+            "xyz:SPCX"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.0074
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:14:29.674000+00:00"
+    },
+    {
+      "wallet": "0xbeccae9ffcb69e9d42a1d4e744abf8056149562d",
+      "score": 0.2174,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.0172,
+        "timing_profile": 0.1564,
+        "leverage_profile": 0.8505,
+        "entry_exit_style": 0.3508,
+        "hold_duration": 0.0,
+        "account_size": 0.435,
+        "trade_sequencing": 0.4187,
+        "position_sizing": 0.2873,
+        "activity": 0.321,
+        "direction_bias": 0.1394,
+        "position_management": 0.8081,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Weak asset overlap",
+          "Different active trading hours",
+          "Very different trading frequency"
+        ],
+        "vetoes": [
+          "Decision frequency 58x apart (1.00 vs 58.00 position episodes/day)",
+          "Incompatible hold style: 0% vs 97% of holds under 1h"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "AAVE",
+            "ASTER",
+            "AXS",
+            "AZTEC",
+            "BERA",
+            "BTC",
+            "CHIP",
+            "CRV",
+            "ENA",
+            "ETH",
+            "FARTCOIN",
+            "GRAM",
+            "HYPE",
+            "JTO",
+            "LDO",
+            "LIT",
+            "MEGA",
+            "MET",
+            "MON",
+            "NEAR",
+            "PENGU",
+            "PUMP",
+            "SOL",
+            "SUI",
+            "TAO",
+            "UNI",
+            "XMR",
+            "XPL",
+            "XRP",
+            "ZEC",
+            "ZRO",
+            "xyz:AMD",
+            "xyz:CBRS",
+            "xyz:CL",
+            "xyz:COIN",
+            "xyz:CRCL",
+            "xyz:DRAM",
+            "xyz:EWY",
+            "xyz:GOLD",
+            "xyz:HOOD",
+            "xyz:INTC",
+            "xyz:MRVL",
+            "xyz:MSFT",
+            "xyz:MSTR",
+            "xyz:MU",
+            "xyz:NATGAS",
+            "xyz:NBIS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:PALLADIUM",
+            "xyz:PLATINUM",
+            "xyz:PLTR",
+            "xyz:SILVER",
+            "xyz:SMSN",
+            "xyz:SNDK",
+            "xyz:SPCX",
+            "xyz:TSLA"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.0172
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:15:06.365082+00:00"
+    },
+    {
+      "wallet": "0xfc667adba8d4837586078f4fdcdc29804337ca06",
+      "score": 0.2031,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.0244,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.4967,
+        "entry_exit_style": 0.2569,
+        "hold_duration": 0.0,
+        "account_size": 0.5984,
+        "trade_sequencing": 0.7225,
+        "position_sizing": 0.4714,
+        "activity": 0.3335,
+        "direction_bias": 0.4561,
+        "position_management": 0.8147,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Weak asset overlap",
+          "Different active trading hours",
+          "Very different trading frequency"
+        ],
+        "vetoes": [
+          "Decision frequency 41x apart (1.00 vs 41.00 position episodes/day)",
+          "Incompatible hold style: 0% vs 100% of holds under 1h"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "BTC",
+            "ETH",
+            "HYPE",
+            "SOL",
+            "XRP",
             "mkts:US500",
             "mkts:USTECH",
             "xyz:AAPL",
@@ -5419,34 +5297,38 @@
             "xyz:CRWV",
             "xyz:DRAM",
             "xyz:EUR",
+            "xyz:EWJ",
             "xyz:EWY",
             "xyz:GOLD",
+            "xyz:GOOGL",
             "xyz:HOOD",
             "xyz:INTC",
-            "xyz:MRVL",
+            "xyz:META",
             "xyz:MSFT",
             "xyz:MSTR",
             "xyz:MU",
             "xyz:NFLX",
             "xyz:NVDA",
+            "xyz:ORCL",
             "xyz:PLTR",
-            "xyz:SILVER",
+            "xyz:RKLB",
             "xyz:SKHY",
             "xyz:SNDK",
             "xyz:SP500",
             "xyz:SPCX",
             "xyz:TSLA",
+            "xyz:TSM",
             "xyz:XYZ100"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.0303
+          "jaccard": 0.0244
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:34.808747+00:00"
+      "scanned_at": "2026-07-16T07:13:53.965360+00:00"
     },
     {
       "wallet": "0x00004808a6df8de77c891dc13826ff33cb17e24d",
@@ -5497,24 +5379,24 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:01:27.820198+00:00"
+      "scanned_at": "2026-07-16T07:27:13.484462+00:00"
     },
     {
       "wallet": "0x38f9715251bd7b9962a51b6e56b547fedb11709a",
-      "score": 0.1949,
+      "score": 0.1956,
       "score_percentile": null,
       "dimensions": {
         "asset_preferences": 0.125,
         "timing_profile": 0.0149,
         "leverage_profile": 0.0,
-        "entry_exit_style": 0.4539,
+        "entry_exit_style": 0.4652,
         "hold_duration": 0.0,
-        "account_size": 0.6081,
-        "trade_sequencing": 0.6185,
+        "account_size": 0.6012,
+        "trade_sequencing": 0.6135,
         "position_sizing": 0.5,
-        "activity": 0.6983,
+        "activity": 0.6992,
         "direction_bias": 0.5056,
-        "position_management": 0.8138,
+        "position_management": 0.8158,
         "loss_handling": null
       },
       "evidence": {
@@ -5550,39 +5432,38 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:00:10.676041+00:00"
+      "scanned_at": "2026-07-16T07:26:02.988696+00:00"
     },
     {
-      "wallet": "0xc42ec9d9156d9196f9a3887380ccfaaa518e4c8d",
-      "score": 0.1941,
+      "wallet": "0xf27ebb91ea420f73b59b205ac7e0b77a90ec8f3c",
+      "score": 0.1906,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.0667,
+        "asset_preferences": 0.0175,
         "timing_profile": 0.0,
-        "leverage_profile": 0.5276,
-        "entry_exit_style": 0.4684,
+        "leverage_profile": 0.6349,
+        "entry_exit_style": 0.033,
         "hold_duration": 0.0,
-        "account_size": 0.2044,
-        "trade_sequencing": 0.7007,
-        "position_sizing": 0.2621,
-        "activity": 0.3845,
-        "direction_bias": 0.5493,
-        "position_management": 0.844,
+        "account_size": 0.5041,
+        "trade_sequencing": 0.6279,
+        "position_sizing": 0.5883,
+        "activity": 0.3199,
+        "direction_bias": 0.5303,
+        "position_management": 0.7464,
         "loss_handling": null
       },
       "evidence": {
         "tier": "BACKGROUND",
         "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar scaling/TWAP/clip-size habits"
+          "Shares rare HIP-3 markets: xyz:BRENTOIL"
         ],
         "warnings": [
           "Weak asset overlap",
           "Different active trading hours",
-          "Very different account-size bracket"
+          "Very different trading frequency"
         ],
         "vetoes": [
-          "Decision frequency 15x apart (1.00 vs 15.00 position episodes/day)",
+          "Decision frequency 60x apart (1.00 vs 60.00 position episodes/day)",
           "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
@@ -5591,41 +5472,83 @@
           ],
           "target_only": [],
           "candidate_only": [
+            "@184",
+            "AAVE",
+            "BCH",
+            "BTC",
+            "EIGEN",
             "ETH",
-            "HMSTR",
+            "FARTCOIN",
+            "GRAM",
             "HYPE",
-            "NEAR",
+            "SOL",
+            "SYRUP",
             "TAO",
+            "XRP",
             "ZEC",
+            "kBONK",
+            "xyz:AAPL",
+            "xyz:AMD",
+            "xyz:AMZN",
+            "xyz:ARM",
+            "xyz:AVGO",
+            "xyz:BABA",
+            "xyz:BOT",
+            "xyz:CBRS",
             "xyz:CL",
+            "xyz:COIN",
+            "xyz:COPPER",
+            "xyz:CRCL",
+            "xyz:CRWV",
+            "xyz:DRAM",
+            "xyz:EWY",
+            "xyz:GOLD",
+            "xyz:GOOGL",
+            "xyz:HOOD",
+            "xyz:INTC",
+            "xyz:LITE",
+            "xyz:META",
             "xyz:MRVL",
+            "xyz:MSFT",
             "xyz:MSTR",
             "xyz:MU",
+            "xyz:NATGAS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:PLTR",
+            "xyz:QNT",
+            "xyz:RKLB",
+            "xyz:SILVER",
             "xyz:SKHX",
             "xyz:SKHY",
             "xyz:SNDK",
-            "xyz:SPCX"
+            "xyz:SP500",
+            "xyz:SPCX",
+            "xyz:TSLA",
+            "xyz:TSM",
+            "xyz:WDC",
+            "xyz:XYZ100"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.0667
+          "jaccard": 0.0175
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:50:26.672630+00:00"
+      "scanned_at": "2026-07-16T07:14:27.561113+00:00"
     },
     {
       "wallet": "0x27c9fa86c91b84ddfa15de58c482ff662498d65d",
-      "score": 0.1878,
+      "score": 0.188,
       "dimensions": {
         "asset_preferences": 0.0,
         "timing_profile": 0.0,
         "leverage_profile": 0.9383,
         "entry_exit_style": 0.9724,
         "hold_duration": 0.0,
-        "account_size": 0.6349,
+        "account_size": 0.6372,
         "trade_sequencing": 0.5837,
         "position_sizing": 0.6667,
         "activity": 0.3335,
@@ -5702,12 +5625,76 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:18.154775+00:00",
+      "scanned_at": "2026-07-16T07:13:37.340848+00:00",
       "source": "bridge_depositor"
     },
     {
+      "wallet": "0xc42ec9d9156d9196f9a3887380ccfaaa518e4c8d",
+      "score": 0.1854,
+      "score_percentile": null,
+      "dimensions": {
+        "asset_preferences": 0.0667,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.5276,
+        "entry_exit_style": 0.4114,
+        "hold_duration": 0.0,
+        "account_size": 0.1748,
+        "trade_sequencing": 0.7064,
+        "position_sizing": 0.3145,
+        "activity": 0.3701,
+        "direction_bias": 0.4354,
+        "position_management": 0.8049,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Weak asset overlap",
+          "Different active trading hours",
+          "Very different account-size bracket"
+        ],
+        "vetoes": [
+          "Decision frequency 19x apart (1.00 vs 19.00 position episodes/day)",
+          "Incompatible hold style: 0% vs 100% of holds under 1h"
+        ],
+        "asset_overlap": {
+          "overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "target_only": [],
+          "candidate_only": [
+            "ETH",
+            "HYPE",
+            "NEAR",
+            "TAO",
+            "WLD",
+            "ZEC",
+            "xyz:CL",
+            "xyz:MRVL",
+            "xyz:MSTR",
+            "xyz:MU",
+            "xyz:SKHX",
+            "xyz:SKHY",
+            "xyz:SNDK",
+            "xyz:SPCX"
+          ],
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.0667
+        }
+      },
+      "fills_count": 2000,
+      "scanned_at": "2026-07-16T07:16:01.931472+00:00"
+    },
+    {
       "wallet": "0x1c1c270b573d55b68b3d14722b5d5d401511bed0",
-      "score": 0.1722,
+      "score": 0.1816,
       "score_percentile": null,
       "dimensions": {
         "asset_preferences": 0.0909,
@@ -5715,12 +5702,12 @@
         "leverage_profile": 0.3311,
         "entry_exit_style": 0.0,
         "hold_duration": 0.0,
-        "account_size": 0.4352,
-        "trade_sequencing": 0.6702,
-        "position_sizing": 0.3441,
-        "activity": 0.3997,
-        "direction_bias": 0.484,
-        "position_management": 0.8548,
+        "account_size": 0.461,
+        "trade_sequencing": 0.6943,
+        "position_sizing": 0.318,
+        "activity": 0.4221,
+        "direction_bias": 0.574,
+        "position_management": 0.8926,
         "loss_handling": null
       },
       "evidence": {
@@ -5734,7 +5721,7 @@
           "Different active trading hours"
         ],
         "vetoes": [
-          "Decision frequency 12x apart (1.00 vs 12.00 position episodes/day)",
+          "Decision frequency 9x apart (1.00 vs 9.00 position episodes/day)",
           "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
@@ -5762,112 +5749,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:40.683546+00:00"
-    },
-    {
-      "wallet": "0xf27ebb91ea420f73b59b205ac7e0b77a90ec8f3c",
-      "score": 0.1703,
-      "score_percentile": null,
-      "dimensions": {
-        "asset_preferences": 0.0175,
-        "timing_profile": 0.0,
-        "leverage_profile": 0.6456,
-        "entry_exit_style": 0.0096,
-        "hold_duration": 0.0,
-        "account_size": 0.4903,
-        "trade_sequencing": 0.3537,
-        "position_sizing": 0.6124,
-        "activity": 0.3184,
-        "direction_bias": 0.4313,
-        "position_management": 0.7471,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Shares rare HIP-3 markets: xyz:BRENTOIL"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Different active trading hours",
-          "Very different trading frequency"
-        ],
-        "vetoes": [
-          "Decision frequency 63x apart (1.00 vs 63.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 100% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "target_only": [],
-          "candidate_only": [
-            "@184",
-            "AAVE",
-            "BCH",
-            "ETH",
-            "FARTCOIN",
-            "GRAM",
-            "HYPE",
-            "SOL",
-            "SUI",
-            "SYRUP",
-            "TAO",
-            "XRP",
-            "ZEC",
-            "ZRO",
-            "kBONK",
-            "xyz:AAPL",
-            "xyz:AMD",
-            "xyz:AMZN",
-            "xyz:ARM",
-            "xyz:AVGO",
-            "xyz:BABA",
-            "xyz:BOT",
-            "xyz:CBRS",
-            "xyz:CL",
-            "xyz:COIN",
-            "xyz:COPPER",
-            "xyz:CRCL",
-            "xyz:CRWV",
-            "xyz:DRAM",
-            "xyz:EWY",
-            "xyz:GOLD",
-            "xyz:GOOGL",
-            "xyz:HOOD",
-            "xyz:INTC",
-            "xyz:LITE",
-            "xyz:META",
-            "xyz:MRVL",
-            "xyz:MSFT",
-            "xyz:MSTR",
-            "xyz:MU",
-            "xyz:NATGAS",
-            "xyz:NBIS",
-            "xyz:NVDA",
-            "xyz:ORCL",
-            "xyz:PLTR",
-            "xyz:QNT",
-            "xyz:RKLB",
-            "xyz:SILVER",
-            "xyz:SKHY",
-            "xyz:SNDK",
-            "xyz:SP500",
-            "xyz:SPCX",
-            "xyz:TSLA",
-            "xyz:TSM",
-            "xyz:WDC",
-            "xyz:XYZ100"
-          ],
-          "overlap_count": 1,
-          "rare_overlap": [
-            "xyz:BRENTOIL"
-          ],
-          "jaccard": 0.0175
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:49:12.830656+00:00"
+      "scanned_at": "2026-07-16T07:14:01.241326+00:00"
     },
     {
       "wallet": "0x04dbde5c9d1e6a3239c8ff8ee3fca386a4a3c605",
@@ -5919,57 +5801,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:49:11.169126+00:00"
-    },
-    {
-      "wallet": "0x8ed318c5eefd8c9b15b6ee351734c8a350b2f23a",
-      "score": 0.1526,
-      "dimensions": {
-        "asset_preferences": 0.0,
-        "timing_profile": 0.3877,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 1.0,
-        "hold_duration": 0.0,
-        "account_size": 0.1051,
-        "trade_sequencing": 0.5158,
-        "position_sizing": 0.0043,
-        "activity": 0.5693,
-        "direction_bias": null,
-        "position_management": 0.4813,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Similar market/limit execution style"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Very different account-size bracket"
-        ],
-        "vetoes": [],
-        "asset_overlap": {
-          "overlap": [],
-          "target_only": [
-            "xyz:BRENTOIL"
-          ],
-          "candidate_only": [
-            "@107",
-            "@142",
-            "@151",
-            "@156",
-            "@188",
-            "@193",
-            "@210"
-          ],
-          "overlap_count": 0,
-          "rare_overlap": [],
-          "jaccard": 0.0
-        }
-      },
-      "fills_count": 413,
-      "scanned_at": "2026-07-16T04:48:24.284275+00:00",
-      "source": "bridge_depositor"
+      "scanned_at": "2026-07-16T07:14:25.442576+00:00"
     },
     {
       "wallet": "0xf7772737dd6e90bfbfd6b1f966a0021452cea894",
@@ -6064,40 +5896,38 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:50:15.146054+00:00"
+      "scanned_at": "2026-07-16T07:15:26.279022+00:00"
     },
     {
-      "wallet": "0x9b89b84179fb680d97c7b2ea80ad2e88e0811869",
-      "score": 0.1376,
+      "wallet": "0x35f13dc71426d4a429cf8bad69c4b39abbbf9896",
+      "score": 0.1405,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.0256,
-        "timing_profile": 0.1134,
-        "leverage_profile": 0.3725,
-        "entry_exit_style": 0.002,
+        "asset_preferences": 0.0385,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 0.8256,
         "hold_duration": 0.0,
-        "account_size": 0.248,
-        "trade_sequencing": 0.6986,
-        "position_sizing": 0.0001,
-        "activity": 0.3344,
-        "direction_bias": 0.7028,
-        "position_management": 0.8213,
+        "account_size": 0.7781,
+        "trade_sequencing": 0.3651,
+        "position_sizing": 0.5,
+        "activity": 0.3534,
+        "direction_bias": 0.4841,
+        "position_management": 0.7792,
         "loss_handling": null
       },
       "evidence": {
         "tier": "BACKGROUND",
         "reasons": [
           "Shares rare HIP-3 markets: xyz:BRENTOIL",
-          "Similar scaling/TWAP/clip-size habits"
+          "Similar account-size bracket"
         ],
         "warnings": [
           "Weak asset overlap",
-          "Different active trading hours",
-          "Very different account-size bracket",
-          "Very different trading frequency"
+          "Different active trading hours"
         ],
         "vetoes": [
-          "Decision frequency 40x apart (1.00 vs 40.00 position episodes/day)",
+          "Decision frequency 26x apart (1.00 vs 26.00 position episodes/day)",
           "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
@@ -6106,54 +5936,41 @@
           ],
           "target_only": [],
           "candidate_only": [
-            "xyz:AAPL",
             "xyz:AMD",
-            "xyz:AMZN",
-            "xyz:ARM",
             "xyz:AVGO",
-            "xyz:BABA",
-            "xyz:BB",
             "xyz:CBRS",
             "xyz:CL",
+            "xyz:COPPER",
             "xyz:CRCL",
-            "xyz:CRWV",
+            "xyz:DELL",
             "xyz:DRAM",
-            "xyz:EWJ",
             "xyz:EWY",
-            "xyz:GOOGL",
-            "xyz:HIMS",
+            "xyz:GOLD",
             "xyz:HOOD",
-            "xyz:HYUNDAI",
             "xyz:INTC",
-            "xyz:LITE",
-            "xyz:LLY",
             "xyz:MRVL",
-            "xyz:MSFT",
+            "xyz:MSTR",
             "xyz:MU",
             "xyz:NATGAS",
-            "xyz:NBIS",
             "xyz:NVDA",
-            "xyz:ORCL",
-            "xyz:PLTR",
-            "xyz:QCOM",
             "xyz:RKLB",
+            "xyz:SILVER",
             "xyz:SKHX",
             "xyz:SKHY",
             "xyz:SMSN",
             "xyz:SNDK",
             "xyz:SPCX",
-            "xyz:TSLA",
-            "xyz:ZM"
+            "xyz:TSLA"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.0256
+          "jaccard": 0.0385
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:49:06.901984+00:00"
+      "scanned_at": "2026-07-16T07:16:11.975028+00:00"
     },
     {
       "wallet": "0xa31441e058492bc7cfffda9aa7623c407ae83a81",
@@ -6211,7 +6028,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:51:02.114121+00:00"
+      "scanned_at": "2026-07-16T07:16:16.288606+00:00"
     },
     {
       "wallet": "0x90cc9850f850bb51a2cc6054a8a57246c02b40ed",
@@ -6225,7 +6042,7 @@
         "hold_duration": 0.0,
         "account_size": 0.1902,
         "trade_sequencing": 0.7509,
-        "position_sizing": 0.1306,
+        "position_sizing": 0.1308,
         "activity": 0.4566,
         "direction_bias": 0.5745,
         "position_management": 0.7295,
@@ -6353,24 +6170,24 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T05:01:15.730324+00:00"
+      "scanned_at": "2026-07-16T07:27:00.025900+00:00"
     },
     {
       "wallet": "0x34827044cbd4b808fc1b189fce9f50e6dafae7c9",
-      "score": 0.1302,
+      "score": 0.1244,
       "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.0167,
-        "timing_profile": 0.0,
-        "leverage_profile": 0.745,
-        "entry_exit_style": 0.0542,
+        "asset_preferences": 0.0161,
+        "timing_profile": 0.0938,
+        "leverage_profile": 0.5369,
+        "entry_exit_style": 0.0609,
         "hold_duration": 0.0,
-        "account_size": 0.2897,
-        "trade_sequencing": 0.3902,
-        "position_sizing": 0.1553,
-        "activity": 0.2807,
-        "direction_bias": 0.554,
-        "position_management": 0.7163,
+        "account_size": 0.3015,
+        "trade_sequencing": 0.3951,
+        "position_sizing": 0.1487,
+        "activity": 0.2817,
+        "direction_bias": 0.5203,
+        "position_management": 0.7234,
         "loss_handling": null
       },
       "evidence": {
@@ -6384,7 +6201,7 @@
           "Very different trading frequency"
         ],
         "vetoes": [
-          "Decision frequency 389x apart (1.00 vs 389.00 position episodes/day)",
+          "Decision frequency 362x apart (1.00 vs 362.00 position episodes/day)",
           "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
@@ -6395,38 +6212,39 @@
           "candidate_only": [
             "0G",
             "AAVE",
-            "BABY",
-            "BERA",
+            "ADA",
+            "BLUR",
             "CC",
-            "CHIP",
-            "ETC",
+            "DASH",
+            "ENA",
             "ETHFI",
-            "FIL",
+            "FARTCOIN",
             "GRASS",
-            "HYPER",
-            "IOTA",
-            "JTO",
+            "INJ",
             "KAITO",
             "LINK",
-            "LTC",
-            "MET",
-            "MOODENG",
             "MORPHO",
             "NEAR",
+            "ONDO",
             "REZ",
-            "S",
-            "SOL",
-            "SUPER",
+            "SPX",
             "SYRUP",
+            "TAO",
             "TIA",
+            "UNI",
             "VIRTUAL",
             "VVV",
+            "WLD",
+            "XLM",
             "XMR",
             "XPL",
+            "ZEC",
+            "ZEN",
             "ZRO",
             "xyz:AAPL",
             "xyz:AMD",
             "xyz:AMZN",
+            "xyz:ARM",
             "xyz:ASML",
             "xyz:BABA",
             "xyz:CBRS",
@@ -6439,84 +6257,119 @@
             "xyz:GOOGL",
             "xyz:HOOD",
             "xyz:IBM",
-            "xyz:INTC",
             "xyz:META",
             "xyz:MRVL",
             "xyz:MSFT",
+            "xyz:MSTR",
             "xyz:NATGAS",
             "xyz:NBIS",
             "xyz:NOK",
             "xyz:NOW",
             "xyz:ORCL",
-            "xyz:PLTR",
+            "xyz:RKLB",
+            "xyz:SILVER",
             "xyz:SNDK",
-            "xyz:WDC",
+            "xyz:TSM",
             "xyz:XYZ100"
           ],
           "overlap_count": 1,
           "rare_overlap": [
             "xyz:BRENTOIL"
           ],
-          "jaccard": 0.0167
+          "jaccard": 0.0161
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:51:12.332314+00:00"
+      "scanned_at": "2026-07-16T07:16:31.107942+00:00"
     },
     {
-      "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
-      "score": 0.1279,
+      "wallet": "0x9b89b84179fb680d97c7b2ea80ad2e88e0811869",
+      "score": 0.12,
+      "score_percentile": null,
       "dimensions": {
-        "asset_preferences": 0.0,
+        "asset_preferences": 0.025,
         "timing_profile": 0.0,
-        "leverage_profile": 0.8744,
-        "entry_exit_style": 0.0,
+        "leverage_profile": 0.3725,
+        "entry_exit_style": 0.002,
         "hold_duration": 0.0,
-        "account_size": 0.6589,
-        "trade_sequencing": 0.8955,
-        "position_sizing": 0.3333,
-        "activity": 0.4221,
-        "direction_bias": 0.6559,
-        "position_management": 0.9097,
+        "account_size": 0.2546,
+        "trade_sequencing": 0.6863,
+        "position_sizing": 0.0001,
+        "activity": 0.3335,
+        "direction_bias": 0.6753,
+        "position_management": 0.8173,
         "loss_handling": null
       },
       "evidence": {
         "tier": "BACKGROUND",
         "reasons": [
+          "Shares rare HIP-3 markets: xyz:BRENTOIL",
           "Similar scaling/TWAP/clip-size habits"
         ],
         "warnings": [
           "Weak asset overlap",
-          "Different active trading hours"
+          "Different active trading hours",
+          "Very different trading frequency"
         ],
         "vetoes": [
-          "Decision frequency 9x apart (1.00 vs 9.00 position episodes/day)",
+          "Decision frequency 41x apart (1.00 vs 41.00 position episodes/day)",
           "Incompatible hold style: 0% vs 100% of holds under 1h"
         ],
         "asset_overlap": {
-          "overlap": [],
-          "target_only": [
+          "overlap": [
             "xyz:BRENTOIL"
           ],
+          "target_only": [],
           "candidate_only": [
-            "ASTER",
-            "BTC",
-            "DOGE",
-            "ETH",
-            "HYPE",
-            "LIT",
-            "SOL",
-            "XMR",
-            "xyz:GOLD"
+            "xyz:AAPL",
+            "xyz:AMD",
+            "xyz:AMZN",
+            "xyz:ARM",
+            "xyz:AVGO",
+            "xyz:BABA",
+            "xyz:BB",
+            "xyz:CBRS",
+            "xyz:CL",
+            "xyz:CRCL",
+            "xyz:CRWV",
+            "xyz:DRAM",
+            "xyz:EWJ",
+            "xyz:EWY",
+            "xyz:GOOGL",
+            "xyz:HIMS",
+            "xyz:HOOD",
+            "xyz:HYUNDAI",
+            "xyz:INTC",
+            "xyz:LITE",
+            "xyz:LLY",
+            "xyz:MRVL",
+            "xyz:MSFT",
+            "xyz:MU",
+            "xyz:NATGAS",
+            "xyz:NBIS",
+            "xyz:NVDA",
+            "xyz:ORCL",
+            "xyz:PLTR",
+            "xyz:QCOM",
+            "xyz:RKLB",
+            "xyz:SILVER",
+            "xyz:SKHX",
+            "xyz:SKHY",
+            "xyz:SMSN",
+            "xyz:SNDK",
+            "xyz:SPCX",
+            "xyz:TSLA",
+            "xyz:ZM"
           ],
-          "overlap_count": 0,
-          "rare_overlap": [],
-          "jaccard": 0.0
+          "overlap_count": 1,
+          "rare_overlap": [
+            "xyz:BRENTOIL"
+          ],
+          "jaccard": 0.025
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:26.642444+00:00",
-      "source": "bridge_depositor"
+      "scanned_at": "2026-07-16T07:14:16.338286+00:00"
     },
     {
       "wallet": "0x4f0289f688194ca041974579fa216027d86ba525",
@@ -6568,7 +6421,7 @@
         }
       },
       "fills_count": 496,
-      "scanned_at": "2026-07-16T04:48:23.040395+00:00",
+      "scanned_at": "2026-07-16T07:13:43.079139+00:00",
       "source": "bridge_depositor"
     },
     {
@@ -6615,24 +6468,73 @@
         }
       },
       "fills_count": 257,
-      "scanned_at": "2026-07-16T04:48:19.021750+00:00",
+      "scanned_at": "2026-07-16T07:13:38.545999+00:00",
+      "source": "bridge_depositor"
+    },
+    {
+      "wallet": "0x1cc4db7ae58178412a09d3f198289c768237b897",
+      "score": 0.0938,
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": 0.0205,
+        "leverage_profile": 0.5369,
+        "entry_exit_style": 0.9987,
+        "hold_duration": 0.0,
+        "account_size": 0.1712,
+        "trade_sequencing": 0.4791,
+        "position_sizing": 0.179,
+        "activity": 0.422,
+        "direction_bias": 0.6925,
+        "position_management": 0.8855,
+        "loss_handling": null
+      },
+      "evidence": {
+        "tier": "BACKGROUND",
+        "reasons": [
+          "Similar market/limit execution style",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Weak asset overlap",
+          "Different active trading hours",
+          "Very different account-size bracket"
+        ],
+        "vetoes": [
+          "Decision frequency 7x apart (1.00 vs 0.14 position episodes/day)"
+        ],
+        "asset_overlap": {
+          "overlap": [],
+          "target_only": [
+            "xyz:BRENTOIL"
+          ],
+          "candidate_only": [
+            "SOL",
+            "xyz:SKHX"
+          ],
+          "overlap_count": 0,
+          "rare_overlap": [],
+          "jaccard": 0.0
+        }
+      },
+      "fills_count": 661,
+      "scanned_at": "2026-07-16T07:13:35.619594+00:00",
       "source": "bridge_depositor"
     },
     {
       "wallet": "0x956cb0cd887f8dcee306c9820a7dd48e1c3fb441",
-      "score": 0.0773,
+      "score": 0.0792,
       "dimensions": {
         "asset_preferences": 0.0,
-        "timing_profile": 0.0215,
+        "timing_profile": 0.0307,
         "leverage_profile": 0.0,
-        "entry_exit_style": 0.9997,
+        "entry_exit_style": 0.9995,
         "hold_duration": 0.0,
-        "account_size": 0.7177,
-        "trade_sequencing": 0.6565,
+        "account_size": 0.7165,
+        "trade_sequencing": 0.6431,
         "position_sizing": 0.5,
-        "activity": 0.6436,
-        "direction_bias": 0.4417,
-        "position_management": 0.7841,
+        "activity": 0.6532,
+        "direction_bias": 0.4393,
+        "position_management": 0.7867,
         "loss_handling": null
       },
       "evidence": {
@@ -6663,7 +6565,6 @@
             "ICP",
             "LIT",
             "MANTA",
-            "PAXG",
             "STABLE",
             "TNSR",
             "TRX",
@@ -6674,7 +6575,6 @@
             "xyz:MSFT",
             "xyz:MU",
             "xyz:NVDA",
-            "xyz:SILVER",
             "xyz:SKHX",
             "xyz:SNDK",
             "xyz:XYZ100"
@@ -6685,116 +6585,7 @@
         }
       },
       "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:20.343275+00:00",
-      "source": "bridge_depositor"
-    },
-    {
-      "wallet": "0x023a3d058020fb76cca98f01b3c48c8938a22355",
-      "score": 0.0742,
-      "dimensions": {
-        "asset_preferences": 0.0,
-        "timing_profile": 0.0,
-        "leverage_profile": 0.8671,
-        "entry_exit_style": 0.099,
-        "hold_duration": 0.0,
-        "account_size": 0.8255,
-        "trade_sequencing": 0.3537,
-        "position_sizing": 0.3333,
-        "activity": 0.3254,
-        "direction_bias": 0.0582,
-        "position_management": 0.7903,
-        "loss_handling": null
-      },
-      "evidence": {
-        "tier": "BACKGROUND",
-        "reasons": [
-          "Similar account-size bracket"
-        ],
-        "warnings": [
-          "Weak asset overlap",
-          "Different active trading hours",
-          "Very different trading frequency"
-        ],
-        "vetoes": [
-          "Decision frequency 51x apart (1.00 vs 51.00 position episodes/day)",
-          "Incompatible hold style: 0% vs 96% of holds under 1h"
-        ],
-        "asset_overlap": {
-          "overlap": [],
-          "target_only": [
-            "xyz:BRENTOIL"
-          ],
-          "candidate_only": [
-            "@107",
-            "@142",
-            "@151",
-            "@156",
-            "@162",
-            "@188",
-            "@194",
-            "@206",
-            "@228",
-            "@258",
-            "@272",
-            "AAVE",
-            "ADA",
-            "ALGO",
-            "ANIME",
-            "APT",
-            "AR",
-            "ARB",
-            "ASTER",
-            "AVAX",
-            "BNB",
-            "BTC",
-            "DOGE",
-            "DOT",
-            "ENA",
-            "ETC",
-            "ETH",
-            "ETHFI",
-            "FARTCOIN",
-            "FIL",
-            "GALA",
-            "GRAM",
-            "HBAR",
-            "HYPE",
-            "INJ",
-            "JUP",
-            "LINK",
-            "NEAR",
-            "ONDO",
-            "PENDLE",
-            "PENGU",
-            "PUMP",
-            "SKY",
-            "SOL",
-            "STABLE",
-            "STRK",
-            "STX",
-            "SUI",
-            "TAO",
-            "TRX",
-            "UNI",
-            "VIRTUAL",
-            "W",
-            "WIF",
-            "XLM",
-            "XPL",
-            "XRP",
-            "ZEC",
-            "ZRO",
-            "kFLOKI",
-            "kPEPE",
-            "kSHIB"
-          ],
-          "overlap_count": 0,
-          "rare_overlap": [],
-          "jaccard": 0.0
-        }
-      },
-      "fills_count": 2000,
-      "scanned_at": "2026-07-16T04:48:25.589761+00:00",
+      "scanned_at": "2026-07-16T07:13:40.141873+00:00",
       "source": "bridge_depositor"
     }
   ]
