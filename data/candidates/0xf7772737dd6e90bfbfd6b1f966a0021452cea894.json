@@ -1,9 +1,9 @@
 {
   "wallet": "0xf7772737dd6e90bfbfd6b1f966a0021452cea894",
   "first_seen": "2026-07-06T11:22:30.313081+00:00",
-  "last_seen": "2026-07-19T07:27:15.768479+00:00",
+  "last_seen": "2026-07-19T09:44:07.164302+00:00",
   "best_score": 0.4257,
-  "latest_score": 0.371,
+  "latest_score": 0.1842,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -12,11 +12,12 @@
       "Similar market/limit execution style"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Different active trading hours"
     ],
     "vetoes": [
-      "Decision frequency 18x apart (2.00 vs 37.00 position episodes/day)",
-      "Incompatible hold style: 0% vs 94% of holds under 1h"
+      "Decision frequency 20x apart (2.00 vs 39.00 position episodes/day)",
+      "Incompatible hold style: 0% vs 100% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -28,23 +29,24 @@
       ],
       "candidate_only": [
         "xyz:AAPL",
+        "xyz:AMD",
         "xyz:AMZN",
         "xyz:CBRS",
         "xyz:CL",
         "xyz:COIN",
         "xyz:COPPER",
-        "xyz:COST",
         "xyz:CRCL",
         "xyz:CRWV",
         "xyz:DRAM",
         "xyz:EWT",
         "xyz:EWY",
-        "xyz:GOLD",
         "xyz:GOOGL",
+        "xyz:HIMS",
         "xyz:HOOD",
         "xyz:INTC",
         "xyz:LITE",
         "xyz:META",
+        "xyz:MINIMAX",
         "xyz:MRVL",
         "xyz:MSFT",
         "xyz:MSTR",
@@ -52,13 +54,14 @@
         "xyz:NATGAS",
         "xyz:NVDA",
         "xyz:PLATINUM",
-        "xyz:PLTR",
         "xyz:QNT",
+        "xyz:RKLB",
         "xyz:SILVER",
         "xyz:SKHX",
         "xyz:SKHY",
         "xyz:SMSN",
         "xyz:SNDK",
+        "xyz:SOFTBANK",
         "xyz:SPCX",
         "xyz:TSLA",
         "xyz:TSM",
@@ -68,29 +71,10 @@
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.0256
+      "jaccard": 0.0244
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-12T07:57:08.498130+00:00",
-      "score": 0.1531,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0222,
-        "timing_profile": 0.0,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 1.0,
-        "hold_duration": 0.0,
-        "account_size": 0.8724,
-        "trade_sequencing": 0.4255,
-        "position_sizing": 0.5,
-        "activity": 0.3299,
-        "direction_bias": 0.5349,
-        "position_management": 0.8006,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-12T09:43:20.516553+00:00",
       "score": 0.1523,
@@ -1971,8 +1955,27 @@
         "position_management": 0.7089,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-19T09:44:07.164302+00:00",
+      "score": 0.1842,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0244,
+        "timing_profile": 0.0456,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.0,
+        "account_size": 0.4569,
+        "trade_sequencing": 0.6419,
+        "position_sizing": 0.5,
+        "activity": 0.4393,
+        "direction_bias": 0.6307,
+        "position_management": 0.7046,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2032
+  "recent_avg_score": 0.204
 }
