@@ -1,20 +1,23 @@
 {
   "wallet": "0x79f2bb1fc86a1f0592fb30aa6a369a24a7fd2361",
   "first_seen": "2026-07-06T11:34:07.120247+00:00",
-  "last_seen": "2026-07-22T12:28:38.570588+00:00",
+  "last_seen": "2026-07-22T15:02:08.411610+00:00",
   "best_score": 0.5793,
-  "latest_score": 0.5793,
+  "latest_score": 0.57,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:BRENTOIL",
-      "Similar market/limit execution style"
+      "Similar market/limit execution style",
+      "Matching trade frequency and cadence"
     ],
     "warnings": [
       "Different active trading hours"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Incompatible hold style: 100% vs 13% of holds under 1h"
+    ],
     "asset_overlap": {
       "overlap": [
         "BTC",
@@ -27,35 +30,17 @@
       ],
       "candidate_only": [
         "SOL",
-        "ZEC"
+        "ZEC",
+        "xyz:XYZ100"
       ],
       "overlap_count": 3,
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.4286
+      "jaccard": 0.375
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-14T09:54:10.642320+00:00",
-      "score": 0.2448,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0435,
-        "timing_profile": 0.0535,
-        "leverage_profile": 0.298,
-        "entry_exit_style": 0.9761,
-        "hold_duration": 0.0,
-        "account_size": 0.2705,
-        "trade_sequencing": 0.7629,
-        "position_sizing": 0.0242,
-        "activity": 0.6778,
-        "direction_bias": 0.9363,
-        "position_management": 0.8043,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-14T11:26:04.145675+00:00",
       "score": 0.2446,
@@ -1936,8 +1921,27 @@
         "position_management": 0.7335,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-22T15:02:08.411610+00:00",
+      "score": 0.57,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.6062,
+        "timing_profile": 0.2234,
+        "leverage_profile": 0.9813,
+        "entry_exit_style": 0.9978,
+        "hold_duration": 0.234,
+        "account_size": 0.3669,
+        "trade_sequencing": 0.3974,
+        "position_sizing": 0.0107,
+        "activity": 0.7522,
+        "direction_bias": 0.4181,
+        "position_management": 0.7603,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.513
+  "recent_avg_score": 0.5352
 }
