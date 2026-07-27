@@ -691,12 +691,21 @@ def select_alerts(graph: dict, previous: dict | None = None,
     material confidence increase. Everything else stays on the dashboard.
     """
     prev_nodes = {n["wallet"].lower(): n for n in (previous or {}).get("nodes", [])}
+    # Discoveries selected on a previous run but never delivered (SMTP down, auth
+    # rejected). They must be re-selected even though the node itself is unchanged,
+    # otherwise advancing the saved graph silently retires an undelivered alert.
+    undelivered = {w.lower() for w in (previous or {}).get("undelivered_alerts", [])}
     out = []
     for node in graph.get("nodes", []):
         if node["classification"] == CLASS_SERVICE:
             continue
         prev = prev_nodes.get(node["wallet"].lower())
         reasons = []
+
+        if node["wallet"].lower() in undelivered:
+            out.append({"node": node,
+                        "trigger_reasons": ["retry: previously selected but not delivered"]})
+            continue
 
         if prev is None:
             if node["confidence"] < min_confidence and not node["evidence"].get("direct_from_target"):
@@ -732,19 +741,30 @@ def _format_path(path: list[str]) -> str:
     return "\n    -> ".join(path) if path else "(unknown)"
 
 
-def fire_alerts(graph: dict, alerts: list[dict]) -> int:
-    """Send one email per meaningful discovery, with the full audit trail."""
+def fire_alerts(graph: dict, alerts: list[dict]) -> tuple[int, list[str]]:
+    """Send one email per meaningful discovery, with the full audit trail.
+
+    Returns (sent_count, undelivered_wallets). The caller MUST persist the
+    undelivered list: the graph state advances on every run, so a discovery that
+    was selected but not delivered would otherwise look "already reported" on the
+    next run and be lost permanently.
+    """
     from src.alerts import alert_transfer_graph_discovery
 
     edges_by_id = {e["id"]: e for e in graph.get("edges", [])}
     sent = 0
+    undelivered = []
     for a in alerts:
         node = a["node"]
         edges = [edges_by_id[i] for i in node["edge_ids"] if i in edges_by_id]
         edges.sort(key=lambda e: e["ts"] or 0)
         if alert_transfer_graph_discovery(node, a["trigger_reasons"], edges):
             sent += 1
-    return sent
+        else:
+            undelivered.append(node["wallet"].lower())
+            print(f"[graph] alert NOT delivered for {node['wallet'][:12]}... "
+                  f"({node['classification']}) — queued for retry next run")
+    return sent, undelivered
 
 
 # --- I/O wrapper ----------------------------------------------------------------
@@ -1003,8 +1023,19 @@ def run_transfer_graph(expand: bool = True) -> dict:
             previous = None
 
     alerts = select_alerts(graph, previous)
-    graph["alerts_fired"] = fire_alerts(graph, alerts) if alerts else 0
+    if alerts:
+        sent, undelivered = fire_alerts(graph, alerts)
+    else:
+        sent, undelivered = 0, []
+    graph["alerts_fired"] = sent
     graph["pending_alerts"] = len(alerts)
+    # Persisted so the next run re-selects these. Without it the saved graph
+    # advances as though the alert had been delivered, select_alerts sees no
+    # change, and the discovery is silently dropped forever — which is exactly
+    # what happened to a MIGRATION_CANDIDATE after an SMTP auth failure.
+    graph["undelivered_alerts"] = undelivered
+    if undelivered:
+        print(f"[graph] {len(undelivered)} alert(s) undelivered and queued for retry")
 
     save_latest(str(DATA_DIR / "transfer_graph"), graph)
 

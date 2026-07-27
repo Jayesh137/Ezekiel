@@ -187,7 +187,14 @@ def check_new_outbound_transfers(result: dict | None = None) -> list[dict]:
             c["bidirectional"], c["tokens"],
         ):
             newly_alerted.append(c)
-        max_seen = max(max_seen, c["last_seen_ms"])
+            # Only a DELIVERED alert may advance the cursor. This used to sit
+            # outside the branch, so a failed send still moved the watermark past
+            # the transfer and the alert was never retried — the same defect that
+            # silently retired an undelivered transfer-graph discovery.
+            max_seen = max(max_seen, c["last_seen_ms"])
+        else:
+            print(f"[ledger_analyzer] alert NOT delivered for {c['wallet'][:12]}... "
+                  f"— cursor held at {cursor} so it is retried next run")
 
     if max_seen > cursor:
         write_cursor("last_hl_transfer_alert_ms", max_seen)
