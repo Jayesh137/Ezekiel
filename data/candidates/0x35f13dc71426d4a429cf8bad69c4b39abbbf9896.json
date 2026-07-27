@@ -1,23 +1,24 @@
 {
   "wallet": "0x35f13dc71426d4a429cf8bad69c4b39abbbf9896",
   "first_seen": "2026-07-06T11:22:41.307082+00:00",
-  "last_seen": "2026-07-27T05:40:26.818350+00:00",
+  "last_seen": "2026-07-27T09:26:15.856725+00:00",
   "best_score": 0.4757,
-  "latest_score": 0.2685,
+  "latest_score": 0.2962,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:BRENTOIL",
       "Similar market/limit execution style",
-      "Similar holding-duration profile"
+      "Similar holding-duration profile",
+      "Matching long/short bias"
     ],
     "warnings": [
       "Weak asset overlap",
       "Different active trading hours"
     ],
     "vetoes": [
-      "Decision frequency 18x apart (1.41 vs 26.00 position episodes/day)"
+      "Decision frequency 16x apart (1.41 vs 23.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
@@ -31,7 +32,6 @@
       ],
       "candidate_only": [
         "xyz:AMD",
-        "xyz:AVGO",
         "xyz:BB",
         "xyz:CBRS",
         "xyz:CL",
@@ -40,18 +40,16 @@
         "xyz:DELL",
         "xyz:DRAM",
         "xyz:EWY",
-        "xyz:GOLD",
-        "xyz:HOOD",
         "xyz:INTC",
         "xyz:MRVL",
         "xyz:MSTR",
-        "xyz:MU",
         "xyz:NATGAS",
         "xyz:NVDA",
-        "xyz:QNT",
         "xyz:RKLB",
         "xyz:SILVER",
+        "xyz:SKHX",
         "xyz:SKHY",
+        "xyz:SMSN",
         "xyz:SNDK",
         "xyz:SPCX",
         "xyz:TSLA"
@@ -60,29 +58,10 @@
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.0333
+      "jaccard": 0.037
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-19T01:25:15.903158+00:00",
-      "score": 0.1754,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0385,
-        "timing_profile": 0.0,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 0.9464,
-        "hold_duration": 0.0,
-        "account_size": 0.5908,
-        "trade_sequencing": 0.6819,
-        "position_sizing": 0.5,
-        "activity": 0.4424,
-        "direction_bias": null,
-        "position_management": 0.8355,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-19T05:01:15.615515+00:00",
       "score": 0.1876,
@@ -1963,8 +1942,27 @@
         "position_management": 0.7899,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-27T09:26:15.856725+00:00",
+      "score": 0.2962,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.037,
+        "timing_profile": 0.0,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 0.8955,
+        "hold_duration": 1.0,
+        "account_size": 0.3086,
+        "trade_sequencing": 0.863,
+        "position_sizing": 0.5,
+        "activity": 0.4691,
+        "direction_bias": 0.9204,
+        "position_management": 0.7917,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3476
+  "recent_avg_score": 0.3297
 }
