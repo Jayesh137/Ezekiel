@@ -44,12 +44,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # Only data/index.json and src/ are needed — avoid pulling the whole
-          # data tree just to read one timestamp.
+          # data tree just to read one timestamp. requirements.txt MUST be here:
+          # setup-python's pip cache hashes **/requirements.txt, and omitting it
+          # failed the job with "No file matched [**/requirements.txt or
+          # **/pyproject.toml]" before the freshness check ever ran.
           sparse-checkout: |
             src
             data/index.json
             data/state
             config.json
+            requirements.txt
           sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
@@ -57,12 +61,19 @@ jobs:
           cache: 'pip'
       - run: pip install -r requirements.txt
       - name: Check collection freshness
+        id: freshness
         env:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: python src/heartbeat.py
+      # Only when the freshness check ITSELF failed — i.e. src/heartbeat.py ran and
+      # exited non-zero because the data is stale. A bare `if: failure()` also
+      # fired for checkout, setup-python and pip failures, filing a "collection is
+      # stale" issue when collection was fine and the workflow was simply broken.
+      # Those failures still fail the job (no continue-on-error), they just no
+      # longer masquerade as a data-staleness alert.
       - name: Open stale-collection issue
-        if: failure()
+        if: always() && steps.freshness.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
