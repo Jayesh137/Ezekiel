@@ -1,0 +1,102 @@
+name: SMTP Delivery Check (manual)
+
+# MANUAL ONLY — deliberately no `schedule:` and no `workflow_run:` trigger, so this
+# can never fire on its own and can never be mistaken for a real alert.
+#
+# Sends one clearly-labelled test email through the real src/alerts.py send path,
+# so it exercises exactly the code the pipeline uses: same host, port, STARTTLS,
+# and the same BREVO_SMTP_LOGIN / BREVO_SMTP_KEY / ALERT_EMAIL credentials.
+#
+# It touches NO production state:
+#   - calls send_alert() directly, never _send_with_cooldown(), so no alert
+#     cooldown cursor is read or written
+#   - sparse-checkout pulls only src/ and requirements.txt, so data/ (candidates,
+#     cooldowns, transfer graph, calibration) is not even present on the runner
+#   - the job has read-only `contents` permission and commits nothing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smtp-smoke-test
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No data/ at all — this job must be incapable of reading or mutating
+          # candidate data, alert cooldowns or any other production state.
+          sparse-checkout: |
+            src
+            requirements.txt
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+
+      - name: Report which credentials are present
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          # Presence only — never the value, never a prefix, never a length that
+          # could narrow a secret.
+          for v in BREVO_SMTP_LOGIN BREVO_SMTP_KEY ALERT_EMAIL; do
+            if [ -n "${!v}" ]; then echo "  $v: set"; else echo "  $v: MISSING"; fi
+          done
+
+      - name: Send test email via the real alert path
+        id: smoke
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          python - <<'PY'
+          import sys
+          from src.alerts import send_alert
+
+          subject = "[Ezekiel TEST] SMTP delivery check"
+          body = (
+              "This is a manual SMTP delivery check for the Ezekiel pipeline.\n\n"
+              "It was triggered by hand from the Actions tab and is NOT an alert.\n"
+              "No candidate data, alert cooldown or other production state was read\n"
+              "or modified to produce it.\n\n"
+              "If you are reading this, Brevo authentication and delivery both work.\n"
+          )
+
+          # send_alert() only — never _send_with_cooldown(), so no cooldown cursor
+          # is consulted or written by this job.
+          ok = send_alert(subject, body)
+          print(f"[smoke] delivery reported: {'SUCCESS' if ok else 'FAILURE'}")
+          if not ok:
+              print("[smoke] The alert module logs the specific reason above "
+                    "(missing variable, 535 auth rejection, or sender refusal). "
+                    "No credential values are printed by design.")
+              sys.exit(1)
+          print("[smoke] Check the inbox for ALERT_EMAIL and Brevo -> "
+                "Transactional -> Logs for the corresponding entry.")
+          PY
+
+      - name: Result
+        if: always()
+        run: |
+          if [ "${{ steps.smoke.outcome }}" = "success" ]; then
+            echo "SMTP delivery check PASSED — credentials are valid and mail was accepted."
+          else
+            echo "SMTP delivery check FAILED — see the step log above for the reason."
+            echo "Most likely causes, in order:"
+            echo "  1. BREVO_SMTP_LOGIN is not the SMTP login from Brevo Settings -> SMTP & API"
+            echo "  2. BREVO_SMTP_KEY is an API key or account password rather than an SMTP key"
+            echo "  3. ALERT_EMAIL is not a verified sender on the Brevo account"
+          fi
