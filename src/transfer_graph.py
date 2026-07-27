@@ -89,6 +89,13 @@ DEFAULTS = {
 REPEATED_TRANSFER_MIN = 3
 # Withdrawal -> new-wallet deposit/trading within this window is suggestive.
 FAST_REENTRY_HOURS = 72.0
+# Transfer evidence ages: a wallet funded three years ago is weaker evidence of a
+# migration happening now. Flat for FRESH_DAYS, then linear to FLOOR — the floor
+# keeps a genuinely linked old wallet visible rather than erasing it. Only the
+# transfer-derived score decays; behaviour and address reuse do not.
+RECENCY_FRESH_DAYS = 90.0
+RECENCY_DECAY_DAYS = 365.0
+RECENCY_FLOOR = 0.4
 # Split-transfer detection: fragments summing to within this fraction of an exit.
 SPLIT_TOLERANCE = 0.05
 
@@ -106,13 +113,21 @@ def _iso(ts_seconds: float | int | None) -> str | None:
         return None
 
 
-def edge_id(src: str, dst: str, chain: str, ref: str, ts: int) -> str:
+def edge_id(src: str, dst: str, chain: str, ref: str, ts: int = 0) -> str:
     """Stable identity so re-ingesting the same transfer never double-counts.
 
-    Keyed on the transaction/ledger reference plus direction: one L1 hash can
-    carry several token transfers, and one ledger hash can appear on both sides.
+    Keyed on chain + reference + direction, and deliberately NOT on the timestamp.
+    One transfer reaches this module through several paths — the raw
+    l1_transactions table carries the block timeStamp while a fund_flows finding
+    carries its own detected_at — so including ts minted two ids for one real
+    movement and doubled `transfer_count`, inflating the "repeated transfers"
+    signal from a single transaction.
+
+    Direction stays in the key because one tx hash can carry several token
+    transfers between different pairs, and one ledger hash appears on both sides
+    of an internal transfer.
     """
-    raw = f"{chain}|{(ref or '').lower()}|{src.lower()}|{dst.lower()}|{ts}"
+    raw = f"{chain}|{(ref or '').lower()}|{src.lower()}|{dst.lower()}"
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
 
 
@@ -290,57 +305,81 @@ def detect_services(edges: list[dict], known_services: set,
 
 # --- confidence scoring ---------------------------------------------------------
 
+def recency_factor(age_days: float | None) -> float:
+    """Weight for how recently the transfer relationship was active.
+
+    A wallet the target funded three years ago is weaker evidence of a migration
+    happening now than one funded last week. Decay applies only to the
+    transfer-derived portion of the score: behavioural similarity and address
+    reuse are independent of when money moved and are not aged.
+
+    Flat for FRESH_DAYS, then linear to a floor — the floor keeps a genuinely
+    linked old wallet on the board rather than erasing it.
+    """
+    if age_days is None:
+        return 1.0
+    if age_days <= RECENCY_FRESH_DAYS:
+        return 1.0
+    decayed = 1.0 - (age_days - RECENCY_FRESH_DAYS) / RECENCY_DECAY_DAYS
+    return max(RECENCY_FLOOR, min(1.0, decayed))
+
+
 def score_confidence(ev: dict) -> tuple[float, list[str]]:
     """Combine evidence into a 0-1 linkage confidence plus readable reasons.
 
     Pure: `ev` is a plain dict of already-measured facts. Negative evidence
     short-circuits — a service address is never a linked wallet.
+
+    Two buckets. `relationship` is everything derived from money moving, and is
+    aged by recency_factor(). `corroboration` is independent evidence — behaviour,
+    amount correlation, address reuse, gas funding — which does not decay.
     """
     reasons: list[str] = []
 
     if ev.get("is_service"):
         return 0.0, [f"Excluded: {ev.get('service_reason', 'service address')}"]
 
-    score = 0.0
+    relationship = 0.0
+    corroboration = 0.0
 
     if ev.get("direct_from_target"):
-        score += 0.15
+        relationship += 0.15
         reasons.append("Received funds directly from the target wallet")
     if ev.get("funded_target"):
-        score += 0.08
+        relationship += 0.08
         reasons.append("Sent funds to the target wallet")
 
     transfers = int(ev.get("transfer_count", 0) or 0)
     if transfers >= REPEATED_TRANSFER_MIN:
-        score += 0.15
+        relationship += 0.15
         reasons.append(f"Repeated transfers ({transfers} separate movements)")
 
     if ev.get("bidirectional"):
-        score += 0.20
+        relationship += 0.20
         reasons.append("Two-way flow — funds move both to and from this wallet")
 
     if ev.get("hl_native"):
-        score += 0.12
+        relationship += 0.12
         reasons.append("Transfer happened entirely inside Hyperliquid (no L1 trace)")
 
     if ev.get("shared_funder"):
-        score += 0.12
+        corroboration += 0.12
         reasons.append("Shares the target's original funding source")
     if ev.get("shared_deposit_address"):
-        score += 0.18
+        corroboration += 0.18
         reasons.append("Sends to the same deposit address as the target (address reuse)")
     if ev.get("gas_funded_by_target"):
-        score += 0.15
+        corroboration += 0.15
         reasons.append("First gas paid by the target wallet")
 
     gap = ev.get("reentry_gap_hours")
     if gap is not None and gap <= FAST_REENTRY_HOURS:
-        score += 0.15
+        corroboration += 0.15
         reasons.append(f"Began depositing/trading {gap:.1f}h after a target exit")
 
     if ev.get("amount_correlation"):
         conf = float(ev.get("amount_correlation") or 0)
-        score += 0.15 * min(1.0, conf)
+        corroboration += 0.15 * min(1.0, conf)
         detail = "split across multiple transfers" if ev.get("split_transfer") else "single amount"
         reasons.append(f"Exit amount re-appears as a deposit ({detail}, "
                        f"{conf * 100:.0f}% match confidence)")
@@ -349,14 +388,23 @@ def score_confidence(ev: dict) -> tuple[float, list[str]]:
     if behavioural is not None:
         b = float(behavioural)
         if b >= 0.65:
-            score += 0.25 * min(1.0, (b - 0.65) / 0.35 + 0.4)
+            corroboration += 0.25 * min(1.0, (b - 0.65) / 0.35 + 0.4)
             reasons.append(f"Trades like the target (behavioural similarity {b * 100:.0f}%)")
         elif b > 0:
             reasons.append(f"Behavioural similarity only {b * 100:.0f}% — weak on its own")
 
     if ev.get("trades_on_hl"):
-        score += 0.08
+        corroboration += 0.08
         reasons.append("Actively trading on Hyperliquid after receiving funds")
+
+    age = ev.get("age_days")
+    factor = recency_factor(age)
+    if factor < 1.0:
+        relationship *= factor
+        reasons.append(f"Last movement {age:.0f} days ago — transfer evidence "
+                       f"aged to {factor * 100:.0f}%")
+
+    score = relationship + corroboration
 
     # Distance penalty: every extra hop admits an unrelated intermediary.
     depth = int(ev.get("depth", 1) or 1)
@@ -446,13 +494,16 @@ def build_graph(edges: list[dict], target: str, *,
                 correlations: dict | None = None,
                 max_depth: int = DEFAULTS["max_depth"],
                 max_nodes: int = DEFAULTS["max_nodes"],
-                dust_usd: float = DEFAULTS["dust_usd"]) -> dict:
+                dust_usd: float = DEFAULTS["dust_usd"],
+                now_ts: float | None = None,
+                expansion: dict | None = None) -> dict:
     """Walk outward from the target, classifying and scoring every wallet reached.
 
     Pure function — every external input is passed in, so traversal and scoring
     are fully testable offline.
     """
     target = target.lower()
+    now_ts = now_ts if now_ts is not None else time.time()
     known_services = {a.lower() for a in (known_services or set())}
     behavioural = {k.lower(): v for k, v in (behavioural or {}).items()}
     hl_active = {a.lower() for a in (hl_active or set())}
@@ -527,6 +578,7 @@ def build_graph(edges: list[dict], target: str, *,
         stamps = [e["ts"] for e in incident if e["ts"]]
         link = linkage.get(addr, {})
         corr = correlations.get(addr, {})
+        age_days = ((now_ts - max(stamps)) / 86400.0) if stamps else None
 
         ev = {
             "depth": depths[addr],
@@ -546,6 +598,7 @@ def build_graph(edges: list[dict], target: str, *,
             "amount_correlation": corr.get("confidence"),
             "split_transfer": corr.get("split", False),
             "reentry_gap_hours": corr.get("gap_hours"),
+            "age_days": round(age_days, 1) if age_days is not None else None,
         }
         confidence, reasons = score_confidence(ev)
         classification = classify_node(ev, confidence)
@@ -573,16 +626,50 @@ def build_graph(edges: list[dict], target: str, *,
         })
 
     nodes.sort(key=lambda n: (-CLASS_ORDER[n["classification"]], -n["confidence"]))
+
+    all_stamps = [e["ts"] for e in wallet_edges if e["ts"]]
+    reached_depth = max(depths.values()) if depths else 0
+    # A frontier is incomplete when the walk stopped for a reason other than
+    # running out of graph: budget exhausted, node cap hit, or depth cap reached
+    # while expandable nodes remained.
+    at_node_cap = len(depths) >= max_nodes
+    expansion = expansion or {"status": "not_attempted"}
+    sources = sorted({e["discovery_source"] for e in wallet_edges})
+
     return {
         "computed_at": utc_now(),
         "target": target,
         "node_count": len(nodes),
         "edge_count": len(wallet_edges),
         "service_count": len(services),
-        "max_depth_reached": max(depths.values()) if depths else 0,
+        "max_depth_reached": reached_depth,
         "services": services,
         "nodes": nodes,
         "edges": wallet_edges,
+        # Graph health: enough to tell "nothing out there" from "we stopped looking".
+        "health": {
+            "expansion": expansion,
+            "nodes_explored": len(depths),
+            "edges_explored": len(wallet_edges),
+            "max_depth_configured": max_depth,
+            "max_depth_reached": reached_depth,
+            "node_budget": max_nodes,
+            "node_budget_exhausted": at_node_cap,
+            "depth_limited": reached_depth >= max_depth,
+            # Anything other than a clean "ok" expansion means the graph may be
+            # smaller than reality. A skipped expansion is NOT the same as
+            # "nothing further exists" — that ambiguity is exactly what the
+            # depth-1 graph looked like before these diagnostics existed.
+            "frontier_incomplete": bool(
+                at_node_cap
+                or reached_depth >= max_depth
+                or expansion.get("status") != "ok"
+            ),
+            "discovery_sources": sources,
+            "degraded_sources": expansion.get("degraded_sources", []),
+            "oldest_evidence": _iso(min(all_stamps)) if all_stamps else None,
+            "newest_evidence": _iso(max(all_stamps)) if all_stamps else None,
+        },
     }
 
 
@@ -763,17 +850,40 @@ def collect_known_edges() -> list[dict]:
     return edges
 
 
-def expand_frontier(edges: list[dict], target: str, budget: dict) -> list[dict]:
-    """Optionally widen the graph with Etherscan lookups, under a hard budget.
+def expand_frontier(edges: list[dict], target: str,
+                    budget: dict) -> tuple[list[dict], dict]:
+    """Widen the graph with Etherscan lookups, under a hard budget.
+
+    Returns (edges, diagnostics). The diagnostics say explicitly whether expansion
+    ran, was skipped, degraded or failed — without them a depth-1 graph is
+    ambiguous between "no deeper links exist" and "we never looked". In CI the
+    secret is present so this runs automatically; locally it degrades cleanly.
 
     Only unexplored non-service wallets that received funds from the target are
-    expanded, newest-first, and only while both the call budget and the wall-clock
-    budget hold. Skipped entirely without an API key.
+    expanded, newest-first, and only while the call and wall-clock budgets hold.
     """
     import os
+
+    diag = {
+        "status": "not_attempted",
+        "attempted_at": utc_now(),
+        "lookups": 0,
+        "lookup_budget": budget["max_expansions"],
+        "time_budget_seconds": budget["time_budget_seconds"],
+        "new_edges": 0,
+        "wallets_expanded": [],
+        "frontier_size": 0,
+        "frontier_remaining": 0,
+        "degraded_sources": [],
+        "error": None,
+    }
+
     if not os.environ.get("ETHERSCAN_API_KEY"):
-        print("[graph] no ETHERSCAN_API_KEY — skipping frontier expansion")
-        return edges
+        diag["status"] = "skipped_no_api_key"
+        diag["degraded_sources"] = ["arbitrum_l1"]
+        print("[graph] ETHERSCAN_API_KEY absent — L1 frontier expansion SKIPPED. "
+              "Graph is limited to locally recorded edges (typically depth 1).")
+        return edges, diag
 
     from src.tracer import get_usdc_transfers
 
@@ -783,31 +893,56 @@ def expand_frontier(edges: list[dict], target: str, budget: dict) -> list[dict]:
 
     services = detect_services(edges, set())
     explored = set()
-    cursor_key = "transfer_graph_explored"
 
     # Expand wallets funded by the target first — those are the migration paths.
     frontier = [e["dst"] for e in sorted(
         (e for e in edges if e["src"] == target and not e.get("bridge_event")),
         key=lambda e: -(e["ts"] or 0))]
+    frontier = [w for w in dict.fromkeys(frontier)
+                if w not in services and w != target]
+    diag["frontier_size"] = len(frontier)
 
     calls = 0
     added = []
-    for wallet in frontier:
-        if calls >= max_calls or time.monotonic() > deadline:
-            print(f"[graph] expansion budget reached ({calls} calls); stopping")
-            break
-        if wallet in explored or wallet in services or wallet == target:
-            continue
-        explored.add(wallet)
-        calls += 1
-        for tx in get_usdc_transfers(wallet):
-            e = normalise_l1_transfer(tx)
-            if e and e["id"] not in {x["id"] for x in edges}:
-                added.append(e)
+    known_ids = {x["id"] for x in edges}
+    budget_hit = False
+    try:
+        for wallet in frontier:
+            if calls >= max_calls or time.monotonic() > deadline:
+                budget_hit = True
+                print(f"[graph] expansion budget reached after {calls} lookup(s); stopping")
+                break
+            if wallet in explored:
+                continue
+            explored.add(wallet)
+            calls += 1
+            for tx in get_usdc_transfers(wallet):
+                e = normalise_l1_transfer(tx)
+                if e and e["id"] not in known_ids:
+                    known_ids.add(e["id"])
+                    added.append(e)
+    except Exception as exc:  # network/API failure must not lose partial results
+        diag["status"] = "failed"
+        diag["error"] = str(exc)[:200]
+        diag["degraded_sources"] = ["arbitrum_l1"]
+        print(f"[graph] frontier expansion FAILED after {calls} lookup(s): {exc}")
+        diag["lookups"] = calls
+        diag["new_edges"] = len(added)
+        diag["wallets_expanded"] = sorted(explored)
+        diag["frontier_remaining"] = max(0, len(frontier) - len(explored))
+        return edges + added, diag
 
-    print(f"[graph] frontier expansion: {calls} lookup(s), {len(added)} new edge(s)")
-    write_cursor(cursor_key, now_ms())
-    return edges + added
+    diag["lookups"] = calls
+    diag["new_edges"] = len(added)
+    diag["wallets_expanded"] = sorted(explored)
+    diag["frontier_remaining"] = max(0, len(frontier) - len(explored))
+    diag["status"] = "budget_exhausted" if budget_hit else "ok"
+    diag["completed_at"] = utc_now()
+
+    print(f"[graph] L1 frontier expansion {diag['status']}: {calls} lookup(s), "
+          f"{len(added)} new edge(s), {diag['frontier_remaining']} wallet(s) unexplored")
+    write_cursor("transfer_graph_last_expansion_ms", now_ms())
+    return edges + added, diag
 
 
 def run_transfer_graph(expand: bool = True) -> dict:
@@ -824,7 +959,25 @@ def run_transfer_graph(expand: bool = True) -> dict:
     edges = collect_known_edges()
     print(f"[graph] {len(edges)} edge(s) from local data")
     if expand:
-        edges = expand_frontier(edges, target, cfg)
+        edges, expansion = expand_frontier(edges, target, cfg)
+    else:
+        expansion = {"status": "disabled", "degraded_sources": ["arbitrum_l1"],
+                     "attempted_at": utc_now()}
+    # Carry the previous successful expansion forward so the dashboard can show
+    # "last successful L1 expansion" even on a run where it was skipped.
+    prev_path = DATA_DIR / "transfer_graph" / "latest.json"
+    if expansion.get("status") != "ok" and prev_path.exists():
+        try:
+            with open(prev_path) as f:
+                prev_health = (json.load(f).get("health") or {}).get("expansion") or {}
+            if prev_health.get("status") == "ok":
+                expansion["last_successful"] = prev_health.get("completed_at")
+            elif prev_health.get("last_successful"):
+                expansion["last_successful"] = prev_health["last_successful"]
+        except (OSError, ValueError):
+            pass
+    elif expansion.get("status") == "ok":
+        expansion["last_successful"] = expansion.get("completed_at")
 
     behavioural, hl_active = _load_behavioural_scores()
     graph = build_graph(
@@ -837,6 +990,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
         max_depth=cfg["max_depth"],
         max_nodes=cfg["max_nodes"],
         dust_usd=cfg["dust_usd"],
+        expansion=expansion,
     )
 
     previous = None

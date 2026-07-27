@@ -49,6 +49,25 @@
 		SERVICE: 'badge-grey'
 	};
 
+	// --- graph health -----------------------------------------------------------
+	$: health = graph?.health ?? null;
+	$: expansion = health?.expansion ?? null;
+
+	const EXPANSION_LABEL = {
+		ok: 'Completed',
+		budget_exhausted: 'Stopped at budget',
+		skipped_no_api_key: 'Skipped — no ETHERSCAN_API_KEY',
+		failed: 'Failed',
+		disabled: 'Disabled for this run',
+		not_attempted: 'Not attempted'
+	};
+
+	function fmtDate(iso) {
+		if (!iso) return '—';
+		const d = new Date(iso);
+		return isNaN(d) ? '—' : d.toLocaleString();
+	}
+
 	/** Behavioural watchlist score for a wallet, if the scanner has one. */
 	function behaviouralScore(wallet) {
 		const c = (candidates?.candidates || []).find(
@@ -117,6 +136,102 @@
 				</div>
 			</div>
 		</div>
+
+		{#if health}
+			<div class="card health" class:health-warn={health.frontier_incomplete}>
+				<div class="health-head">
+					<strong>Graph health</strong>
+					{#if health.frontier_incomplete}
+						<span class="badge badge-yellow">frontier incomplete</span>
+					{:else}
+						<span class="badge badge-cyan">fully explored</span>
+					{/if}
+				</div>
+				<p class="health-note text-muted">
+					{#if health.frontier_incomplete}
+						This graph may be smaller than reality — read an absent link as “not
+						looked for”, not “not there”.
+					{:else}
+						Every reachable wallet within budget was explored.
+					{/if}
+				</p>
+				<div class="health-grid">
+					<div>
+						<span class="hl">L1 expansion</span>
+						<span
+							class="mono"
+							class:text-red={expansion?.status === 'failed'}
+							class:text-yellow={expansion &&
+								!['ok', 'failed'].includes(expansion.status)}
+							>{EXPANSION_LABEL[expansion?.status] ?? expansion?.status ?? '—'}</span
+						>
+					</div>
+					<div>
+						<span class="hl">Last successful expansion</span>
+						<span class="mono"
+							>{fmtDate(
+								expansion?.status === 'ok'
+									? expansion?.completed_at
+									: expansion?.last_successful
+							)}</span
+						>
+					</div>
+					<div>
+						<span class="hl">Explored</span>
+						<span class="mono"
+							>{health.nodes_explored} nodes / {health.edges_explored} edges</span
+						>
+					</div>
+					<div>
+						<span class="hl">Depth</span>
+						<span class="mono"
+							>{health.max_depth_reached} of {health.max_depth_configured}
+							{#if health.depth_limited}<span class="text-yellow">(capped)</span>{/if}</span
+						>
+					</div>
+					<div>
+						<span class="hl">Node budget</span>
+						<span class="mono"
+							>{health.node_budget}
+							{#if health.node_budget_exhausted}<span class="text-yellow"
+									>(exhausted)</span
+								>{/if}</span
+						>
+					</div>
+					<div>
+						<span class="hl">L1 lookups used</span>
+						<span class="mono"
+							>{expansion?.lookups ?? 0} / {expansion?.lookup_budget ?? '—'}
+							{#if expansion?.frontier_remaining}<span class="text-yellow"
+									>({expansion.frontier_remaining} unexplored)</span
+								>{/if}</span
+						>
+					</div>
+					<div>
+						<span class="hl">Evidence window</span>
+						<span class="mono"
+							>{fmtDate(health.oldest_evidence)} → {fmtDate(health.newest_evidence)}</span
+						>
+					</div>
+					<div>
+						<span class="hl">Sources</span>
+						<span class="mono">{(health.discovery_sources || []).join(', ') || '—'}</span>
+					</div>
+				</div>
+				{#if health.degraded_sources?.length}
+					<p class="health-degraded">
+						Degraded source{health.degraded_sources.length > 1 ? 's' : ''}:
+						<span class="mono">{health.degraded_sources.join(', ')}</span>
+						{#if expansion?.status === 'skipped_no_api_key'}
+							— set the <span class="mono">ETHERSCAN_API_KEY</span> secret to enable
+							multi-hop L1 tracing.
+						{:else if expansion?.error}
+							— <span class="mono">{expansion.error}</span>
+						{/if}
+					</p>
+				{/if}
+			</div>
+		{/if}
 
 		<div class="toolbar">
 			<span class="text-muted">
@@ -478,5 +593,49 @@
 		.node-head {
 			align-items: flex-start;
 		}
+	}
+
+	.health {
+		margin-bottom: 14px;
+		border-left: 3px solid var(--accent-cyan, #00ccdd);
+	}
+	.health.health-warn {
+		border-left-color: var(--accent-yellow, #f59e0b);
+	}
+	.health-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 4px;
+	}
+	.health-note {
+		font-size: 0.72rem;
+		margin: 0 0 10px;
+	}
+	.health-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		gap: 8px 18px;
+		font-size: 0.72rem;
+	}
+	.health-grid > div {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+	.hl {
+		color: var(--text-muted, #8888a0);
+		font-size: 0.62rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.health-grid .mono {
+		overflow-wrap: anywhere;
+	}
+	.health-degraded {
+		margin: 10px 0 0;
+		font-size: 0.72rem;
+		color: var(--accent-yellow, #f59e0b);
 	}
 </style>
