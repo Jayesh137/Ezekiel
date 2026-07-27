@@ -3,10 +3,10 @@
 
 import os
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-from src.utils import read_cursor, write_cursor, now_ms
+from src.utils import now_ms, read_cursor, write_cursor
 
 # Once a send fails (e.g. bad SMTP credentials), it will keep failing for the
 # rest of this run. Short-circuit so a batch of alerts doesn't attempt hundreds
@@ -94,9 +94,15 @@ def alert_new_wallet_found(source_wallet: str, new_wallet: str, method: str, con
 
 def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bool:
     subject = f"[EZEKIEL] HIGH: Behavioral Match ({score:.0%} similarity)"
+    # Dimensions excluded for insufficient data are None — sort and format would
+    # both raise on them, so they are listed separately rather than dropped.
+    scored = {k: v for k, v in dimensions.items() if isinstance(v, (int, float))}
+    skipped = [k for k, v in dimensions.items() if not isinstance(v, (int, float))]
     dim_lines = "\n".join(
-        f"  - {k}: {v:.2f}" for k, v in sorted(dimensions.items(), key=lambda x: -x[1])
+        f"  - {k}: {v:.2f}" for k, v in sorted(scored.items(), key=lambda x: -x[1])
     )
+    if skipped:
+        dim_lines += f"\n  (not comparable, excluded: {', '.join(sorted(skipped))})"
     body = (
         f"Candidate Wallet: {candidate}\n"
         f"Similarity Score: {score:.2f} / 1.00\n\n"
@@ -235,6 +241,87 @@ def alert_risk_level(score: float, level: str, factors: list, wallet: str | None
         body += f"\nStrongest lead: {wallet}\n"
     body += "\nCheck the Recovery page.\n"
     return _send_with_cooldown(f"risk_{level.lower()}", 12, subject, body)
+
+
+def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
+                                   edges: list) -> bool:
+    """Fire on a meaningful transfer-graph discovery.
+
+    Carries the complete audit trail — full path, every transfer with amount and
+    timestamp and reference, the classification and the specific evidence — so the
+    conclusion can be checked rather than trusted.
+    """
+    wallet = node["wallet"]
+    cls = node["classification"]
+    conf = node["confidence"]
+
+    severity = "CRITICAL" if cls == "MIGRATION_CANDIDATE" else (
+        "HIGH" if cls == "POSSIBLE_LINKED_WALLET" else "INFO")
+    subject = f"[EZEKIEL] {severity}: {cls.replace('_', ' ').title()} ({conf:.0%} confidence)"
+
+    path = "\n    -> ".join(node.get("path") or [wallet])
+    reasons = "\n".join(f"  - {r}" for r in node.get("confidence_reasons", [])) or "  (none)"
+    triggers = "\n".join(f"  - {r}" for r in trigger_reasons) or "  (none)"
+
+    edge_lines = [
+        f"  {e.get('timestamp') or 'unknown time'}  "
+        f"{e.get('chain')}/{e.get('asset')}  "
+        f"${float(e.get('amount_usd', 0)):,.2f}\n"
+        f"      {e.get('src')} -> {e.get('dst')}\n"
+        f"      ref: {e.get('ref') or 'n/a'}  via: {e.get('discovery_source')}"
+        for e in edges[:15]
+    ]
+    edges_txt = "\n".join(edge_lines) or "  (no transfer detail)"
+    more = f"\n  ... and {len(edges) - 15} further transfer(s)" if len(edges) > 15 else ""
+
+    totals = node.get("totals", {})
+    body = (
+        f"Wallet: {wallet}\n"
+        f"Classification: {cls}\n"
+        f"Linkage confidence: {conf:.0%}\n"
+        f"Hops from target: {node.get('depth')}\n"
+        f"First seen: {node.get('first_seen')}\n"
+        f"Last seen:  {node.get('last_seen')}\n\n"
+        f"WHY THIS ALERTED NOW\n{triggers}\n\n"
+        f"RELATIONSHIP PATH\n    {path}\n\n"
+        f"EVIDENCE\n{reasons}\n\n"
+        f"FLOWS\n"
+        f"  Received from target: ${float(totals.get('received_from_target_usd', 0)):,.2f}\n"
+        f"  Sent to target:       ${float(totals.get('sent_to_target_usd', 0)):,.2f}\n"
+        f"  Transfers observed:   {totals.get('edge_count', 0)}\n\n"
+        f"TRANSFERS\n{edges_txt}{more}\n\n"
+    )
+    if cls in ("DIRECT_RECIPIENT", "OPERATIONAL_COUNTERPARTY"):
+        body += ("NOTE: a transfer relationship is NOT proof of common ownership. This\n"
+                 "wallet is recorded as a lead for review, not identified as the target.\n\n")
+    body += "Full graph and paths: Recovery page -> Transfer Graph.\n"
+
+    # Keyed on wallet + classification + confidence band, so a strengthened
+    # finding re-alerts while a re-scan of unchanged state does not.
+    band = int(conf * 10)
+    return _send_with_cooldown(f"tg_{wallet.lower()}_{cls}_{band}", 48, subject, body)
+
+
+def alert_collection_stale(age_minutes: float | None, threshold_minutes: float) -> bool:
+    """Fire when data collection itself has stopped. This is the failure the rest
+    of the alerting cannot detect — every other alert requires the collector to
+    be running."""
+    age_desc = f"{age_minutes:.0f} minutes" if age_minutes is not None else "unknown"
+    subject = "[EZEKIEL] CRITICAL: Data Collection Has Stalled"
+    body = (
+        f"No new data has been collected for {age_desc} "
+        f"(alert threshold: {threshold_minutes:.0f} minutes).\n\n"
+        f"While collection is down the system cannot detect a migration, and "
+        f"Hyperliquid serves only ~2000 recent entries per endpoint, so a long "
+        f"enough gap would put older activity beyond reach.\n\n"
+        f"Check: GitHub Actions tab -> 'Collect Trading Data' workflow.\n"
+        f"Note: this repo's schedule is heavily throttled by GitHub (~14.9 runs/day "
+        f"against a 15-minute request), so gaps of a few hours are normal; this "
+        f"alert only fires past {threshold_minutes:.0f} minutes.\n"
+        f"Common causes: exhausted Actions minutes, revoked workflow write "
+        f"permissions, or a job failing before its commit step.\n"
+    )
+    return _send_with_cooldown("collection_stale", 24, subject, body)
 
 
 def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:

@@ -9,16 +9,20 @@ never sees it. This module reads the ledger data the collector already stores an
 extracts the counterparties, ranking outbound destinations as migration leads.
 """
 
-import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
-    load_config, load_all_records, save_latest,
-    read_cursor, write_cursor, now_ms, DATA_DIR,
+    DATA_DIR,
+    load_all_records,
+    load_config,
+    now_ms,
+    read_cursor,
+    save_latest,
+    write_cursor,
 )
 
 # Ledger delta types that carry a wallet-to-wallet counterparty.
@@ -117,8 +121,8 @@ def build_counterparties(ledger: list[dict], target: str, excluded: set,
             "bidirectional": bidirectional,
             "known_self": p["known_self"],
             "tokens": sorted(p["tokens"]),
-            "first_seen": datetime.fromtimestamp(p["first_seen_ms"] / 1000, tz=timezone.utc).isoformat() if p["first_seen_ms"] else None,
-            "last_seen": datetime.fromtimestamp(p["last_seen_ms"] / 1000, tz=timezone.utc).isoformat() if p["last_seen_ms"] else None,
+            "first_seen": datetime.fromtimestamp(p["first_seen_ms"] / 1000, tz=UTC).isoformat() if p["first_seen_ms"] else None,
+            "last_seen": datetime.fromtimestamp(p["last_seen_ms"] / 1000, tz=UTC).isoformat() if p["last_seen_ms"] else None,
             "last_seen_ms": p["last_seen_ms"],
             "relevance": round(relevance, 2),
         })
@@ -139,7 +143,7 @@ def analyze_hl_transfers() -> dict:
     counterparties = build_counterparties(ledger, target, excluded, known_self, min_track)
 
     result = {
-        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "computed_at": datetime.now(UTC).isoformat(),
         "target": target,
         "counterparty_count": len(counterparties),
         "counterparties": counterparties,

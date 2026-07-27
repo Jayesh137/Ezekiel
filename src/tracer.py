@@ -3,17 +3,21 @@
 
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.alerts import alert_combined_match, alert_fund_movement, alert_new_wallet_found
 from src.utils import (
-    load_config, etherscan_get, read_cursor, write_cursor,
-    append_records, save_latest, DATA_DIR
+    DATA_DIR,
+    append_records,
+    etherscan_get,
+    load_config,
+    read_cursor,
+    save_latest,
+    write_cursor,
 )
-from src.alerts import alert_fund_movement, alert_new_wallet_found, alert_combined_match
-
 
 # Max unique destinations to trace per run — a safety net so a wallet spammed
 # with transfers to many addresses can never blow the job timeout.
@@ -31,7 +35,7 @@ _transfer_cache: dict[tuple[str, int], list[dict]] = {}
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def get_usdc_transfers(address: str, start_block: int = 0) -> list[dict]:
@@ -255,7 +259,7 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                 direct_deposits[0].get("hash"),
             ))
         else:
-            print(f"[tracer] Destination hasn't deposited to HL. Checking next hop...")
+            print("[tracer] Destination hasn't deposited to HL. Checking next hop...")
             pending_recorded = False
             next_transfers = get_usdc_transfers(destination)
             for nt in next_transfers[:5]:

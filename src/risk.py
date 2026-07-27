@@ -8,15 +8,18 @@ have a lead?". High score = act now: check the top candidate.
 
 import json
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
-    load_config, load_all_records, save_latest, read_cursor, write_cursor,
-    now_ms, DATA_DIR,
+    DATA_DIR,
+    load_all_records,
+    now_ms,
+    read_cursor,
+    save_latest,
+    write_cursor,
 )
 
 # Points each signal contributes at full strength (sum = 100).
@@ -30,6 +33,23 @@ WEIGHTS = {
     "linkage": 10,          # shared funder / address reuse with a candidate
     "xyz_abandoned": 5,     # stopped trading the signature HIP-3 markets
 }
+
+
+# Fund-movement signals only count as "migrating right now" for this long.
+# Without a bound, one outbound transfer ever contributes points forever.
+RECENT_SIGNAL_DAYS = 21
+
+
+def _detected_ts(finding: dict) -> float:
+    """Unix seconds for a fund-flow finding's detection time. Unparseable or
+    missing timestamps are treated as ancient so they cannot latch a signal on."""
+    raw = finding.get("detected_at")
+    if not raw:
+        return 0.0
+    try:
+        return datetime.fromisoformat(raw).timestamp()
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _level(score: float) -> str:
@@ -100,15 +120,17 @@ def _xyz_abandoned(fills: list[dict], days: float = 10) -> bool:
 
 
 def _gather_signals() -> dict:
-    config = load_config()
     signals = {}
 
     # Silence
     last_fill = read_cursor("last_fill_time")
     signals["days_silent"] = (now_ms() - last_fill) / 86_400_000 if last_fill else 0
 
-    # Drawdown vs high-water (tracked by collector as prev_account_value_cents)
-    hw_cents = read_cursor("prev_account_value_cents")
+    # Drawdown vs the true high-water mark. This must NOT read
+    # prev_account_value_cents: the collector resets that cursor when it fires a
+    # drop alert, which drove drawdown_pct to 0.0 precisely when the account had
+    # just collapsed. account_high_water_cents only ever ratchets upward.
+    hw_cents = read_cursor("account_high_water_cents") or read_cursor("prev_account_value_cents")
     cur = 0.0
     acct_path = DATA_DIR / "account" / "latest.json"
     if acct_path.exists():
@@ -124,12 +146,18 @@ def _gather_signals() -> dict:
     else:
         signals["drawdown_pct"] = 0.0
 
-    # Fund movement (L1 + HL-native)
+    # Fund movement (L1 + HL-native). Both are time-bounded: fund_flows/latest.json
+    # keeps the last 100 findings with no expiry, so an unbounded `any()` latched
+    # this signal on permanently after a single historical transfer.
     ff_path = DATA_DIR / "fund_flows" / "latest.json"
     if ff_path.exists():
         try:
             findings = json.load(open(ff_path)).get("findings", [])
-            signals["l1_outbound"] = any(f.get("amount_usdc_raw", 0) for f in findings)
+            cutoff = datetime.now(UTC).timestamp() - RECENT_SIGNAL_DAYS * 86400
+            signals["l1_outbound"] = any(
+                f.get("amount_usdc_raw", 0) and _detected_ts(f) >= cutoff
+                for f in findings
+            )
         except Exception:
             signals["l1_outbound"] = False
 
@@ -184,7 +212,7 @@ def run_risk() -> dict:
 
     signals = _gather_signals()
     result = compute_risk_score(signals)
-    result["computed_at"] = datetime.now(timezone.utc).isoformat()
+    result["computed_at"] = datetime.now(UTC).isoformat()
     result["signals"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in signals.items()}
     save_latest(str(DATA_DIR / "risk"), result)
 

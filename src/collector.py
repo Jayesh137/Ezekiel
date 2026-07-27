@@ -7,9 +7,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
-    load_config, hl_post, read_cursor, write_cursor,
-    append_records, save_snapshot, save_latest, update_index,
-    now_ms, DATA_DIR
+    DATA_DIR,
+    append_records,
+    hl_post,
+    load_config,
+    now_ms,
+    read_cursor,
+    save_latest,
+    save_snapshot,
+    update_index,
+    write_cursor,
 )
 
 
@@ -37,23 +44,45 @@ def collect_positions(wallet: str) -> None:
     save_snapshot(str(DATA_DIR / "account"), {"perp": state, "spot": spot, "hip3": hip3_positions})
 
 
+# Hyperliquid returns at most ~2000 records per userFillsByTime call. A single
+# unpaginated call therefore silently truncates whenever the gap since the last
+# cursor holds more than that — which is exactly what happens after an outage.
+# The 21-day collection stall left >2000 fills unrecovered until this loop existed.
+HL_PAGE_LIMIT = 2000
+# Bound the work per run so a routine 15-minute collection stays fast; a long
+# outage is drained over consecutive runs (or in one pass via backfill.py).
+MAX_FILL_PAGES = 15
+
+
 def collect_fills(wallet: str) -> int:
-    """Collect new fills since last cursor. Returns count of new fills."""
+    """Collect new fills since last cursor, paginating through full pages.
+
+    Returns count of new fills added.
+    """
     last_ts = read_cursor("last_fill_time")
     start = last_ts + 1 if last_ts else 0
+    added_total = 0
 
-    body = {"type": "userFillsByTime", "user": wallet, "startTime": start}
-    fills = hl_post(body)
+    for page in range(MAX_FILL_PAGES):
+        fills = hl_post({"type": "userFillsByTime", "user": wallet, "startTime": start})
+        if not fills:
+            break
 
-    if not fills:
-        return 0
+        added_total += append_records(str(DATA_DIR / "fills"), fills, key_field="tid")
+        max_ts = max(f["time"] for f in fills)
+        write_cursor("last_fill_time", max_ts)
 
-    added = append_records(str(DATA_DIR / "fills"), fills, key_field="tid")
+        if len(fills) < HL_PAGE_LIMIT:
+            break  # caught up
+        if max_ts <= start:
+            break  # no forward progress — avoid an infinite loop on a stuck page
+        start = max_ts + 1
+        print(f"[collector] fills page {page + 1} full ({len(fills)}), continuing from {max_ts}")
+    else:
+        print(f"[collector] fills: stopped at page cap ({MAX_FILL_PAGES}); "
+              f"more history remains, next run will continue")
 
-    max_ts = max(f["time"] for f in fills)
-    write_cursor("last_fill_time", max_ts)
-
-    return added
+    return added_total
 
 
 def collect_orders(wallet: str) -> None:
@@ -114,21 +143,39 @@ def collect_ledger(wallet: str) -> int:
 
 
 def collect_fees(wallet: str) -> None:
-    """Collect fee schedule and rate info."""
+    """Collect fee schedule and rate info.
+
+    Only latest.json carries the full payload (the dashboard reads that). The
+    dated history keeps a small summary: appending the whole schedule — including
+    the per-coin fee tiers and the 30-day volume table — cost ~5 KB per run and
+    had grown data/fees to 14 MB with no reader at all.
+    """
     fees = hl_post({"type": "userFees", "user": wallet})
     if not isinstance(fees, dict) or not fees:
         return
     save_latest(str(DATA_DIR / "fees"), fees)
-    append_records(str(DATA_DIR / "fees"), [{"_ts": now_ms(), **fees}], key_field="_ts")
+    summary = {
+        "_ts": now_ms(),
+        "userCrossRate": fees.get("userCrossRate"),
+        "userAddRate": fees.get("userAddRate"),
+        "activeReferralDiscount": fees.get("activeReferralDiscount"),
+    }
+    append_records(str(DATA_DIR / "fees"), [summary], key_field="_ts")
 
 
 def collect_rate_limit(wallet: str) -> None:
-    """Collect rate limit / cumulative volume info."""
+    """Collect rate limit / cumulative volume info.
+
+    cumVlm is the only field with a useful time series; the rest is derivable
+    from it or static."""
     rl = hl_post({"type": "userRateLimit", "user": wallet})
     if not isinstance(rl, dict) or not rl:
         return
     save_latest(str(DATA_DIR / "rate_limit"), rl)
-    append_records(str(DATA_DIR / "rate_limit"), [{"_ts": now_ms(), **rl}], key_field="_ts")
+    append_records(str(DATA_DIR / "rate_limit"),
+                   [{"_ts": now_ms(), "cumVlm": rl.get("cumVlm"),
+                     "nRequestsUsed": rl.get("nRequestsUsed")}],
+                   key_field="_ts")
 
 
 def collect_subaccounts(wallet: str) -> None:
@@ -190,6 +237,26 @@ def compute_migration_risk() -> None:
     run_risk()
 
 
+def check_own_freshness() -> None:
+    """Self-report a collection stall from inside the collector.
+
+    The heartbeat workflow is triggered by the same GitHub scheduler it supervises,
+    and that scheduler drops ~95% of high-frequency runs here. This inline check
+    means a collector that IS running will report a preceding gap even if the
+    heartbeat workflow never fired. It cannot detect a total scheduling outage —
+    nothing inside Actions can.
+    """
+    from src.heartbeat import STALE_AFTER_MINUTES, data_age_minutes, is_stale
+
+    age = data_age_minutes()
+    if age is None:
+        return  # first ever run, or no index yet
+    if is_stale(age, STALE_AFTER_MINUTES):
+        print(f"[collector] NOTE: {age:.0f} min since the last recorded update "
+              f"(threshold {STALE_AFTER_MINUTES}) — collection had stalled before "
+              f"this run; catching up now.")
+
+
 def check_silence() -> None:
     """Alert if the target has not traded in 3+ days. Cooldown: once per 24h."""
     last_fill_ts = read_cursor("last_fill_time")
@@ -232,6 +299,14 @@ def check_account_value_drop() -> None:
     current_cents = int(current_value * 100)
     prev_cents = read_cursor("prev_account_value_cents")
 
+    # True high-water mark, ratcheted upward only and never reset by an alert.
+    # The drop-alert cursor below IS reset on fire (so we don't re-alert hourly on
+    # the same collapse), and risk.py previously read that same cursor as its
+    # high-water — which zeroed drawdown_pct at the exact moment it mattered.
+    hw_cents = read_cursor("account_high_water_cents")
+    if current_cents > (hw_cents or 0):
+        write_cursor("account_high_water_cents", current_cents)
+
     if prev_cents and prev_cents > 1_000_000:  # Only check if previous reading was > $10k
         prev_value = prev_cents / 100.0
         drop_pct = (prev_value - current_value) / prev_value
@@ -259,6 +334,8 @@ def main():
 
     # Each step runs independently — one failed API response must not kill the run.
     steps = [
+        # Runs first: reports the gap BEFORE this run overwrites the index.
+        ("freshness self-check", check_own_freshness),
         ("positions", lambda: collect_positions(wallet)),
         ("fills", lambda: print(f"[collector] {collect_fills(wallet)} new fills")),
         ("orders", lambda: collect_orders(wallet)),

@@ -362,7 +362,7 @@
 </script>
 
 {#if !loading}
-	{@const alertState = getAlertState(fundFlows, candidates, hlTransfers)}
+	{@const alertState = getAlertState(fundFlows, candidates, hlTransfers, scan)}
 	{#if alertState}
 		<div class="alert-banner alert-{alertState.level}">
 			<span class="alert-label">[{alertState.level.toUpperCase()}]</span>

@@ -4,7 +4,7 @@
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -12,44 +12,72 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import numpy as np
 import requests
 
-from src.utils import (
-    load_config, hl_post, append_records, save_latest, DATA_DIR, etherscan_get, read_cursor
+from src import calibration
+from src import thresholds as th
+from src.alerts import (
+    alert_behavioral_match,
+    alert_combined_match,
+    alert_linkage_match,
+    alert_migration_correlation,
+    alert_vault_match,
+    alert_xyz_signature_match,
 )
 from src.fingerprint import (
-    build_fingerprint, compute_asset_preferences, compute_timing_profile,
-    compute_trade_sequencing, compute_position_sizing,
+    build_fingerprint,
+    compute_asset_preferences,
+    compute_position_sizing,
+    compute_timing_profile,
+    compute_trade_sequencing,
 )
-from src.alerts import (
-    alert_behavioral_match, alert_combined_match, alert_vault_match,
-    alert_migration_correlation, alert_xyz_signature_match, alert_linkage_match,
+from src.thresholds import VETO_BONUS_CEILING, VETO_SCORE_CAP
+from src.utils import (
+    DATA_DIR,
+    append_records,
+    etherscan_get,
+    hl_post,
+    load_config,
+    read_cursor,
+    save_latest,
 )
-from src import calibration
 
 
-def _effective_thresholds(thresholds: dict) -> dict:
-    """Adapt alert thresholds to what the scorer can actually achieve.
-    The self-match backtest score is the realistic ceiling for the true trader
-    (his own adjacent windows scored it); config thresholds above that ceiling
-    would guarantee missing the migration. Precision is protected by the
-    percentile gate, persistence requirement, and style vetoes instead."""
-    eff = dict(thresholds)
-    try:
-        with open(DATA_DIR.parent / "profile" / "backtest.json") as f:
-            report = json.load(f)
-        if report.get("passed") and report.get("self_score"):
-            achievable = float(report["self_score"])
-            eff["similarity_high"] = max(VETO_SCORE_CAP + 0.01,
-                                         min(eff["similarity_high"], round(achievable - 0.02, 4)))
-            eff["similarity_medium"] = max(VETO_SCORE_CAP,
-                                           min(eff["similarity_medium"], round(achievable - 0.07, 4)))
-            eff["similarity_low"] = max(0.40,
-                                        min(eff["similarity_low"], round(achievable - 0.12, 4)))
-            if eff != thresholds:
-                print(f"[scanner] Backtest-adapted thresholds: high={eff['similarity_high']}, "
-                      f"medium={eff['similarity_medium']}, low={eff['similarity_low']} "
-                      f"(self-match ceiling {achievable})")
-    except Exception:
-        pass
+def _effective_thresholds(alert_thresholds: dict) -> dict:
+    """Resolve effective thresholds via the shared policy module.
+
+    Kept as a thin wrapper so the scanner reads naturally; all the logic (and the
+    now-visible warning when backtest.json is missing or unreadable) lives in
+    src/thresholds.py, which the dashboard's numbers also derive from.
+    """
+    report = th.load_backtest_report(DATA_DIR.parent / "profile")
+    eff = th.resolve(alert_thresholds, report)
+    policy = eff.get("policy")
+
+    if policy == th.SRC_CURRENT_VALIDATED:
+        print(f"[scanner] Policy CURRENT_VALIDATED: high={eff['high']}, "
+              f"medium={eff['medium']}, low={eff['low']} "
+              f"(self-match ceiling {eff['self_match_ceiling']})")
+    elif policy == th.SRC_CARRIED_FORWARD:
+        prov = eff.get("provenance") or {}
+        print(f"[scanner] Policy CARRIED_FORWARD: high={eff['high']}, "
+              f"medium={eff['medium']}, low={eff['low']} — reusing the ceiling "
+              f"{eff['self_match_ceiling']} validated {eff.get('validated_at')} "
+              f"(margin {prov.get('margin')} over {prov.get('strangers_scored')} "
+              f"strangers, schema {prov.get('scoring_schema')}). Current self-match "
+              f"is inconclusive.")
+    else:
+        # No validated ceiling. The raw config numbers are unreachable for this
+        # trader, so alerting on them is silence. Behavioural discovery instead
+        # runs against the measured population, capped at WATCHLIST.
+        print(f"[scanner] Policy {policy}: no validated ceiling, so raw config "
+              f"thresholds (high={eff['high']}) are NOT used for behavioural "
+              f"discovery. Candidates are ranked against the calibration "
+              f"population and capped at WATCHLIST unless independently "
+              f"corroborated by fund-flow / HL-native / correlation / linkage "
+              f"evidence.")
+        if eff.get("carry_forward_rejected"):
+            print(f"[scanner] carry-forward REJECTED: {eff['carry_forward_rejected']}")
+        if report is not None and report.get("reason"):
+            print(f"[scanner] backtest: {report['reason']}")
     return eff
 
 
@@ -67,24 +95,44 @@ def _sustained_high(wallet: str, threshold: float, n: int = 2) -> bool:
     return len(history) >= n and all(h.get("score", 0) >= threshold for h in history[-n:])
 
 
-def _should_alert_behavioral(wallet: str, score: float, thresholds: dict,
+def evaluate_candidate(wallet: str, score: float, eff: dict,
+                       population: list[float] | None = None,
+                       vetoes: list | None = None,
+                       rare_overlap: bool = False,
+                       score_without_market_bonus: float | None = None,
+                       corroborated: bool = False) -> dict:
+    """Full disposition for a candidate: promote, watchlist, or drop — with reasons.
+
+    Every alert route consults this, so a style veto or a failed percentile gate
+    blocks promotion consistently instead of only on the behavioural route. The
+    returned record is persisted so the dashboard can show WHY a wallet was or
+    wasn't promoted.
+    """
+    pop = population if population is not None else []
+    d = th.disposition(
+        score, eff,
+        vetoes=vetoes,
+        percentile_ok=calibration.passes_percentile_gate(score, pop),
+        sustained=_sustained_high(wallet, eff["high"]),
+        rare_overlap=rare_overlap,
+        score_without_market_bonus=score_without_market_bonus,
+        # Inputs for the unvalidated-scorer fallback: rank the score against the
+        # measured null distribution instead of an unreachable raw threshold.
+        percentile=calibration.score_percentile(score, pop),
+        population_size=len(pop),
+        corroborated=corroborated,
+    )
+    if d["blockers"] and score >= eff["low"]:
+        print(f"[scanner] {wallet[:10]}... {score:.4f} -> {d['action']}: "
+              f"{'; '.join(d['blockers'])}")
+    return d
+
+
+def _should_alert_behavioral(wallet: str, score: float, eff: dict,
                              population: list[float] | None = None,
                              vetoes: list | None = None) -> bool:
-    """HIGH behavioral alerts need: raw threshold + top-percentile vs the
-    scanned population + persistence across consecutive scans + no style veto."""
-    if vetoes:
-        return False  # style-incompatible wallets never behavioral-alert
-    if score < thresholds["similarity_high"]:
-        return False
-    if not calibration.passes_percentile_gate(score, population):
-        print(f"[scanner] {wallet[:10]}... {score:.4f} clears raw threshold but not "
-              f"the population percentile gate — suppressing behavioral alert")
-        return False
-    if not _sustained_high(wallet, thresholds["similarity_high"]):
-        print(f"[scanner] {wallet[:10]}... {score:.4f} awaiting persistence "
-              f"(needs 2 consecutive high scans) — suppressing behavioral alert")
-        return False
-    return True
+    """True only when the candidate is promoted to a high-confidence alert."""
+    return evaluate_candidate(wallet, score, eff, population, vetoes)["action"] == th.ACTION_ALERT
 
 
 def fetch_leaderboard() -> list[dict]:
@@ -187,10 +235,21 @@ def get_asset_overlap(fp_a: dict, fp_b: dict) -> dict:
     }
 
 
-def compare_timing_profiles(fp_a: dict, fp_b: dict) -> float:
-    """Compare timing profile dimensions using cosine similarity."""
+def compare_timing_profiles(fp_a: dict, fp_b: dict) -> float | None:
+    """Compare active-hours profiles. None when either side spans too few days.
+
+    An hourly histogram only describes a human's rhythm once it aggregates many
+    separate days. Measured on the target's own adjacent windows — 4 distinct
+    trading days each — it returned 0.0045, i.e. the trader looked maximally
+    unlike himself on a 0.14-weight dimension. Excluding it (and renormalizing) is
+    honest; scoring near-zero from a 4-day sample is not.
+    """
+    if not fp_a.get("sufficient_data", True) or not fp_b.get("sufficient_data", True):
+        return None
     hourly_a = fp_a.get("hourly_distribution", [0]*24)
     hourly_b = fp_b.get("hourly_distribution", [0]*24)
+    if not any(hourly_a) or not any(hourly_b):
+        return None
     return cosine_similarity(hourly_a, hourly_b)
 
 
@@ -242,6 +301,38 @@ def compare_position_sizing(fp_a: dict, fp_b: dict) -> float:
     if ratio_a <= 0 or ratio_b <= 0:
         return 0.5  # Neutral when unavailable
     return float(np.sqrt(min(ratio_a, ratio_b) / max(ratio_a, ratio_b)))
+
+
+def compare_hold_duration(fp_a: dict, fp_b: dict) -> float | None:
+    """Holding-period character. Returns None when either side has too few
+    position episodes to characterise — a 5-bucket histogram built from 4
+    episodes is noise, and scoring it 0.0 previously penalised the true trader
+    harder than it penalised strangers.
+
+    Combines the bucket-shape cosine with a ratio on median hold length; the
+    ratio stays meaningful at small sample sizes where the histogram does not.
+    """
+    hd_a = fp_a.get("hold_duration", {})
+    hd_b = fp_b.get("hold_duration", {})
+    if not hd_a.get("sufficient_data") or not hd_b.get("sufficient_data"):
+        return None
+
+    scores = []
+    buckets_a = hd_a.get("distribution_buckets", {})
+    buckets_b = hd_b.get("distribution_buckets", {})
+    if buckets_a and buckets_b:
+        keys = sorted(set(buckets_a) | set(buckets_b))
+        vec_a = [buckets_a.get(k, 0) for k in keys]
+        vec_b = [buckets_b.get(k, 0) for k in keys]
+        if any(vec_a) and any(vec_b):
+            scores.append(cosine_similarity(vec_a, vec_b))
+
+    med = _ratio_score(hd_a.get("overall_minutes", {}).get("median", 0),
+                       hd_b.get("overall_minutes", {}).get("median", 0))
+    if med is not None:
+        scores.append(med)
+
+    return float(np.mean(scores)) if scores else None
 
 
 def compare_leverage(fp_a: dict, fp_b: dict) -> float:
@@ -368,24 +459,17 @@ def check_style_vetoes(ezekiel_fp: dict, candidate_fp: dict) -> list[str]:
     return vetoes
 
 
-# A vetoed candidate is capped below the WEAK_LEAD tier; hard on-chain linkage
-# bonuses may lift it slightly but never into alert territory on style alone.
-VETO_SCORE_CAP = 0.45
-VETO_BONUS_CEILING = 0.60
-
-
-def classify_match(score: float) -> str:
-    if score >= 0.90:
-        return "CONFIRMED_CANDIDATE"
-    if score >= 0.80:
-        return "WATCH_CLOSELY"
-    if score >= 0.65:
-        return "WEAK_LEAD"
-    return "BACKGROUND"
+def classify_match(score: float, eff: dict | None = None) -> str:
+    """Tier label. Uses the SAME effective thresholds the alerts use — this was
+    previously hardcoded to 0.90/0.80/0.65 while alerting ran on backtest-adapted
+    values near 0.51, so a wallet could email as HIGH and be labelled WEAK_LEAD."""
+    if eff is None:
+        eff = _effective_thresholds(load_config()["alert_thresholds"])
+    return th.classify(score, eff)
 
 
 def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score: float,
-                   vetoes: list[str] | None = None) -> dict:
+                   vetoes: list[str] | None = None, eff: dict | None = None) -> dict:
     """Explain the score so the dashboard can rank leads by evidence."""
     asset_overlap = get_asset_overlap(
         ezekiel_fp.get("asset_preferences", {}),
@@ -394,37 +478,52 @@ def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score
     reasons = []
     warnings = []
 
+    def dim(name: str) -> float | None:
+        """Dimension value, or None when it was excluded for insufficient data.
+        Any dimension can now be None, so never compare one directly."""
+        v = dimensions.get(name)
+        return v if isinstance(v, (int, float)) else None
+
+    def at_least(name: str, cutoff: float) -> bool:
+        v = dim(name)
+        return v is not None and v >= cutoff
+
+    def below(name: str, cutoff: float) -> bool:
+        v = dim(name)
+        return v is not None and v < cutoff
+
     if asset_overlap["rare_overlap"]:
         reasons.append(f"Shares rare HIP-3 markets: {', '.join(asset_overlap['rare_overlap'][:5])}")
-    if dimensions.get("asset_preferences", 0) >= 0.65:
+    if at_least("asset_preferences", 0.65):
         reasons.append("Strong asset mix overlap")
-    if dimensions.get("timing_profile", 0) >= 0.80:
+    if at_least("timing_profile", 0.80):
         reasons.append("Trades in similar active UTC hours")
-    if dimensions.get("entry_exit_style", 0) >= 0.85:
+    if at_least("entry_exit_style", 0.85):
         reasons.append("Similar market/limit execution style")
-    if dimensions.get("hold_duration", 0) >= 0.85:
+    if at_least("hold_duration", 0.85):
         reasons.append("Similar holding-duration profile")
-    if dimensions.get("account_size", 0) >= 0.70:
+    if at_least("account_size", 0.70):
         reasons.append("Similar account-size bracket")
-
-    if (dimensions.get("activity") or 0) >= 0.75:
+    if at_least("activity", 0.75):
         reasons.append("Matching trade frequency and cadence")
-    if (dimensions.get("direction_bias") or 0) >= 0.85:
+    if at_least("direction_bias", 0.85):
         reasons.append("Matching long/short bias")
-    if (dimensions.get("position_management") or 0) >= 0.80:
+    if at_least("position_management", 0.80):
         reasons.append("Similar scaling/TWAP/clip-size habits")
 
     if asset_overlap["overlap_count"] < 3:
         warnings.append("Weak asset overlap")
-    if dimensions.get("timing_profile", 0) < 0.35:
+    if below("timing_profile", 0.35):
         warnings.append("Different active trading hours")
-    if dimensions.get("account_size", 0) < 0.25:
+    if below("account_size", 0.25):
         warnings.append("Very different account-size bracket")
-    if dimensions.get("activity") is not None and dimensions["activity"] < 0.35:
+    if below("activity", 0.35):
         warnings.append("Very different trading frequency")
+    if dim("hold_duration") is None:
+        warnings.append("Too few position episodes to compare holding style")
 
     return {
-        "tier": classify_match(score),
+        "tier": classify_match(score, eff),
         "reasons": reasons,
         "warnings": warnings,
         "vetoes": vetoes or [],
@@ -432,7 +531,9 @@ def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score
     }
 
 
-def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dict, dict]:
+def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
+                       eff: dict | None = None,
+                       market_freq: dict | None = None) -> tuple[float, dict, dict]:
     """Compute weighted similarity between Ezekiel and a candidate fingerprint."""
     dimensions = {}
 
@@ -448,7 +549,7 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
         ezekiel_fp.get("timing_profile", {}),
         candidate_fp.get("timing_profile", {})
     )
-    dimensions["timing_profile"] = round(dim_score, 4)
+    dimensions["timing_profile"] = round(dim_score, 4) if dim_score is not None else None
 
     # Leverage
     dim_score = compare_leverage(
@@ -467,16 +568,10 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     else:
         dimensions["entry_exit_style"] = 0.0
 
-    # Hold duration buckets
-    buckets_a = ezekiel_fp.get("hold_duration", {}).get("distribution_buckets", {})
-    buckets_b = candidate_fp.get("hold_duration", {}).get("distribution_buckets", {})
-    if buckets_a and buckets_b:
-        keys = sorted(set(list(buckets_a.keys()) + list(buckets_b.keys())))
-        vec_a = [buckets_a.get(k, 0) for k in keys]
-        vec_b = [buckets_b.get(k, 0) for k in keys]
-        dimensions["hold_duration"] = round(cosine_similarity(vec_a, vec_b), 4)
-    else:
-        dimensions["hold_duration"] = 0.0
+    # Hold duration — None when either side has too few episodes to judge, so the
+    # weight is redistributed rather than scoring a misleading 0.0.
+    hd_score = compare_hold_duration(ezekiel_fp, candidate_fp)
+    dimensions["hold_duration"] = round(hd_score, 4) if hd_score is not None else None
 
     dim_score = compare_account_size(
         ezekiel_fp.get("account_characteristics", {}),
@@ -547,11 +642,15 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
         candidate_fp.get("asset_preferences", {}),
     )
     penalty = 0.0
+    # Penalties only apply to dimensions that were actually measurable. An
+    # excluded dimension is unknown, not bad — penalising None would reintroduce
+    # exactly the false-negative the exclusion exists to prevent.
     if overlap["overlap_count"] < 3:
         penalty += 0.12
-    if dimensions["timing_profile"] < 0.30:
+    if dimensions["timing_profile"] is not None and dimensions["timing_profile"] < 0.30:
         penalty += 0.08
-    if dimensions["account_size"] < 0.20 and weights["account_size"] > 0:
+    if dimensions["account_size"] is not None and dimensions["account_size"] < 0.20 \
+            and weights["account_size"] > 0:
         penalty += 0.05
 
     score = max(0.0, weighted_sum - penalty)
@@ -562,13 +661,49 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict) -> tuple[float, dic
     if vetoes:
         score = min(score, VETO_SCORE_CAP)
 
-    # xyz: HIP-3 market bonus — trading these exotic markets is extremely rare.
-    # Any overlap here is near-conclusive behavioral evidence of the same trader.
-    if overlap.get("rare_overlap"):
-        score = min(VETO_BONUS_CEILING if vetoes else 1.0, score + 0.12)
+    # Shared-market bonus, scaled by MEASURED rarity rather than a flat constant.
+    #
+    # The old flat +0.12 for any xyz: overlap assumed those markets were
+    # near-unique. They are not: xyz:BRENTOIL is traded by ~20% of scanned wallets,
+    # and the flat bonus lifted three style-vetoed wallets above the target's own
+    # self-match. Frequencies now come from the wallets the scanner already
+    # fingerprints each sweep (src/calibration.py).
+    #
+    # Still gated on `not vetoes`: boosting the similarity of a wallet just judged
+    # to be a different human is incoherent. The overlap remains recorded in
+    # evidence.asset_overlap.rare_overlap and still earns a watchlist slot, so no
+    # lead is lost — it simply cannot outrank the real trader.
+    score_before_market_bonus = score
+    market_bonus = 0.0
+    market_reasons = []
+    shared_markets = overlap.get("rare_overlap") or []
+    if shared_markets:
+        freq = market_freq if market_freq is not None else calibration.load_market_frequencies()
+        market_bonus, market_reasons = calibration.market_rarity_bonus(shared_markets, freq)
+        if vetoes:
+            market_bonus = 0.0
+            market_reasons.append("Market bonus withheld: style veto in force")
+        elif market_bonus:
+            score = min(1.0, score + market_bonus)
 
     score = round(score, 4)
-    evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score, vetoes)
+    evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score, vetoes, eff)
+    # Published so the dashboard and any reviewer can see exactly how much of the
+    # score came from market overlap and why — and so disposition can refuse to
+    # promote a wallet that only clears the threshold because of it.
+    evidence["market_rarity"] = {
+        "shared_markets": shared_markets,
+        "bonus_applied": round(market_bonus, 4),
+        "score_without_bonus": round(score_before_market_bonus, 4),
+        "explanations": market_reasons,
+        "frequencies": {
+            m: round(calibration.market_frequency(
+                m, market_freq if market_freq is not None
+                else calibration.load_market_frequencies()), 5)
+            for m in shared_markets
+        } if shared_markets else {},
+    }
+    evidence["reasons"].extend(market_reasons)
     return score, dimensions, evidence
 
 
@@ -587,7 +722,9 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
     """Build a mini-fingerprint for a candidate wallet from their data.
     Now includes all 8 comparable dimensions (trade_sequencing, position_sizing added)."""
     from src.fingerprint import (
-        compute_leverage_profile, compute_hold_duration, compute_entry_exit_style,
+        compute_entry_exit_style,
+        compute_hold_duration,
+        compute_leverage_profile,
         compute_style_profile,
     )
 
@@ -712,7 +849,8 @@ def persist_candidate(result: dict) -> None:
 
 
 def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
-                          source: str = "targeted") -> dict | None:
+                          source: str = "targeted", eff: dict | None = None,
+                          market_freq: dict | None = None) -> dict | None:
     """Score a single wallet against the fingerprint, bypassing the leaderboard.
     Used for fund-flow destinations, bridge depositors, and subaccounts."""
     lookback_days = config["scanner"].get("fills_lookback_days", 21)
@@ -730,7 +868,7 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
 
     state = get_candidate_state(wallet)
     candidate_fp = build_candidate_fingerprint(fills, state)
-    score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp)
+    score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
 
     return {
         "wallet": wallet,
@@ -738,7 +876,7 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
         "dimensions": dimensions,
         "evidence": evidence,
         "fills_count": len(fills),
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "scanned_at": datetime.now(UTC).isoformat(),
         "fingerprint": _summarize_fingerprint(candidate_fp),
         "source": source,
     }
@@ -857,6 +995,42 @@ def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
     return False
 
 
+# Priority sources that constitute independent, non-behavioural evidence: the
+# target's funds actually reached this wallet, or an amount/timing correlation
+# re-linked it. These are what may promote a population-fallback watchlist entry
+# to an alert while the scorer itself is unvalidated.
+CORROBORATING_SOURCES = {"fund_flow", "hl_transfer", "known_linked", "correlation",
+                         "subaccount", "bridge_depositor"}
+
+
+def _is_corroborated(result: dict, source: str | None = None) -> bool:
+    """Independent (non-behavioural) evidence tying this wallet to the target.
+
+    Behavioural similarity deliberately does NOT count — the whole point is that
+    behaviour alone cannot promote itself while the scorer is unvalidated.
+    """
+    if source in CORROBORATING_SOURCES:
+        return True
+    ev = result.get("evidence") or {}
+    link = ev.get("linkage") or {}
+    return bool(link.get("shared_funder") or link.get("shared_deposit_addresses"))
+
+
+def _market_free_score(result: dict) -> float | None:
+    """The candidate's score with the shared-market bonus removed.
+
+    Passed to disposition so a wallet that only clears the high threshold because
+    of market overlap is watchlisted rather than promoted. Note the priority path
+    can add vault/referral/linkage bonuses AFTER scoring, so the delta rather than
+    the stored absolute is applied.
+    """
+    mr = (result.get("evidence") or {}).get("market_rarity") or {}
+    bonus = mr.get("bonus_applied")
+    if not bonus:
+        return None
+    return round(result["score"] - float(bonus), 4)
+
+
 def _rare_overlap(result: dict) -> list:
     """xyz: HIP-3 markets the candidate shares with the target (the rarest tell)."""
     return result.get("evidence", {}).get("asset_overlap", {}).get("rare_overlap", []) or []
@@ -879,17 +1053,29 @@ def _apply_linkage(result: dict, target: str, profile: dict) -> float:
         cap = VETO_BONUS_CEILING if result["evidence"].get("vetoes") else 1.0
         result["score"] = round(min(cap, result["score"] + link["linkage_bonus"]), 4)
         print(f"[scanner] Linkage for {wallet[:10]}...: +{link['linkage_bonus']} {link['reasons']}")
-        alert_linkage_match(wallet, link["reasons"], result["score"])
+        # Linkage is on-chain evidence, but a style-vetoed wallet still must not
+        # be promoted to a high-confidence alert on any route.
+        if th.can_alert(result["evidence"].get("vetoes")):
+            alert_linkage_match(wallet, link["reasons"], result["score"])
+        else:
+            print(f"[scanner] Linkage alert suppressed for {wallet[:10]}... (style veto); "
+                  f"evidence retained on watchlist")
     return result["score"]
 
 
-def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
+def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
+                          population: list[float] | None = None,
+                          market_freq: dict | None = None) -> list[dict]:
     """Scan high-priority candidates before the leaderboard sweep:
     fund-flow destinations, subaccounts, and recent large bridge depositors.
-    Returns scored results and fires combined alerts when both vectors agree."""
-    thresholds = _effective_thresholds(config["alert_thresholds"])
+    Returns scored results and fires combined alerts when both vectors agree.
+
+    `eff` and `population` are passed in rather than resolved here so priority
+    targets go through exactly the same threshold policy and percentile gate as
+    the leaderboard sweep — previously the population was loaded after this ran,
+    so the highest-priority wallets silently bypassed calibration."""
     candidate_threshold = min(config["scanner"].get("candidate_threshold", 0.65),
-                              thresholds["similarity_low"])
+                              eff["low"])
 
     # Collect priority wallets with their source metadata
     priority: dict[str, dict] = {}
@@ -986,20 +1172,28 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
 
     for wallet, meta in priority.items():
         source = meta.get("source", "targeted")
-        result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source)
+        result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source, eff=eff,
+                                      market_freq=market_freq)
         if result is None:
             continue
 
         score = result["score"]
         print(f"[scanner] Priority {wallet[:10]}... ({source}): {score:.4f}")
 
+        vetoes = result["evidence"].get("vetoes")
+        alertable = th.can_alert(vetoes)
+
         rare = _rare_overlap(result)
         if rare:
             print(f"[scanner] xyz: SIGNATURE MATCH {wallet[:10]}...: {rare}")
-            alert_xyz_signature_match(wallet, rare, score)
+            if alertable:
+                alert_xyz_signature_match(wallet, rare, score)
+            else:
+                print(f"[scanner] xyz: alert suppressed for {wallet[:10]}... (style veto); "
+                      f"still watchlisted with evidence")
 
         # Vault, referral, and L1-clustering checks for promising candidates
-        bonus_cap = VETO_BONUS_CEILING if result["evidence"].get("vetoes") else 1.0
+        bonus_cap = VETO_BONUS_CEILING if vetoes else 1.0
         if score >= 0.70 or rare:
             shared_vaults = _check_vault_overlap(wallet, target_vaults)
             if shared_vaults:
@@ -1009,7 +1203,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
                 score = min(bonus_cap, score + 0.08)
                 result["score"] = round(score, 4)
                 print(f"[scanner] Vault overlap for {wallet[:10]}...: {shared_vaults}")
-                alert_vault_match(wallet, shared_vaults)
+                if alertable:
+                    alert_vault_match(wallet, shared_vaults)
 
             if _check_referral_link(wallet, target_referral_addrs):
                 result["evidence"]["reasons"].append("Referral network connection to target wallet")
@@ -1022,30 +1217,39 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict) -> list[dict]:
                 target_l1 = linkage_mod.target_l1_profile(target_addr)
             score = _apply_linkage(result, target_addr, target_l1)
 
+        # One disposition decides promote / watchlist / drop for every route below.
+        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+                                  _market_free_score(result),
+                                  corroborated=_is_corroborated(result, source))
+        result["disposition"] = disp
         results.append(result)
 
-        # Persist if it clears the threshold OR shares the rare xyz: signature
-        # (an xyz: overlap alone is strong enough to warrant a watchlist slot).
-        if score >= candidate_threshold or rare:
+        # Persist anything watchlisted or better — suppressed candidates keep their
+        # evidence and stay visible rather than being discarded.
+        if disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold:
             persist_candidate(result)
 
-        if _should_alert_behavioral(wallet, score, thresholds,
-                                    vetoes=result["evidence"].get("vetoes")):
+        promoted = disp["action"] == th.ACTION_ALERT
+        if promoted:
             alert_behavioral_match(wallet, score, result["dimensions"])
 
-        # Combined alert: fund flow hit + behavioral match on the same wallet
-        if meta.get("deposited_to_hl") and score >= thresholds["similarity_medium"]:
-            alert_combined_match(wallet, score, meta["amount"], meta["method"])
-        elif source == "bridge_depositor" and score >= thresholds["similarity_high"]:
-            alert_combined_match(wallet, score, "large bridge deposit", "bridge_depositor")
-        elif source in ("hl_transfer", "known_linked") and score >= thresholds["similarity_medium"]:
-            # Funds moved HL-natively to this wallet AND it trades like the target —
-            # the strongest possible in-platform migration signal.
-            amount = f"${meta.get('out_usd', 0):,.0f} sent in-platform"
-            alert_combined_match(wallet, score, amount, f"hl_native_transfer ({source})")
-        elif source == "correlation" and score >= thresholds["similarity_low"]:
-            # Deposit/withdrawal amount+timing correlation AND behavioral match.
-            alert_combined_match(wallet, score, meta.get("amount", "amount match"), "deposit_correlation")
+        # Combined alerts: fund-flow/HL-native/correlation evidence AND behaviour.
+        # All require `alertable` so a style-vetoed wallet cannot be promoted by a
+        # side route — previously only the behavioural route checked vetoes.
+        if alertable:
+            if meta.get("deposited_to_hl") and score >= eff["medium"]:
+                alert_combined_match(wallet, score, meta["amount"], meta["method"])
+            elif source == "bridge_depositor" and score >= eff["high"]:
+                alert_combined_match(wallet, score, "large bridge deposit", "bridge_depositor")
+            elif source in ("hl_transfer", "known_linked") and score >= eff["medium"]:
+                # Funds moved HL-natively to this wallet AND it trades like the target —
+                # the strongest possible in-platform migration signal.
+                amount = f"${meta.get('out_usd', 0):,.0f} sent in-platform"
+                alert_combined_match(wallet, score, amount, f"hl_native_transfer ({source})")
+            elif source == "correlation" and score >= eff["low"]:
+                # Deposit/withdrawal amount+timing correlation AND behavioral match.
+                alert_combined_match(wallet, score, meta.get("amount", "amount match"),
+                                     "deposit_correlation")
 
         time.sleep(0.5)
 
@@ -1057,8 +1261,19 @@ def scan_leaderboard():
     """Main scanning loop: check leaderboard wallets against fingerprint."""
     config = load_config()
     target = config["target_wallet"].lower()
-    thresholds = _effective_thresholds(config["alert_thresholds"])
+    eff = _effective_thresholds(config["alert_thresholds"])
     scanner_config = config["scanner"]
+    # Loaded up front so priority targets and the leaderboard sweep share one
+    # null distribution; previously this happened after the priority phase.
+    population = calibration.load_population()
+    print(f"[scanner] Calibration: {len(population)} samples, "
+          f"gate {'ENFORCING' if calibration.gate_active(population) else 'OBSERVING'}")
+    # Market rarity measured from previously-scanned wallets. Loaded once per
+    # sweep so every candidate is scored against the same frequency table.
+    market_freq = calibration.load_market_frequencies()
+    print(f"[scanner] Market rarity: {market_freq['eligible_wallets']} wallets over "
+          f"{market_freq['observations']} sweep(s), "
+          f"{'ACTIVE' if market_freq['sufficient'] else 'INSUFFICIENT (no bonus)'}")
 
     # Load fingerprint — prefer recent (21-day window) for fair candidate comparison
     fp_path = Path(DATA_DIR.parent / "profile" / "fingerprint.json")
@@ -1077,7 +1292,7 @@ def scan_leaderboard():
 
     # Phase 1: priority targets — fund-flow destinations, subaccounts, bridge depositors
     # These bypass the leaderboard and get scanned regardless of ranking.
-    priority_results = scan_priority_targets(ezekiel_fp, config)
+    priority_results = scan_priority_targets(ezekiel_fp, config, eff, population, market_freq)
     priority_wallets = {r["wallet"].lower() for r in priority_results}
 
     # Phase 2: leaderboard sweep
@@ -1088,13 +1303,13 @@ def scan_leaderboard():
     min_fills = scanner_config["min_fills_for_comparison"]
     lookback_days = scanner_config["fills_lookback_days"]
     candidate_threshold = min(scanner_config.get("candidate_threshold", 0.65),
-                              thresholds["similarity_low"])
+                              eff["low"])
 
     results = list(priority_results)  # Start with priority results
     top_scores = [{"wallet": r["wallet"][:10], "score": r["score"]} for r in priority_results]
     scanned = 0
-    population = calibration.load_population()
     sweep_scores = []  # this sweep's scores → next sweep's null distribution
+    sweep_markets = {}  # eligible wallet → markets traded → rarity calibration
 
     for entry in leaderboard[:max_wallets]:
         wallet = entry.get("ethAddress", entry.get("address", ""))
@@ -1113,8 +1328,13 @@ def scan_leaderboard():
 
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
-        score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp)
+        score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
         sweep_scores.append(score)
+        # This wallet cleared min_fills and was fingerprinted, so it belongs in the
+        # rarity denominator. Recording only eligible wallets keeps the frequency
+        # table describing the same population the scores come from.
+        sweep_markets[wallet.lower()] = candidate_fp.get(
+            "asset_preferences", {}).get("coins_traded", [])
 
         result = {
             "wallet": wallet,
@@ -1123,7 +1343,7 @@ def scan_leaderboard():
             "dimensions": dimensions,
             "evidence": evidence,
             "fills_count": len(fills),
-            "scanned_at": datetime.now(timezone.utc).isoformat(),
+            "scanned_at": datetime.now(UTC).isoformat(),
             "fingerprint": _summarize_fingerprint(candidate_fp),
         }
 
@@ -1135,22 +1355,31 @@ def scan_leaderboard():
         # its own, so a leaderboard wallet sharing them is auto-promoted and alerted
         # even if its overall score is modest (it may be a fresh, thin-history wallet).
         rare = _rare_overlap(result)
+        vetoes = evidence.get("vetoes")
         if rare:
             print(f"[scanner] xyz: SIGNATURE MATCH (leaderboard): {wallet} {rare}")
-            alert_xyz_signature_match(wallet, rare, score)
+            if th.can_alert(vetoes):
+                alert_xyz_signature_match(wallet, rare, score)
+            else:
+                print(f"[scanner] xyz: alert suppressed for {wallet[:10]}... (style veto); "
+                      f"still watchlisted with evidence")
 
-        if score >= thresholds["similarity_low"] or rare:
+        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+                                  _market_free_score(result),
+                                  corroborated=_is_corroborated(result))
+        result["disposition"] = disp
+
+        # Keep anything watchlisted or better in the scan output and on the
+        # persistent watchlist — suppression downgrades, it never discards.
+        if disp["action"] != th.ACTION_BACKGROUND:
             results.append(result)
-
-        if score >= candidate_threshold or rare:
+        if disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold:
             persist_candidate(result)
 
-        if score >= thresholds["similarity_high"]:
+        if disp["action"] == th.ACTION_ALERT:
             print(f"[scanner] HIGH MATCH: {wallet} (score={score:.4f})")
-            if _should_alert_behavioral(wallet, score, thresholds, population,
-                                        vetoes=evidence.get("vetoes")):
-                alert_behavioral_match(wallet, score, dimensions)
-        elif score >= thresholds["similarity_medium"]:
+            alert_behavioral_match(wallet, score, dimensions)
+        elif score >= eff["medium"]:
             print(f"[scanner] MEDIUM MATCH: {wallet} (score={score:.4f})")
 
         time.sleep(0.5)
@@ -1160,6 +1389,12 @@ def scan_leaderboard():
     pop_size = calibration.record_population_scores(sweep_scores)
     print(f"[scanner] Calibration population: {pop_size} samples")
 
+    market_summary = calibration.record_market_observation(sweep_markets)
+    print(f"[scanner] Market rarity now: {market_summary['eligible_wallets']} wallets "
+          f"over {market_summary['observations']} sweep(s), "
+          f"{len(market_summary['market_counts'])} distinct markets, "
+          f"{'ACTIVE' if market_summary['sufficient'] else 'INSUFFICIENT'}")
+
     results.sort(key=lambda r: r["score"], reverse=True)
 
     for i, r in enumerate(results):
@@ -1167,11 +1402,47 @@ def scan_leaderboard():
             r.pop("fingerprint", None)
 
     scan_result = {
-        "scan_time": datetime.now(timezone.utc).isoformat(),
+        "scan_time": datetime.now(UTC).isoformat(),
         "wallets_scanned": scanned + len(priority_wallets),
         "priority_scanned": len(priority_wallets),
         "matches_found": len(results),
-        "thresholds": thresholds,
+        # Resolved effective thresholds — the dashboard reads these instead of
+        # hardcoding 0.90/0.80, so UI tiers match the tiers the alerts used.
+        "thresholds": eff,
+        # Which policy produced the dispositions in this sweep. Rendered on the
+        # dashboard so the operating mode is never ambiguous.
+        "policy": eff.get("policy"),
+        "policy_detail": {
+            "scoring_schema": eff.get("scoring_schema"),
+            "validated_at": eff.get("validated_at"),
+            "provenance": eff.get("provenance"),
+            "carry_forward_rejected": eff.get("carry_forward_rejected"),
+            "fallback_percentile": th.FALLBACK_WATCHLIST_PERCENTILE,
+            "fallback_min_population": th.FALLBACK_MIN_POPULATION,
+        },
+        "calibration": {
+            "population_size": len(population),
+            "gate_active": calibration.gate_active(population),
+            "alert_percentile": calibration.ALERT_PERCENTILE,
+        },
+        # Published so the dashboard can explain a market bonus without recomputing
+        # it, and so a reviewer can see the measured frequency behind any claim.
+        "market_rarity": {
+            "eligible_wallets": market_summary["eligible_wallets"],
+            "observations": market_summary["observations"],
+            "sufficient": market_summary["sufficient"],
+            "window_days": calibration.MARKET_WINDOW_DAYS,
+            "common_frequency": calibration.COMMON_FREQUENCY,
+            "max_bonus": calibration.MAX_MARKET_BONUS,
+            "first_observed": market_summary["first_observed"],
+            "last_observed": market_summary["last_observed"],
+            # Only the HIP-3 markets matter for the bonus; keep the payload small.
+            "frequencies": {
+                m: round(calibration.market_frequency(m, market_summary), 5)
+                for m in sorted(market_summary["market_counts"])
+                if m.startswith("xyz:")
+            },
+        },
         "top_scores": top_scores,
         "results": results,
     }
@@ -1186,9 +1457,9 @@ def scan_leaderboard():
             days_silent = (time.time() * 1000 - last_fill_ts) / (24 * 60 * 60 * 1000)
             if days_silent >= 5 and results:
                 top = results[0]
-                corr_threshold = min(0.75, thresholds["similarity_medium"])
+                corr_threshold = min(0.75, eff["medium"])
                 if (top["score"] >= corr_threshold
-                        and not top.get("evidence", {}).get("vetoes")
+                        and th.can_alert(top.get("evidence", {}).get("vetoes"))
                         and calibration.passes_percentile_gate(top["score"], population)):
                     print(f"[scanner] MIGRATION CORRELATION: {days_silent:.1f}d silence + {top['score']:.4f} candidate")
                     alert_migration_correlation(top["wallet"], top["score"], round(days_silent, 1))

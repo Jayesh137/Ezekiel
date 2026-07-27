@@ -1,0 +1,34 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "dashboard", "data"]
+
+[tool.ruff.lint]
+# Focused on rules that catch real defects rather than restyling working code:
+#   F  pyflakes      — undefined names, unused imports/variables
+#   E  pycodestyle   — syntax-adjacent errors
+#   I  isort         — deterministic import order
+#   UP pyupgrade     — stale syntax for the pinned 3.12 target
+#   B  bugbear       — mutable defaults, unused loop vars, common traps
+#   PERF              — accidental O(n^2) and needless work in hot loops
+select = ["F", "E", "I", "UP", "B", "PERF"]
+
+# Deliberately NOT enabled:
+#   BLE001 / S110 (blind except, try-except-pass) — this system polls flaky
+#     third-party APIs and must never let one bad response kill a collection run.
+#     Broad excepts here are a documented resilience pattern, not an oversight;
+#     the ones that matter log a visible warning.
+#   SIM115 (open without context manager) — a handful of json.load(open(...))
+#     reads in short-lived scripts; churn without benefit.
+ignore = [
+    "E501",  # line length is enforced by the formatter budget above, not per-line
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally import modules for monkeypatching and shadow names in fixtures.
+"tests/*" = ["B011"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Quiet, deterministic output; -ra surfaces skips/xfails that would otherwise hide.
+addopts = "-ra"

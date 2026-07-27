@@ -2,9 +2,8 @@
 """Targeted tests for changed critical behavior: batch dedup and alert cooldowns."""
 import tempfile
 
+from src import alerts, tracer
 from src.utils import append_records, load_all_records
-from src import alerts
-from src import tracer
 
 
 def test_append_records_dedupes_within_batch():

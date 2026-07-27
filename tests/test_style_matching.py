@@ -7,11 +7,15 @@ completely different trading style scored as a match."""
 import numpy as np
 
 from src import calibration
-from src.backtest import split_windows, MIN_WINDOW_FILLS
-from src.fingerprint import compute_style_profile, _position_episodes
+from src.backtest import MIN_WINDOW_FILLS, split_windows
+from src.fingerprint import _position_episodes, compute_style_profile
 from src.scanner import (
-    build_candidate_fingerprint, compute_similarity, check_style_vetoes,
-    compare_activity, compare_direction_bias, VETO_SCORE_CAP,
+    VETO_SCORE_CAP,
+    build_candidate_fingerprint,
+    check_style_vetoes,
+    compare_activity,
+    compare_direction_bias,
+    compute_similarity,
 )
 
 DAY_MS = 86_400_000
@@ -195,39 +199,123 @@ def test_record_and_load_population(tmp_path, monkeypatch):
 
 # --- adaptive thresholds ----------------------------------------------------------
 
+RAW_THRESHOLDS = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+
+
 def test_effective_thresholds_lowered_by_backtest_ceiling(tmp_path, monkeypatch):
     import json as _json
+
     from src import scanner
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
     (profile_dir / "backtest.json").write_text(
         _json.dumps({"passed": True, "self_score": 0.52}))
     monkeypatch.setattr(scanner, "DATA_DIR", tmp_path / "data")
-    eff = scanner._effective_thresholds(
-        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65})
-    assert eff["similarity_high"] == 0.50  # self-score - 0.02
-    assert eff["similarity_high"] > scanner.VETO_SCORE_CAP
-    assert eff["similarity_medium"] == scanner.VETO_SCORE_CAP  # floored
-    assert eff["similarity_low"] == 0.40
+    eff = scanner._effective_thresholds(RAW_THRESHOLDS)
+    assert eff["high"] == 0.50  # self-score - 0.02
+    assert eff["high"] > scanner.VETO_SCORE_CAP
+    assert eff["medium"] == scanner.VETO_SCORE_CAP  # floored
+    assert eff["low"] == 0.40
+    assert eff["source"] == "backtest_adapted"
+
+
+def test_effective_thresholds_stay_reachable_for_true_trader():
+    """The adapted high threshold must never exceed what the target scores
+    against his own history — that would guarantee missing the migration."""
+    from src import thresholds as th
+    for ceiling in (0.48, 0.53, 0.62, 0.80):
+        eff = th.resolve(RAW_THRESHOLDS, {"passed": True, "self_score": ceiling})
+        assert eff["high"] <= max(ceiling, th.MIN_HIGH), (
+            f"high {eff['high']} unreachable at ceiling {ceiling}")
 
 
 def test_effective_thresholds_unchanged_when_backtest_fails(tmp_path, monkeypatch):
     import json as _json
+
     from src import scanner
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
     (profile_dir / "backtest.json").write_text(
         _json.dumps({"passed": False, "self_score": 0.3}))
     monkeypatch.setattr(scanner, "DATA_DIR", tmp_path / "data")
-    raw = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
-    assert scanner._effective_thresholds(raw) == raw
+    eff = scanner._effective_thresholds(RAW_THRESHOLDS)
+    assert (eff["high"], eff["medium"], eff["low"]) == (0.90, 0.80, 0.65)
+    assert eff["source"] == "config"
+
+
+def test_missing_backtest_report_falls_back_visibly(tmp_path, capsys):
+    """A missing/corrupt report must warn, not silently install unreachable
+    thresholds — this was previously swallowed by a bare `except: pass`."""
+    from src import thresholds as th
+    assert th.load_backtest_report(tmp_path) is None
+    assert "WARNING" in capsys.readouterr().out
+    (tmp_path / "backtest.json").write_text("{not json")
+    assert th.load_backtest_report(tmp_path) is None
+    assert "WARNING" in capsys.readouterr().out
 
 
 def test_vetoed_wallet_never_behavioral_alerts():
     from src.scanner import _should_alert_behavioral
     assert not _should_alert_behavioral(
-        "0xabc", 0.95, {"similarity_high": 0.5}, population=[0.1] * 100,
-        vetoes=["Decision frequency 20x apart"])
+        "0xabc", 0.95, {"high": 0.5, "medium": 0.45, "low": 0.4},
+        population=[0.1] * 100, vetoes=["Decision frequency 20x apart"])
+
+
+# --- veto applies to EVERY alert route, not just the behavioural one -------------
+
+def test_veto_blocks_all_alert_routes_but_keeps_candidate_visible():
+    """A style-vetoed wallet must not be promoted by any route, including the
+    bonus-lifted ones — but its evidence must survive on the watchlist."""
+    from src import thresholds as th
+    vetoes = ["Decision frequency 20x apart"]
+    assert th.can_alert(vetoes) is False
+    assert th.can_alert([]) is True
+    assert th.can_alert(None) is True
+
+    # Bonus-lifted vetoed score can exceed the alert threshold; disposition must
+    # still refuse promotion while keeping the wallet watchlisted.
+    eff = {"high": 0.51, "medium": 0.46, "low": 0.41}
+    d = th.disposition(th.VETO_BONUS_CEILING, eff, vetoes=vetoes, rare_overlap=True)
+    assert d["action"] == th.ACTION_WATCHLIST
+    assert any("veto" in b for b in d["blockers"])
+    assert d["reasons"]  # kept for a reason, and the reason is recorded
+
+
+def test_disposition_watchlists_suppressed_candidates():
+    from src import thresholds as th
+    eff = {"high": 0.51, "medium": 0.46, "low": 0.41}
+    # Clears high but fails the percentile gate -> watchlisted, not discarded.
+    d = th.disposition(0.72, eff, percentile_ok=False)
+    assert d["action"] == th.ACTION_WATCHLIST
+    assert any("percentile" in b for b in d["blockers"])
+    # Fails persistence -> still watchlisted.
+    d2 = th.disposition(0.72, eff, sustained=False)
+    assert d2["action"] == th.ACTION_WATCHLIST
+    # Genuinely unremarkable -> background.
+    assert th.disposition(0.10, eff)["action"] == th.ACTION_BACKGROUND
+    # Clean and clearing everything -> promoted.
+    assert th.disposition(0.72, eff)["action"] == th.ACTION_ALERT
+
+
+def test_tier_labels_track_effective_thresholds():
+    """classify() must use the same numbers alerting uses; it was hardcoded to
+    0.90/0.80/0.65 while alerts ran near 0.51, so a wallet emailed as HIGH while
+    displaying as WEAK_LEAD."""
+    from src import thresholds as th
+    eff = th.resolve(RAW_THRESHOLDS, {"passed": True, "self_score": 0.53})
+    assert th.classify(0.75, eff) == th.TIER_CONFIRMED
+    assert th.classify(0.10, eff) == th.TIER_BACKGROUND
+    # Same score under raw config thresholds is merely a weak lead — proving the
+    # two policies really do disagree and that one source now decides.
+    raw = th.resolve(RAW_THRESHOLDS, None)
+    assert th.classify(0.75, raw) == th.TIER_WEAK
+
+
+def test_calibration_gate_observes_then_enforces():
+    assert calibration.gate_active([0.5] * 10) is False
+    assert calibration.gate_active([0.5] * calibration.MIN_SAMPLES_FOR_GATE) is True
+    # While observing, nothing is suppressed.
+    assert calibration.passes_percentile_gate(0.9, [0.5] * 10) is True
 
 
 # --- backtest windowing ----------------------------------------------------------
@@ -244,3 +332,23 @@ def test_split_windows_falls_back_to_halves():
     older, recent = split_windows(fills)
     assert len(older) + len(recent) == len(fills)
     assert max(f["time"] for f in older) <= min(f["time"] for f in recent)
+
+
+def test_threshold_shape_normalisation_matches_dashboard_fallback():
+    """Scan files written before the threshold unification carry
+    similarity_* keys. Python and the dashboard's getThresholds() must tier
+    that old data identically instead of one of them raising."""
+    from src import thresholds as th
+    legacy = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+    norm = th.normalise(legacy)
+    assert (norm["high"], norm["medium"], norm["low"]) == (0.90, 0.80, 0.65)
+    assert norm["source"] == "legacy"
+    # classify() accepts either shape
+    assert th.classify(0.95, legacy) == th.TIER_CONFIRMED
+    assert th.classify(0.95, {"high": 0.5, "medium": 0.4, "low": 0.3}) == th.TIER_CONFIRMED
+    # Already-resolved dicts pass through untouched
+    resolved = {"high": 0.5, "medium": 0.4, "low": 0.3}
+    assert th.normalise(resolved) is resolved
+    import pytest
+    with pytest.raises(KeyError):
+        th.normalise({"nonsense": 1})

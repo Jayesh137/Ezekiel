@@ -2,9 +2,7 @@
 """Tests for the migration-detection upgrades: deposit/withdrawal correlation
 (FIFO amount+time matching), L1 clustering linkage, and the unified risk score."""
 
-from src import correlator
-from src import linkage
-from src import risk
+from src import correlator, linkage, risk
 
 DAY = 86400
 T = "0x45d26f28196d226497130c4bac709d808fed4029"

@@ -1,0 +1,74 @@
+name: Collection Heartbeat
+
+# Watches the watcher: every other alert in this system requires the collector to
+# be running, so the one failure it cannot report is its own.
+#
+# IMPORTANT LIMITATION. This job is triggered by the same GitHub scheduler it is
+# meant to supervise, and that scheduler is measurably unreliable here — it honours
+# ~5% of a high-frequency cron (14.9 collect runs/day against 288 requested). If
+# scheduling stops entirely, this workflow stops with it and no alert is sent.
+#
+# Mitigation, in order of independence:
+#   1. workflow_run below — any completed data workflow also triggers this check,
+#      so freshness is verified on an event, not only on a timer.
+#   2. src/collector.py asserts freshness inline, so a running collector
+#      self-reports a stall even if this workflow never fires.
+#   3. GitHub emails the repo owner before auto-disabling schedules after 60 days
+#      of repository inactivity. That is the only genuinely external signal
+#      available without adding a third-party service.
+# See README "Monitoring limits" for what remains uncovered.
+
+on:
+  schedule:
+    - cron: '17 */2 * * *'   # every 2h requested; expect far fewer in practice
+  # Event-driven backup: fires when a data workflow finishes, regardless of
+  # whether this workflow's own schedule was honoured.
+  workflow_run:
+    workflows: ['Collect Trading Data', 'Trace Fund Flows', 'Scan for Matching Wallets']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: heartbeat
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Only data/index.json and src/ are needed — avoid pulling the whole
+          # data tree just to read one timestamp.
+          sparse-checkout: |
+            src
+            data/index.json
+            data/state
+            config.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Check collection freshness
+        env:
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: python src/heartbeat.py
+      - name: Open stale-collection issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="[pipeline] data collection is stale"
+          count=$(gh issue list --state open --search "in:title $title" --json number --jq 'length')
+          if [ "$count" = "0" ]; then
+            gh issue create --title "$title" \
+              --body "Collection has stopped producing fresh data. Check the 'Collect Trading Data' workflow. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi

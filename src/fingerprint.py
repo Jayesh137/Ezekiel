@@ -6,16 +6,14 @@ import shutil
 import sys
 import time as _time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
-from src.utils import (
-    load_config, load_all_records, save_latest, DATA_DIR
-)
+from src.utils import DATA_DIR, load_all_records, load_config, save_latest
 
 
 def load_fills() -> list[dict]:
@@ -156,19 +154,35 @@ def compute_position_sizing(fills: list[dict], positions: dict) -> dict:
     }
 
 
+# A timezone fingerprint needs many separate DAYS, not many fills. This trader
+# executes via TWAP, so a single session can contribute thousands of fills across
+# two or three hours. Below this many distinct days the hourly histogram records
+# when a few bursts happened, not when the human is habitually awake.
+#
+# Measured: the backtest's two windows held 3,162 and 5,497 fills but only 4
+# distinct trading days each, with 4 and 7 active hours. They shared one hour, so
+# the trader scored 0.0045 on timing against his own history — a near-zero on a
+# 0.14-weight dimension, which is a false-negative generator, not a finding.
+MIN_TIMING_DAYS = 10
+
+
 def compute_timing_profile(fills: list[dict]) -> dict:
     """When they trade — timezone fingerprint."""
     if not fills:
-        return {"weight": 0.15, "hourly_distribution": [0]*24, "day_of_week_distribution": [0]*7}
+        return {"weight": 0.15, "hourly_distribution": [0]*24,
+                "day_of_week_distribution": [0]*7,
+                "distinct_days": 0, "sufficient_data": False}
 
     hours = []
     days = []
+    distinct_days = set()
     for f in fills:
         ts = f.get("time", 0)
         if ts:
-            dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+            dt = datetime.fromtimestamp(ts / 1000, tz=UTC)
             hours.append(dt.hour)
             days.append(dt.weekday())
+            distinct_days.add(int(ts) // 86_400_000)
 
     hourly_counts = Counter(hours)
     daily_counts = Counter(days)
@@ -197,36 +211,48 @@ def compute_timing_profile(fills: list[dict]) -> dict:
         "most_active_hours_utc": sorted(most_active),
         "least_active_hours_utc": sorted(least_active),
         "inferred_timezone_offset": inferred_offset,
+        "distinct_days": len(distinct_days),
+        "sufficient_data": len(distinct_days) >= MIN_TIMING_DAYS,
     }
 
 
-def compute_hold_duration(fills: list[dict]) -> dict:
-    """How long positions are held."""
-    if not fills:
-        return {"weight": 0.10, "overall_minutes": {}, "distribution_buckets": {}}
+# A 5-bucket histogram built from a handful of episodes is noise. Below this
+# many episodes the dimension reports insufficient_data and the scanner excludes
+# it (renormalizing the remaining weights) instead of scoring a misleading 0.0.
+MIN_HOLD_EPISODES = 5
 
-    # Match opens and closes per coin
-    coin_trades = defaultdict(list)
-    for f in fills:
-        coin_trades[f.get("coin", "UNKNOWN")].append(f)
+
+def compute_hold_duration(fills: list[dict]) -> dict:
+    """How long positions are held, reconstructed from position episodes.
+
+    Uses _position_episodes (startPosition-based) rather than scanning `dir`
+    strings for Open/Close. The previous matcher kept a single open_time per coin,
+    so a TWAP scale-in overwrote it and every close after the first was silently
+    dropped; a window starting mid-position (all closes, no opens) produced no
+    durations at all. Measured on the target's own history that gave 2 durations
+    from 34,244 fills in one window and 0 from 3,162 in the next, scoring the
+    trader 0.0 against himself on this dimension.
+
+    Zero-length episodes are kept: a TWAP batch filling within one millisecond is
+    a real sub-minute hold, and dropping it biased the distribution.
+    """
+    if not fills:
+        return {"weight": 0.10, "overall_minutes": {}, "distribution_buckets": {},
+                "episode_count": 0, "sufficient_data": False}
+
+    episodes = _position_episodes(fills)
 
     durations_minutes = []
     per_coin_durations = defaultdict(list)
-
-    for coin, trades in coin_trades.items():
-        sorted_trades = sorted(trades, key=lambda t: t.get("time", 0))
-        open_time = None
-        for t in sorted_trades:
-            dir_field = t.get("dir", "")
-            if "Open" in str(dir_field):
-                open_time = t.get("time", 0)
-            elif "Close" in str(dir_field) and open_time:
-                close_time = t.get("time", 0)
-                dur = (close_time - open_time) / 60000  # ms to minutes
-                if dur > 0:
-                    durations_minutes.append(dur)
-                    per_coin_durations[coin].append(dur)
-                open_time = None
+    for ep in episodes:
+        if not ep:
+            continue
+        coin = ep[0].get("coin", "UNKNOWN")
+        dur = (ep[-1].get("time", 0) - ep[0].get("time", 0)) / 60000  # ms to minutes
+        if dur < 0:
+            continue
+        durations_minutes.append(dur)
+        per_coin_durations[coin].append(dur)
 
     overall = {}
     if durations_minutes:
@@ -268,6 +294,8 @@ def compute_hold_duration(fills: list[dict]) -> dict:
         "overall_minutes": overall,
         "per_coin": per_coin_summary,
         "distribution_buckets": bucket_pcts,
+        "episode_count": len(durations_minutes),
+        "sufficient_data": len(durations_minutes) >= MIN_HOLD_EPISODES,
     }
 
 
@@ -437,7 +465,7 @@ def _position_episodes(fills: list[dict]) -> list[list[dict]]:
         coin_fills[f.get("coin", "UNKNOWN")].append(f)
 
     episodes = []
-    for coin, cf in coin_fills.items():
+    for cf in coin_fills.values():
         cf.sort(key=lambda t: t.get("time", 0))
         current = []
         for f in cf:
@@ -564,7 +592,6 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         fills = load_fills()
     funding = load_funding()
     positions = load_positions_latest()
-    account = load_account_latest()
 
     # Use perp positions if available
     if isinstance(positions, dict) and "assetPositions" not in positions:
@@ -579,15 +606,15 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         first = min(timestamps)
         last = max(timestamps)
         data_range = {
-            "first_fill": datetime.fromtimestamp(first / 1000, tz=timezone.utc).isoformat(),
-            "last_fill": datetime.fromtimestamp(last / 1000, tz=timezone.utc).isoformat(),
+            "first_fill": datetime.fromtimestamp(first / 1000, tz=UTC).isoformat(),
+            "last_fill": datetime.fromtimestamp(last / 1000, tz=UTC).isoformat(),
             "total_fills": len(fills),
             "total_days_active": max(1, (last - first) // (24 * 60 * 60 * 1000)),
         }
 
     fingerprint = {
         "version": "1.0",
-        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "computed_at": datetime.now(UTC).isoformat(),
         "data_range": data_range,
         "asset_preferences": compute_asset_preferences(fills),
         "leverage_profile": compute_leverage_profile(fills, positions),
@@ -620,7 +647,7 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
 
     return {
         "version": "1.0-recent",
-        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "computed_at": datetime.now(UTC).isoformat(),
         "lookback_days": lookback_days,
         "data_range": {"total_fills": len(recent)},
         "asset_preferences": compute_asset_preferences(recent),
@@ -650,7 +677,7 @@ def main():
     if fp_path.exists():
         history_dir = profile_dir / "history"
         history_dir.mkdir(exist_ok=True)
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         archive_path = history_dir / f"fingerprint_{today}.json"
         if not archive_path.exists():
             shutil.copy(fp_path, archive_path)

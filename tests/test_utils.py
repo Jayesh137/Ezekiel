@@ -1,12 +1,16 @@
 # tests/test_utils.py
-import json
-import os
 import tempfile
-import pytest
+
 from src.utils import (
-    read_cursor, write_cursor, append_records,
-    load_all_records, deduplicate_by_key, today_str, now_hhmm
+    append_records,
+    deduplicate_by_key,
+    load_all_records,
+    now_hhmm,
+    read_cursor,
+    today_str,
+    write_cursor,
 )
+
 
 def test_read_cursor_missing():
     assert read_cursor("nonexistent", base="/tmp/test_state") == 0

@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
-	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr } from '$lib/api.js';
+	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr,
+	         getThresholds, tierFor, getPolicy } from '$lib/api.js';
 	import Chart from 'chart.js/auto';
 
 	let scan = null;
@@ -34,16 +35,40 @@
 		loading = false;
 	});
 
+	// Tier against the thresholds the backend actually alerted on, published in
+	// scans/latest.json. Hardcoding 0.90/0.80 here made wallets that emailed as
+	// HIGH matches render as unremarkable leads.
+	$: thresholds = getThresholds(scan);
+
+	// Measured market-rarity calibration, published by the scanner.
+	$: rarity = scan?.market_rarity ?? null;
+
+	// Which validation policy produced these dispositions. Never leave the
+	// operating mode ambiguous: "no matches" and "not currently able to alert"
+	// look identical otherwise.
+	$: policy = getPolicy(scan);
+
+	/** Per-result market-bonus detail, or null when no markets were shared. */
+	function marketRarity(r) {
+		const mr = r?.evidence?.market_rarity;
+		if (!mr || !(mr.shared_markets || []).length) return null;
+		return mr;
+	}
+
 	function getConfidenceClass(score) {
-		if (score >= 0.90) return 'badge-green';
-		if (score >= 0.80) return 'badge-yellow';
-		return 'badge-blue';
+		const tier = tierFor(score, thresholds);
+		if (tier === 'CONFIRMED') return 'badge-green';
+		if (tier === 'WATCH') return 'badge-yellow';
+		if (tier === 'WEAK') return 'badge-blue';
+		return 'badge-grey';
 	}
 
 	function getConfidenceLabel(score) {
-		if (score >= 0.90) return 'CONFIRMED';
-		if (score >= 0.80) return 'WATCH';
-		return 'LEAD';
+		const tier = tierFor(score, thresholds);
+		if (tier === 'CONFIRMED') return 'CONFIRMED';
+		if (tier === 'WATCH') return 'WATCH';
+		if (tier === 'WEAK') return 'LEAD';
+		return 'BACKGROUND';
 	}
 
 	function getCandidateData(wallet) {
@@ -268,6 +293,24 @@
 	<p class="text-muted">Behavioral fingerprint matching — click a wallet to compare</p>
 </div>
 
+{#if !loading && policy.policy}
+	<div class="policy-bar" class:policy-warn={policy.behaviouralAlerts !== true}>
+		<strong>Validation policy: {policy.label}</strong>
+		{#if policy.policy === 'CURRENT_VALIDATED'}
+			<span>Self-match validated{policy.provenance?.margin ? ` (margin ${policy.provenance.margin} over ${policy.provenance.strangers_scored} strangers)` : ''}. Behavioural alerts active.</span>
+		{:else if policy.policy === 'CARRIED_FORWARD'}
+			<span>Current self-match inconclusive — reusing the ceiling validated {policy.validatedAt}. Behavioural alerts active.</span>
+		{:else if policy.policy === 'POPULATION_WATCHLIST_FALLBACK'}
+			<span>Scorer unvalidated. Candidates are ranked against the measured population and capped at <strong>WATCHLIST</strong>; only independent fund-flow, HL-native, correlation or linkage evidence can promote to an alert.</span>
+		{:else}
+			<span>Scorer unvalidated and calibration population too small to rank scores. Evidence is retained; nothing alerts on behaviour alone.</span>
+		{/if}
+		{#if policy.carryForwardRejected}
+			<span class="policy-note">Carry-forward rejected: {policy.carryForwardRejected}</span>
+		{/if}
+	</div>
+{/if}
+
 {#if loading}
 	<div class="loading">Loading scan results...</div>
 {:else if !scan}
@@ -302,6 +345,7 @@
 					{@const flowLink = hasFundFlowLink(r.wallet)}
 					{@const flowFinding = flowLink ? getFundFlowFinding(r.wallet) : null}
 					{@const sparkPts = sparklinePoints(candidateData?.score_history)}
+					{@const mr = marketRarity(r)}
 
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -309,6 +353,30 @@
 						{#if flowLink}
 							<div class="flow-link-bar" class:flow-confirmed={flowFinding?.deposited_to_hl}>
 								{flowFinding?.deposited_to_hl ? 'FUND TRACE — HL DEPOSIT CONFIRMED' : 'FUND TRACE — PENDING HL DEPOSIT'}
+							</div>
+						{/if}
+						{#if mr}
+							<div class="market-rarity" class:no-bonus={!mr.bonus_applied}>
+								<span class="mr-head">
+									Shared markets:
+									{#each mr.shared_markets as m, i}<span class="mono"
+											>{i ? ', ' : ''}{m}</span
+										>{/each}
+									{#if mr.bonus_applied}
+										<span class="mr-bonus">+{mr.bonus_applied.toFixed(4)}</span>
+									{:else}
+										<span class="mr-none">no bonus</span>
+									{/if}
+								</span>
+								{#each mr.explanations as e}<span class="mr-why">{e}</span>{/each}
+								{#if mr.bonus_applied}
+									<span class="mr-why">
+										Score without market bonus: <span class="mono"
+											>{(mr.score_without_bonus * 100).toFixed(1)}%</span
+										>
+										— market overlap corroborates a match, it never creates one.
+									</span>
+								{/if}
 							</div>
 						{/if}
 						<div class="result-main">
@@ -319,7 +387,7 @@
 								{/if}
 							</div>
 							<div class="result-score">
-								<strong class:text-green={r.score >= 0.90} class:text-yellow={r.score >= 0.80 && r.score < 0.90} class:text-muted={r.score < 0.80}>
+								<strong class:text-green={tierFor(r.score, thresholds) === 'CONFIRMED'} class:text-yellow={tierFor(r.score, thresholds) === 'WATCH'} class:text-muted={tierFor(r.score, thresholds) === 'BACKGROUND'}>
 									{(r.score * 100).toFixed(1)}%
 								</strong>
 								<span class="badge {getConfidenceClass(r.score)}">{getConfidenceLabel(r.score)}</span>
@@ -339,7 +407,7 @@
 										<polyline
 											points={sparkPts}
 											fill="none"
-											stroke={r.score >= 0.80 ? 'var(--accent-green)' : 'var(--accent-cyan)'}
+											stroke={r.score >= thresholds.medium ? 'var(--accent-green)' : 'var(--accent-cyan)'}
 											stroke-width="1.5"
 											stroke-linecap="round"
 											stroke-linejoin="round"
@@ -650,5 +718,52 @@
 		.comparison-details {
 			grid-template-columns: 1fr;
 		}
+	}
+
+	/* Market-rarity strip: shows what a shared market was actually worth. */
+	.market-rarity {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px 10px;
+		border-left: 2px solid var(--accent-yellow, #f59e0b);
+		background: rgba(245, 158, 11, 0.06);
+		font-size: 0.68rem;
+	}
+	.market-rarity.no-bonus {
+		border-left-color: var(--border, #2a2a4a);
+		background: rgba(136, 136, 160, 0.05);
+	}
+	.mr-head {
+		font-weight: 600;
+	}
+	.mr-bonus {
+		color: var(--accent-yellow, #f59e0b);
+		margin-left: 6px;
+	}
+	.mr-none {
+		color: var(--text-muted, #8888a0);
+		margin-left: 6px;
+	}
+	.mr-why {
+		color: var(--text-muted, #8888a0);
+	}
+
+	.policy-bar {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		padding: 8px 12px;
+		margin-bottom: 12px;
+		border-left: 3px solid var(--accent-cyan, #00ccdd);
+		background: rgba(0, 204, 221, 0.06);
+		font-size: 0.72rem;
+	}
+	.policy-bar.policy-warn {
+		border-left-color: var(--accent-yellow, #f59e0b);
+		background: rgba(245, 158, 11, 0.07);
+	}
+	.policy-note {
+		color: var(--accent-yellow, #f59e0b);
 	}
 </style>

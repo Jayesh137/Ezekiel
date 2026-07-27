@@ -18,22 +18,25 @@ Two research-backed heuristics defeat that:
    SAME address the target withdraws to, they are almost certainly the same person.
 """
 
-import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
-    load_config, etherscan_get, load_all_records, save_latest, DATA_DIR,
+    DATA_DIR,
+    etherscan_get,
+    load_all_records,
+    load_config,
+    save_latest,
 )
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _uniqueness(amount: float) -> float:

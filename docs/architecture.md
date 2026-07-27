@@ -3,6 +3,13 @@
 > Technical architecture for the Ezekiel trader intelligence and fingerprinting system.
 > Companion to [PRD.md](../PRD.md).
 
+> **Staleness warning (2026-07-27).** Parts of this document describe intent that
+> was never built — most notably the Svelte component list, `stores.js` and
+> `utils.js` in §2/§4, and the storage projections in §5.3, which were roughly 10x
+> optimistic (35x for `data/scans/`). Sections updated to match the code are
+> marked *(current)*. For anything not so marked, **[README.md](../README.md) and
+> the code are authoritative.**
+
 ---
 
 ## 1. System Overview
@@ -148,18 +155,35 @@ Ezekiel/
 
 ## 3. Backend Architecture (Python)
 
-### 3.1 Module Responsibilities
+### 3.1 Module Responsibilities *(current)*
 
 ```
 src/
-├── collector.py            ─── Polls 14 HL endpoints, appends to data/
+├── collector.py            ─── Polls HL endpoints, appends to data/. Fills are
+│                               PAGINATED (a single call caps at ~2000 records and
+│                               silently truncated after any outage).
 ├── backfill.py             ─── One-time historical pull with pagination
-├── fingerprint.py          ─── Reads ALL data/, computes profile/fingerprint.json
+├── fingerprint.py          ─── Reads ALL data/, computes profile/fingerprint.json.
+│                               hold_duration is reconstructed from position
+│                               episodes (startPosition), not `dir` string matching.
 ├── scanner.py              ─── Pulls leaderboard, scores each wallet vs fingerprint
+├── thresholds.py           ─── SINGLE SOURCE for thresholds, tiers, disposition
+│                               (ALERT / WATCHLIST / BACKGROUND + reasons)
+├── calibration.py          ─── Rolling population; percentile gate, OBSERVING
+│                               until 50+ samples then ENFORCING
+├── backtest.py             ─── Self-match validation; non-zero exit on failure or
+│                               on any dimension scoring 0.0 vs the trader's own data
 ├── tracer.py               ─── Monitors Arbitrum L1 for fund movements
-├── alerts.py               ─── Sends email via Brevo SMTP (with per-subject cooldowns)
+├── correlator.py           ─── Re-links exits to fresh deposits across a CEX gap
+├── linkage.py              ─── L1 clustering: shared funder, address reuse
+├── ledger_analyzer.py      ─── HL-native transfer counterparties (no L1 footprint)
+├── transfer_graph.py       ─── Normalises every vector into one bounded transfer
+│                               graph; grades wallets SERVICE -> MIGRATION_CANDIDATE
+├── risk.py                 ─── Unified 0-100 migration risk posture
+├── heartbeat.py            ─── Alerts when collection ITSELF has stalled
+├── alerts.py               ─── Sends email via Brevo SMTP (per-subject cooldowns)
 ├── profile_builder.py      ─── Parses research/*.docx + *.pdf into profile
-└── utils.py                ─── Shared: API calls, file I/O, dedup, cursors
+└── utils.py                ─── Shared: API calls, file I/O, dedup, cursors, index
 
 Note: twitter_monitor.py / twitter_correlator.py were removed 2026-07 — all free
 nitter RSS bridges are dead. Historical tweet data remains in data/twitter/.
@@ -403,9 +427,21 @@ export async function fetchJSON(path) {
 - Persistent candidate watchlist (`data/candidates/latest.json`) with score history
 - Fund-flow findings and combined-signal highlights
 
+#### Transfers (`/transfers`) — Transfer Graph *(current)*
+- Wallets discovered outward from the target, ranked by classification then confidence
+- Relationship path per wallet, with per-wallet transfer tables (chain, asset,
+  amount, reference, timestamp)
+- Behavioural watchlist cross-reference and post-funding trading activity
+- Exchange/bridge addresses collapsed behind a toggle
+- Reads `data/transfer_graph/latest.json`
+
 > Note: earlier drafts described `/twitter`, `/fund-flow` and `/reports` routes;
 > these were never built. Actual routes: `/`, `/fills`, `/fingerprint`,
-> `/scanner`, `/recovery`.
+> `/scanner`, `/recovery`, `/transfers`.
+>
+> There is no `src/lib/components/` directory, no `stores.js` and no `utils.js` —
+> the component list in §2/§4 was never built. Shared helpers live in
+> `src/lib/api.js`; each route is self-contained.
 
 ### 4.6 Svelte 5 Patterns Used
 
@@ -581,46 +617,69 @@ Each collection cycle generates `data/index.json` — a manifest of all availabl
 }
 ```
 
-### 5.3 Size Estimates
+### 5.3 Size — measured, not estimated *(current)*
 
-| Data Type | Records/Day | Size/Day | Size/Year |
-|-----------|------------|----------|-----------|
-| Position snapshots | 288 (every 5 min) | ~150 KB | ~55 MB |
-| Fills | ~50-200 trades | ~30 KB | ~11 MB |
-| Orders | ~100-500 | ~50 KB | ~18 MB |
-| Funding | ~24-48 payments | ~5 KB | ~2 MB |
-| Ledger | ~1-5 events | ~2 KB | ~1 MB |
-| Account snapshots | 288 | ~100 KB | ~36 MB |
-| L1 transactions | ~1-10 | ~5 KB | ~2 MB |
-| Scanner results | 24 scans | ~50 KB | ~18 MB |
-| **Total** | | **~400 KB** | **~143 MB** |
+The original projection here was ~143 MB/year. Actual growth over ~5 months was
+**749 MB**, roughly 10x optimistic overall and ~35x for `data/scans/`. That was not
+a cosmetic miss: every workflow run starts with a checkout of the whole tree, and
+at 749 MB the checkout consumed `collect.yml`'s 4-minute budget, which is why a
+`*/5` cron only produced ~12-17 runs/day instead of 288.
 
-Well within GitHub's repo size limits (5 GB recommended max).
+Three causes, all now fixed at the writer and retro-compacted by
+`scripts/compact_data.py`:
+
+| Cause | Effect | Fix |
+|---|---|---|
+| `historicalOrders` returns the last ~2000 every poll; `append_records` dedupes only within one daily file | 651,116 oid mentions for 29,791 distinct orders (~22x) | cross-file dedup → 170 MB to 10 MB |
+| Each hourly scan embedded full fingerprint summaries for its top 20 | 3.6 MB per daily file | strip + keep top 25 → 277 MB to 4.7 MB |
+| `fees`/`rate_limit` appended the entire API payload every run, unread | ~5 KB/run | append a summary → 14 MB to 0.3 MB |
+
+Plus: snapshot directories older than 7 days roll into one gzipped JSONL per day
+(~10x compression), with a small plain-JSON daily series retained for `account` so
+chart history stays directly fetchable.
+
+**Current: `data/` is 85 MB.** `fills`, `funding`, `ledger` and `l1_transactions`
+are never compacted — they cannot be re-fetched.
 
 ---
 
 ## 6. Infrastructure Architecture
 
-### 6.1 GitHub Actions Workflow Schedule
+### 6.1 GitHub Actions Workflow Schedule *(current)*
 
 ```
 Time ──────────────────────────────────────────────────────►
 
-Every 5 min:    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-                collect.yml (positions, fills, orders, account)
-
 Every 15 min:   ░   ░   ░   ░   ░   ░   ░   ░   ░   ░   ░
-                trace.yml (L1 fund flows, funding, ledger)
+                collect.yml (positions, fills, orders, account, risk)
+                timeout 10 min; a real run takes ~16s
+
+Every 30 min:   ░       ░       ░       ░       ░       ░
+                trace.yml (L1 fund flows, correlation, transfer graph)
+                timeout 10 min
 
 Every 1 hour:   ░           ░           ░           ░
                 scan.yml (leaderboard behavioral matching)
+                timeout 30 min
+
+Every 2 hours:  ░                   ░                   ░
+                heartbeat.yml (alerts if collection has stalled)
 
 Daily (00:00):  ░
-                analyze.yml (rebuild fingerprint, daily report)
+                analyze.yml (rebuild fingerprint, backtest, research profile)
 
-On push:        ░ (when dashboard/ changes)
-                deploy-dashboard.yml (build + deploy to GH Pages)
+On push:        ░ (src/tests/scripts/dashboard) test.yml — ruff + pytest + build
+                ░ (dashboard/ only)            deploy-dashboard.yml
 ```
+
+**Cadence is 15 minutes, not 5.** The `*/5` schedule was configured for months but
+GitHub honoured it ~12-17 times a day (see §5.3). 15 min is a cadence the system
+actually sustains.
+
+**All data-committing jobs share the `data-commit` concurrency group.** They
+previously had four separate groups (`collect`, `trace`, `scan`, `analyze`) plus a
+fifth on `backfill` that matched nothing, so nothing serialised pushes and
+concurrent runs raced on rebase — including on shared `data/state/` cursors.
 
 ### 6.2 Dashboard Deployment Workflow
 
