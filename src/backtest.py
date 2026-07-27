@@ -16,16 +16,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import thresholds as th
 from src.utils import DATA_DIR
 
 WINDOW_DAYS = 21
 MIN_WINDOW_FILLS = 50
-# A fill count says nothing about window quality for a TWAP trader: 5,497 fills
-# concentrated in 4 sessions is not 5,497 independent observations. Both windows
+# A fill count says nothing about window quality for a TWAP trader: 5,496 fills
+# concentrated in 4 sessions is not 5,496 independent observations. Both windows
 # must also span enough separate trading days for a self-match to mean anything.
 # Below this the test is declared INCONCLUSIVE rather than pass or fail — asserting
 # either from two 4-day windows would be a fabricated result.
 MIN_WINDOW_DAYS = 8
+# Preferred active days per window when history allows. Roughly matches the active
+# days a leaderboard wallet accumulates in the scanner's 21-day lookback, so the
+# target is characterised from a comparable amount of behaviour to its strangers.
+TARGET_WINDOW_DAYS = 12
 PASS_MARGIN = 0.05
 REPORT_PATH = DATA_DIR.parent / "profile" / "backtest.json"
 
@@ -50,28 +55,102 @@ def _previous_validation() -> dict | None:
     except (OSError, ValueError):
         return None
     if prev.get("passed") and prev.get("self_score"):
-        return {"self_score": prev["self_score"], "validated_at": prev.get("run_at")}
+        # Full provenance so a carried-forward threshold set can be audited, and
+        # so it can be rejected if the scoring schema has moved on since.
+        return {
+            "self_score": prev["self_score"],
+            "validated_at": prev.get("run_at"),
+            "scoring_schema": prev.get("scoring_schema"),
+            "best_stranger_score": prev.get("best_stranger_score"),
+            "margin": prev.get("margin_over_best_stranger"),
+            "strangers_scored": prev.get("strangers_scored"),
+            "windows": prev.get("windows"),
+        }
     return prev.get("last_validated")
 
 
-def split_windows(fills: list[dict], window_days: int = WINDOW_DAYS) -> tuple[list, list]:
-    """Two disjoint windows anchored to the last fill: (older, recent).
-    Falls back to halving the full history when the windows are too thin."""
+def split_windows(fills: list[dict],
+                  target_days: int = TARGET_WINDOW_DAYS) -> tuple[list, list]:
+    """Two disjoint chronological windows selected by ACTIVE TRADING DAYS.
+
+    Previously this sliced two fixed 21-calendar-day windows anchored to the last
+    fill. This target trades sparsely — 61 active days across a 166-day span — so
+    the last 21 calendar days held only 4 active days, and the 21 before them
+    another 4. MIN_WINDOW_FILLS could not detect that: TWAP concentrates thousands
+    of fills into single sessions (the busiest 5 days hold 40% of all fills), so
+    both windows cleared the fill floor while discarding ~90% of usable history.
+
+    Now: take the most recent 2N active days and split them in half, newest N as
+    `recent` and the N before as `older`. The calendar span stretches as far back
+    as needed to collect the days; it is never cherry-picked, and the two windows
+    share no fill, tid, episode or calendar day by construction.
+    """
     if not fills:
         return [], []
     fills = sorted(fills, key=lambda f: f.get("time", 0))
-    last_ts = fills[-1].get("time", 0)
-    day_ms = 86_400_000
-    recent_start = last_ts - window_days * day_ms
-    older_start = recent_start - window_days * day_ms
+    day_of = {}
+    for f in fills:
+        ts = f.get("time")
+        if ts:
+            day_of.setdefault(int(ts) // 86_400_000, []).append(f)
 
-    recent = [f for f in fills if f.get("time", 0) >= recent_start]
-    older = [f for f in fills if older_start <= f.get("time", 0) < recent_start]
+    active_days = sorted(day_of)
+    if len(active_days) < 2 * MIN_WINDOW_DAYS:
+        # Not enough separate sessions to build two honest windows. Return the
+        # chronological halves so the caller can report exactly how short it fell.
+        mid = len(active_days) // 2
+        older = [f for d in active_days[:mid] for f in day_of[d]]
+        recent = [f for d in active_days[mid:] for f in day_of[d]]
+        return older, recent
 
-    if len(recent) < MIN_WINDOW_FILLS or len(older) < MIN_WINDOW_FILLS:
-        mid = len(fills) // 2
-        older, recent = fills[:mid], fills[mid:]
+    max_side = len(active_days) // 2
+    per_side = max(MIN_WINDOW_DAYS, min(target_days, max_side))
+
+    def build(n):
+        older = [f for d in active_days[-2 * n:-n] for f in day_of[d]]
+        recent = [f for d in active_days[-n:] for f in day_of[d]]
+        return older, recent
+
+    older, recent = build(per_side)
+    # A low-volume trader can clear the day floor while missing the fill floor.
+    # Widen by taking MORE active days rather than relaxing either requirement —
+    # sufficiency is never weakened to manufacture a usable window.
+    while (len(older) < MIN_WINDOW_FILLS or len(recent) < MIN_WINDOW_FILLS) \
+            and per_side < max_side:
+        per_side += 1
+        older, recent = build(per_side)
     return older, recent
+
+
+def window_summary(fills: list[dict]) -> dict:
+    """Dates, active-day count and fill count for a window — published so the
+    windows a verdict rests on can be audited."""
+    ts = sorted(f.get("time", 0) for f in fills if f.get("time"))
+    if not ts:
+        return {"fills": 0, "active_days": 0, "first_day": None, "last_day": None,
+                "calendar_span_days": 0}
+    days = sorted({t // 86_400_000 for t in ts})
+    fmt = "%Y-%m-%d"
+    return {
+        "fills": len(fills),
+        "active_days": len(days),
+        "first_day": datetime.fromtimestamp(ts[0] / 1000, tz=UTC).strftime(fmt),
+        "last_day": datetime.fromtimestamp(ts[-1] / 1000, tz=UTC).strftime(fmt),
+        "calendar_span_days": days[-1] - days[0] + 1,
+    }
+
+
+def window_leakage(older: list[dict], recent: list[dict]) -> dict:
+    """Prove the two windows are disjoint. Any non-zero value invalidates the test."""
+    o_tid = {f.get("tid") for f in older if f.get("tid") is not None}
+    r_tid = {f.get("tid") for f in recent if f.get("tid") is not None}
+    o_day = {int(f["time"]) // 86_400_000 for f in older if f.get("time")}
+    r_day = {int(f["time"]) // 86_400_000 for f in recent if f.get("time")}
+    return {
+        "shared_tids": len(o_tid & r_tid),
+        "shared_days": len(o_day & r_day),
+        "chronological": (max(o_day) < min(r_day)) if (o_day and r_day) else True,
+    }
 
 
 def zero_dimensions(dims: dict) -> list[str]:
@@ -93,18 +172,45 @@ def run_backtest() -> dict:
     fills = load_fills()
     older, recent = split_windows(fills)
     older_days, recent_days = distinct_days(older), distinct_days(recent)
+    total_active = distinct_days(fills)
     report = {
         "run_at": datetime.now(UTC).isoformat(),
+        "scoring_schema": th.SCORING_SCHEMA,
         "older_fills": len(older),
         "recent_fills": len(recent),
         "older_distinct_days": older_days,
         "recent_distinct_days": recent_days,
+        # Published so a verdict can be audited: exactly which days were used,
+        # how far the calendar had to stretch, and proof the windows are disjoint.
+        "windows": {
+            "selection": "activity_based",
+            "target_days_per_window": TARGET_WINDOW_DAYS,
+            "min_days_per_window": MIN_WINDOW_DAYS,
+            "total_active_days_available": total_active,
+            "older": window_summary(older),
+            "recent": window_summary(recent),
+            "leakage": window_leakage(older, recent),
+            "excluded": (
+                f"{max(0, total_active - older_days - recent_days)} older active "
+                f"day(s) outside the two most recent windows"),
+        },
     }
     if len(older) < MIN_WINDOW_FILLS or len(recent) < MIN_WINDOW_FILLS:
-        report.update({"passed": None, "reason": "insufficient fills for two windows"})
+        report.update({"passed": None,
+                       "reason": "insufficient fills for two windows",
+                       "last_validated": _previous_validation()})
         _save(report)
         print(f"[backtest] INCONCLUSIVE: {len(older)}/{len(recent)} fills — "
               f"need {MIN_WINDOW_FILLS} in each window")
+        return report
+
+    leak = report["windows"]["leakage"]
+    if leak["shared_tids"] or leak["shared_days"] or not leak["chronological"]:
+        report.update({"passed": None,
+                       "reason": f"window leakage detected: {leak}",
+                       "last_validated": _previous_validation()})
+        _save(report)
+        print(f"[backtest] INCONCLUSIVE: windows are not disjoint — {leak}")
         return report
 
     if older_days < MIN_WINDOW_DAYS or recent_days < MIN_WINDOW_DAYS:

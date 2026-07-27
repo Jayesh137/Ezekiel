@@ -35,7 +35,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 139 passed
+.\.venv\Scripts\python.exe -m pytest -q          # expect: 156 passed
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
@@ -140,27 +140,42 @@ working tree before running `--apply` anyway.
 run the bound is a one-off: per-minute snapshots and re-polled `historicalOrders`
 regrow `data/` to ~800 MB within weeks.
 
-## When the backtest is inconclusive
+## Validation policy
 
-`src/backtest.py` reports three states, not two:
+`src/backtest.py` proves the scorer can pick the target out of a stranger set by
+splitting his own history into two disjoint windows. Windows are chosen by
+**distinct active trading days**, not by a fixed calendar period: this target
+traded on 61 days across a 166-day span, so two fixed 21-day windows captured only
+4 active days each while still clearing the fill floor (TWAP puts thousands of
+fills in a single session). Windows widen — never relax — until both the day floor
+and the fill floor are met, and the report publishes the dates, active-day counts,
+fill counts, excluded days and a leakage check.
 
-| State | Meaning | Effect on thresholds |
-|---|---|---|
-| PASS | Scorer ranks the target above every stranger by ≥0.05 | Adapted to the proven ceiling |
-| INCONCLUSIVE | Windows span too few *distinct trading days* to judge | Reuse last proven ceiling, else raw config |
-| FAIL | A stranger outranks the target | Raw config — a broken scorer never relaxes the bar |
+Whatever the outcome, the scanner always operates under one of four named
+policies, published in `scans/latest.json`, logged, and shown on the scanner page:
 
-A fill count cannot detect a degenerate window: 8,000 TWAP fills across 4 sessions
-is not 8,000 independent observations, so both windows must also span
-`MIN_WINDOW_DAYS` separate days.
+| Policy | When | Behavioural alerts | Watchlist |
+|---|---|---|---|
+| `CURRENT_VALIDATED` | Self-match passed | Yes, at the proven ceiling | Yes |
+| `CARRIED_FORWARD` | Inconclusive, but a compatible validated ceiling exists | Yes, at the carried ceiling | Yes |
+| `POPULATION_WATCHLIST_FALLBACK` | Unvalidated, calibration sufficient | Only when independently corroborated | Yes, top-percentile vs measured population |
+| `OBSERVING` | Unvalidated and calibration too small | No | Evidence retained, nothing alerts |
 
-**This matters operationally.** With no previously-validated ceiling, thresholds
-stay at the raw config 0.90/0.80/0.65, which is unreachable for a trader whose
-demonstrated self-similarity is ~0.59 — so behavioural alerting and the
-behavioural watchlist are effectively off. The scanner prints an explicit WARNING
-when this is the case. Fund-flow, HL-native, deposit-correlation and
-transfer-graph detection are unaffected. It self-heals once the target trades on
-enough separate days to re-validate.
+Three rules hold in every policy:
+
+- **Behaviour alone can never alert while the scorer is unvalidated.** Under the
+  population fallback a candidate is capped at `WATCHLIST` no matter how extreme
+  its percentile; only independent evidence — fund flow, HL-native transfer,
+  deposit correlation, or transfer-graph linkage — promotes it.
+- **A style-vetoed wallet is never promoted**, and its evidence is still retained.
+- **A carried-forward ceiling is rejected when the scoring schema changes.**
+  `SCORING_SCHEMA` in `src/thresholds.py` must be bumped whenever dimensions,
+  weights or normalisation change; a ceiling proven under a different scorer is
+  not evidence about the current one.
+
+An inconclusive backtest exits 0 — it is neither a pass nor a daily red build.
+Only an outright FAILED self-match keeps the conservative config thresholds, and a
+failure never lowers them.
 
 ## Matching: thresholds and dispositions
 

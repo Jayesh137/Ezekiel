@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr,
-	         getThresholds, tierFor } from '$lib/api.js';
+	         getThresholds, tierFor, getPolicy } from '$lib/api.js';
 	import Chart from 'chart.js/auto';
 
 	let scan = null;
@@ -42,6 +42,11 @@
 
 	// Measured market-rarity calibration, published by the scanner.
 	$: rarity = scan?.market_rarity ?? null;
+
+	// Which validation policy produced these dispositions. Never leave the
+	// operating mode ambiguous: "no matches" and "not currently able to alert"
+	// look identical otherwise.
+	$: policy = getPolicy(scan);
 
 	/** Per-result market-bonus detail, or null when no markets were shared. */
 	function marketRarity(r) {
@@ -287,6 +292,24 @@
 	<h1>Wallet Scanner</h1>
 	<p class="text-muted">Behavioral fingerprint matching — click a wallet to compare</p>
 </div>
+
+{#if !loading && policy.policy}
+	<div class="policy-bar" class:policy-warn={policy.behaviouralAlerts !== true}>
+		<strong>Validation policy: {policy.label}</strong>
+		{#if policy.policy === 'CURRENT_VALIDATED'}
+			<span>Self-match validated{policy.provenance?.margin ? ` (margin ${policy.provenance.margin} over ${policy.provenance.strangers_scored} strangers)` : ''}. Behavioural alerts active.</span>
+		{:else if policy.policy === 'CARRIED_FORWARD'}
+			<span>Current self-match inconclusive — reusing the ceiling validated {policy.validatedAt}. Behavioural alerts active.</span>
+		{:else if policy.policy === 'POPULATION_WATCHLIST_FALLBACK'}
+			<span>Scorer unvalidated. Candidates are ranked against the measured population and capped at <strong>WATCHLIST</strong>; only independent fund-flow, HL-native, correlation or linkage evidence can promote to an alert.</span>
+		{:else}
+			<span>Scorer unvalidated and calibration population too small to rank scores. Evidence is retained; nothing alerts on behaviour alone.</span>
+		{/if}
+		{#if policy.carryForwardRejected}
+			<span class="policy-note">Carry-forward rejected: {policy.carryForwardRejected}</span>
+		{/if}
+	</div>
+{/if}
 
 {#if loading}
 	<div class="loading">Loading scan results...</div>
@@ -724,5 +747,23 @@
 	}
 	.mr-why {
 		color: var(--text-muted, #8888a0);
+	}
+
+	.policy-bar {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		padding: 8px 12px;
+		margin-bottom: 12px;
+		border-left: 3px solid var(--accent-cyan, #00ccdd);
+		background: rgba(0, 204, 221, 0.06);
+		font-size: 0.72rem;
+	}
+	.policy-bar.policy-warn {
+		border-left-color: var(--accent-yellow, #f59e0b);
+		background: rgba(245, 158, 11, 0.07);
+	}
+	.policy-note {
+		color: var(--accent-yellow, #f59e0b);
 	}
 </style>

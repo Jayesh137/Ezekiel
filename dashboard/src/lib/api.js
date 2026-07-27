@@ -249,6 +249,45 @@ export async function fetchAllFunding(index) {
  * @param {object|null} scan - data/scans/latest.json
  * @returns {{high:number, medium:number, low:number, source:string}}
  */
+/**
+ * Which validation policy produced this sweep's dispositions.
+ *
+ * CURRENT_VALIDATED             — self-match passed; thresholds proven now.
+ * CARRIED_FORWARD               — self-match inconclusive; reusing the last
+ *                                 proven ceiling (same scoring schema).
+ * POPULATION_WATCHLIST_FALLBACK — unvalidated; candidates ranked against the
+ *                                 measured population, capped at WATCHLIST
+ *                                 unless independently corroborated.
+ * OBSERVING                     — unvalidated and calibration too small; evidence
+ *                                 retained, nothing alerts.
+ * @param {object|null} scan - data/scans/latest.json
+ */
+export function getPolicy(scan) {
+	const policy = scan?.policy ?? null;
+	const detail = scan?.policy_detail ?? {};
+	const LABEL = {
+		CURRENT_VALIDATED: 'Validated',
+		CARRIED_FORWARD: 'Carried forward',
+		POPULATION_WATCHLIST_FALLBACK: 'Population fallback',
+		OBSERVING: 'Observing'
+	};
+	const ALERTS_ENABLED = {
+		CURRENT_VALIDATED: true,
+		CARRIED_FORWARD: true,
+		POPULATION_WATCHLIST_FALLBACK: 'corroborated-only',
+		OBSERVING: false
+	};
+	return {
+		policy,
+		label: LABEL[policy] ?? policy ?? 'unknown',
+		behaviouralAlerts: ALERTS_ENABLED[policy] ?? false,
+		schema: detail.scoring_schema ?? null,
+		validatedAt: detail.validated_at ?? null,
+		provenance: detail.provenance ?? null,
+		carryForwardRejected: detail.carry_forward_rejected ?? null
+	};
+}
+
 export function getThresholds(scan) {
 	const t = scan?.thresholds;
 	if (t && typeof t.high === 'number') return t;

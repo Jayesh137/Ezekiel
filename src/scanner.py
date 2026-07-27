@@ -50,31 +50,34 @@ def _effective_thresholds(alert_thresholds: dict) -> dict:
     """
     report = th.load_backtest_report(DATA_DIR.parent / "profile")
     eff = th.resolve(alert_thresholds, report)
-    if eff["source"] == "backtest_adapted":
-        print(f"[scanner] Backtest-adapted thresholds: high={eff['high']}, "
+    policy = eff.get("policy")
+
+    if policy == th.SRC_CURRENT_VALIDATED:
+        print(f"[scanner] Policy CURRENT_VALIDATED: high={eff['high']}, "
               f"medium={eff['medium']}, low={eff['low']} "
               f"(self-match ceiling {eff['self_match_ceiling']})")
-    elif eff["source"] == "last_validated":
-        print(f"[scanner] Thresholds from last VALIDATED ceiling "
-              f"({eff['self_match_ceiling']} at {eff.get('validated_at')}): "
-              f"high={eff['high']}, medium={eff['medium']}, low={eff['low']} "
-              f"— current self-match is inconclusive, carrying the proven ceiling forward")
+    elif policy == th.SRC_CARRIED_FORWARD:
+        prov = eff.get("provenance") or {}
+        print(f"[scanner] Policy CARRIED_FORWARD: high={eff['high']}, "
+              f"medium={eff['medium']}, low={eff['low']} — reusing the ceiling "
+              f"{eff['self_match_ceiling']} validated {eff.get('validated_at')} "
+              f"(margin {prov.get('margin')} over {prov.get('strangers_scored')} "
+              f"strangers, schema {prov.get('scoring_schema')}). Current self-match "
+              f"is inconclusive.")
     else:
-        print(f"[scanner] Config thresholds in force: high={eff['high']}, "
-              f"medium={eff['medium']}, low={eff['low']}")
-        # Say plainly what this costs. An unvalidated scorer running against raw
-        # config thresholds is effectively silent for a trader whose demonstrated
-        # ceiling is far below them, and silence must never look like "no match".
-        if report is not None and not report.get("passed"):
-            state = "INCONCLUSIVE" if report.get("passed") is None else "FAILED"
-            print(f"[scanner] WARNING: self-match backtest is {state} and no "
-                  f"previously-validated ceiling exists, so behavioural alerting "
-                  f"is effectively DISABLED at these thresholds. Fund-flow, "
-                  f"HL-native, correlation and transfer-graph detection are "
-                  f"unaffected. This self-heals once the target trades on enough "
-                  f"separate days to re-validate the scorer.")
-            if report.get("reason"):
-                print(f"[scanner] backtest reason: {report['reason']}")
+        # No validated ceiling. The raw config numbers are unreachable for this
+        # trader, so alerting on them is silence. Behavioural discovery instead
+        # runs against the measured population, capped at WATCHLIST.
+        print(f"[scanner] Policy {policy}: no validated ceiling, so raw config "
+              f"thresholds (high={eff['high']}) are NOT used for behavioural "
+              f"discovery. Candidates are ranked against the calibration "
+              f"population and capped at WATCHLIST unless independently "
+              f"corroborated by fund-flow / HL-native / correlation / linkage "
+              f"evidence.")
+        if eff.get("carry_forward_rejected"):
+            print(f"[scanner] carry-forward REJECTED: {eff['carry_forward_rejected']}")
+        if report is not None and report.get("reason"):
+            print(f"[scanner] backtest: {report['reason']}")
     return eff
 
 
@@ -96,7 +99,8 @@ def evaluate_candidate(wallet: str, score: float, eff: dict,
                        population: list[float] | None = None,
                        vetoes: list | None = None,
                        rare_overlap: bool = False,
-                       score_without_market_bonus: float | None = None) -> dict:
+                       score_without_market_bonus: float | None = None,
+                       corroborated: bool = False) -> dict:
     """Full disposition for a candidate: promote, watchlist, or drop — with reasons.
 
     Every alert route consults this, so a style veto or a failed percentile gate
@@ -104,13 +108,19 @@ def evaluate_candidate(wallet: str, score: float, eff: dict,
     returned record is persisted so the dashboard can show WHY a wallet was or
     wasn't promoted.
     """
+    pop = population if population is not None else []
     d = th.disposition(
         score, eff,
         vetoes=vetoes,
-        percentile_ok=calibration.passes_percentile_gate(score, population),
+        percentile_ok=calibration.passes_percentile_gate(score, pop),
         sustained=_sustained_high(wallet, eff["high"]),
         rare_overlap=rare_overlap,
         score_without_market_bonus=score_without_market_bonus,
+        # Inputs for the unvalidated-scorer fallback: rank the score against the
+        # measured null distribution instead of an unreachable raw threshold.
+        percentile=calibration.score_percentile(score, pop),
+        population_size=len(pop),
+        corroborated=corroborated,
     )
     if d["blockers"] and score >= eff["low"]:
         print(f"[scanner] {wallet[:10]}... {score:.4f} -> {d['action']}: "
@@ -985,6 +995,27 @@ def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
     return False
 
 
+# Priority sources that constitute independent, non-behavioural evidence: the
+# target's funds actually reached this wallet, or an amount/timing correlation
+# re-linked it. These are what may promote a population-fallback watchlist entry
+# to an alert while the scorer itself is unvalidated.
+CORROBORATING_SOURCES = {"fund_flow", "hl_transfer", "known_linked", "correlation",
+                         "subaccount", "bridge_depositor"}
+
+
+def _is_corroborated(result: dict, source: str | None = None) -> bool:
+    """Independent (non-behavioural) evidence tying this wallet to the target.
+
+    Behavioural similarity deliberately does NOT count — the whole point is that
+    behaviour alone cannot promote itself while the scorer is unvalidated.
+    """
+    if source in CORROBORATING_SOURCES:
+        return True
+    ev = result.get("evidence") or {}
+    link = ev.get("linkage") or {}
+    return bool(link.get("shared_funder") or link.get("shared_deposit_addresses"))
+
+
 def _market_free_score(result: dict) -> float | None:
     """The candidate's score with the shared-market bonus removed.
 
@@ -1188,7 +1219,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
 
         # One disposition decides promote / watchlist / drop for every route below.
         disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
-                                  _market_free_score(result))
+                                  _market_free_score(result),
+                                  corroborated=_is_corroborated(result, source))
         result["disposition"] = disp
         results.append(result)
 
@@ -1333,7 +1365,8 @@ def scan_leaderboard():
                       f"still watchlisted with evidence")
 
         disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
-                                  _market_free_score(result))
+                                  _market_free_score(result),
+                                  corroborated=_is_corroborated(result))
         result["disposition"] = disp
 
         # Keep anything watchlisted or better in the scan output and on the
@@ -1376,6 +1409,17 @@ def scan_leaderboard():
         # Resolved effective thresholds — the dashboard reads these instead of
         # hardcoding 0.90/0.80, so UI tiers match the tiers the alerts used.
         "thresholds": eff,
+        # Which policy produced the dispositions in this sweep. Rendered on the
+        # dashboard so the operating mode is never ambiguous.
+        "policy": eff.get("policy"),
+        "policy_detail": {
+            "scoring_schema": eff.get("scoring_schema"),
+            "validated_at": eff.get("validated_at"),
+            "provenance": eff.get("provenance"),
+            "carry_forward_rejected": eff.get("carry_forward_rejected"),
+            "fallback_percentile": th.FALLBACK_WATCHLIST_PERCENTILE,
+            "fallback_min_population": th.FALLBACK_MIN_POPULATION,
+        },
         "calibration": {
             "population_size": len(population),
             "gate_active": calibration.gate_active(population),

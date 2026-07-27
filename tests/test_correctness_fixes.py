@@ -446,14 +446,22 @@ def test_inconclusive_backtest_keeps_last_validated_ceiling():
     raw = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
     inconclusive = {"passed": None,
                     "last_validated": {"self_score": 0.5931,
-                                       "validated_at": "2026-07-27T00:00:00+00:00"}}
+                                       "validated_at": "2026-07-27T00:00:00+00:00",
+                                       "scoring_schema": th.SCORING_SCHEMA}}
     eff = th.resolve(raw, inconclusive)
     assert eff["source"] == "last_validated"
+    assert eff["policy"] == th.SRC_CARRIED_FORWARD
     assert eff["high"] < 0.60, "carried ceiling must still be reachable"
     assert eff["self_match_ceiling"] == 0.5931
     assert eff["validated_at"]
 
-    # No prior validation -> conservative config values.
+    # Carry-forward requires a schema match; without one it must be refused.
+    no_schema = {"passed": None,
+                 "last_validated": {"self_score": 0.5931,
+                                    "validated_at": "2026-07-27T00:00:00+00:00"}}
+    assert th.resolve(raw, no_schema)["policy"] == th.SRC_OBSERVING
+
+    # No prior validation -> conservative config values, OBSERVING policy.
     assert th.resolve(raw, {"passed": None})["high"] == 0.90
     assert th.resolve(raw, {"passed": None, "last_validated": {}})["high"] == 0.90
 

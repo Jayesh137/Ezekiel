@@ -35,6 +35,25 @@ ACTION_ALERT = "ALERT"
 ACTION_WATCHLIST = "WATCHLIST"
 ACTION_BACKGROUND = "BACKGROUND"
 
+# Bump whenever scoring dimensions, weights or normalisation change. A validated
+# threshold set is only reusable while the thing it validated still exists; a
+# ceiling proven under different weights says nothing about the current scorer.
+SCORING_SCHEMA = "2026-07-27.1"
+
+# Where the thresholds in force came from. Published in scans/latest.json and
+# rendered on the dashboard so the operating mode is never ambiguous.
+SRC_CURRENT_VALIDATED = "CURRENT_VALIDATED"
+SRC_CARRIED_FORWARD = "CARRIED_FORWARD"
+SRC_POPULATION_FALLBACK = "POPULATION_WATCHLIST_FALLBACK"
+SRC_OBSERVING = "OBSERVING"
+
+# Population fallback: with no validated ceiling, a candidate may still earn a
+# WATCHLIST slot by being extreme against the measured null distribution. This is
+# deliberately stricter than the alerting percentile — it is a discovery aid, not
+# an alert, and behaviour alone can never promote past WATCHLIST from here.
+FALLBACK_WATCHLIST_PERCENTILE = 99.0
+FALLBACK_MIN_POPULATION = 50
+
 # Floor for the adapted high threshold — a sanity bound, not a veto defence.
 # It deliberately sits BELOW VETO_BONUS_CEILING: with a self-match ceiling near
 # 0.53, flooring high at 0.61 would put the alert threshold above what the true
@@ -62,6 +81,9 @@ def resolve(alert_thresholds: dict, backtest_report: dict | None = None) -> dict
         "medium": float(alert_thresholds["similarity_medium"]),
         "low": float(alert_thresholds["similarity_low"]),
         "source": "config",
+        # Default policy when nothing has been validated: watch, never alert.
+        "policy": SRC_OBSERVING,
+        "scoring_schema": SCORING_SCHEMA,
         "self_match_ceiling": None,
     }
     if not backtest_report:
@@ -69,6 +91,9 @@ def resolve(alert_thresholds: dict, backtest_report: dict | None = None) -> dict
 
     if backtest_report.get("passed") and backtest_report.get("self_score"):
         achievable = float(backtest_report["self_score"])
+        eff["policy"] = SRC_CURRENT_VALIDATED
+        eff["validated_at"] = backtest_report.get("run_at")
+        eff["provenance"] = _provenance(backtest_report)
     elif backtest_report.get("passed") is None and backtest_report.get("last_validated"):
         # Inconclusive run (the target has been too quiet to re-test). Reuse the
         # last PROVEN ceiling rather than snapping back to the raw config numbers:
@@ -77,9 +102,19 @@ def resolve(alert_thresholds: dict, backtest_report: dict | None = None) -> dict
         lv = backtest_report["last_validated"]
         if not lv.get("self_score"):
             return eff
+        if not schema_compatible(lv.get("scoring_schema")):
+            # The ceiling was proven under a different scorer. Reusing it would be
+            # asserting a validation that never happened for this code.
+            eff["policy"] = SRC_OBSERVING
+            eff["carry_forward_rejected"] = (
+                f"validated under scoring schema {lv.get('scoring_schema')!r}, "
+                f"current is {SCORING_SCHEMA!r} — revalidation required")
+            return eff
         achievable = float(lv["self_score"])
         eff["source"] = "last_validated"
+        eff["policy"] = SRC_CARRIED_FORWARD
         eff["validated_at"] = lv.get("validated_at")
+        eff["provenance"] = _provenance(lv)
     else:
         # An outright FAILED self-match must not lower thresholds — the scorer is
         # known-unreliable, so the conservative config values stand.
@@ -114,6 +149,29 @@ def load_backtest_report(profile_dir: Path) -> dict | None:
         print(f"[thresholds] WARNING: could not read {path}: {e}. "
               f"Falling back to raw config thresholds.")
         return None
+
+
+def schema_compatible(schema: str | None) -> bool:
+    """Whether a previously-validated threshold set still describes this scorer.
+
+    Deliberately exact. A ceiling proven under different dimensions, weights or
+    normalisation is not evidence about the current scorer, and a report written
+    before schema tracking existed (None) cannot be shown to be compatible.
+    """
+    return schema is not None and schema == SCORING_SCHEMA
+
+
+def _provenance(report: dict) -> dict:
+    """Audit trail for whichever validation the thresholds rest on."""
+    return {
+        "validated_at": report.get("validated_at") or report.get("run_at"),
+        "scoring_schema": report.get("scoring_schema"),
+        "self_score": report.get("self_score"),
+        "best_stranger_score": report.get("best_stranger_score"),
+        "margin": report.get("margin") or report.get("margin_over_best_stranger"),
+        "strangers_scored": report.get("strangers_scored"),
+        "windows": report.get("windows"),
+    }
 
 
 def normalise(thresholds: dict) -> dict:
@@ -158,10 +216,62 @@ def can_alert(vetoes: list | None) -> bool:
     return not vetoes
 
 
+def population_fallback(score: float, percentile: float | None,
+                        population_size: int, vetoes: list | None,
+                        corroborated: bool) -> dict | None:
+    """Disposition when no validated ceiling exists.
+
+    Raw config thresholds are unreachable for this trader, so applying them makes
+    behavioural discovery silently invisible. Instead judge the score against the
+    measured null distribution: a wallet in the extreme tail of the population is
+    worth looking at even though we cannot currently prove the scorer works.
+
+    Behaviour alone is capped at WATCHLIST — an unvalidated scorer must never page
+    anyone on its own. Independent corroboration (fund flow, HL-native transfer,
+    deposit correlation, transfer-graph linkage) is what promotes to ALERT.
+
+    Returns None when calibration cannot support even this, leaving the caller in
+    OBSERVING mode.
+    """
+    if vetoes:
+        return {"action": ACTION_WATCHLIST, "tier": TIER_WEAK,
+                "reasons": ["retained for review despite style veto"],
+                "blockers": [f"style veto: {'; '.join(vetoes)}"],
+                "policy": SRC_POPULATION_FALLBACK}
+
+    if population_size < FALLBACK_MIN_POPULATION or percentile is None:
+        return None
+
+    if percentile < FALLBACK_WATCHLIST_PERCENTILE:
+        return None
+
+    reasons = [
+        f"score {score:.4f} is in the top {100 - percentile:.2f}% of "
+        f"{population_size} scanned wallets (percentile {percentile:.2f})",
+        "self-match validation unavailable — judged against the measured "
+        "population instead of a proven threshold",
+    ]
+    if corroborated:
+        reasons.append("independently corroborated by fund-flow / HL-native / "
+                       "correlation / linkage evidence")
+        return {"action": ACTION_ALERT, "tier": TIER_WATCH, "reasons": reasons,
+                "blockers": [], "policy": SRC_POPULATION_FALLBACK}
+
+    return {
+        "action": ACTION_WATCHLIST, "tier": TIER_WEAK, "reasons": reasons,
+        "blockers": ["behaviour alone cannot alert while the scorer is "
+                     "unvalidated — needs independent corroboration"],
+        "policy": SRC_POPULATION_FALLBACK,
+    }
+
+
 def disposition(score: float, thresholds: dict, *, vetoes: list | None = None,
                 percentile_ok: bool = True, sustained: bool = True,
                 rare_overlap: bool = False,
-                score_without_market_bonus: float | None = None) -> dict:
+                score_without_market_bonus: float | None = None,
+                percentile: float | None = None,
+                population_size: int = 0,
+                corroborated: bool = False) -> dict:
     """Decide promote / watchlist / drop, and record why.
 
     Recall-biased: anything clearing `low`, or carrying a rare-market signature,
@@ -175,6 +285,26 @@ def disposition(score: float, thresholds: dict, *, vetoes: list | None = None,
     instrument is.
     """
     t = normalise(thresholds)
+    policy = t.get("policy", SRC_CURRENT_VALIDATED)
+
+    # No validated ceiling: the raw config thresholds are unreachable here, so
+    # applying them would silently hide every behavioural lead. Judge against the
+    # measured population instead, capped at WATCHLIST unless corroborated.
+    if policy == SRC_OBSERVING:
+        fb = population_fallback(score, percentile, population_size, vetoes,
+                                 corroborated)
+        if fb is not None:
+            return fb
+        return {
+            "action": ACTION_BACKGROUND if score < t["low"] else ACTION_WATCHLIST,
+            "tier": classify(score, t),
+            "reasons": ["retained without alerting: scorer unvalidated and "
+                        "calibration population too small to rank this score"],
+            "blockers": ["OBSERVING — no validated threshold and insufficient "
+                         "calibration data"],
+            "policy": SRC_OBSERVING,
+        }
+
     reasons = []
     blockers = []
 
@@ -198,7 +328,7 @@ def disposition(score: float, thresholds: dict, *, vetoes: list | None = None,
         if rare_overlap:
             reasons.append("corroborated by shared rare markets")
         return {"action": ACTION_ALERT, "tier": classify(score, t),
-                "reasons": reasons, "blockers": []}
+                "reasons": reasons, "blockers": [], "policy": policy}
 
     if score >= t["low"] or rare_overlap:
         if rare_overlap:
@@ -206,7 +336,7 @@ def disposition(score: float, thresholds: dict, *, vetoes: list | None = None,
         else:
             reasons.append(f"score {score:.4f} >= low threshold {t['low']:.4f}")
         return {"action": ACTION_WATCHLIST, "tier": classify(score, t),
-                "reasons": reasons, "blockers": blockers}
+                "reasons": reasons, "blockers": blockers, "policy": policy}
 
     return {"action": ACTION_BACKGROUND, "tier": TIER_BACKGROUND,
-            "reasons": [], "blockers": blockers}
+            "reasons": [], "blockers": blockers, "policy": policy}
