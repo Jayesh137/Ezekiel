@@ -237,23 +237,37 @@ def test_veto_suppresses_rare_market_bonus():
     assert xyz in evidence["asset_overlap"]["overlap"]
 
 
-def test_rare_market_bonus_still_applies_without_veto():
-    """The bonus must keep working for style-compatible wallets."""
+def test_market_bonus_requires_measured_rarity_not_the_xyz_prefix():
+    """The bonus is earned by measured rarity, not by a market name prefix.
+
+    Supersedes the old flat-bonus behaviour: an xyz: market only pays out when the
+    calibration data actually shows it is uncommon. With no measurement at all the
+    bonus is zero, which is the conservative default.
+    """
+    from src import calibration as c
     from src.scanner import build_candidate_fingerprint, compute_similarity
     from tests.test_style_matching import DAY_MS, swing_fills
 
     eff = {"high": 0.52, "medium": 0.47, "low": 0.42}
-    a = build_candidate_fingerprint(swing_fills(coin="xyz:BRENTOIL"), {})
+    market = "xyz:BRENTOIL"
+    a = build_candidate_fingerprint(swing_fills(coin=market), {})
     b = build_candidate_fingerprint(
-        swing_fills(coin="xyz:BRENTOIL", start=1_700_000_000_000 + 30 * DAY_MS), {})
-    plain_a = build_candidate_fingerprint(swing_fills(coin="ETH"), {})
-    plain_b = build_candidate_fingerprint(
-        swing_fills(coin="ETH", start=1_700_000_000_000 + 30 * DAY_MS), {})
+        swing_fills(coin=market, start=1_700_000_000_000 + 30 * DAY_MS), {})
 
-    rare_score, _, ev = compute_similarity(a, b, eff)
-    plain_score, _, _ = compute_similarity(plain_a, plain_b, eff)
-    assert not ev["vetoes"]
-    assert rare_score > plain_score, "rare-market bonus should still reward clean matches"
+    def table(eligible, hits):
+        return c.summarise_market_observations([{
+            "recorded_at": "2026-07-27T00:00:00+00:00",
+            "eligible_wallets": eligible, "market_counts": {market: hits}}])
+
+    no_data, _, ev_none = compute_similarity(a, b, eff, table(0, 0))
+    common, _, ev_common = compute_similarity(a, b, eff, table(1000, 200))   # 20%
+    rare, _, ev_rare = compute_similarity(a, b, eff, table(1000, 2))         # 0.2%
+
+    assert not ev_rare["vetoes"]
+    assert ev_none["market_rarity"]["bonus_applied"] == 0.0    # unmeasured -> nothing
+    assert ev_common["market_rarity"]["bonus_applied"] == 0.0  # popular -> nothing
+    assert ev_rare["market_rarity"]["bonus_applied"] > 0.0     # genuinely rare -> paid
+    assert rare > common == no_data
 
 
 # --- heartbeat threshold must sit above the MEASURED scheduling jitter ----------
@@ -288,3 +302,110 @@ def test_collector_freshness_selfcheck_is_silent_when_fresh(monkeypatch, capsys)
     monkeypatch.setattr("src.heartbeat.data_age_minutes", lambda *a, **k: None)
     collector.check_own_freshness()
     assert "had stalled" not in capsys.readouterr().out
+
+
+# --- exclusion must be genuine, not a way to dodge a hard comparison ------------
+
+def test_hold_duration_participates_when_both_sides_have_episodes():
+    """Task-4 guard: hold_duration must be EXCLUDED only when a side genuinely
+    lacks completed episodes. Given enough on both sides it must produce a real
+    similarity value and take part in scoring — not be quietly dropped."""
+    from src.fingerprint import MIN_HOLD_EPISODES
+    from src.scanner import build_candidate_fingerprint, compute_similarity
+
+    eff = {"high": 0.52, "medium": 0.47, "low": 0.42}
+
+    def episodes(n, hold_ms, coin="ETH"):
+        out = []
+        for d in range(n):
+            out.extend(_episode(coin, d * 24 * HOUR, hold_ms, scale_ins=3, scale_outs=2))
+        return out
+
+    long_holder = episodes(20, 6 * HOUR)     # ~6h holds
+    short_holder = episodes(20, 5 * MIN)     # ~5min holds
+
+    a = build_candidate_fingerprint(long_holder, {})
+    b = build_candidate_fingerprint(episodes(20, 6 * HOUR, coin="ETH"), {})
+    c_fp = build_candidate_fingerprint(short_holder, {})
+
+    for fp in (a, b, c_fp):
+        assert fp["hold_duration"]["episode_count"] >= MIN_HOLD_EPISODES
+        assert fp["hold_duration"]["sufficient_data"] is True
+
+    # Both sides comparable -> the dimension is scored, not None.
+    _, same_dims, _ = compute_similarity(a, b, eff)
+    assert same_dims["hold_duration"] is not None
+    assert same_dims["hold_duration"] > 0.9, "identical hold styles must score high"
+
+    # And it genuinely discriminates rather than always returning ~1.
+    _, diff_dims, _ = compute_similarity(a, c_fp, eff)
+    assert diff_dims["hold_duration"] is not None
+    assert diff_dims["hold_duration"] < same_dims["hold_duration"]
+
+
+def test_hold_duration_excluded_only_below_the_episode_floor():
+    """One side under the floor -> excluded. Both at/above -> scored."""
+    from src.fingerprint import MIN_HOLD_EPISODES, compute_hold_duration
+    from src.scanner import compare_hold_duration
+
+    def fp(n):
+        fills = []
+        for d in range(n):
+            fills.extend(_episode("ETH", d * 24 * HOUR, 2 * HOUR))
+        return {"hold_duration": compute_hold_duration(fills)}
+
+    at_floor = fp(MIN_HOLD_EPISODES)
+    below = fp(MIN_HOLD_EPISODES - 1)
+    assert at_floor["hold_duration"]["sufficient_data"] is True
+    assert below["hold_duration"]["sufficient_data"] is False
+
+    assert compare_hold_duration(at_floor, at_floor) is not None   # both fine
+    assert compare_hold_duration(at_floor, below) is None          # one short
+    assert compare_hold_duration(below, at_floor) is None
+
+
+def test_timing_profile_excluded_only_when_too_few_distinct_days():
+    """The same rule for timing. Measured cause: the backtest's windows held
+    thousands of TWAP fills across only 4 distinct days, so the hourly histogram
+    scored the trader 0.0045 against himself on a 0.14-weight dimension."""
+    from src.fingerprint import MIN_TIMING_DAYS, compute_timing_profile
+    from src.scanner import compare_timing_profiles
+
+    def fills_over(days, hour):
+        return [{"coin": "ETH", "time": d * 24 * HOUR + hour * HOUR, "sz": "1",
+                 "px": "100", "side": "B", "dir": "Open Long", "startPosition": "0"}
+                for d in range(days)]
+
+    thin = compute_timing_profile(fills_over(MIN_TIMING_DAYS - 1, 14))
+    rich = compute_timing_profile(fills_over(MIN_TIMING_DAYS + 5, 14))
+    other = compute_timing_profile(fills_over(MIN_TIMING_DAYS + 5, 3))
+
+    assert thin["sufficient_data"] is False
+    assert rich["sufficient_data"] is True
+    assert rich["distinct_days"] == MIN_TIMING_DAYS + 5
+
+    # Thin on either side -> excluded rather than a confident near-zero.
+    assert compare_timing_profiles(rich, thin) is None
+    assert compare_timing_profiles(thin, rich) is None
+    # Enough days on both sides -> scored, and it still discriminates.
+    same = compare_timing_profiles(rich, rich)
+    diff = compare_timing_profiles(rich, other)
+    assert same is not None and same > 0.99
+    assert diff is not None and diff < 0.1
+
+
+def test_excluded_dimension_is_not_also_penalised():
+    """An excluded dimension is unknown, not bad. Penalising None would restore
+    the false negative the exclusion exists to prevent."""
+    from src.scanner import build_candidate_fingerprint, compute_similarity
+    from tests.test_style_matching import DAY_MS, swing_fills
+
+    eff = {"high": 0.52, "medium": 0.47, "low": 0.42}
+    a = build_candidate_fingerprint(swing_fills(), {})
+    b = build_candidate_fingerprint(swing_fills(start=1_700_000_000_000 + 30 * DAY_MS), {})
+    score, dims, _ = compute_similarity(a, b, eff)
+    # swing_fills spans 21 days -> timing is measurable here; the guard is that a
+    # None dimension never contributes a penalty.
+    assert score > 0.0
+    for v in dims.values():
+        assert v is None or isinstance(v, (int, float))

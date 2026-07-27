@@ -9,6 +9,7 @@ how unusual is this similarity compared to unrelated traders?
 """
 
 import json
+import math
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,32 @@ MAX_SAMPLES = 1000
 # fall back to raw-threshold behavior.
 MIN_SAMPLES_FOR_GATE = 50
 ALERT_PERCENTILE = 99.0
+
+# --- market rarity calibration --------------------------------------------------
+#
+# The scanner used to add a flat +0.12 for ANY shared xyz: market on the premise
+# that HIP-3 markets are near-unique. Measurement disproved that: in a 30-wallet
+# leaderboard sample, six wallets traded xyz:BRENTOIL. The flat bonus lifted three
+# style-vetoed wallets to 0.57 — above the target's own 0.5395 self-match — and
+# tiered them CONFIRMED_CANDIDATE.
+#
+# Rarity is now measured from the wallets the scanner already fingerprints on
+# every sweep, and the bonus is scaled by it.
+MARKET_FREQ_PATH = DATA_DIR / "calibration" / "market_frequency.json"
+# Bounded rolling window: at most this many sweep observations, and none older
+# than MARKET_WINDOW_DAYS. Market popularity drifts, so old sweeps must age out.
+MAX_MARKET_OBSERVATIONS = 60
+MARKET_WINDOW_DAYS = 30
+# Below this many observed wallets the sample cannot support any rarity claim, so
+# the bonus is zero. Conservative by construction: thin data means no bonus, never
+# the maximum bonus.
+MIN_ELIGIBLE_FOR_RARITY = 50
+# At or above this share of eligible wallets a market is simply popular; sharing it
+# is not evidence of anything. xyz:BRENTOIL measured ~0.20 here.
+COMMON_FREQUENCY = 0.05
+# The rarity floor that earns the full bonus: roughly one wallet in five hundred.
+RARE_FREQUENCY = 0.002
+MAX_MARKET_BONUS = 0.12
 
 
 def load_population() -> list[float]:
@@ -84,3 +111,160 @@ def passes_percentile_gate(score: float, population: list[float] | None = None) 
     With too few samples the gate is open (raw thresholds still apply)."""
     pct = score_percentile(score, population)
     return pct is None or pct >= ALERT_PERCENTILE
+
+
+# --- market rarity: measurement --------------------------------------------------
+
+def record_market_observation(markets_by_wallet: dict[str, list],
+                              path: Path | None = None) -> dict:
+    """Record which markets each eligible wallet traded during one sweep.
+
+    "Eligible" means the wallet cleared min_fills_for_comparison and was actually
+    fingerprinted — the same population the similarity scores come from, so the
+    frequencies describe the comparison set rather than all of Hyperliquid.
+
+    Bounded: at most MAX_MARKET_OBSERVATIONS sweeps, none older than
+    MARKET_WINDOW_DAYS.
+    """
+    p = path or MARKET_FREQ_PATH
+    if not markets_by_wallet:
+        return load_market_frequencies(p)
+
+    counts: dict[str, int] = {}
+    for markets in markets_by_wallet.values():
+        for m in set(markets):
+            counts[m] = counts.get(m, 0) + 1
+
+    now = datetime.now(UTC)
+    observation = {
+        "recorded_at": now.isoformat(),
+        "eligible_wallets": len(markets_by_wallet),
+        "market_counts": counts,
+    }
+
+    p.parent.mkdir(parents=True, exist_ok=True)
+    observations = []
+    if p.exists():
+        try:
+            with open(p) as f:
+                observations = json.load(f).get("observations", [])
+        except (OSError, ValueError):
+            observations = []
+
+    observations.append(observation)
+    cutoff = now.timestamp() - MARKET_WINDOW_DAYS * 86400
+    kept = []
+    for o in observations:
+        try:
+            if datetime.fromisoformat(o["recorded_at"]).timestamp() >= cutoff:
+                kept.append(o)
+        except (KeyError, TypeError, ValueError):
+            continue
+    kept = kept[-MAX_MARKET_OBSERVATIONS:]
+
+    with open(p, "w") as f:
+        json.dump({"updated_at": now.isoformat(),
+                   "window_days": MARKET_WINDOW_DAYS,
+                   "observations": kept}, f)
+    return summarise_market_observations(kept)
+
+
+def summarise_market_observations(observations: list[dict]) -> dict:
+    """Collapse rolling observations into totals. Pure."""
+    eligible = 0
+    counts: dict[str, int] = {}
+    stamps = []
+    for o in observations:
+        eligible += int(o.get("eligible_wallets", 0) or 0)
+        for m, c in (o.get("market_counts") or {}).items():
+            counts[m] = counts.get(m, 0) + int(c or 0)
+        if o.get("recorded_at"):
+            stamps.append(o["recorded_at"])
+    return {
+        "eligible_wallets": eligible,
+        "market_counts": counts,
+        "observations": len(observations),
+        "first_observed": min(stamps) if stamps else None,
+        "last_observed": max(stamps) if stamps else None,
+        "sufficient": eligible >= MIN_ELIGIBLE_FOR_RARITY,
+    }
+
+
+def load_market_frequencies(path: Path | None = None) -> dict:
+    p = path or MARKET_FREQ_PATH
+    if not p.exists():
+        return summarise_market_observations([])
+    try:
+        with open(p) as f:
+            return summarise_market_observations(json.load(f).get("observations", []))
+    except (OSError, ValueError):
+        return summarise_market_observations([])
+
+
+# --- market rarity: scoring (pure) -----------------------------------------------
+
+def market_frequency(market: str, freq: dict) -> float:
+    """Add-one (Laplace) smoothed share of eligible wallets trading `market`.
+
+        f = (hits + 1) / (eligible + 2)
+
+    Smoothing matters: a market seen once in a one-wallet sample would otherwise
+    read as frequency 1.0 or, worse, an unseen market as 0.0 — infinitely rare, and
+    thus maximally rewarded, on no evidence. Add-one pulls both toward 0.5, which
+    lands above COMMON_FREQUENCY and therefore earns nothing.
+    """
+    eligible = int(freq.get("eligible_wallets", 0) or 0)
+    hits = int((freq.get("market_counts") or {}).get(market, 0) or 0)
+    return (hits + 1) / (eligible + 2)
+
+
+def market_rarity_bonus(markets: list[str], freq: dict) -> tuple[float, list[str]]:
+    """Bonus for shared markets, scaled by measured rarity. Pure.
+
+    Per market, on a log scale between "popular" and "one in five hundred":
+
+        f    = smoothed frequency
+        b    = 0                                        if f >= COMMON_FREQUENCY
+        b    = MAX * log(COMMON/f) / log(COMMON/RARE)   otherwise, clamped to [0, MAX]
+
+    Log rather than linear because the interesting range spans two orders of
+    magnitude: 5% and 0.2% differ far more in evidential weight than 50% and 45%.
+
+    Several shared markets compound with diminishing returns (1, 1/2, 1/4, …) so a
+    wallet touching many mildly-uncommon markets cannot accumulate the full bonus.
+
+    Returns (bonus, human-readable explanations).
+    """
+    if not markets:
+        return 0.0, []
+    if not freq.get("sufficient"):
+        return 0.0, [
+            f"No market-rarity bonus: only {freq.get('eligible_wallets', 0)} wallets "
+            f"observed (need {MIN_ELIGIBLE_FOR_RARITY}) — treating rarity as unproven"
+        ]
+
+    span = math.log(COMMON_FREQUENCY / RARE_FREQUENCY)
+    scored = []
+    for m in sorted(set(markets)):
+        f = market_frequency(m, freq)
+        if f >= COMMON_FREQUENCY:
+            scored.append((0.0, m, f))
+            continue
+        frac = min(1.0, math.log(COMMON_FREQUENCY / f) / span)
+        scored.append((MAX_MARKET_BONUS * frac, m, f))
+
+    scored.sort(reverse=True)
+    total = 0.0
+    reasons = []
+    for i, (b, m, f) in enumerate(scored):
+        share = b / (2 ** i)
+        total += share
+        pct = f * 100
+        if b <= 0:
+            reasons.append(f"{m}: traded by ~{pct:.1f}% of scanned wallets — "
+                           f"too common to be evidence (no bonus)")
+        else:
+            reasons.append(f"{m}: traded by ~{pct:.2f}% of scanned wallets — "
+                           f"rarity bonus +{share:.4f}")
+    total = round(min(MAX_MARKET_BONUS, total), 4)
+    return total, reasons

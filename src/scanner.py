@@ -77,7 +77,8 @@ def _sustained_high(wallet: str, threshold: float, n: int = 2) -> bool:
 def evaluate_candidate(wallet: str, score: float, eff: dict,
                        population: list[float] | None = None,
                        vetoes: list | None = None,
-                       rare_overlap: bool = False) -> dict:
+                       rare_overlap: bool = False,
+                       score_without_market_bonus: float | None = None) -> dict:
     """Full disposition for a candidate: promote, watchlist, or drop — with reasons.
 
     Every alert route consults this, so a style veto or a failed percentile gate
@@ -91,6 +92,7 @@ def evaluate_candidate(wallet: str, score: float, eff: dict,
         percentile_ok=calibration.passes_percentile_gate(score, population),
         sustained=_sustained_high(wallet, eff["high"]),
         rare_overlap=rare_overlap,
+        score_without_market_bonus=score_without_market_bonus,
     )
     if d["blockers"] and score >= eff["low"]:
         print(f"[scanner] {wallet[:10]}... {score:.4f} -> {d['action']}: "
@@ -205,10 +207,21 @@ def get_asset_overlap(fp_a: dict, fp_b: dict) -> dict:
     }
 
 
-def compare_timing_profiles(fp_a: dict, fp_b: dict) -> float:
-    """Compare timing profile dimensions using cosine similarity."""
+def compare_timing_profiles(fp_a: dict, fp_b: dict) -> float | None:
+    """Compare active-hours profiles. None when either side spans too few days.
+
+    An hourly histogram only describes a human's rhythm once it aggregates many
+    separate days. Measured on the target's own adjacent windows — 4 distinct
+    trading days each — it returned 0.0045, i.e. the trader looked maximally
+    unlike himself on a 0.14-weight dimension. Excluding it (and renormalizing) is
+    honest; scoring near-zero from a 4-day sample is not.
+    """
+    if not fp_a.get("sufficient_data", True) or not fp_b.get("sufficient_data", True):
+        return None
     hourly_a = fp_a.get("hourly_distribution", [0]*24)
     hourly_b = fp_b.get("hourly_distribution", [0]*24)
+    if not any(hourly_a) or not any(hourly_b):
+        return None
     return cosine_similarity(hourly_a, hourly_b)
 
 
@@ -491,7 +504,8 @@ def build_evidence(ezekiel_fp: dict, candidate_fp: dict, dimensions: dict, score
 
 
 def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
-                       eff: dict | None = None) -> tuple[float, dict, dict]:
+                       eff: dict | None = None,
+                       market_freq: dict | None = None) -> tuple[float, dict, dict]:
     """Compute weighted similarity between Ezekiel and a candidate fingerprint."""
     dimensions = {}
 
@@ -507,7 +521,7 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
         ezekiel_fp.get("timing_profile", {}),
         candidate_fp.get("timing_profile", {})
     )
-    dimensions["timing_profile"] = round(dim_score, 4)
+    dimensions["timing_profile"] = round(dim_score, 4) if dim_score is not None else None
 
     # Leverage
     dim_score = compare_leverage(
@@ -600,11 +614,15 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
         candidate_fp.get("asset_preferences", {}),
     )
     penalty = 0.0
+    # Penalties only apply to dimensions that were actually measurable. An
+    # excluded dimension is unknown, not bad — penalising None would reintroduce
+    # exactly the false-negative the exclusion exists to prevent.
     if overlap["overlap_count"] < 3:
         penalty += 0.12
-    if dimensions["timing_profile"] < 0.30:
+    if dimensions["timing_profile"] is not None and dimensions["timing_profile"] < 0.30:
         penalty += 0.08
-    if dimensions["account_size"] < 0.20 and weights["account_size"] > 0:
+    if dimensions["account_size"] is not None and dimensions["account_size"] < 0.20 \
+            and weights["account_size"] > 0:
         penalty += 0.05
 
     score = max(0.0, weighted_sum - penalty)
@@ -615,28 +633,49 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     if vetoes:
         score = min(score, VETO_SCORE_CAP)
 
-    # xyz: HIP-3 market bonus. Trading these is unusual, so overlap is worth a
-    # behavioural boost — but ONLY for wallets that aren't style-vetoed. Boosting
-    # the similarity of a wallet we've just judged to be a different human is
-    # incoherent, and measurably harmful: in a 30-wallet leaderboard sample, six
-    # wallets shared xyz:BRENTOIL and every one of them was style-vetoed, yet the
-    # bonus lifted three of them to 0.57 — above the target's own 0.5395 self-match
-    # — and labelled them CONFIRMED_CANDIDATE. The self-match backtest failed on
-    # exactly that (margin -0.0305).
+    # Shared-market bonus, scaled by MEASURED rarity rather than a flat constant.
     #
-    # The overlap is still recorded in evidence.asset_overlap.rare_overlap and
-    # still earns a watchlist slot, so no lead is lost — it just no longer
-    # outranks the real trader.
+    # The old flat +0.12 for any xyz: overlap assumed those markets were
+    # near-unique. They are not: xyz:BRENTOIL is traded by ~20% of scanned wallets,
+    # and the flat bonus lifted three style-vetoed wallets above the target's own
+    # self-match. Frequencies now come from the wallets the scanner already
+    # fingerprints each sweep (src/calibration.py).
     #
-    # NOTE: xyz: rarity is assumed, not measured. xyz:BRENTOIL is demonstrably
-    # common among leaderboard wallets, so treating any xyz: overlap as
-    # "near-conclusive" is unproven. A per-market rarity weight would be the
-    # principled improvement.
-    if overlap.get("rare_overlap") and not vetoes:
-        score = min(1.0, score + 0.12)
+    # Still gated on `not vetoes`: boosting the similarity of a wallet just judged
+    # to be a different human is incoherent. The overlap remains recorded in
+    # evidence.asset_overlap.rare_overlap and still earns a watchlist slot, so no
+    # lead is lost — it simply cannot outrank the real trader.
+    score_before_market_bonus = score
+    market_bonus = 0.0
+    market_reasons = []
+    shared_markets = overlap.get("rare_overlap") or []
+    if shared_markets:
+        freq = market_freq if market_freq is not None else calibration.load_market_frequencies()
+        market_bonus, market_reasons = calibration.market_rarity_bonus(shared_markets, freq)
+        if vetoes:
+            market_bonus = 0.0
+            market_reasons.append("Market bonus withheld: style veto in force")
+        elif market_bonus:
+            score = min(1.0, score + market_bonus)
 
     score = round(score, 4)
     evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score, vetoes, eff)
+    # Published so the dashboard and any reviewer can see exactly how much of the
+    # score came from market overlap and why — and so disposition can refuse to
+    # promote a wallet that only clears the threshold because of it.
+    evidence["market_rarity"] = {
+        "shared_markets": shared_markets,
+        "bonus_applied": round(market_bonus, 4),
+        "score_without_bonus": round(score_before_market_bonus, 4),
+        "explanations": market_reasons,
+        "frequencies": {
+            m: round(calibration.market_frequency(
+                m, market_freq if market_freq is not None
+                else calibration.load_market_frequencies()), 5)
+            for m in shared_markets
+        } if shared_markets else {},
+    }
+    evidence["reasons"].extend(market_reasons)
     return score, dimensions, evidence
 
 
@@ -782,7 +821,8 @@ def persist_candidate(result: dict) -> None:
 
 
 def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
-                          source: str = "targeted", eff: dict | None = None) -> dict | None:
+                          source: str = "targeted", eff: dict | None = None,
+                          market_freq: dict | None = None) -> dict | None:
     """Score a single wallet against the fingerprint, bypassing the leaderboard.
     Used for fund-flow destinations, bridge depositors, and subaccounts."""
     lookback_days = config["scanner"].get("fills_lookback_days", 21)
@@ -800,7 +840,7 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
 
     state = get_candidate_state(wallet)
     candidate_fp = build_candidate_fingerprint(fills, state)
-    score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff)
+    score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
 
     return {
         "wallet": wallet,
@@ -927,6 +967,21 @@ def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
     return False
 
 
+def _market_free_score(result: dict) -> float | None:
+    """The candidate's score with the shared-market bonus removed.
+
+    Passed to disposition so a wallet that only clears the high threshold because
+    of market overlap is watchlisted rather than promoted. Note the priority path
+    can add vault/referral/linkage bonuses AFTER scoring, so the delta rather than
+    the stored absolute is applied.
+    """
+    mr = (result.get("evidence") or {}).get("market_rarity") or {}
+    bonus = mr.get("bonus_applied")
+    if not bonus:
+        return None
+    return round(result["score"] - float(bonus), 4)
+
+
 def _rare_overlap(result: dict) -> list:
     """xyz: HIP-3 markets the candidate shares with the target (the rarest tell)."""
     return result.get("evidence", {}).get("asset_overlap", {}).get("rare_overlap", []) or []
@@ -960,7 +1015,8 @@ def _apply_linkage(result: dict, target: str, profile: dict) -> float:
 
 
 def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
-                          population: list[float] | None = None) -> list[dict]:
+                          population: list[float] | None = None,
+                          market_freq: dict | None = None) -> list[dict]:
     """Scan high-priority candidates before the leaderboard sweep:
     fund-flow destinations, subaccounts, and recent large bridge depositors.
     Returns scored results and fires combined alerts when both vectors agree.
@@ -1067,7 +1123,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
 
     for wallet, meta in priority.items():
         source = meta.get("source", "targeted")
-        result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source, eff=eff)
+        result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source, eff=eff,
+                                      market_freq=market_freq)
         if result is None:
             continue
 
@@ -1112,7 +1169,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
             score = _apply_linkage(result, target_addr, target_l1)
 
         # One disposition decides promote / watchlist / drop for every route below.
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare))
+        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+                                  _market_free_score(result))
         result["disposition"] = disp
         results.append(result)
 
@@ -1160,6 +1218,12 @@ def scan_leaderboard():
     population = calibration.load_population()
     print(f"[scanner] Calibration: {len(population)} samples, "
           f"gate {'ENFORCING' if calibration.gate_active(population) else 'OBSERVING'}")
+    # Market rarity measured from previously-scanned wallets. Loaded once per
+    # sweep so every candidate is scored against the same frequency table.
+    market_freq = calibration.load_market_frequencies()
+    print(f"[scanner] Market rarity: {market_freq['eligible_wallets']} wallets over "
+          f"{market_freq['observations']} sweep(s), "
+          f"{'ACTIVE' if market_freq['sufficient'] else 'INSUFFICIENT (no bonus)'}")
 
     # Load fingerprint — prefer recent (21-day window) for fair candidate comparison
     fp_path = Path(DATA_DIR.parent / "profile" / "fingerprint.json")
@@ -1178,7 +1242,7 @@ def scan_leaderboard():
 
     # Phase 1: priority targets — fund-flow destinations, subaccounts, bridge depositors
     # These bypass the leaderboard and get scanned regardless of ranking.
-    priority_results = scan_priority_targets(ezekiel_fp, config, eff, population)
+    priority_results = scan_priority_targets(ezekiel_fp, config, eff, population, market_freq)
     priority_wallets = {r["wallet"].lower() for r in priority_results}
 
     # Phase 2: leaderboard sweep
@@ -1195,6 +1259,7 @@ def scan_leaderboard():
     top_scores = [{"wallet": r["wallet"][:10], "score": r["score"]} for r in priority_results]
     scanned = 0
     sweep_scores = []  # this sweep's scores → next sweep's null distribution
+    sweep_markets = {}  # eligible wallet → markets traded → rarity calibration
 
     for entry in leaderboard[:max_wallets]:
         wallet = entry.get("ethAddress", entry.get("address", ""))
@@ -1213,8 +1278,13 @@ def scan_leaderboard():
 
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
-        score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff)
+        score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
         sweep_scores.append(score)
+        # This wallet cleared min_fills and was fingerprinted, so it belongs in the
+        # rarity denominator. Recording only eligible wallets keeps the frequency
+        # table describing the same population the scores come from.
+        sweep_markets[wallet.lower()] = candidate_fp.get(
+            "asset_preferences", {}).get("coins_traded", [])
 
         result = {
             "wallet": wallet,
@@ -1244,7 +1314,8 @@ def scan_leaderboard():
                 print(f"[scanner] xyz: alert suppressed for {wallet[:10]}... (style veto); "
                       f"still watchlisted with evidence")
 
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare))
+        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+                                  _market_free_score(result))
         result["disposition"] = disp
 
         # Keep anything watchlisted or better in the scan output and on the
@@ -1267,6 +1338,12 @@ def scan_leaderboard():
     pop_size = calibration.record_population_scores(sweep_scores)
     print(f"[scanner] Calibration population: {pop_size} samples")
 
+    market_summary = calibration.record_market_observation(sweep_markets)
+    print(f"[scanner] Market rarity now: {market_summary['eligible_wallets']} wallets "
+          f"over {market_summary['observations']} sweep(s), "
+          f"{len(market_summary['market_counts'])} distinct markets, "
+          f"{'ACTIVE' if market_summary['sufficient'] else 'INSUFFICIENT'}")
+
     results.sort(key=lambda r: r["score"], reverse=True)
 
     for i, r in enumerate(results):
@@ -1285,6 +1362,24 @@ def scan_leaderboard():
             "population_size": len(population),
             "gate_active": calibration.gate_active(population),
             "alert_percentile": calibration.ALERT_PERCENTILE,
+        },
+        # Published so the dashboard can explain a market bonus without recomputing
+        # it, and so a reviewer can see the measured frequency behind any claim.
+        "market_rarity": {
+            "eligible_wallets": market_summary["eligible_wallets"],
+            "observations": market_summary["observations"],
+            "sufficient": market_summary["sufficient"],
+            "window_days": calibration.MARKET_WINDOW_DAYS,
+            "common_frequency": calibration.COMMON_FREQUENCY,
+            "max_bonus": calibration.MAX_MARKET_BONUS,
+            "first_observed": market_summary["first_observed"],
+            "last_observed": market_summary["last_observed"],
+            # Only the HIP-3 markets matter for the bonus; keep the payload small.
+            "frequencies": {
+                m: round(calibration.market_frequency(m, market_summary), 5)
+                for m in sorted(market_summary["market_counts"])
+                if m.startswith("xyz:")
+            },
         },
         "top_scores": top_scores,
         "results": results,

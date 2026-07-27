@@ -154,19 +154,35 @@ def compute_position_sizing(fills: list[dict], positions: dict) -> dict:
     }
 
 
+# A timezone fingerprint needs many separate DAYS, not many fills. This trader
+# executes via TWAP, so a single session can contribute thousands of fills across
+# two or three hours. Below this many distinct days the hourly histogram records
+# when a few bursts happened, not when the human is habitually awake.
+#
+# Measured: the backtest's two windows held 3,162 and 5,497 fills but only 4
+# distinct trading days each, with 4 and 7 active hours. They shared one hour, so
+# the trader scored 0.0045 on timing against his own history — a near-zero on a
+# 0.14-weight dimension, which is a false-negative generator, not a finding.
+MIN_TIMING_DAYS = 10
+
+
 def compute_timing_profile(fills: list[dict]) -> dict:
     """When they trade — timezone fingerprint."""
     if not fills:
-        return {"weight": 0.15, "hourly_distribution": [0]*24, "day_of_week_distribution": [0]*7}
+        return {"weight": 0.15, "hourly_distribution": [0]*24,
+                "day_of_week_distribution": [0]*7,
+                "distinct_days": 0, "sufficient_data": False}
 
     hours = []
     days = []
+    distinct_days = set()
     for f in fills:
         ts = f.get("time", 0)
         if ts:
             dt = datetime.fromtimestamp(ts / 1000, tz=UTC)
             hours.append(dt.hour)
             days.append(dt.weekday())
+            distinct_days.add(int(ts) // 86_400_000)
 
     hourly_counts = Counter(hours)
     daily_counts = Counter(days)
@@ -195,6 +211,8 @@ def compute_timing_profile(fills: list[dict]) -> dict:
         "most_active_hours_utc": sorted(most_active),
         "least_active_hours_utc": sorted(least_active),
         "inferred_timezone_offset": inferred_offset,
+        "distinct_days": len(distinct_days),
+        "sufficient_data": len(distinct_days) >= MIN_TIMING_DAYS,
     }
 
 

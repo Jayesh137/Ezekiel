@@ -40,6 +40,16 @@
 	// HIGH matches render as unremarkable leads.
 	$: thresholds = getThresholds(scan);
 
+	// Measured market-rarity calibration, published by the scanner.
+	$: rarity = scan?.market_rarity ?? null;
+
+	/** Per-result market-bonus detail, or null when no markets were shared. */
+	function marketRarity(r) {
+		const mr = r?.evidence?.market_rarity;
+		if (!mr || !(mr.shared_markets || []).length) return null;
+		return mr;
+	}
+
 	function getConfidenceClass(score) {
 		const tier = tierFor(score, thresholds);
 		if (tier === 'CONFIRMED') return 'badge-green';
@@ -312,6 +322,7 @@
 					{@const flowLink = hasFundFlowLink(r.wallet)}
 					{@const flowFinding = flowLink ? getFundFlowFinding(r.wallet) : null}
 					{@const sparkPts = sparklinePoints(candidateData?.score_history)}
+					{@const mr = marketRarity(r)}
 
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -319,6 +330,30 @@
 						{#if flowLink}
 							<div class="flow-link-bar" class:flow-confirmed={flowFinding?.deposited_to_hl}>
 								{flowFinding?.deposited_to_hl ? 'FUND TRACE — HL DEPOSIT CONFIRMED' : 'FUND TRACE — PENDING HL DEPOSIT'}
+							</div>
+						{/if}
+						{#if mr}
+							<div class="market-rarity" class:no-bonus={!mr.bonus_applied}>
+								<span class="mr-head">
+									Shared markets:
+									{#each mr.shared_markets as m, i}<span class="mono"
+											>{i ? ', ' : ''}{m}</span
+										>{/each}
+									{#if mr.bonus_applied}
+										<span class="mr-bonus">+{mr.bonus_applied.toFixed(4)}</span>
+									{:else}
+										<span class="mr-none">no bonus</span>
+									{/if}
+								</span>
+								{#each mr.explanations as e}<span class="mr-why">{e}</span>{/each}
+								{#if mr.bonus_applied}
+									<span class="mr-why">
+										Score without market bonus: <span class="mono"
+											>{(mr.score_without_bonus * 100).toFixed(1)}%</span
+										>
+										— market overlap corroborates a match, it never creates one.
+									</span>
+								{/if}
 							</div>
 						{/if}
 						<div class="result-main">
@@ -660,5 +695,34 @@
 		.comparison-details {
 			grid-template-columns: 1fr;
 		}
+	}
+
+	/* Market-rarity strip: shows what a shared market was actually worth. */
+	.market-rarity {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px 10px;
+		border-left: 2px solid var(--accent-yellow, #f59e0b);
+		background: rgba(245, 158, 11, 0.06);
+		font-size: 0.68rem;
+	}
+	.market-rarity.no-bonus {
+		border-left-color: var(--border, #2a2a4a);
+		background: rgba(136, 136, 160, 0.05);
+	}
+	.mr-head {
+		font-weight: 600;
+	}
+	.mr-bonus {
+		color: var(--accent-yellow, #f59e0b);
+		margin-left: 6px;
+	}
+	.mr-none {
+		color: var(--text-muted, #8888a0);
+		margin-left: 6px;
+	}
+	.mr-why {
+		color: var(--text-muted, #8888a0);
 	}
 </style>

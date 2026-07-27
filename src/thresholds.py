@@ -144,38 +144,52 @@ def can_alert(vetoes: list | None) -> bool:
 
 def disposition(score: float, thresholds: dict, *, vetoes: list | None = None,
                 percentile_ok: bool = True, sustained: bool = True,
-                rare_overlap: bool = False) -> dict:
+                rare_overlap: bool = False,
+                score_without_market_bonus: float | None = None) -> dict:
     """Decide promote / watchlist / drop, and record why.
 
-    Recall-biased: anything clearing `low`, or carrying the rare xyz: signature,
+    Recall-biased: anything clearing `low`, or carrying a rare-market signature,
     stays visible on the watchlist even when suppressed from alerting. Only
     genuinely unremarkable wallets fall through to BACKGROUND.
+
+    `score_without_market_bonus` enforces that shared markets can corroborate a
+    match but never manufacture one: if removing the rarity bonus drops the wallet
+    below the high threshold, it is watchlisted rather than promoted. Trading the
+    same instrument is weak evidence of common ownership no matter how rare the
+    instrument is.
     """
+    t = normalise(thresholds)
     reasons = []
     blockers = []
 
     if vetoes:
         blockers.append(f"style veto: {'; '.join(vetoes)}")
-    if score < thresholds["high"]:
-        blockers.append(f"score {score:.4f} below high threshold {thresholds['high']:.4f}")
+    if score < t["high"]:
+        blockers.append(f"score {score:.4f} below high threshold {t['high']:.4f}")
+    elif (score_without_market_bonus is not None
+          and score_without_market_bonus < t["high"]):
+        blockers.append(
+            f"clears the high threshold only via the shared-market bonus "
+            f"({score_without_market_bonus:.4f} without it) — market overlap alone "
+            f"is not evidence of common ownership")
     if not percentile_ok:
         blockers.append("score not unusual vs scanned population (percentile gate)")
     if not sustained:
         blockers.append("awaiting persistence (needs 2 consecutive high scans)")
 
     if not blockers:
-        reasons.append(f"score {score:.4f} >= high threshold {thresholds['high']:.4f}")
+        reasons.append(f"score {score:.4f} >= high threshold {t['high']:.4f}")
         if rare_overlap:
-            reasons.append("shares rare xyz: HIP-3 markets")
-        return {"action": ACTION_ALERT, "tier": classify(score, thresholds),
+            reasons.append("corroborated by shared rare markets")
+        return {"action": ACTION_ALERT, "tier": classify(score, t),
                 "reasons": reasons, "blockers": []}
 
-    if score >= thresholds["low"] or rare_overlap:
+    if score >= t["low"] or rare_overlap:
         if rare_overlap:
-            reasons.append("shares rare xyz: HIP-3 markets — kept regardless of score")
+            reasons.append("shares uncommon markets — kept regardless of score")
         else:
-            reasons.append(f"score {score:.4f} >= low threshold {thresholds['low']:.4f}")
-        return {"action": ACTION_WATCHLIST, "tier": classify(score, thresholds),
+            reasons.append(f"score {score:.4f} >= low threshold {t['low']:.4f}")
+        return {"action": ACTION_WATCHLIST, "tier": classify(score, t),
                 "reasons": reasons, "blockers": blockers}
 
     return {"action": ACTION_BACKGROUND, "tier": TIER_BACKGROUND,
