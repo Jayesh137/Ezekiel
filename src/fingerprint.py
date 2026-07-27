@@ -6,16 +6,14 @@ import shutil
 import sys
 import time as _time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
-from src.utils import (
-    load_config, load_all_records, save_latest, DATA_DIR
-)
+from src.utils import DATA_DIR, load_all_records, load_config, save_latest
 
 
 def load_fills() -> list[dict]:
@@ -166,7 +164,7 @@ def compute_timing_profile(fills: list[dict]) -> dict:
     for f in fills:
         ts = f.get("time", 0)
         if ts:
-            dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+            dt = datetime.fromtimestamp(ts / 1000, tz=UTC)
             hours.append(dt.hour)
             days.append(dt.weekday())
 
@@ -449,7 +447,7 @@ def _position_episodes(fills: list[dict]) -> list[list[dict]]:
         coin_fills[f.get("coin", "UNKNOWN")].append(f)
 
     episodes = []
-    for coin, cf in coin_fills.items():
+    for cf in coin_fills.values():
         cf.sort(key=lambda t: t.get("time", 0))
         current = []
         for f in cf:
@@ -576,7 +574,6 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         fills = load_fills()
     funding = load_funding()
     positions = load_positions_latest()
-    account = load_account_latest()
 
     # Use perp positions if available
     if isinstance(positions, dict) and "assetPositions" not in positions:
@@ -591,15 +588,15 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         first = min(timestamps)
         last = max(timestamps)
         data_range = {
-            "first_fill": datetime.fromtimestamp(first / 1000, tz=timezone.utc).isoformat(),
-            "last_fill": datetime.fromtimestamp(last / 1000, tz=timezone.utc).isoformat(),
+            "first_fill": datetime.fromtimestamp(first / 1000, tz=UTC).isoformat(),
+            "last_fill": datetime.fromtimestamp(last / 1000, tz=UTC).isoformat(),
             "total_fills": len(fills),
             "total_days_active": max(1, (last - first) // (24 * 60 * 60 * 1000)),
         }
 
     fingerprint = {
         "version": "1.0",
-        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "computed_at": datetime.now(UTC).isoformat(),
         "data_range": data_range,
         "asset_preferences": compute_asset_preferences(fills),
         "leverage_profile": compute_leverage_profile(fills, positions),
@@ -632,7 +629,7 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
 
     return {
         "version": "1.0-recent",
-        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "computed_at": datetime.now(UTC).isoformat(),
         "lookback_days": lookback_days,
         "data_range": {"total_fills": len(recent)},
         "asset_preferences": compute_asset_preferences(recent),
@@ -662,7 +659,7 @@ def main():
     if fp_path.exists():
         history_dir = profile_dir / "history"
         history_dir.mkdir(exist_ok=True)
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         archive_path = history_dir / f"fingerprint_{today}.json"
         if not archive_path.exists():
             shutil.copy(fp_path, archive_path)

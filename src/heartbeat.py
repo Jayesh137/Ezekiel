@@ -12,12 +12,12 @@ even when every collection job is failing.
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import DATA_DIR, read_cursor, write_cursor, now_ms
+from src.utils import DATA_DIR, now_ms, read_cursor, write_cursor
 
 # Collection runs every 15 min; alert once it has missed ~8 consecutive cycles.
 STALE_AFTER_MINUTES = 120
@@ -40,10 +40,10 @@ def data_age_minutes(index_path: Path | None = None, now: datetime | None = None
             return None
         ts = datetime.fromisoformat(last)
         if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
     except (OSError, ValueError, TypeError):
         return None
-    reference = now or datetime.now(timezone.utc)
+    reference = now or datetime.now(UTC)
     return (reference - ts).total_seconds() / 60.0
 
 
@@ -62,7 +62,7 @@ def check_freshness() -> dict:
     age = data_age_minutes()
     stale = is_stale(age)
     status = {
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
         "data_age_minutes": round(age, 1) if age is not None else None,
         "threshold_minutes": STALE_AFTER_MINUTES,
         "stale": stale,

@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import load_config, etherscan_get, load_all_records, DATA_DIR
+from src.utils import DATA_DIR, etherscan_get, load_all_records, load_config
 
 
 def compute_linkage(candidate: str, candidate_first_funder: str | None,

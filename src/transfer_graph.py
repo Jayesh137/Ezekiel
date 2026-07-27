@@ -29,14 +29,18 @@ import hashlib
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
-    load_config, load_all_records, save_latest, read_cursor, write_cursor,
-    now_ms, DATA_DIR,
+    DATA_DIR,
+    load_all_records,
+    load_config,
+    now_ms,
+    save_latest,
+    write_cursor,
 )
 
 # --- chains / sources -----------------------------------------------------------
@@ -90,14 +94,14 @@ SPLIT_TOLERANCE = 0.05
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _iso(ts_seconds: float | int | None) -> str | None:
     if not ts_seconds:
         return None
     try:
-        return datetime.fromtimestamp(float(ts_seconds), tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(float(ts_seconds), tz=UTC).isoformat()
     except (TypeError, ValueError, OSError):
         return None
 
@@ -777,7 +781,6 @@ def expand_frontier(edges: list[dict], target: str, budget: dict) -> list[dict]:
     max_calls = budget["max_expansions"]
     target = target.lower()
 
-    known = {e["src"] for e in edges} | {e["dst"] for e in edges}
     services = detect_services(edges, set())
     explored = set()
     cursor_key = "transfer_graph_explored"

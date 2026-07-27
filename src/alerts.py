@@ -3,10 +3,10 @@
 
 import os
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-from src.utils import read_cursor, write_cursor, now_ms
+from src.utils import now_ms, read_cursor, write_cursor
 
 # Once a send fails (e.g. bad SMTP credentials), it will keep failing for the
 # rest of this run. Short-circuit so a batch of alerts doesn't attempt hundreds
@@ -263,15 +263,14 @@ def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
     reasons = "\n".join(f"  - {r}" for r in node.get("confidence_reasons", [])) or "  (none)"
     triggers = "\n".join(f"  - {r}" for r in trigger_reasons) or "  (none)"
 
-    edge_lines = []
-    for e in edges[:15]:
-        edge_lines.append(
-            f"  {e.get('timestamp') or 'unknown time'}  "
-            f"{e.get('chain')}/{e.get('asset')}  "
-            f"${float(e.get('amount_usd', 0)):,.2f}\n"
-            f"      {e.get('src')} -> {e.get('dst')}\n"
-            f"      ref: {e.get('ref') or 'n/a'}  via: {e.get('discovery_source')}"
-        )
+    edge_lines = [
+        f"  {e.get('timestamp') or 'unknown time'}  "
+        f"{e.get('chain')}/{e.get('asset')}  "
+        f"${float(e.get('amount_usd', 0)):,.2f}\n"
+        f"      {e.get('src')} -> {e.get('dst')}\n"
+        f"      ref: {e.get('ref') or 'n/a'}  via: {e.get('discovery_source')}"
+        for e in edges[:15]
+    ]
     edges_txt = "\n".join(edge_lines) or "  (no transfer detail)"
     more = f"\n  ... and {len(edges) - 15} further transfer(s)" if len(edges) > 15 else ""
 

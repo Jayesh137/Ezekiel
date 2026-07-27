@@ -9,11 +9,11 @@ Each test pins a specific broken behaviour so it cannot silently return:
 """
 
 import json
+from datetime import UTC
 
-from src.fingerprint import compute_hold_duration, MIN_HOLD_EPISODES
+from src import heartbeat, risk
+from src.fingerprint import MIN_HOLD_EPISODES, compute_hold_duration
 from src.scanner import compare_hold_duration
-from src import heartbeat
-from src import risk
 
 MIN = 60_000
 HOUR = 60 * MIN
@@ -61,10 +61,9 @@ def test_window_starting_mid_position_still_yields_durations():
     because the opens fell before the boundary; the old matcher produced zero
     durations and cosine scored 0.0. Episode reconstruction uses startPosition,
     so a window that opens mid-position still measures."""
-    fills = []
     # Orphaned closes: position already open when the window starts.
-    for i in range(8):
-        fills.append(_fill("BTC", i * HOUR, 1.0, "A", 10.0 - i, "Close Short", pnl="3.0"))
+    fills = [_fill("BTC", i * HOUR, 1.0, "A", 10.0 - i, "Close Short", pnl="3.0")
+             for i in range(8)]
     hd = compute_hold_duration(fills)
     assert hd["episode_count"] >= 1
     assert any(v > 0 for v in hd["distribution_buckets"].values())
@@ -123,12 +122,12 @@ def test_empty_fills_is_insufficient_not_zero_scoring():
 
 def test_l1_outbound_expires(tmp_path, monkeypatch):
     """One historical transfer previously contributed +8 points forever."""
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
     monkeypatch.setattr(risk, "DATA_DIR", tmp_path)
     (tmp_path / "fund_flows").mkdir(parents=True)
 
     def write(days_ago):
-        ts = (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
+        ts = (datetime.now(UTC) - timedelta(days=days_ago)).isoformat()
         (tmp_path / "fund_flows" / "latest.json").write_text(json.dumps(
             {"findings": [{"amount_usdc_raw": 500000.0, "detected_at": ts}]}))
 
@@ -170,9 +169,9 @@ def test_drawdown_survives_drop_alert_cursor_reset(tmp_path, monkeypatch):
 # --- heartbeat -------------------------------------------------------------------
 
 def test_heartbeat_detects_stale_data(tmp_path):
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
     idx = tmp_path / "index.json"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     idx.write_text(json.dumps({"last_updated": (now - timedelta(minutes=10)).isoformat()}))
     fresh = heartbeat.data_age_minutes(idx, now)
@@ -208,3 +207,50 @@ def test_backtest_flags_zero_self_dimension():
     assert zero_dimensions({"hold_duration": None, "timing_profile": 0.85}) == []
     assert zero_dimensions({"a": 0.0, "b": 0.0}) == ["a", "b"]
     assert zero_dimensions({}) == []
+
+
+# --- vetoed wallets must not receive the behavioural rare-market bonus -----------
+
+def test_veto_suppresses_rare_market_bonus():
+    """A style-vetoed wallet must not get the xyz: similarity boost.
+
+    Six wallets in a 30-wallet leaderboard sample shared xyz:BRENTOIL and all were
+    style-vetoed, yet the bonus lifted three to 0.57 — above the target's own
+    0.5395 self-match — and tiered them CONFIRMED_CANDIDATE. The self-match
+    backtest failed with margin -0.0305 as a direct result.
+    """
+    from src.scanner import VETO_SCORE_CAP, build_candidate_fingerprint, compute_similarity
+    from tests.test_style_matching import scalper_fills, swing_fills
+
+    eff = {"high": 0.52, "medium": 0.47, "low": 0.42}
+    xyz = "xyz:BRENTOIL"
+    # Same rare market on both sides, but incompatible styles -> vetoed.
+    swing = build_candidate_fingerprint(swing_fills(coin=xyz), {})
+    scalp = build_candidate_fingerprint(scalper_fills(coin=xyz), {})
+
+    score, _, evidence = compute_similarity(swing, scalp, eff)
+    assert evidence["vetoes"], "expected a style veto for swing vs scalper"
+    assert evidence["asset_overlap"]["rare_overlap"] == [xyz]
+    # Capped, not bonus-lifted above the cap.
+    assert score <= VETO_SCORE_CAP, f"vetoed wallet bonus-lifted to {score}"
+    # The overlap is still recorded so the lead survives on the watchlist.
+    assert xyz in evidence["asset_overlap"]["overlap"]
+
+
+def test_rare_market_bonus_still_applies_without_veto():
+    """The bonus must keep working for style-compatible wallets."""
+    from src.scanner import build_candidate_fingerprint, compute_similarity
+    from tests.test_style_matching import DAY_MS, swing_fills
+
+    eff = {"high": 0.52, "medium": 0.47, "low": 0.42}
+    a = build_candidate_fingerprint(swing_fills(coin="xyz:BRENTOIL"), {})
+    b = build_candidate_fingerprint(
+        swing_fills(coin="xyz:BRENTOIL", start=1_700_000_000_000 + 30 * DAY_MS), {})
+    plain_a = build_candidate_fingerprint(swing_fills(coin="ETH"), {})
+    plain_b = build_candidate_fingerprint(
+        swing_fills(coin="ETH", start=1_700_000_000_000 + 30 * DAY_MS), {})
+
+    rare_score, _, ev = compute_similarity(a, b, eff)
+    plain_score, _, _ = compute_similarity(plain_a, plain_b, eff)
+    assert not ev["vetoes"]
+    assert rare_score > plain_score, "rare-market bonus should still reward clean matches"

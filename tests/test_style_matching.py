@@ -7,11 +7,15 @@ completely different trading style scored as a match."""
 import numpy as np
 
 from src import calibration
-from src.backtest import split_windows, MIN_WINDOW_FILLS
-from src.fingerprint import compute_style_profile, _position_episodes
+from src.backtest import MIN_WINDOW_FILLS, split_windows
+from src.fingerprint import _position_episodes, compute_style_profile
 from src.scanner import (
-    build_candidate_fingerprint, compute_similarity, check_style_vetoes,
-    compare_activity, compare_direction_bias, VETO_SCORE_CAP,
+    VETO_SCORE_CAP,
+    build_candidate_fingerprint,
+    check_style_vetoes,
+    compare_activity,
+    compare_direction_bias,
+    compute_similarity,
 )
 
 DAY_MS = 86_400_000
@@ -200,6 +204,7 @@ RAW_THRESHOLDS = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarit
 
 def test_effective_thresholds_lowered_by_backtest_ceiling(tmp_path, monkeypatch):
     import json as _json
+
     from src import scanner
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
@@ -226,6 +231,7 @@ def test_effective_thresholds_stay_reachable_for_true_trader():
 
 def test_effective_thresholds_unchanged_when_backtest_fails(tmp_path, monkeypatch):
     import json as _json
+
     from src import scanner
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
@@ -326,3 +332,23 @@ def test_split_windows_falls_back_to_halves():
     older, recent = split_windows(fills)
     assert len(older) + len(recent) == len(fills)
     assert max(f["time"] for f in older) <= min(f["time"] for f in recent)
+
+
+def test_threshold_shape_normalisation_matches_dashboard_fallback():
+    """Scan files written before the threshold unification carry
+    similarity_* keys. Python and the dashboard's getThresholds() must tier
+    that old data identically instead of one of them raising."""
+    from src import thresholds as th
+    legacy = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+    norm = th.normalise(legacy)
+    assert (norm["high"], norm["medium"], norm["low"]) == (0.90, 0.80, 0.65)
+    assert norm["source"] == "legacy"
+    # classify() accepts either shape
+    assert th.classify(0.95, legacy) == th.TIER_CONFIRMED
+    assert th.classify(0.95, {"high": 0.5, "medium": 0.4, "low": 0.3}) == th.TIER_CONFIRMED
+    # Already-resolved dicts pass through untouched
+    resolved = {"high": 0.5, "medium": 0.4, "low": 0.3}
+    assert th.normalise(resolved) is resolved
+    import pytest
+    with pytest.raises(KeyError):
+        th.normalise({"nonsense": 1})

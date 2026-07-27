@@ -12,11 +12,21 @@ correct answer is "this is NOT the same owner":
 
 from src import transfer_graph as tg
 from src.transfer_graph import (
-    build_graph, normalise_l1_transfer, normalise_hl_ledger_entry,
-    normalise_gas_funding, dedupe_edges, detect_services, score_confidence,
-    classify_node, find_split_correlation, select_alerts,
-    CLASS_SERVICE, CLASS_DIRECT_RECIPIENT, CLASS_OPERATIONAL,
-    CLASS_POSSIBLE_LINKED, CLASS_MIGRATION_CANDIDATE,
+    CLASS_DIRECT_RECIPIENT,
+    CLASS_MIGRATION_CANDIDATE,
+    CLASS_OPERATIONAL,
+    CLASS_POSSIBLE_LINKED,
+    CLASS_SERVICE,
+    build_graph,
+    classify_node,
+    dedupe_edges,
+    detect_services,
+    find_split_correlation,
+    normalise_gas_funding,
+    normalise_hl_ledger_entry,
+    normalise_l1_transfer,
+    score_confidence,
+    select_alerts,
 )
 
 T = "0x45d26f28196d226497130c4bac709d808fed4029"

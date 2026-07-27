@@ -11,8 +11,7 @@ validated instead of guessed.
 
 import json
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -58,13 +57,13 @@ def zero_dimensions(dims: dict) -> list[str]:
 
 def run_backtest() -> dict:
     from src.fingerprint import load_fills, load_positions_latest
-    from src.scanner import build_candidate_fingerprint, compute_similarity, _effective_thresholds
+    from src.scanner import _effective_thresholds, build_candidate_fingerprint, compute_similarity
     from src.utils import load_config
 
     fills = load_fills()
     older, recent = split_windows(fills)
     report = {
-        "run_at": datetime.now(timezone.utc).isoformat(),
+        "run_at": datetime.now(UTC).isoformat(),
         "older_fills": len(older),
         "recent_fills": len(recent),
     }

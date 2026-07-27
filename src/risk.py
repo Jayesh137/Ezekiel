@@ -8,15 +8,18 @@ have a lead?". High score = act now: check the top candidate.
 
 import json
 import sys
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
-    load_config, load_all_records, save_latest, read_cursor, write_cursor,
-    now_ms, DATA_DIR,
+    DATA_DIR,
+    load_all_records,
+    now_ms,
+    read_cursor,
+    save_latest,
+    write_cursor,
 )
 
 # Points each signal contributes at full strength (sum = 100).
@@ -117,7 +120,6 @@ def _xyz_abandoned(fills: list[dict], days: float = 10) -> bool:
 
 
 def _gather_signals() -> dict:
-    config = load_config()
     signals = {}
 
     # Silence
@@ -151,7 +153,7 @@ def _gather_signals() -> dict:
     if ff_path.exists():
         try:
             findings = json.load(open(ff_path)).get("findings", [])
-            cutoff = datetime.now(timezone.utc).timestamp() - RECENT_SIGNAL_DAYS * 86400
+            cutoff = datetime.now(UTC).timestamp() - RECENT_SIGNAL_DAYS * 86400
             signals["l1_outbound"] = any(
                 f.get("amount_usdc_raw", 0) and _detected_ts(f) >= cutoff
                 for f in findings
@@ -210,7 +212,7 @@ def run_risk() -> dict:
 
     signals = _gather_signals()
     result = compute_risk_score(signals)
-    result["computed_at"] = datetime.now(timezone.utc).isoformat()
+    result["computed_at"] = datetime.now(UTC).isoformat()
     result["signals"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in signals.items()}
     save_latest(str(DATA_DIR / "risk"), result)
 

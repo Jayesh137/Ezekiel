@@ -10,7 +10,7 @@ how unusual is this similarity compared to unrelated traders?
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -50,7 +50,7 @@ def record_population_scores(scores: list[float]) -> int:
                 samples = json.load(f).get("samples", [])
         except Exception:
             samples = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     samples.extend({"score": round(float(s), 4), "recorded_at": now} for s in scores)
     samples = samples[-MAX_SAMPLES:]
     with open(POPULATION_PATH, "w") as f:

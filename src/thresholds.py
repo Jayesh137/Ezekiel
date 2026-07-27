@@ -100,13 +100,34 @@ def load_backtest_report(profile_dir: Path) -> dict | None:
         return None
 
 
+def normalise(thresholds: dict) -> dict:
+    """Accept either the resolved shape or raw config keys.
+
+    Scan files written before the threshold unification carry
+    similarity_high/medium/low. The dashboard's getThresholds() has the same
+    fallback, so both sides tier old data identically instead of raising.
+    """
+    if "high" in thresholds:
+        return thresholds
+    if "similarity_high" in thresholds:
+        return {
+            "high": float(thresholds["similarity_high"]),
+            "medium": float(thresholds["similarity_medium"]),
+            "low": float(thresholds["similarity_low"]),
+            "source": "legacy",
+            "self_match_ceiling": None,
+        }
+    raise KeyError(f"unrecognised threshold shape: {sorted(thresholds)}")
+
+
 def classify(score: float, thresholds: dict) -> str:
     """Tier label derived from the SAME effective thresholds used for alerting."""
-    if score >= thresholds["high"]:
+    t = normalise(thresholds)
+    if score >= t["high"]:
         return TIER_CONFIRMED
-    if score >= thresholds["medium"]:
+    if score >= t["medium"]:
         return TIER_WATCH
-    if score >= thresholds["low"]:
+    if score >= t["low"]:
         return TIER_WEAK
     return TIER_BACKGROUND
 

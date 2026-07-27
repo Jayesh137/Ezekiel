@@ -34,7 +34,7 @@ import gzip
 import json
 import shutil
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -149,7 +149,7 @@ def archive_snapshot_type(data_type: str, dry_run: bool = True,
         return {"before": 0, "after": 0, "days": 0, "snapshots": 0}
 
     before = _dir_size(type_dir)
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(UTC) - timedelta(days=keep_days)).strftime("%Y-%m-%d")
     archive_dir = type_dir / "archive"
     summary_dir = type_dir / "daily"
 

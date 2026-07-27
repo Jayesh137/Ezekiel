@@ -4,12 +4,12 @@
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import save_latest, DATA_DIR
+from src.utils import DATA_DIR, save_latest
 
 
 def parse_docx(filepath: str) -> str:
@@ -45,7 +45,7 @@ def parse_pdf(filepath: str) -> str:
             return text
         print(f"[profile] pypdf extracted only {len(text)} chars, trying fallback...")
     except ImportError:
-        print(f"[profile] pypdf not installed")
+        print("[profile] pypdf not installed")
     except Exception as e:
         print(f"[profile] pypdf error: {e}")
 
@@ -156,7 +156,7 @@ def build_profile():
 
     profile = {
         "codename": "Ezekiel",
-        "built_at": datetime.now(timezone.utc).isoformat(),
+        "built_at": datetime.now(UTC).isoformat(),
         "sources": [],
         "aggregated_patterns": {
             "mentioned_coins": [],

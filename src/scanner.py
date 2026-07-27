@@ -4,7 +4,7 @@
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -12,20 +12,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import numpy as np
 import requests
 
-from src.utils import (
-    load_config, hl_post, append_records, save_latest, DATA_DIR, etherscan_get, read_cursor
-)
-from src.fingerprint import (
-    build_fingerprint, compute_asset_preferences, compute_timing_profile,
-    compute_trade_sequencing, compute_position_sizing,
-)
-from src.alerts import (
-    alert_behavioral_match, alert_combined_match, alert_vault_match,
-    alert_migration_correlation, alert_xyz_signature_match, alert_linkage_match,
-)
 from src import calibration
 from src import thresholds as th
-from src.thresholds import VETO_SCORE_CAP, VETO_BONUS_CEILING
+from src.alerts import (
+    alert_behavioral_match,
+    alert_combined_match,
+    alert_linkage_match,
+    alert_migration_correlation,
+    alert_vault_match,
+    alert_xyz_signature_match,
+)
+from src.fingerprint import (
+    build_fingerprint,
+    compute_asset_preferences,
+    compute_position_sizing,
+    compute_timing_profile,
+    compute_trade_sequencing,
+)
+from src.thresholds import VETO_BONUS_CEILING, VETO_SCORE_CAP
+from src.utils import (
+    DATA_DIR,
+    append_records,
+    etherscan_get,
+    hl_post,
+    load_config,
+    read_cursor,
+    save_latest,
+)
 
 
 def _effective_thresholds(alert_thresholds: dict) -> dict:
@@ -602,10 +615,25 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     if vetoes:
         score = min(score, VETO_SCORE_CAP)
 
-    # xyz: HIP-3 market bonus — trading these exotic markets is extremely rare.
-    # Any overlap here is near-conclusive behavioral evidence of the same trader.
-    if overlap.get("rare_overlap"):
-        score = min(VETO_BONUS_CEILING if vetoes else 1.0, score + 0.12)
+    # xyz: HIP-3 market bonus. Trading these is unusual, so overlap is worth a
+    # behavioural boost — but ONLY for wallets that aren't style-vetoed. Boosting
+    # the similarity of a wallet we've just judged to be a different human is
+    # incoherent, and measurably harmful: in a 30-wallet leaderboard sample, six
+    # wallets shared xyz:BRENTOIL and every one of them was style-vetoed, yet the
+    # bonus lifted three of them to 0.57 — above the target's own 0.5395 self-match
+    # — and labelled them CONFIRMED_CANDIDATE. The self-match backtest failed on
+    # exactly that (margin -0.0305).
+    #
+    # The overlap is still recorded in evidence.asset_overlap.rare_overlap and
+    # still earns a watchlist slot, so no lead is lost — it just no longer
+    # outranks the real trader.
+    #
+    # NOTE: xyz: rarity is assumed, not measured. xyz:BRENTOIL is demonstrably
+    # common among leaderboard wallets, so treating any xyz: overlap as
+    # "near-conclusive" is unproven. A per-market rarity weight would be the
+    # principled improvement.
+    if overlap.get("rare_overlap") and not vetoes:
+        score = min(1.0, score + 0.12)
 
     score = round(score, 4)
     evidence = build_evidence(ezekiel_fp, candidate_fp, dimensions, score, vetoes, eff)
@@ -627,7 +655,9 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
     """Build a mini-fingerprint for a candidate wallet from their data.
     Now includes all 8 comparable dimensions (trade_sequencing, position_sizing added)."""
     from src.fingerprint import (
-        compute_leverage_profile, compute_hold_duration, compute_entry_exit_style,
+        compute_entry_exit_style,
+        compute_hold_duration,
+        compute_leverage_profile,
         compute_style_profile,
     )
 
@@ -778,7 +808,7 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
         "dimensions": dimensions,
         "evidence": evidence,
         "fills_count": len(fills),
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "scanned_at": datetime.now(UTC).isoformat(),
         "fingerprint": _summarize_fingerprint(candidate_fp),
         "source": source,
     }
@@ -1193,7 +1223,7 @@ def scan_leaderboard():
             "dimensions": dimensions,
             "evidence": evidence,
             "fills_count": len(fills),
-            "scanned_at": datetime.now(timezone.utc).isoformat(),
+            "scanned_at": datetime.now(UTC).isoformat(),
             "fingerprint": _summarize_fingerprint(candidate_fp),
         }
 
@@ -1244,7 +1274,7 @@ def scan_leaderboard():
             r.pop("fingerprint", None)
 
     scan_result = {
-        "scan_time": datetime.now(timezone.utc).isoformat(),
+        "scan_time": datetime.now(UTC).isoformat(),
         "wallets_scanned": scanned + len(priority_wallets),
         "priority_scanned": len(priority_wallets),
         "matches_found": len(results),
