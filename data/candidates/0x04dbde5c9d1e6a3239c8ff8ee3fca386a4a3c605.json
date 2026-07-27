@@ -1,9 +1,9 @@
 {
   "wallet": "0x04dbde5c9d1e6a3239c8ff8ee3fca386a4a3c605",
   "first_seen": "2026-07-07T06:35:29.021037+00:00",
-  "last_seen": "2026-07-27T12:48:53.082952+00:00",
+  "last_seen": "2026-07-27T15:36:06.151830+00:00",
   "best_score": 0.425,
-  "latest_score": 0.3778,
+  "latest_score": 0.3532,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -13,9 +13,12 @@
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Different active trading hours"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Decision frequency 6x apart (1.41 vs 9.00 position episodes/day)"
+    ],
     "asset_overlap": {
       "overlap": [
         "xyz:BRENTOIL"
@@ -28,7 +31,11 @@
       ],
       "candidate_only": [
         "xyz:CL",
+        "xyz:GOLD",
+        "xyz:MRVL",
+        "xyz:NVDA",
         "xyz:SILVER",
+        "xyz:SMSN",
         "xyz:SP500",
         "xyz:XYZ100"
       ],
@@ -36,29 +43,10 @@
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.1111
+      "jaccard": 0.0769
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-19T16:42:29.255217+00:00",
-      "score": 0.3378,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.1429,
-        "timing_profile": 0.5559,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 0.0,
-        "hold_duration": 0.0,
-        "account_size": 0.8306,
-        "trade_sequencing": 0.7216,
-        "position_sizing": 0.5,
-        "activity": 0.6423,
-        "direction_bias": 0.4446,
-        "position_management": 0.8416,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-19T17:47:11.770397+00:00",
       "score": 0.3378,
@@ -1939,8 +1927,27 @@
         "position_management": 0.883,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-27T15:36:06.151830+00:00",
+      "score": 0.3532,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0769,
+        "timing_profile": 0.3234,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 0.0,
+        "hold_duration": 0.9993,
+        "account_size": 0.6996,
+        "trade_sequencing": 0.6916,
+        "position_sizing": 0.0,
+        "activity": 0.6683,
+        "direction_bias": 0.5404,
+        "position_management": 0.8369,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2923
+  "recent_avg_score": 0.3096
 }
