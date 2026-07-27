@@ -94,9 +94,15 @@ def alert_new_wallet_found(source_wallet: str, new_wallet: str, method: str, con
 
 def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bool:
     subject = f"[EZEKIEL] HIGH: Behavioral Match ({score:.0%} similarity)"
+    # Dimensions excluded for insufficient data are None — sort and format would
+    # both raise on them, so they are listed separately rather than dropped.
+    scored = {k: v for k, v in dimensions.items() if isinstance(v, (int, float))}
+    skipped = [k for k, v in dimensions.items() if not isinstance(v, (int, float))]
     dim_lines = "\n".join(
-        f"  - {k}: {v:.2f}" for k, v in sorted(dimensions.items(), key=lambda x: -x[1])
+        f"  - {k}: {v:.2f}" for k, v in sorted(scored.items(), key=lambda x: -x[1])
     )
+    if skipped:
+        dim_lines += f"\n  (not comparable, excluded: {', '.join(sorted(skipped))})"
     body = (
         f"Candidate Wallet: {candidate}\n"
         f"Similarity Score: {score:.2f} / 1.00\n\n"
@@ -235,6 +241,25 @@ def alert_risk_level(score: float, level: str, factors: list, wallet: str | None
         body += f"\nStrongest lead: {wallet}\n"
     body += "\nCheck the Recovery page.\n"
     return _send_with_cooldown(f"risk_{level.lower()}", 12, subject, body)
+
+
+def alert_collection_stale(age_minutes: float | None, threshold_minutes: float) -> bool:
+    """Fire when data collection itself has stopped. This is the failure the rest
+    of the alerting cannot detect — every other alert requires the collector to
+    be running."""
+    age_desc = f"{age_minutes:.0f} minutes" if age_minutes is not None else "unknown"
+    subject = "[EZEKIEL] CRITICAL: Data Collection Has Stalled"
+    body = (
+        f"No new data has been collected for {age_desc} "
+        f"(alert threshold: {threshold_minutes:.0f} minutes).\n\n"
+        f"While collection is down the system cannot detect a migration, and "
+        f"Hyperliquid only serves ~2000 recent entries per endpoint — data not "
+        f"captured now is permanently lost.\n\n"
+        f"Check: GitHub Actions tab -> 'Collect Trading Data' workflow.\n"
+        f"Common causes: workflow disabled after repo inactivity, job timeout, "
+        f"or exhausted Actions minutes.\n"
+    )
+    return _send_with_cooldown("collection_stale", 24, subject, body)
 
 
 def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:

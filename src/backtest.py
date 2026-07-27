@@ -45,9 +45,21 @@ def split_windows(fills: list[dict], window_days: int = WINDOW_DAYS) -> tuple[li
     return older, recent
 
 
+def zero_dimensions(dims: dict) -> list[str]:
+    """Dimensions that scored exactly 0.0 for the trader against his own history.
+
+    None means "excluded, not enough data" and is fine. A hard 0.0 means the
+    dimension actively votes against the true trader — that is always a scoring
+    bug, and it shipped undetected for months on hold_duration.
+    """
+    return sorted(k for k, v in dims.items()
+                  if isinstance(v, (int, float)) and float(v) == 0.0)
+
+
 def run_backtest() -> dict:
     from src.fingerprint import load_fills, load_positions_latest
-    from src.scanner import build_candidate_fingerprint, compute_similarity
+    from src.scanner import build_candidate_fingerprint, compute_similarity, _effective_thresholds
+    from src.utils import load_config
 
     fills = load_fills()
     older, recent = split_windows(fills)
@@ -64,10 +76,14 @@ def run_backtest() -> dict:
     positions = load_positions_latest()
     if isinstance(positions, dict) and "assetPositions" not in positions:
         positions = positions.get("perp", positions)
+    # Resolved once and threaded through: compute_similarity would otherwise
+    # re-read backtest.json for every stranger it scores.
+    eff = _effective_thresholds(load_config()["alert_thresholds"])
+
     # Same account on both sides is legitimate: it IS the same account.
     target_fp = build_candidate_fingerprint(recent, positions)
     self_fp = build_candidate_fingerprint(older, positions)
-    self_score, self_dims, self_evidence = compute_similarity(target_fp, self_fp)
+    self_score, self_dims, self_evidence = compute_similarity(target_fp, self_fp, eff)
 
     # Strangers: fingerprint summaries from the latest scan sweep
     strangers = []
@@ -79,7 +95,7 @@ def run_backtest() -> dict:
             for r in scan.get("results", []):
                 cand_fp = r.get("fingerprint")
                 if cand_fp:
-                    s, _, _ = compute_similarity(target_fp, cand_fp)
+                    s, _, _ = compute_similarity(target_fp, cand_fp, eff)
                     strangers.append({"wallet": r["wallet"], "score": s})
         except Exception as e:
             print(f"[backtest] Could not score strangers: {e}")
@@ -88,17 +104,33 @@ def run_backtest() -> dict:
     best_stranger = strangers[0]["score"] if strangers else None
     rank = 1 + sum(1 for s in strangers if s["score"] >= self_score)
     margin = round(self_score - best_stranger, 4) if best_stranger is not None else None
-    passed = (rank == 1 and (margin is None or margin >= PASS_MARGIN))
+
+    zeros = zero_dimensions(self_dims)
+    vetoes = self_evidence.get("vetoes", [])
+    failures = []
+    if rank != 1:
+        failures.append(f"self-match ranked {rank}, not 1")
+    if margin is not None and margin < PASS_MARGIN:
+        failures.append(f"margin {margin} below required {PASS_MARGIN}")
+    if zeros:
+        failures.append(f"dimension(s) scored 0.0 against the trader's own "
+                        f"history: {', '.join(zeros)}")
+    if vetoes:
+        failures.append(f"self-match tripped style vetoes: {vetoes}")
+    passed = not failures
 
     report.update({
         "self_score": self_score,
         "self_dimensions": self_dims,
-        "self_vetoes": self_evidence.get("vetoes", []),
+        "self_vetoes": vetoes,
+        "zero_dimensions": zeros,
+        "excluded_dimensions": sorted(k for k, v in self_dims.items() if v is None),
         "strangers_scored": len(strangers),
         "best_stranger_score": best_stranger,
         "top_strangers": strangers[:5],
         "self_rank": rank,
         "margin_over_best_stranger": margin,
+        "failures": failures,
         "passed": passed,
     })
     _save(report)
@@ -106,12 +138,14 @@ def run_backtest() -> dict:
     status = "PASS" if passed else "FAIL"
     print(f"[backtest] {status}: self-match {self_score:.4f}, rank {rank} "
           f"of {len(strangers) + 1}, margin {margin}")
+    for f in failures:
+        print(f"[backtest] FAILURE: {f}")
+    if zeros:
+        print("[backtest] A 0.0 self-dimension is always a scoring bug: it votes "
+              "against the true trader. (None = excluded for thin data, which is fine.)")
     if not passed:
         print("[backtest] WARNING: the scorer cannot reliably distinguish Ezekiel "
               "from strangers — do not trust match alerts until this passes.")
-    if self_evidence.get("vetoes"):
-        print(f"[backtest] WARNING: self-match tripped style vetoes: "
-              f"{self_evidence['vetoes']} — veto thresholds are too tight.")
     return report
 
 
@@ -122,4 +156,9 @@ def _save(report: dict) -> None:
 
 
 if __name__ == "__main__":
-    run_backtest()
+    import sys as _sys
+    _report = run_backtest()
+    # Non-zero exit when the scorer can't recognise its own target, so the daily
+    # analyze workflow goes red instead of quietly shipping a broken fingerprint.
+    if _report.get("passed") is False:
+        _sys.exit(1)

@@ -200,33 +200,43 @@ def compute_timing_profile(fills: list[dict]) -> dict:
     }
 
 
-def compute_hold_duration(fills: list[dict]) -> dict:
-    """How long positions are held."""
-    if not fills:
-        return {"weight": 0.10, "overall_minutes": {}, "distribution_buckets": {}}
+# A 5-bucket histogram built from a handful of episodes is noise. Below this
+# many episodes the dimension reports insufficient_data and the scanner excludes
+# it (renormalizing the remaining weights) instead of scoring a misleading 0.0.
+MIN_HOLD_EPISODES = 5
 
-    # Match opens and closes per coin
-    coin_trades = defaultdict(list)
-    for f in fills:
-        coin_trades[f.get("coin", "UNKNOWN")].append(f)
+
+def compute_hold_duration(fills: list[dict]) -> dict:
+    """How long positions are held, reconstructed from position episodes.
+
+    Uses _position_episodes (startPosition-based) rather than scanning `dir`
+    strings for Open/Close. The previous matcher kept a single open_time per coin,
+    so a TWAP scale-in overwrote it and every close after the first was silently
+    dropped; a window starting mid-position (all closes, no opens) produced no
+    durations at all. Measured on the target's own history that gave 2 durations
+    from 34,244 fills in one window and 0 from 3,162 in the next, scoring the
+    trader 0.0 against himself on this dimension.
+
+    Zero-length episodes are kept: a TWAP batch filling within one millisecond is
+    a real sub-minute hold, and dropping it biased the distribution.
+    """
+    if not fills:
+        return {"weight": 0.10, "overall_minutes": {}, "distribution_buckets": {},
+                "episode_count": 0, "sufficient_data": False}
+
+    episodes = _position_episodes(fills)
 
     durations_minutes = []
     per_coin_durations = defaultdict(list)
-
-    for coin, trades in coin_trades.items():
-        sorted_trades = sorted(trades, key=lambda t: t.get("time", 0))
-        open_time = None
-        for t in sorted_trades:
-            dir_field = t.get("dir", "")
-            if "Open" in str(dir_field):
-                open_time = t.get("time", 0)
-            elif "Close" in str(dir_field) and open_time:
-                close_time = t.get("time", 0)
-                dur = (close_time - open_time) / 60000  # ms to minutes
-                if dur > 0:
-                    durations_minutes.append(dur)
-                    per_coin_durations[coin].append(dur)
-                open_time = None
+    for ep in episodes:
+        if not ep:
+            continue
+        coin = ep[0].get("coin", "UNKNOWN")
+        dur = (ep[-1].get("time", 0) - ep[0].get("time", 0)) / 60000  # ms to minutes
+        if dur < 0:
+            continue
+        durations_minutes.append(dur)
+        per_coin_durations[coin].append(dur)
 
     overall = {}
     if durations_minutes:
@@ -268,6 +278,8 @@ def compute_hold_duration(fills: list[dict]) -> dict:
         "overall_minutes": overall,
         "per_coin": per_coin_summary,
         "distribution_buckets": bucket_pcts,
+        "episode_count": len(durations_minutes),
+        "sufficient_data": len(durations_minutes) >= MIN_HOLD_EPISODES,
     }
 
 

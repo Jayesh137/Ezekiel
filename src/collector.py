@@ -232,6 +232,14 @@ def check_account_value_drop() -> None:
     current_cents = int(current_value * 100)
     prev_cents = read_cursor("prev_account_value_cents")
 
+    # True high-water mark, ratcheted upward only and never reset by an alert.
+    # The drop-alert cursor below IS reset on fire (so we don't re-alert hourly on
+    # the same collapse), and risk.py previously read that same cursor as its
+    # high-water — which zeroed drawdown_pct at the exact moment it mattered.
+    hw_cents = read_cursor("account_high_water_cents")
+    if current_cents > (hw_cents or 0):
+        write_cursor("account_high_water_cents", current_cents)
+
     if prev_cents and prev_cents > 1_000_000:  # Only check if previous reading was > $10k
         prev_value = prev_cents / 100.0
         drop_pct = (prev_value - current_value) / prev_value

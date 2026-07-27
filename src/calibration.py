@@ -58,11 +58,22 @@ def record_population_scores(scores: list[float]) -> int:
     return len(samples)
 
 
+def gate_active(population: list[float] | None = None) -> bool:
+    """Whether the gate is ENFORCING (enough samples) or merely OBSERVING.
+
+    Until this returns True the gate is open and only logs what it *would* have
+    suppressed, so switching it on can't silently start dropping real leads.
+    """
+    if population is None:
+        population = load_population()
+    return len(population) >= MIN_SAMPLES_FOR_GATE
+
+
 def score_percentile(score: float, population: list[float] | None = None) -> float | None:
     """Percentile of `score` within the population; None if too few samples."""
     if population is None:
         population = load_population()
-    if len(population) < MIN_SAMPLES_FOR_GATE:
+    if not gate_active(population):
         return None
     below = sum(1 for s in population if s < score)
     return round(100.0 * below / len(population), 2)

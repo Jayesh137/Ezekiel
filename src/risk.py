@@ -32,6 +32,23 @@ WEIGHTS = {
 }
 
 
+# Fund-movement signals only count as "migrating right now" for this long.
+# Without a bound, one outbound transfer ever contributes points forever.
+RECENT_SIGNAL_DAYS = 21
+
+
+def _detected_ts(finding: dict) -> float:
+    """Unix seconds for a fund-flow finding's detection time. Unparseable or
+    missing timestamps are treated as ancient so they cannot latch a signal on."""
+    raw = finding.get("detected_at")
+    if not raw:
+        return 0.0
+    try:
+        return datetime.fromisoformat(raw).timestamp()
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _level(score: float) -> str:
     if score >= 75:
         return "CRITICAL"
@@ -107,8 +124,11 @@ def _gather_signals() -> dict:
     last_fill = read_cursor("last_fill_time")
     signals["days_silent"] = (now_ms() - last_fill) / 86_400_000 if last_fill else 0
 
-    # Drawdown vs high-water (tracked by collector as prev_account_value_cents)
-    hw_cents = read_cursor("prev_account_value_cents")
+    # Drawdown vs the true high-water mark. This must NOT read
+    # prev_account_value_cents: the collector resets that cursor when it fires a
+    # drop alert, which drove drawdown_pct to 0.0 precisely when the account had
+    # just collapsed. account_high_water_cents only ever ratchets upward.
+    hw_cents = read_cursor("account_high_water_cents") or read_cursor("prev_account_value_cents")
     cur = 0.0
     acct_path = DATA_DIR / "account" / "latest.json"
     if acct_path.exists():
@@ -124,12 +144,18 @@ def _gather_signals() -> dict:
     else:
         signals["drawdown_pct"] = 0.0
 
-    # Fund movement (L1 + HL-native)
+    # Fund movement (L1 + HL-native). Both are time-bounded: fund_flows/latest.json
+    # keeps the last 100 findings with no expiry, so an unbounded `any()` latched
+    # this signal on permanently after a single historical transfer.
     ff_path = DATA_DIR / "fund_flows" / "latest.json"
     if ff_path.exists():
         try:
             findings = json.load(open(ff_path)).get("findings", [])
-            signals["l1_outbound"] = any(f.get("amount_usdc_raw", 0) for f in findings)
+            cutoff = datetime.now(timezone.utc).timestamp() - RECENT_SIGNAL_DAYS * 86400
+            signals["l1_outbound"] = any(
+                f.get("amount_usdc_raw", 0) and _detected_ts(f) >= cutoff
+                for f in findings
+            )
         except Exception:
             signals["l1_outbound"] = False
 
