@@ -251,16 +251,26 @@ def alert_deposit_correlation(candidate: str, confidence: float, deposit_usd: fl
     return _send_with_cooldown(f"correlation_{candidate.lower()}", 48, subject, body)
 
 
-def alert_xyz_signature_match(candidate: str, shared_markets: list, score: float) -> bool:
-    """Fire when a wallet trades the same rare xyz: HIP-3 markets as the target.
-    Almost nobody trades these, so overlap is near-conclusive."""
-    subject = "[EZEKIEL] CRITICAL: xyz: Signature Match — Same Rare HIP-3 Markets"
+def alert_xyz_signature_match(candidate: str, shared_markets: list, score: float,
+                              rarity_description: str = "") -> bool:
+    """Fire when a wallet shares HIP-3 markets that MEASUREMENT classifies as rare.
+
+    Callers must pass only markets from calibration.rare_markets(). The subject
+    previously asserted "Same Rare HIP-3 Markets" for anything named `xyz:`, which
+    made xyz:BRENTOIL — traded by ~26% of scanned wallets — look conclusive.
+    """
+    subject = "[EZEKIEL] HIGH: Shared Rare HIP-3 Markets (measured)"
     body = (
-        f"A wallet is trading the same rare HIP-3 (xyz:) markets as the target.\n"
-        f"Almost no one trades these — this is one of the strongest behavioral tells.\n\n"
+        f"A wallet shares HIP-3 markets with the target that the rolling rarity\n"
+        f"calibration classifies as rare. Rarity is measured against the wallets\n"
+        f"this scanner fingerprints, not assumed from the market name.\n\n"
         f"Candidate Wallet: {candidate}\n"
-        f"Shared xyz: markets: {', '.join(shared_markets[:8])}\n"
-        f"Behavioral similarity: {score:.0%}\n"
+        f"Rare shared markets: {', '.join(shared_markets[:8])}\n"
+        f"Measured rarity: {rarity_description or 'see scan evidence'}\n"
+        f"Behavioral similarity: {score:.0%}\n\n"
+        f"This wallet also cleared the standard disposition checks (threshold,\n"
+        f"percentile gate, persistence, style vetoes) and carries independent\n"
+        f"corroboration — a shared market alone never triggers this alert.\n"
     )
     return _send_with_cooldown(f"xyz_sig_{candidate.lower()}", 48, subject, body)
 

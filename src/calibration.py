@@ -51,6 +51,22 @@ COMMON_FREQUENCY = 0.05
 RARE_FREQUENCY = 0.002
 MAX_MARKET_BONUS = 0.12
 
+# A market may only be CALLED rare — in an alert subject, or as grounds for
+# promoting a candidate — when measurement supports it. Deliberately stricter
+# than "earns a bonus": a market can be mildly unusual (and score a small bonus)
+# without being evidence strong enough to headline a CRITICAL alert.
+#
+# Measured example: xyz:BRENTOIL sits at ~26% of eligible wallets, so it is
+# COMMON. It nevertheless produced "xyz: SIGNATURE MATCH — Same Rare HIP-3
+# Markets" CRITICAL alerts, because the alert route classified rarity by the
+# "xyz:" name prefix and never consulted this module.
+RARE_MAX_FREQUENCY = 0.01      # traded by <=1% of eligible wallets
+
+MARKET_RARE = "RARE"
+MARKET_UNUSUAL = "UNUSUAL"
+MARKET_COMMON = "COMMON"
+MARKET_UNKNOWN = "UNKNOWN"     # insufficient sample — never treated as rare
+
 
 def load_population() -> list[float]:
     if not POPULATION_PATH.exists():
@@ -268,3 +284,45 @@ def market_rarity_bonus(markets: list[str], freq: dict) -> tuple[float, list[str
                            f"rarity bonus +{share:.4f}")
     total = round(min(MAX_MARKET_BONUS, total), 4)
     return total, reasons
+
+
+# --- market rarity: classification (pure) -----------------------------------------
+
+def classify_market(market: str, freq: dict) -> str:
+    """Measured rarity class for one market.
+
+    UNKNOWN when the sample is too small to support any claim — never RARE.
+    This is the single authority on whether a market may be described as rare.
+    """
+    if not freq.get("sufficient"):
+        return MARKET_UNKNOWN
+    f = market_frequency(market, freq)
+    if f <= RARE_MAX_FREQUENCY:
+        return MARKET_RARE
+    if f < COMMON_FREQUENCY:
+        return MARKET_UNUSUAL
+    return MARKET_COMMON
+
+
+def rare_markets(markets: list, freq: dict) -> list:
+    """Subset of `markets` that measurement classifies as genuinely rare.
+
+    The alert routes must use this, never a name-prefix match: `xyz:` is a venue
+    prefix, not evidence of rarity.
+    """
+    return sorted(m for m in set(markets or []) if classify_market(m, freq) == MARKET_RARE)
+
+
+def describe_markets(markets: list, freq: dict) -> str:
+    """Accurate human phrasing for an alert subject or reason line."""
+    if not markets:
+        return "no shared markets"
+    if not freq.get("sufficient"):
+        return (f"{len(markets)} shared HIP-3 market(s), rarity UNMEASURED "
+                f"({freq.get('eligible_wallets', 0)} wallets observed, "
+                f"need {MIN_ELIGIBLE_FOR_RARITY})")
+    parts = []
+    for m in sorted(set(markets)):
+        cls = classify_market(m, freq)
+        parts.append(f"{m} ({cls.lower()}, ~{market_frequency(m, freq) * 100:.1f}% of wallets)")
+    return "; ".join(parts)

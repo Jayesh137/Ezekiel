@@ -691,8 +691,16 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     # Published so the dashboard and any reviewer can see exactly how much of the
     # score came from market overlap and why — and so disposition can refuse to
     # promote a wallet that only clears the threshold because of it.
+    _freq = (market_freq if market_freq is not None
+             else calibration.load_market_frequencies())
     evidence["market_rarity"] = {
         "shared_markets": shared_markets,
+        # The ONLY list an alert route may act on. A name prefix is not evidence.
+        "rare_markets": calibration.rare_markets(shared_markets, _freq),
+        "classification": {m: calibration.classify_market(m, _freq)
+                           for m in shared_markets},
+        "description": calibration.describe_markets(shared_markets, _freq),
+        "sample_sufficient": bool(_freq.get("sufficient")),
         "bonus_applied": round(market_bonus, 4),
         "score_without_bonus": round(score_before_market_bonus, 4),
         "explanations": market_reasons,
@@ -1031,9 +1039,44 @@ def _market_free_score(result: dict) -> float | None:
     return round(result["score"] - float(bonus), 4)
 
 
-def _rare_overlap(result: dict) -> list:
-    """xyz: HIP-3 markets the candidate shares with the target (the rarest tell)."""
+# Run-scoped guard so one sweep cannot emit dozens of equivalent market alerts.
+# Keyed on the market SET: six wallets all sharing the same market is one finding
+# repeated, not six findings. Reset at the start of every sweep.
+_market_alert_sets_this_run: set = set()
+MAX_MARKET_ALERTS_PER_RUN = 3
+
+
+def _shared_hip3_markets(result: dict) -> list:
+    """HIP-3 markets shared with the target. EVIDENCE ONLY — a name prefix says
+    nothing about rarity. Never use this to justify an alert."""
     return result.get("evidence", {}).get("asset_overlap", {}).get("rare_overlap", []) or []
+
+
+def _measured_rare_markets(result: dict) -> list:
+    """Shared markets that the persisted calibration classifies as genuinely rare.
+
+    This is the only list an alert route may act on. The previous code alerted on
+    any market whose name began with "xyz:", so xyz:BRENTOIL — measured at ~26% of
+    eligible wallets, bonus 0.0 — produced CRITICAL "Same Rare HIP-3 Markets"
+    alerts for every non-vetoed wallet that traded it.
+    """
+    mr = (result.get("evidence") or {}).get("market_rarity") or {}
+    return list(mr.get("rare_markets") or [])
+
+
+def _market_alert_allowed(markets: list) -> bool:
+    """Dedupe equivalent market findings within a single sweep, and cap the total."""
+    key = tuple(sorted(markets))
+    if key in _market_alert_sets_this_run:
+        print(f"[scanner] market signature {list(key)} already alerted this run — "
+              f"deduplicated")
+        return False
+    if len(_market_alert_sets_this_run) >= MAX_MARKET_ALERTS_PER_RUN:
+        print(f"[scanner] market-alert cap ({MAX_MARKET_ALERTS_PER_RUN}) reached "
+              f"this run; {list(key)} recorded as evidence only")
+        return False
+    _market_alert_sets_this_run.add(key)
+    return True
 
 
 def _apply_linkage(result: dict, target: str, profile: dict) -> float:
@@ -1104,7 +1147,14 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         try:
             with open(subaccounts_path) as f:
                 subs = json.load(f)
-            sub_list = subs if isinstance(subs, list) else subs.get("subaccounts", [])
+            # The HL subAccounts endpoint returns JSON null when the account has
+            # none, so `subs` is None and `.get` raised AttributeError every run.
+            if isinstance(subs, list):
+                sub_list = subs
+            elif isinstance(subs, dict):
+                sub_list = subs.get("subaccounts") or []
+            else:
+                sub_list = []
             for sub in sub_list:
                 addr = (sub.get("user", "") or sub.get("address", "")).lower()
                 if addr and addr not in priority:
@@ -1183,14 +1233,34 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         vetoes = result["evidence"].get("vetoes")
         alertable = th.can_alert(vetoes)
 
-        rare = _rare_overlap(result)
-        if rare:
-            print(f"[scanner] xyz: SIGNATURE MATCH {wallet[:10]}...: {rare}")
-            if alertable:
-                alert_xyz_signature_match(wallet, rare, score)
+        shared_markets = _shared_hip3_markets(result)
+        rare = _measured_rare_markets(result)
+        if shared_markets:
+            mr = (result.get("evidence") or {}).get("market_rarity") or {}
+            print(f"[scanner] shared HIP-3 markets {wallet[:10]}...: "
+                  f"{mr.get('description', shared_markets)}")
+        # Market evidence alone never alerts. It must be measured-rare AND clear
+        # the same disposition every other route uses AND be independently
+        # corroborated — the market itself is not corroboration.
+        if rare and alertable and _is_corroborated(result, source) \
+                and _market_alert_allowed(rare):
+            md = evaluate_candidate(wallet, score, eff, population, vetoes,
+                                    rare_overlap=True,
+                                    score_without_market_bonus=_market_free_score(result),
+                                    corroborated=True)
+            if md["action"] == th.ACTION_ALERT:
+                alert_xyz_signature_match(wallet, rare, score,
+                                          (result["evidence"]["market_rarity"]
+                                           ["description"]))
             else:
-                print(f"[scanner] xyz: alert suppressed for {wallet[:10]}... (style veto); "
-                      f"still watchlisted with evidence")
+                print(f"[scanner] rare-market alert withheld for {wallet[:10]}...: "
+                      f"{'; '.join(md['blockers'])}")
+        elif rare and not alertable:
+            print(f"[scanner] rare-market alert suppressed for {wallet[:10]}... "
+                  f"(style veto); evidence retained on watchlist")
+        elif rare:
+            print(f"[scanner] rare markets {rare} for {wallet[:10]}... recorded as "
+                  f"evidence — no independent corroboration, so no alert")
 
         # Vault, referral, and L1-clustering checks for promising candidates
         bonus_cap = VETO_BONUS_CEILING if vetoes else 1.0
@@ -1261,6 +1331,9 @@ def scan_leaderboard():
     """Main scanning loop: check leaderboard wallets against fingerprint."""
     config = load_config()
     target = config["target_wallet"].lower()
+    # Fresh dedup state per sweep: the guard bounds alerts within a run, it must
+    # not silence a genuine finding on the next one.
+    _market_alert_sets_this_run.clear()
     eff = _effective_thresholds(config["alert_thresholds"])
     scanner_config = config["scanner"]
     # Loaded up front so priority targets and the leaderboard sweep share one
@@ -1354,20 +1427,34 @@ def scan_leaderboard():
         # xyz: HIP-3 signature — trading these rare markets is near-conclusive on
         # its own, so a leaderboard wallet sharing them is auto-promoted and alerted
         # even if its overall score is modest (it may be a fresh, thin-history wallet).
-        rare = _rare_overlap(result)
+        shared_markets = _shared_hip3_markets(result)
+        rare = _measured_rare_markets(result)
         vetoes = evidence.get("vetoes")
-        if rare:
-            print(f"[scanner] xyz: SIGNATURE MATCH (leaderboard): {wallet} {rare}")
-            if th.can_alert(vetoes):
-                alert_xyz_signature_match(wallet, rare, score)
-            else:
-                print(f"[scanner] xyz: alert suppressed for {wallet[:10]}... (style veto); "
-                      f"still watchlisted with evidence")
 
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+        # A leaderboard wallet has no independent evidence by construction — it was
+        # not reached via fund flow, HL-native transfer or correlation. So a shared
+        # market, however rare, can only earn it a watchlist slot here.
+        disp = evaluate_candidate(wallet, score, eff, population, vetoes,
+                                  bool(shared_markets),
                                   _market_free_score(result),
                                   corroborated=_is_corroborated(result))
         result["disposition"] = disp
+
+        if rare:
+            if not th.can_alert(vetoes):
+                print(f"[scanner] rare markets {rare} for {wallet[:10]}... — style "
+                      f"veto, evidence retained, no alert")
+            elif disp["action"] == th.ACTION_ALERT and _market_alert_allowed(rare):
+                alert_xyz_signature_match(
+                    wallet, rare, score,
+                    result["evidence"]["market_rarity"]["description"])
+            else:
+                print(f"[scanner] rare markets {rare} for {wallet[:10]}... recorded "
+                      f"as evidence; not promoted ({disp['action']})")
+        elif shared_markets:
+            mr = (result.get("evidence") or {}).get("market_rarity") or {}
+            print(f"[scanner] shared HIP-3 markets {wallet[:10]}...: "
+                  f"{mr.get('description', shared_markets)} — not rare, no alert")
 
         # Keep anything watchlisted or better in the scan output and on the
         # persistent watchlist — suppression downgrades, it never discards.
@@ -1458,11 +1545,28 @@ def scan_leaderboard():
             if days_silent >= 5 and results:
                 top = results[0]
                 corr_threshold = min(0.75, eff["medium"])
-                if (top["score"] >= corr_threshold
-                        and th.can_alert(top.get("evidence", {}).get("vetoes"))
-                        and calibration.passes_percentile_gate(top["score"], population)):
+                # Prolonged silence IS independent corroboration: the target going
+                # quiet and a lookalike appearing are two separate observations, so
+                # this route may legitimately waive the persistence requirement a
+                # behaviour-only match must satisfy. That waiver is now expressed
+                # through the central disposition (corroborated=True) instead of
+                # bypassing it, so vetoes, the percentile gate and the
+                # market-bonus protection all still apply.
+                corr_disp = evaluate_candidate(
+                    top["wallet"], top["score"], eff, population,
+                    top.get("evidence", {}).get("vetoes"),
+                    rare_overlap=bool(_measured_rare_markets(top)),
+                    score_without_market_bonus=_market_free_score(top),
+                    corroborated=True,
+                )
+                if top["score"] >= corr_threshold and corr_disp["action"] == th.ACTION_ALERT:
                     print(f"[scanner] MIGRATION CORRELATION: {days_silent:.1f}d silence + {top['score']:.4f} candidate")
                     alert_migration_correlation(top["wallet"], top["score"], round(days_silent, 1))
+                else:
+                    print(f"[scanner] migration correlation withheld for "
+                          f"{top['wallet'][:10]}... ({top['score']:.4f}, "
+                          f"{days_silent:.1f}d silence): "
+                          f"{'; '.join(corr_disp['blockers']) or 'below correlation threshold'}")
     except Exception as e:
         print(f"[scanner] Migration correlation check failed: {e}")
 
