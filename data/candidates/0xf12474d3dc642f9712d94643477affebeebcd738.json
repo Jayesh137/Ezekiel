@@ -1,19 +1,20 @@
 {
   "wallet": "0xf12474d3dc642f9712d94643477affebeebcd738",
   "first_seen": "2026-07-06T17:48:37.722510+00:00",
-  "last_seen": "2026-07-27T19:19:33.157425+00:00",
+  "last_seen": "2026-07-27T20:18:09.199624+00:00",
   "best_score": 0.3037,
-  "latest_score": 0.2343,
+  "latest_score": 0.1699,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:BRENTOIL",
-      "Similar holding-duration profile"
+      "No market-rarity bonus: only 0 wallets observed (need 50) \u2014 treating rarity as unproven",
+      "Market bonus withheld: style veto in force"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Different active trading hours"
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [
       "Decision frequency 17x apart (1.41 vs 23.98 position episodes/day)"
@@ -67,6 +68,20 @@
         "xyz:BRENTOIL"
       ],
       "jaccard": 0.027
+    },
+    "market_rarity": {
+      "shared_markets": [
+        "xyz:BRENTOIL"
+      ],
+      "bonus_applied": 0.0,
+      "score_without_bonus": 0.1699,
+      "explanations": [
+        "No market-rarity bonus: only 0 wallets observed (need 50) \u2014 treating rarity as unproven",
+        "Market bonus withheld: style veto in force"
+      ],
+      "frequencies": {
+        "xyz:BRENTOIL": 0.5
+      }
     }
   },
   "score_history": [
@@ -1950,8 +1965,27 @@
         "position_management": 0.6718,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-27T20:18:09.199624+00:00",
+      "score": 0.1699,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.027,
+        "timing_profile": null,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 0.7632,
+        "hold_duration": null,
+        "account_size": 0.4917,
+        "trade_sequencing": 0.6791,
+        "position_sizing": 0.0,
+        "activity": 0.4662,
+        "direction_bias": 0.514,
+        "position_management": 0.6718,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2348
+  "recent_avg_score": 0.2251
 }
