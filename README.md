@@ -35,7 +35,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 97 passed
+.\.venv\Scripts\python.exe -m pytest -q          # expect: 139 passed
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
@@ -99,9 +99,10 @@ Before trusting a change to scoring or matching:
 Every job that commits data shares the `data-commit` concurrency group so pushes
 serialise instead of racing on rebase.
 
-**Collection cadence is 15 minutes, not 5.** A `*/5` cron was configured for
-months but GitHub only ran it ~12–17 times a day, because each job began with a
-checkout of a 749 MB data tree against a 4-minute timeout. See *Storage* below.
+**Collection cadence is 15 minutes, not 5.** A `*/5` cron ran for months but
+GitHub honoured only ~5% of it (measured: 14.9 runs/day, median gap 83 min, and
+never once a 5-minute gap). See *Monitoring limits* for the measurement and
+*Storage* for the checkout cost that made short intervals unaffordable.
 
 ### Secrets
 
@@ -115,7 +116,7 @@ Everything degrades gracefully without them — modules log and continue.
 
 ## Storage
 
-`data/` is **85 MB** (was 749 MB). Growth is bounded by:
+`data/` is **~104 MB** (813 MB before compaction). Growth is bounded by:
 
 - Snapshots (`positions`, `account`, `spot`, `positions_hip3_xyz`, `orders`)
   older than 7 days roll into one gzipped JSONL per day. `account` also keeps a
@@ -134,6 +135,32 @@ Everything degrades gracefully without them — modules log and continue.
 cannot be re-fetched. The script refuses to delete an archive source until it has
 read the archive back and matched the record count. Take a backup outside the
 working tree before running `--apply` anyway.
+
+`scripts/compact_data.py --apply` runs daily in `analyze.yml`. Without a scheduled
+run the bound is a one-off: per-minute snapshots and re-polled `historicalOrders`
+regrow `data/` to ~800 MB within weeks.
+
+## When the backtest is inconclusive
+
+`src/backtest.py` reports three states, not two:
+
+| State | Meaning | Effect on thresholds |
+|---|---|---|
+| PASS | Scorer ranks the target above every stranger by ≥0.05 | Adapted to the proven ceiling |
+| INCONCLUSIVE | Windows span too few *distinct trading days* to judge | Reuse last proven ceiling, else raw config |
+| FAIL | A stranger outranks the target | Raw config — a broken scorer never relaxes the bar |
+
+A fill count cannot detect a degenerate window: 8,000 TWAP fills across 4 sessions
+is not 8,000 independent observations, so both windows must also span
+`MIN_WINDOW_DAYS` separate days.
+
+**This matters operationally.** With no previously-validated ceiling, thresholds
+stay at the raw config 0.90/0.80/0.65, which is unreachable for a trader whose
+demonstrated self-similarity is ~0.59 — so behavioural alerting and the
+behavioural watchlist are effectively off. The scanner prints an explicit WARNING
+when this is the case. Fund-flow, HL-native, deposit-correlation and
+transfer-graph detection are unaffected. It self-heals once the target trades on
+enough separate days to re-validate.
 
 ## Matching: thresholds and dispositions
 

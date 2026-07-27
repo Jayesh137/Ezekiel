@@ -23,10 +23,21 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements-analysis.txt
+      # Roll closed days into archives and drop cross-file duplicates. Without a
+      # scheduled run the storage bound is a one-off: per-minute snapshots and
+      # re-polled historicalOrders regrow data/ to ~800MB within weeks, which is
+      # what pushed job checkout past the collect timeout in the first place.
+      # Runs before the fingerprint so the rebuild reads the compacted tree.
+      - name: Compact data
+        run: python scripts/compact_data.py --apply
       - name: Rebuild fingerprint
         run: python src/fingerprint.py
       - name: Build trader profile
         run: python src/profile_builder.py
+      # Refresh the manifest so the dashboard sees the archived days and the
+      # compact account series produced above.
+      - name: Refresh data index
+        run: python -c "from src.utils import update_index; update_index()"
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
