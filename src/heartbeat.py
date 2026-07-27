@@ -1,13 +1,18 @@
 # src/heartbeat.py
 """Watches the watcher: alerts when data collection has gone stale.
 
-The system was silently dead for 21 days (last automated commit 2026-07-06)
-because nothing monitored the collector itself. check_silence() in collector.py
-detects a silent *trader*, but it only runs if the collector is running — the one
-failure mode it cannot cover is its own.
+check_silence() in collector.py detects a silent *trader*, but it only runs if the
+collector is running — the one failure mode it cannot cover is its own. Nothing
+previously monitored the collector itself.
 
-This runs on its own schedule and only reads committed data, so it stays green
-even when every collection job is failing.
+No outage has been observed: remote workflows have run continuously and
+successfully. What IS measured is heavy schedule throttling — GitHub delivered
+about 14.9 collection runs per day against a requested five-minute cron — so the
+staleness threshold below is derived from observed run gaps rather than from the
+cron expression.
+
+This only reads committed data, so it stays green (and keeps reporting) even when
+every collection job is failing.
 """
 
 import json

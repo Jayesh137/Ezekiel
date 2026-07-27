@@ -312,11 +312,14 @@ def alert_collection_stale(age_minutes: float | None, threshold_minutes: float) 
         f"No new data has been collected for {age_desc} "
         f"(alert threshold: {threshold_minutes:.0f} minutes).\n\n"
         f"While collection is down the system cannot detect a migration, and "
-        f"Hyperliquid only serves ~2000 recent entries per endpoint — data not "
-        f"captured now is permanently lost.\n\n"
+        f"Hyperliquid serves only ~2000 recent entries per endpoint, so a long "
+        f"enough gap would put older activity beyond reach.\n\n"
         f"Check: GitHub Actions tab -> 'Collect Trading Data' workflow.\n"
-        f"Common causes: workflow disabled after repo inactivity, job timeout, "
-        f"or exhausted Actions minutes.\n"
+        f"Note: this repo's schedule is heavily throttled by GitHub (~14.9 runs/day "
+        f"against a 15-minute request), so gaps of a few hours are normal; this "
+        f"alert only fires past {threshold_minutes:.0f} minutes.\n"
+        f"Common causes: exhausted Actions minutes, revoked workflow write "
+        f"permissions, or a job failing before its commit step.\n"
     )
     return _send_with_cooldown("collection_stale", 24, subject, body)
 
