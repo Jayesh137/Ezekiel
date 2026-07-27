@@ -1,5 +1,20 @@
 # src/alerts.py
-"""Email alert system via Brevo SMTP."""
+"""Email alert system via Brevo SMTP.
+
+Credentials come from three environment variables, all supplied as GitHub secrets:
+
+    BREVO_SMTP_LOGIN   SMTP username — the login shown in Brevo under
+                       Settings -> SMTP & API -> SMTP, of the form
+                       <id>@smtp-brevo.com. NOT the Brevo account email.
+    BREVO_SMTP_KEY     SMTP password — an SMTP key from the same page.
+                       NOT the account password and NOT a v3 REST API key.
+    ALERT_EMAIL        Recipient, and the From address. Brevo will reject a
+                       From address that is not a verified sender on the account.
+
+This previously authenticated as the literal username "apikey", which is
+SendGrid's convention — Brevo does not accept it and answered every send with
+535 5.7.8 Authentication failed, no matter how valid the key was.
+"""
 
 import os
 import smtplib
@@ -7,6 +22,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from src.utils import now_ms, read_cursor, write_cursor
+
+SMTP_HOST = "smtp-relay.brevo.com"
+SMTP_PORT = 587  # STARTTLS
 
 # Once a send fails (e.g. bad SMTP credentials), it will keep failing for the
 # rest of this run. Short-circuit so a batch of alerts doesn't attempt hundreds
@@ -38,11 +56,23 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
         print(f"[alerts] SMTP disabled after earlier failure this run, skipping: {subject}")
         return False
 
+    smtp_login = os.environ.get("BREVO_SMTP_LOGIN")
     smtp_key = os.environ.get("BREVO_SMTP_KEY")
     alert_email = os.environ.get("ALERT_EMAIL")
 
-    if not smtp_key or not alert_email:
-        print(f"[alerts] SMTP not configured. Alert: {subject}")
+    # Name what is missing, never its value.
+    missing = [name for name, value in (
+        ("BREVO_SMTP_LOGIN", smtp_login),
+        ("BREVO_SMTP_KEY", smtp_key),
+        ("ALERT_EMAIL", alert_email),
+    ) if not value]
+    if missing:
+        print(f"[alerts] SMTP not configured — missing: {', '.join(missing)}. "
+              f"Alert not sent: {subject}")
+        if "BREVO_SMTP_LOGIN" in missing:
+            print("[alerts] BREVO_SMTP_LOGIN is the SMTP login from Brevo "
+                  "Settings -> SMTP & API (<id>@smtp-brevo.com), not the account "
+                  "email and not an API key.")
         print(f"[alerts] {body[:200]}")
         return False
 
@@ -56,14 +86,34 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
         msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP("smtp-relay.brevo.com", 587) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
-            server.login("apikey", smtp_key)
+            # Username is the Brevo SMTP login, password is the SMTP key. Passing
+            # the literal "apikey" here (SendGrid's convention) is what produced
+            # 535 5.7.8 Authentication failed on every send.
+            server.login(smtp_login, smtp_key)
             server.sendmail(msg["From"], [alert_email], msg.as_string())
         print(f"[alerts] Sent: {subject}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        # Credentials were rejected. Report the server's code and the variable
+        # names involved — never the values.
+        print(f"[alerts] SMTP authentication REJECTED by {SMTP_HOST} "
+              f"(code {e.smtp_code}). Check that BREVO_SMTP_LOGIN is the SMTP "
+              f"login from Brevo Settings -> SMTP & API (<id>@smtp-brevo.com) and "
+              f"that BREVO_SMTP_KEY is an SMTP key from that same page — the "
+              f"account password and v3 API keys are not accepted.")
+        _smtp_disabled_this_run = True
+        print("[alerts] Disabling further sends for this run.")
+        return False
+    except smtplib.SMTPSenderRefused as e:
+        print(f"[alerts] Sender address refused (code {e.smtp_code}). ALERT_EMAIL "
+              f"must be a verified sender on the Brevo account.")
+        _smtp_disabled_this_run = True
+        print("[alerts] Disabling further sends for this run.")
+        return False
     except Exception as e:
-        print(f"[alerts] Failed to send: {e}")
+        print(f"[alerts] Failed to send ({type(e).__name__}): {e}")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
         return False
