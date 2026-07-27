@@ -236,6 +236,16 @@ def update_index() -> None:
             index["files"][data_type] = dates
             index["stats"][f"total_{data_type}_snapshots"] = snapshot_count
 
+            # Archived days: rolled into one gzipped JSONL each by
+            # scripts/compact_data.py. Advertised so readers know the day exists
+            # and where to find it, rather than 404-ing on the old snapshot path.
+            archive_dir = type_dir / "archive"
+            if archive_dir.exists():
+                archived = sorted(f.stem.replace(".jsonl", "")
+                                  for f in archive_dir.glob("*.jsonl.gz"))
+                if archived:
+                    index.setdefault("archived", {})[data_type] = archived
+
             # Include per-date snapshot filenames for account data (used by dashboard charts)
             if data_type == "account":
                 snapshots_by_date = {}
@@ -246,6 +256,12 @@ def update_index() -> None:
                     if files:
                         snapshots_by_date[d] = files
                 index["account_snapshots"] = snapshots_by_date
+                # Compact per-day account series for archived days — a few KB each
+                # and directly fetchable, so chart history survives compaction.
+                daily_dir = type_dir / "daily"
+                if daily_dir.exists():
+                    index["account_daily"] = sorted(
+                        f.stem for f in daily_dir.glob("*.json"))
 
     for data_type in singleton_types:
         type_dir = DATA_DIR / data_type

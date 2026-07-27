@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
-	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr } from '$lib/api.js';
+	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr,
+	         getThresholds, tierFor } from '$lib/api.js';
 	import Chart from 'chart.js/auto';
 
 	let scan = null;
@@ -34,16 +35,25 @@
 		loading = false;
 	});
 
+	// Tier against the thresholds the backend actually alerted on, published in
+	// scans/latest.json. Hardcoding 0.90/0.80 here made wallets that emailed as
+	// HIGH matches render as unremarkable leads.
+	$: thresholds = getThresholds(scan);
+
 	function getConfidenceClass(score) {
-		if (score >= 0.90) return 'badge-green';
-		if (score >= 0.80) return 'badge-yellow';
-		return 'badge-blue';
+		const tier = tierFor(score, thresholds);
+		if (tier === 'CONFIRMED') return 'badge-green';
+		if (tier === 'WATCH') return 'badge-yellow';
+		if (tier === 'WEAK') return 'badge-blue';
+		return 'badge-grey';
 	}
 
 	function getConfidenceLabel(score) {
-		if (score >= 0.90) return 'CONFIRMED';
-		if (score >= 0.80) return 'WATCH';
-		return 'LEAD';
+		const tier = tierFor(score, thresholds);
+		if (tier === 'CONFIRMED') return 'CONFIRMED';
+		if (tier === 'WATCH') return 'WATCH';
+		if (tier === 'WEAK') return 'LEAD';
+		return 'BACKGROUND';
 	}
 
 	function getCandidateData(wallet) {
@@ -319,7 +329,7 @@
 								{/if}
 							</div>
 							<div class="result-score">
-								<strong class:text-green={r.score >= 0.90} class:text-yellow={r.score >= 0.80 && r.score < 0.90} class:text-muted={r.score < 0.80}>
+								<strong class:text-green={tierFor(r.score, thresholds) === 'CONFIRMED'} class:text-yellow={tierFor(r.score, thresholds) === 'WATCH'} class:text-muted={tierFor(r.score, thresholds) === 'BACKGROUND'}>
 									{(r.score * 100).toFixed(1)}%
 								</strong>
 								<span class="badge {getConfidenceClass(r.score)}">{getConfidenceLabel(r.score)}</span>
@@ -339,7 +349,7 @@
 										<polyline
 											points={sparkPts}
 											fill="none"
-											stroke={r.score >= 0.80 ? 'var(--accent-green)' : 'var(--accent-cyan)'}
+											stroke={r.score >= thresholds.medium ? 'var(--accent-green)' : 'var(--accent-cyan)'}
 											stroke-width="1.5"
 											stroke-linecap="round"
 											stroke-linejoin="round"

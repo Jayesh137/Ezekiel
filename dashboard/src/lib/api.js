@@ -112,7 +112,7 @@ export async function fetchCorrelations() {
 export async function fetchScanHistory(index) {
 	const dates = index?.files?.scans || [];
 	if (!dates.length) return [];
-	const all = await Promise.all(dates.map(d => fetchDaily('scans', d)));
+	const all = await mapLimit(dates, (d) => fetchDaily('scans', d));
 	return all.filter(Boolean).flat();
 }
 
@@ -134,40 +134,90 @@ export async function fetchPortfolio() {
  * @param {object} index - The data index with account_snapshots map
  * @returns {Promise<Array<{time, accountValue, totalPnl, marginUsed, totalNotional}>>}
  */
-export async function fetchAccountHistory(index) {
-	const snapMap = index?.account_snapshots;
-	if (!snapMap) return [];
-
-	const tasks = [];
-	for (const [date, files] of Object.entries(snapMap)) {
-		// Sample: take every Nth snapshot to keep requests reasonable
-		const step = files.length > 20 ? Math.ceil(files.length / 20) : 1;
-		for (let i = 0; i < files.length; i += step) {
-			tasks.push({ date, file: files[i] });
+/**
+ * Run async tasks with bounded concurrency.
+ *
+ * The previous fetchAccountHistory issued one Promise.all over every task —
+ * ~2,600 simultaneous fetches — while its comment claimed it batched. Anything
+ * fanning out over dated files must go through here.
+ * @template T,R
+ * @param {T[]} items
+ * @param {(item: T) => Promise<R>} fn
+ * @param {number} limit
+ * @returns {Promise<R[]>}
+ */
+async function mapLimit(items, fn, limit = 8) {
+	const results = new Array(items.length);
+	let next = 0;
+	const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+		while (next < items.length) {
+			const i = next++;
+			results[i] = await fn(items[i]);
 		}
-	}
+	});
+	await Promise.all(workers);
+	return results;
+}
 
-	const results = await Promise.all(
-		tasks.map(async ({ date, file }) => {
-			const data = await fetchJSON(`data/account/${date}/${file}`);
-			if (!data) return null;
-			const perp = data.perp || data;
-			const ms = perp.marginSummary || perp.crossMarginSummary || {};
-			const positions = perp.assetPositions || [];
-			const totalPnl = positions.reduce((sum, ap) => {
-				return sum + parseFloat(ap?.position?.unrealizedPnl || 0);
-			}, 0);
-			const [hh, mm] = file.replace('.json', '').split('-');
+/**
+ * Fetch account value history.
+ *
+ * Days older than the live window are compacted into `data/account/daily/{date}.json`
+ * (a few KB each) by scripts/compact_data.py; recent days still have per-minute
+ * snapshots. Prefers the compact form and falls back to sampling snapshots.
+ * @param {object} index - The data index
+ * @returns {Promise<Array<{time:number, accountValue:number, totalPnl:number, marginUsed:number, totalNotional:number}>>}
+ */
+export async function fetchAccountHistory(index) {
+	const out = [];
+
+	// 1. Compact daily series for archived days.
+	const dailyDates = index?.account_daily || [];
+	const dailyRows = await mapLimit(dailyDates, async (date) => {
+		const rows = await fetchJSON(`data/account/daily/${date}.json`);
+		if (!Array.isArray(rows)) return [];
+		return rows.map((r) => {
+			const [hh, mm] = String(r.t).split('-');
 			return {
 				time: new Date(`${date}T${hh}:${mm}:00Z`).getTime(),
-				accountValue: parseFloat(ms.accountValue || 0),
-				totalPnl,
-				marginUsed: parseFloat(ms.totalMarginUsed || 0),
-				totalNotional: parseFloat(ms.totalNtlPos || 0),
+				accountValue: r.av ?? 0,
+				totalPnl: r.pnl ?? 0,
+				marginUsed: r.mu ?? 0,
+				totalNotional: r.ntl ?? 0
 			};
-		})
-	);
-	return results.filter(Boolean).sort((a, b) => a.time - b.time);
+		});
+	});
+	for (const rows of dailyRows) out.push(...rows);
+
+	// 2. Live (un-archived) days still stored as per-minute snapshots.
+	const snapMap = index?.account_snapshots || {};
+	const tasks = [];
+	for (const [date, files] of Object.entries(snapMap)) {
+		if (dailyDates.includes(date)) continue; // already covered by the compact series
+		const step = files.length > 20 ? Math.ceil(files.length / 20) : 1;
+		for (let i = 0; i < files.length; i += step) tasks.push({ date, file: files[i] });
+	}
+	const snapRows = await mapLimit(tasks, async ({ date, file }) => {
+		const data = await fetchJSON(`data/account/${date}/${file}`);
+		if (!data) return null;
+		const perp = data.perp || data;
+		const ms = perp.marginSummary || perp.crossMarginSummary || {};
+		const totalPnl = (perp.assetPositions || []).reduce(
+			(sum, ap) => sum + parseFloat(ap?.position?.unrealizedPnl || 0),
+			0
+		);
+		const [hh, mm] = file.replace('.json', '').split('-');
+		return {
+			time: new Date(`${date}T${hh}:${mm}:00Z`).getTime(),
+			accountValue: parseFloat(ms.accountValue || 0),
+			totalPnl,
+			marginUsed: parseFloat(ms.totalMarginUsed || 0),
+			totalNotional: parseFloat(ms.totalNtlPos || 0)
+		};
+	});
+	for (const r of snapRows) if (r) out.push(r);
+
+	return out.sort((a, b) => a.time - b.time);
 }
 
 /**
@@ -177,8 +227,59 @@ export async function fetchAccountHistory(index) {
 export async function fetchAllFunding(index) {
 	const dates = index?.files?.funding || [];
 	if (!dates.length) return [];
-	const all = await Promise.all(dates.map(d => fetchDaily('funding', d)));
+	const all = await mapLimit(dates, (d) => fetchDaily('funding', d));
 	return all.flat().filter(Boolean).sort((a, b) => (a.time || 0) - (b.time || 0));
+}
+
+/**
+ * Effective match thresholds, as resolved by the backend for the latest scan.
+ *
+ * The backend adapts thresholds to the self-match ceiling from the backtest
+ * (typically ~0.51/0.46/0.41, not the raw 0.90/0.80/0.65 in config.json). The
+ * dashboard used to hardcode 0.90/0.80, so a wallet that emailed as a HIGH match
+ * rendered as unremarkable grey. Always tier through these.
+ * @param {object|null} scan - data/scans/latest.json
+ * @returns {{high:number, medium:number, low:number, source:string}}
+ */
+export function getThresholds(scan) {
+	const t = scan?.thresholds;
+	if (t && typeof t.high === 'number') return t;
+	// Pre-compaction scans stored raw config keys; fall back so old data still renders.
+	if (t && typeof t.similarity_high === 'number') {
+		return {
+			high: t.similarity_high,
+			medium: t.similarity_medium,
+			low: t.similarity_low,
+			source: 'legacy'
+		};
+	}
+	return { high: 0.9, medium: 0.8, low: 0.65, source: 'default' };
+}
+
+/**
+ * Tier label for a score under the given thresholds. Mirrors src/thresholds.py.
+ * @param {number} score
+ * @param {{high:number, medium:number, low:number}} th
+ * @returns {'CONFIRMED'|'WATCH'|'WEAK'|'BACKGROUND'}
+ */
+export function tierFor(score, th) {
+	if (score >= th.high) return 'CONFIRMED';
+	if (score >= th.medium) return 'WATCH';
+	if (score >= th.low) return 'WEAK';
+	return 'BACKGROUND';
+}
+
+/**
+ * Badge class for a score, tiered against the backend's effective thresholds.
+ * @param {number} score
+ * @param {{high:number, medium:number, low:number}} th
+ */
+export function badgeFor(score, th) {
+	const tier = tierFor(score, th);
+	if (tier === 'CONFIRMED') return 'badge-green';
+	if (tier === 'WATCH') return 'badge-yellow';
+	if (tier === 'WEAK') return 'badge-cyan';
+	return 'badge-grey';
 }
 
 /**
@@ -244,9 +345,13 @@ export function getDataFreshnessMinutes(index) {
  * @param {object|null} candidates
  * @param {object|null} hlTransfers
  */
-export function getAlertState(fundFlows, candidates, hlTransfers) {
+export function getAlertState(fundFlows, candidates, hlTransfers, scan = null) {
 	const findings = fundFlows?.findings || [];
 	const cands = candidates?.candidates || [];
+	// Tier against the backend's effective thresholds. Hardcoding 0.90/0.80 here
+	// meant the banner stayed silent on wallets the backend had already emailed
+	// about as HIGH matches (live example: a 0.749 top candidate).
+	const th = getThresholds(scan);
 
 	if (findings.some(f => f.deposited_to_hl)) {
 		return { level: 'critical', msg: 'Fund trace found a wallet that deposited to Hyperliquid.' };
@@ -262,11 +367,18 @@ export function getAlertState(fundFlows, candidates, hlTransfers) {
 		return { level: 'warn', msg: 'Outbound USDC transfers detected from target wallet.' };
 	}
 	const top = cands[0];
-	if (top?.best_score >= 0.90) {
-		return { level: 'high', msg: `Confirmed behavioral match at ${(top.best_score * 100).toFixed(1)}%`, wallet: top.wallet };
-	}
-	if (top?.best_score >= 0.80) {
-		return { level: 'medium', msg: `Strong behavioral lead at ${(top.best_score * 100).toFixed(1)}%`, wallet: top.wallet };
+	const score = top?.best_score;
+	if (typeof score === 'number') {
+		const pct = (score * 100).toFixed(1);
+		if (score >= th.high) {
+			return { level: 'high', msg: `Confirmed behavioral match at ${pct}%`, wallet: top.wallet };
+		}
+		if (score >= th.medium) {
+			return { level: 'medium', msg: `Strong behavioral lead at ${pct}%`, wallet: top.wallet };
+		}
+		if (score >= th.low) {
+			return { level: 'watch', msg: `Watchlisted behavioral lead at ${pct}%`, wallet: top.wallet };
+		}
 	}
 	return null;
 }
