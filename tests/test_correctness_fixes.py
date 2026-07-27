@@ -254,3 +254,37 @@ def test_rare_market_bonus_still_applies_without_veto():
     plain_score, _, _ = compute_similarity(plain_a, plain_b, eff)
     assert not ev["vetoes"]
     assert rare_score > plain_score, "rare-market bonus should still reward clean matches"
+
+
+# --- heartbeat threshold must sit above the MEASURED scheduling jitter ----------
+
+def test_stale_threshold_exceeds_observed_scheduling_jitter():
+    """GitHub honours ~5% of this repo's high-frequency cron. Measured over the
+    100 most recent collect runs: median gap 83 min, p90 160 min, max 220 min.
+    A threshold at or below that range produces routine false alarms."""
+    OBSERVED_MAX_GAP_MIN = 220
+    assert heartbeat.STALE_AFTER_MINUTES > OBSERVED_MAX_GAP_MIN, (
+        f"threshold {heartbeat.STALE_AFTER_MINUTES} would fire on normal jitter "
+        f"(observed max gap {OBSERVED_MAX_GAP_MIN} min)")
+    # Normal-but-slow intervals must NOT be reported stale.
+    for gap in (46, 83, 160, 220):
+        assert heartbeat.is_stale(gap) is False, f"{gap} min wrongly flagged stale"
+    # A genuine multi-day stall must be.
+    assert heartbeat.is_stale(24 * 60) is True
+
+
+def test_collector_freshness_selfcheck_is_silent_when_fresh(monkeypatch, capsys):
+    """The inline check backs up the heartbeat when its schedule is dropped."""
+    from src import collector
+    monkeypatch.setattr("src.heartbeat.data_age_minutes", lambda *a, **k: 30.0)
+    collector.check_own_freshness()
+    assert "had stalled" not in capsys.readouterr().out
+
+    monkeypatch.setattr("src.heartbeat.data_age_minutes", lambda *a, **k: 5000.0)
+    collector.check_own_freshness()
+    assert "had stalled" in capsys.readouterr().out
+
+    # No index yet (first run) must not report a stall.
+    monkeypatch.setattr("src.heartbeat.data_age_minutes", lambda *a, **k: None)
+    collector.check_own_freshness()
+    assert "had stalled" not in capsys.readouterr().out

@@ -237,6 +237,26 @@ def compute_migration_risk() -> None:
     run_risk()
 
 
+def check_own_freshness() -> None:
+    """Self-report a collection stall from inside the collector.
+
+    The heartbeat workflow is triggered by the same GitHub scheduler it supervises,
+    and that scheduler drops ~95% of high-frequency runs here. This inline check
+    means a collector that IS running will report a preceding gap even if the
+    heartbeat workflow never fired. It cannot detect a total scheduling outage —
+    nothing inside Actions can.
+    """
+    from src.heartbeat import STALE_AFTER_MINUTES, data_age_minutes, is_stale
+
+    age = data_age_minutes()
+    if age is None:
+        return  # first ever run, or no index yet
+    if is_stale(age, STALE_AFTER_MINUTES):
+        print(f"[collector] NOTE: {age:.0f} min since the last recorded update "
+              f"(threshold {STALE_AFTER_MINUTES}) — collection had stalled before "
+              f"this run; catching up now.")
+
+
 def check_silence() -> None:
     """Alert if the target has not traded in 3+ days. Cooldown: once per 24h."""
     last_fill_ts = read_cursor("last_fill_time")
@@ -314,6 +334,8 @@ def main():
 
     # Each step runs independently — one failed API response must not kill the run.
     steps = [
+        # Runs first: reports the gap BEFORE this run overwrites the index.
+        ("freshness self-check", check_own_freshness),
         ("positions", lambda: collect_positions(wallet)),
         ("fills", lambda: print(f"[collector] {collect_fills(wallet)} new fills")),
         ("orders", lambda: collect_orders(wallet)),

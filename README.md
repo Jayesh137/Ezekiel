@@ -205,3 +205,44 @@ docs/           architecture.md (see caveat below), plans, specs
 - `scripts/dedupe_fills_by_tid.py` looks like a one-off. Not reviewed.
 - The repo must stay public for `raw.githubusercontent.com` and Pages to work, so
   `research/` documents are world-readable. Deliberate, but worth remembering.
+
+## Monitoring limits (read this before trusting the heartbeat)
+
+GitHub does not honour high-frequency cron on this repo. Measured over the 100
+most recent `collect` runs (160.9 h span, 2026-07-27):
+
+| | |
+|---|---|
+| Requested (`*/5`) | 288 runs/day |
+| **Observed** | **14.9 runs/day (5.2%)** |
+| Gap median / p90 / max | 83 / 160 / 220 min |
+| Smallest gap ever seen | 46 min — the 5-minute schedule was never once honoured |
+
+Two consequences:
+
+1. **Cadence is a request, not a guarantee.** `*/15` will not give 15-minute
+   resolution; expect roughly hourly in practice. Treat collection resolution as
+   ~1–3 h when reasoning about detection latency.
+2. **`STALE_AFTER_MINUTES` is 360**, set above the observed 220-minute maximum. A
+   tighter threshold produces routine false alarms rather than useful signal.
+
+### What the heartbeat cannot do
+
+It is triggered by the same scheduler it supervises. If scheduling stops
+completely, the heartbeat stops too and **no alert is sent**. Mitigations, in
+order of independence:
+
+1. `workflow_run` — the heartbeat also fires when any data workflow completes, so
+   freshness is checked on an event rather than only on a timer.
+2. `collector.check_own_freshness()` — a running collector reports a preceding gap
+   inline.
+3. GitHub emails the repo owner before auto-disabling schedules after 60 days of
+   repository inactivity. Automated commits count as activity, so this only
+   triggers once things are already fully stopped.
+
+**Residual gap:** a total Actions outage is undetectable from inside Actions. The
+only genuine external signal needs something outside this repo — a free uptime
+monitor (e.g. UptimeRobot/cron-job.org) polling
+`https://raw.githubusercontent.com/<owner>/<repo>/main/data/index.json` and
+alerting when `last_updated` ages past ~6 h. That is a deliberate non-goal here
+(no external services), so the gap is documented rather than closed.

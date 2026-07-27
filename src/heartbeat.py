@@ -19,8 +19,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import DATA_DIR, now_ms, read_cursor, write_cursor
 
-# Collection runs every 15 min; alert once it has missed ~8 consecutive cycles.
-STALE_AFTER_MINUTES = 120
+# Threshold is set from MEASURED cadence, not the cron expression.
+#
+# GitHub honours roughly 5% of a high-frequency schedule on this repo. Measured
+# over the 100 most recent collect runs (160.9h span, 2026-07-27):
+#     observed        14.9 runs/day   (schedule requested 288/day at */5)
+#     gap median      83 min
+#     gap p90         160 min
+#     gap max         220 min
+#     gap minimum     46 min  <- the 5-minute schedule was NEVER once honoured
+#
+# A 120-minute threshold would therefore have fired on more than 10% of normal
+# intervals. 6 hours sits comfortably above the observed maximum while still
+# catching a genuine stall within one working session.
+#
+# Re-measure with:
+#   curl -s "https://api.github.com/repos/<owner>/<repo>/actions/workflows/collect.yml/runs?per_page=100"
+STALE_AFTER_MINUTES = 360
 # Don't re-alert more than once a day while an outage persists.
 ALERT_COOLDOWN_HOURS = 24
 
