@@ -65,6 +65,7 @@ def test_unique_destinations_respects_cap():
 
 def test_send_alert_short_circuits_after_failure(monkeypatch):
     monkeypatch.setattr(alerts, "_smtp_disabled_this_run", False)
+    monkeypatch.setenv("BREVO_SMTP_LOGIN", "test-login@smtp-brevo.example")
     monkeypatch.setenv("BREVO_SMTP_KEY", "key")
     monkeypatch.setenv("ALERT_EMAIL", "me@example.com")
 

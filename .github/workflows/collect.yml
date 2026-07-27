@@ -25,6 +25,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python src/collector.py
         env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
       - name: Commit and push

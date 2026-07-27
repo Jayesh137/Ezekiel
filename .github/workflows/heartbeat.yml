@@ -63,6 +63,7 @@ jobs:
       - name: Check collection freshness
         id: freshness
         env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: python src/heartbeat.py
