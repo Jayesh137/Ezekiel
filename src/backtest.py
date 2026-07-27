@@ -20,8 +20,38 @@ from src.utils import DATA_DIR
 
 WINDOW_DAYS = 21
 MIN_WINDOW_FILLS = 50
+# A fill count says nothing about window quality for a TWAP trader: 5,497 fills
+# concentrated in 4 sessions is not 5,497 independent observations. Both windows
+# must also span enough separate trading days for a self-match to mean anything.
+# Below this the test is declared INCONCLUSIVE rather than pass or fail — asserting
+# either from two 4-day windows would be a fabricated result.
+MIN_WINDOW_DAYS = 8
 PASS_MARGIN = 0.05
 REPORT_PATH = DATA_DIR.parent / "profile" / "backtest.json"
+
+
+def distinct_days(fills: list[dict]) -> int:
+    """Separate UTC days the window actually contains fills on."""
+    return len({int(f.get("time", 0)) // 86_400_000 for f in fills if f.get("time")})
+
+
+def _previous_validation() -> dict | None:
+    """The most recent PROVEN self-match, carried across inconclusive runs.
+
+    Read from the report we are about to overwrite, so a validated ceiling
+    survives a quiet stretch instead of being lost the first day the target stops
+    trading enough to re-test.
+    """
+    if not REPORT_PATH.exists():
+        return None
+    try:
+        with open(REPORT_PATH) as f:
+            prev = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if prev.get("passed") and prev.get("self_score"):
+        return {"self_score": prev["self_score"], "validated_at": prev.get("run_at")}
+    return prev.get("last_validated")
 
 
 def split_windows(fills: list[dict], window_days: int = WINDOW_DAYS) -> tuple[list, list]:
@@ -62,14 +92,42 @@ def run_backtest() -> dict:
 
     fills = load_fills()
     older, recent = split_windows(fills)
+    older_days, recent_days = distinct_days(older), distinct_days(recent)
     report = {
         "run_at": datetime.now(UTC).isoformat(),
         "older_fills": len(older),
         "recent_fills": len(recent),
+        "older_distinct_days": older_days,
+        "recent_distinct_days": recent_days,
     }
     if len(older) < MIN_WINDOW_FILLS or len(recent) < MIN_WINDOW_FILLS:
         report.update({"passed": None, "reason": "insufficient fills for two windows"})
         _save(report)
+        print(f"[backtest] INCONCLUSIVE: {len(older)}/{len(recent)} fills — "
+              f"need {MIN_WINDOW_FILLS} in each window")
+        return report
+
+    if older_days < MIN_WINDOW_DAYS or recent_days < MIN_WINDOW_DAYS:
+        # Not a pass and not a failure: the data cannot support the assertion
+        # either way. Reporting FAIL here would raise a daily alarm about a trader
+        # who has simply been quiet; reporting PASS would be fabricated.
+        report.update({
+            "passed": None,
+            "reason": (f"inconclusive: windows span {older_days} and {recent_days} "
+                       f"distinct trading days, need {MIN_WINDOW_DAYS} each. The "
+                       f"target has not traded on enough separate days to validate "
+                       f"the scorer against his own history."),
+            # Carry the last PROVEN ceiling forward. Without it, thresholds revert
+            # to the raw config 0.90 — unreachable for a trader whose demonstrated
+            # ceiling is ~0.59 — which would silently empty the watchlist during
+            # exactly the quiet period a migration is most likely to happen in.
+            "last_validated": _previous_validation(),
+        })
+        _save(report)
+        print(f"[backtest] INCONCLUSIVE: windows span {older_days} and {recent_days} "
+              f"distinct trading days (need {MIN_WINDOW_DAYS} each).")
+        print("[backtest] Not a failure — the target has been too quiet to test "
+              "the scorer. Alerting still runs on config thresholds.")
         return report
 
     positions = load_positions_latest()

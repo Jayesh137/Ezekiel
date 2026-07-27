@@ -67,10 +67,23 @@ def resolve(alert_thresholds: dict, backtest_report: dict | None = None) -> dict
     if not backtest_report:
         return eff
 
-    if not backtest_report.get("passed") or not backtest_report.get("self_score"):
+    if backtest_report.get("passed") and backtest_report.get("self_score"):
+        achievable = float(backtest_report["self_score"])
+    elif backtest_report.get("passed") is None and backtest_report.get("last_validated"):
+        # Inconclusive run (the target has been too quiet to re-test). Reuse the
+        # last PROVEN ceiling rather than snapping back to the raw config numbers:
+        # 0.90 is unreachable for this trader, so reverting would empty the
+        # watchlist during exactly the quiet stretch a migration hides in.
+        lv = backtest_report["last_validated"]
+        if not lv.get("self_score"):
+            return eff
+        achievable = float(lv["self_score"])
+        eff["source"] = "last_validated"
+        eff["validated_at"] = lv.get("validated_at")
+    else:
+        # An outright FAILED self-match must not lower thresholds — the scorer is
+        # known-unreliable, so the conservative config values stand.
         return eff
-
-    achievable = float(backtest_report["self_score"])
     adapted = dict(eff)
     adapted["high"] = max(MIN_HIGH, min(eff["high"], round(achievable - 0.02, 4)))
     adapted["medium"] = max(MIN_MEDIUM, min(eff["medium"], round(achievable - 0.07, 4)))
@@ -78,7 +91,10 @@ def resolve(alert_thresholds: dict, backtest_report: dict | None = None) -> dict
     adapted["self_match_ceiling"] = achievable
     if (adapted["high"], adapted["medium"], adapted["low"]) != (
             eff["high"], eff["medium"], eff["low"]):
-        adapted["source"] = "backtest_adapted"
+        # Preserve "last_validated" if that is where the ceiling came from, so the
+        # dashboard can show the numbers are carried over rather than freshly proven.
+        if adapted["source"] == "config":
+            adapted["source"] = "backtest_adapted"
     return adapted
 
 

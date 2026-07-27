@@ -54,9 +54,27 @@ def _effective_thresholds(alert_thresholds: dict) -> dict:
         print(f"[scanner] Backtest-adapted thresholds: high={eff['high']}, "
               f"medium={eff['medium']}, low={eff['low']} "
               f"(self-match ceiling {eff['self_match_ceiling']})")
+    elif eff["source"] == "last_validated":
+        print(f"[scanner] Thresholds from last VALIDATED ceiling "
+              f"({eff['self_match_ceiling']} at {eff.get('validated_at')}): "
+              f"high={eff['high']}, medium={eff['medium']}, low={eff['low']} "
+              f"— current self-match is inconclusive, carrying the proven ceiling forward")
     else:
         print(f"[scanner] Config thresholds in force: high={eff['high']}, "
               f"medium={eff['medium']}, low={eff['low']}")
+        # Say plainly what this costs. An unvalidated scorer running against raw
+        # config thresholds is effectively silent for a trader whose demonstrated
+        # ceiling is far below them, and silence must never look like "no match".
+        if report is not None and not report.get("passed"):
+            state = "INCONCLUSIVE" if report.get("passed") is None else "FAILED"
+            print(f"[scanner] WARNING: self-match backtest is {state} and no "
+                  f"previously-validated ceiling exists, so behavioural alerting "
+                  f"is effectively DISABLED at these thresholds. Fund-flow, "
+                  f"HL-native, correlation and transfer-graph detection are "
+                  f"unaffected. This self-heals once the target trades on enough "
+                  f"separate days to re-validate the scorer.")
+            if report.get("reason"):
+                print(f"[scanner] backtest reason: {report['reason']}")
     return eff
 
 

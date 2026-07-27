@@ -409,3 +409,62 @@ def test_excluded_dimension_is_not_also_penalised():
     assert score > 0.0
     for v in dims.values():
         assert v is None or isinstance(v, (int, float))
+
+
+# --- backtest must decline to assert on degenerate windows ----------------------
+
+def test_backtest_inconclusive_on_too_few_trading_days():
+    """A fill count says nothing about window quality for a TWAP trader. Two
+    4-day windows holding thousands of fills cannot validate the scorer either
+    way — the honest result is INCONCLUSIVE, not a pass and not a daily alarm."""
+    from src.backtest import MIN_WINDOW_DAYS, distinct_days
+
+    def burst(day, n):
+        return [{"coin": "ETH", "time": day * 24 * HOUR + i, "sz": "1", "px": "100",
+                 "side": "B", "dir": "Open Long", "startPosition": "0"}
+                for i in range(n)]
+
+    thin = []
+    for d in range(4):
+        thin.extend(burst(d, 2000))          # 8000 fills, 4 days
+    assert len(thin) >= 50
+    assert distinct_days(thin) == 4
+    assert distinct_days(thin) < MIN_WINDOW_DAYS
+
+    rich = []
+    for d in range(MIN_WINDOW_DAYS + 4):
+        rich.extend(burst(d, 20))
+    assert distinct_days(rich) >= MIN_WINDOW_DAYS
+
+
+def test_inconclusive_backtest_keeps_last_validated_ceiling():
+    """Thresholds must not snap back to the unreachable config 0.90 while the
+    target is merely quiet — that would empty the watchlist during exactly the
+    stretch a migration hides in."""
+    from src import thresholds as th
+
+    raw = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+    inconclusive = {"passed": None,
+                    "last_validated": {"self_score": 0.5931,
+                                       "validated_at": "2026-07-27T00:00:00+00:00"}}
+    eff = th.resolve(raw, inconclusive)
+    assert eff["source"] == "last_validated"
+    assert eff["high"] < 0.60, "carried ceiling must still be reachable"
+    assert eff["self_match_ceiling"] == 0.5931
+    assert eff["validated_at"]
+
+    # No prior validation -> conservative config values.
+    assert th.resolve(raw, {"passed": None})["high"] == 0.90
+    assert th.resolve(raw, {"passed": None, "last_validated": {}})["high"] == 0.90
+
+
+def test_failed_backtest_never_lowers_thresholds():
+    """An outright FAILED self-match means the scorer is known-unreliable; it must
+    not be allowed to relax the bar."""
+    from src import thresholds as th
+    raw = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+    failed = {"passed": False, "self_score": 0.30,
+              "last_validated": {"self_score": 0.59}}
+    eff = th.resolve(raw, failed)
+    assert (eff["high"], eff["medium"], eff["low"]) == (0.90, 0.80, 0.65)
+    assert eff["source"] == "config"
