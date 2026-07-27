@@ -321,7 +321,20 @@ def disposition(score: float, thresholds: dict, *, vetoes: list | None = None,
     if not percentile_ok:
         blockers.append("score not unusual vs scanned population (percentile gate)")
     if not sustained:
-        blockers.append("awaiting persistence (needs 2 consecutive high scans)")
+        # Persistence exists to filter a single lucky scoring window in the
+        # BEHAVIOUR-ONLY case. Independent evidence — funds actually reaching the
+        # wallet, an amount/timing correlation, address reuse, or the target
+        # falling silent while a lookalike appears — is a second, separate
+        # observation, so it serves the same purpose and waives the wait.
+        #
+        # Deliberately narrow: corroboration waives ONLY persistence. Style
+        # vetoes, the percentile gate and the shared-market-bonus guard all still
+        # apply, so this cannot become a bypass route.
+        if corroborated:
+            reasons.append("persistence waived: independently corroborated by "
+                           "non-behavioural evidence")
+        else:
+            blockers.append("awaiting persistence (needs 2 consecutive high scans)")
 
     if not blockers:
         reasons.append(f"score {score:.4f} >= high threshold {t['high']:.4f}")
