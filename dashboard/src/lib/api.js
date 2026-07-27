@@ -92,6 +92,14 @@ export async function fetchHlTransfers() {
 }
 
 /**
+ * Fetch the transfer graph: normalised transfer edges plus classified and
+ * confidence-scored wallets discovered outward from the target.
+ */
+export async function fetchTransferGraph() {
+	return fetchJSON('data/transfer_graph/latest.json');
+}
+
+/**
  * Fetch the unified migration risk score (0-100 with contributing factors).
  */
 export async function fetchRisk() {

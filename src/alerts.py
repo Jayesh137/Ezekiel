@@ -243,6 +243,66 @@ def alert_risk_level(score: float, level: str, factors: list, wallet: str | None
     return _send_with_cooldown(f"risk_{level.lower()}", 12, subject, body)
 
 
+def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
+                                   edges: list) -> bool:
+    """Fire on a meaningful transfer-graph discovery.
+
+    Carries the complete audit trail — full path, every transfer with amount and
+    timestamp and reference, the classification and the specific evidence — so the
+    conclusion can be checked rather than trusted.
+    """
+    wallet = node["wallet"]
+    cls = node["classification"]
+    conf = node["confidence"]
+
+    severity = "CRITICAL" if cls == "MIGRATION_CANDIDATE" else (
+        "HIGH" if cls == "POSSIBLE_LINKED_WALLET" else "INFO")
+    subject = f"[EZEKIEL] {severity}: {cls.replace('_', ' ').title()} ({conf:.0%} confidence)"
+
+    path = "\n    -> ".join(node.get("path") or [wallet])
+    reasons = "\n".join(f"  - {r}" for r in node.get("confidence_reasons", [])) or "  (none)"
+    triggers = "\n".join(f"  - {r}" for r in trigger_reasons) or "  (none)"
+
+    edge_lines = []
+    for e in edges[:15]:
+        edge_lines.append(
+            f"  {e.get('timestamp') or 'unknown time'}  "
+            f"{e.get('chain')}/{e.get('asset')}  "
+            f"${float(e.get('amount_usd', 0)):,.2f}\n"
+            f"      {e.get('src')} -> {e.get('dst')}\n"
+            f"      ref: {e.get('ref') or 'n/a'}  via: {e.get('discovery_source')}"
+        )
+    edges_txt = "\n".join(edge_lines) or "  (no transfer detail)"
+    more = f"\n  ... and {len(edges) - 15} further transfer(s)" if len(edges) > 15 else ""
+
+    totals = node.get("totals", {})
+    body = (
+        f"Wallet: {wallet}\n"
+        f"Classification: {cls}\n"
+        f"Linkage confidence: {conf:.0%}\n"
+        f"Hops from target: {node.get('depth')}\n"
+        f"First seen: {node.get('first_seen')}\n"
+        f"Last seen:  {node.get('last_seen')}\n\n"
+        f"WHY THIS ALERTED NOW\n{triggers}\n\n"
+        f"RELATIONSHIP PATH\n    {path}\n\n"
+        f"EVIDENCE\n{reasons}\n\n"
+        f"FLOWS\n"
+        f"  Received from target: ${float(totals.get('received_from_target_usd', 0)):,.2f}\n"
+        f"  Sent to target:       ${float(totals.get('sent_to_target_usd', 0)):,.2f}\n"
+        f"  Transfers observed:   {totals.get('edge_count', 0)}\n\n"
+        f"TRANSFERS\n{edges_txt}{more}\n\n"
+    )
+    if cls in ("DIRECT_RECIPIENT", "OPERATIONAL_COUNTERPARTY"):
+        body += ("NOTE: a transfer relationship is NOT proof of common ownership. This\n"
+                 "wallet is recorded as a lead for review, not identified as the target.\n\n")
+    body += "Full graph and paths: Recovery page -> Transfer Graph.\n"
+
+    # Keyed on wallet + classification + confidence band, so a strengthened
+    # finding re-alerts while a re-scan of unchanged state does not.
+    band = int(conf * 10)
+    return _send_with_cooldown(f"tg_{wallet.lower()}_{cls}_{band}", 48, subject, body)
+
+
 def alert_collection_stale(age_minutes: float | None, threshold_minutes: float) -> bool:
     """Fire when data collection itself has stopped. This is the failure the rest
     of the alerting cannot detect — every other alert requires the collector to

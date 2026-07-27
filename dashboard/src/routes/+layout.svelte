@@ -7,6 +7,7 @@
 
 	const navItems = [
 		{ href: `${base}/recovery`, label: 'Recovery', icon: 'R' },
+		{ href: `${base}/transfers`, label: 'Transfers', icon: 'T' },
 		{ href: `${base}/`, label: 'Dashboard', icon: 'D' },
 		{ href: `${base}/fills`, label: 'Fills', icon: 'F' },
 		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'P' },
