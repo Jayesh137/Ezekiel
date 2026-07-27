@@ -83,6 +83,46 @@
 			.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 	}
 
+	let copied = null;
+
+	/** Hyperliquid explorer page for a wallet. */
+	function explorerAddress(addr) {
+		return `https://app.hyperliquid.xyz/explorer/address/${addr}`;
+	}
+
+	/**
+	 * Explorer link for a transfer reference, chosen by the edge's chain.
+	 * Arbitrum edges carry an L1 tx hash; Hyperliquid edges carry a ledger hash.
+	 */
+	function explorerTx(e) {
+		if (e.chain === 'arbitrum') return `https://arbiscan.io/tx/${e.ref}`;
+		return `https://app.hyperliquid.xyz/explorer/tx/${e.ref}`;
+	}
+
+	/** Copy to clipboard, with a fallback for non-secure contexts. */
+	async function copyAddr(addr) {
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(addr);
+			} else {
+				const ta = document.createElement('textarea');
+				ta.value = addr;
+				ta.style.position = 'fixed';
+				ta.style.opacity = '0';
+				document.body.appendChild(ta);
+				ta.select();
+				document.execCommand('copy');
+				document.body.removeChild(ta);
+			}
+			copied = addr;
+			setTimeout(() => {
+				if (copied === addr) copied = null;
+			}, 1500);
+		} catch {
+			copied = null;
+		}
+	}
+
 	function toggle(wallet) {
 		expanded = expanded === wallet ? null : wallet;
 	}
@@ -250,21 +290,38 @@
 		{#each nodes as n (n.wallet)}
 			{@const bScore = behaviouralScore(n.wallet)}
 			<div class="card node" class:is-candidate={n.classification === 'MIGRATION_CANDIDATE'}>
-				<button class="node-head" onclick={() => toggle(n.wallet)}>
+				<div class="node-head">
 					<div class="node-id">
 						<span class="badge {CLASS_BADGE[n.classification]}">
 							{CLASS_LABEL[n.classification] || n.classification}
 						</span>
-						<span class="mono addr">{shortAddr(n.wallet)}</span>
 						{#if n.multi_hop}<span class="badge badge-grey">{n.depth} hops</span>{/if}
 						{#each n.chains as c}<span class="badge badge-grey">{c}</span>{/each}
 					</div>
 					<div class="node-conf">
 						<span class="text-muted">confidence</span>
 						<strong class="mono">{(n.confidence * 100).toFixed(0)}%</strong>
-						<span class="chev">{expanded === n.wallet ? '▾' : '▸'}</span>
+						<button
+							class="chev-btn"
+							onclick={() => toggle(n.wallet)}
+							aria-expanded={expanded === n.wallet}
+							aria-label="Toggle transfer detail for {n.wallet}"
+							>{expanded === n.wallet ? '▾' : '▸'}</button
+						>
 					</div>
-				</button>
+				</div>
+
+				<!-- Full address, never shortAddr(): handing you the address is the whole
+				     point of this page, and truncating everywhere made it unobtainable. -->
+				<div class="addr-row">
+					<code class="addr-full mono">{n.wallet}</code>
+					<button class="addr-btn" onclick={() => copyAddr(n.wallet)}
+						>{copied === n.wallet ? 'copied' : 'copy'}</button
+					>
+					<a class="addr-btn" href={explorerAddress(n.wallet)} target="_blank"
+						rel="noopener noreferrer">explorer ↗</a
+					>
+				</div>
 
 				<div class="meter" aria-hidden="true">
 					<div class="meter-fill" style="width:{Math.max(2, n.confidence * 100)}%"></div>
@@ -274,7 +331,8 @@
 					{#each n.path as hop, i}
 						{#if i > 0}<span class="arrow">→</span>{/if}<span
 							class="hop"
-							class:hop-target={i === 0}>{shortAddr(hop)}</span>
+							class:hop-target={i === 0}
+							title={hop}>{shortAddr(hop)}</span>
 					{/each}
 				</div>
 
@@ -341,9 +399,13 @@
 											<td class="mono">{e.asset}</td>
 											<td class="num mono">{formatUSD(e.amount_usd)}</td>
 											<td class="mono dir"
-												>{shortAddr(e.src)} → {shortAddr(e.dst)}</td
+												title="{e.src} -> {e.dst}"
+											>{shortAddr(e.src)} → {shortAddr(e.dst)}</td
 											>
-											<td class="mono ref">{e.ref ? shortAddr(e.ref) : '—'}</td>
+											<td class="mono ref" title={e.ref || ''}>
+											{#if e.ref}<a href={explorerTx(e)} target="_blank"
+												rel="noopener noreferrer">{shortAddr(e.ref)}</a>{:else}—{/if}
+										</td>
 										</tr>
 									{/each}
 								</tbody>
@@ -637,5 +699,64 @@
 		margin: 10px 0 0;
 		font-size: 0.72rem;
 		color: var(--accent-yellow, #f59e0b);
+	}
+
+	.node-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.chev-btn {
+		background: none;
+		border: 0;
+		color: var(--text-muted, #8888a0);
+		cursor: pointer;
+		font: inherit;
+		padding: 0 2px;
+		line-height: 1;
+	}
+	.chev-btn:hover {
+		color: var(--text-primary, #e0e0e8);
+	}
+	.addr-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+		margin: 8px 0 4px;
+	}
+	.addr-full {
+		font-size: 0.78rem;
+		font-weight: 600;
+		overflow-wrap: anywhere;
+		user-select: all;
+		background: rgba(136, 136, 160, 0.1);
+		padding: 2px 6px;
+		border-radius: 4px;
+	}
+	.addr-btn {
+		font-size: 0.62rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		padding: 2px 7px;
+		border-radius: 4px;
+		border: 1px solid var(--border, #2a2a4a);
+		background: transparent;
+		color: var(--text-muted, #8888a0);
+		cursor: pointer;
+		text-decoration: none;
+		font-family: inherit;
+	}
+	.addr-btn:hover {
+		color: var(--accent-cyan, #00ccdd);
+		border-color: var(--accent-cyan, #00ccdd);
+	}
+	.ref a {
+		color: var(--text-secondary, #b0b0c8);
+	}
+	.ref a:hover {
+		color: var(--accent-cyan, #00ccdd);
 	}
 </style>
