@@ -1,43 +1,42 @@
 {
   "wallet": "0xf27ebb91ea420f73b59b205ac7e0b77a90ec8f3c",
   "first_seen": "2026-07-01T22:12:45.047733+00:00",
-  "last_seen": "2026-07-28T04:52:55.307354+00:00",
+  "last_seen": "2026-07-28T07:31:18.695694+00:00",
   "best_score": 0.6558,
-  "latest_score": 0.45,
+  "latest_score": 0.2783,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:BRENTOIL",
-      "Similar holding-duration profile",
       "xyz:BRENTOIL: traded by ~10.1% of scanned wallets \u2014 too common to be evidence (no bonus)",
       "Market bonus withheld: style veto in force"
     ],
-    "warnings": [],
+    "warnings": [
+      "Weak asset overlap"
+    ],
     "vetoes": [
-      "Decision frequency 56x apart (1.41 vs 79.00 position episodes/day)"
+      "Decision frequency 76x apart (1.41 vs 107.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
         "BTC",
-        "ETH",
         "xyz:BRENTOIL"
       ],
       "target_only": [
         "@107",
-        "CASHCAT"
+        "CASHCAT",
+        "ETH"
       ],
       "candidate_only": [
         "@184",
-        "@210",
         "AAVE",
+        "BCH",
+        "EIGEN",
         "GRAM",
         "HYPE",
         "LIT",
-        "MNT",
         "NEAR",
-        "SOL",
-        "SUI",
         "SYRUP",
         "TAO",
         "WLD",
@@ -58,6 +57,7 @@
         "xyz:COPPER",
         "xyz:CRCL",
         "xyz:CRWV",
+        "xyz:DRAM",
         "xyz:EWY",
         "xyz:GOOGL",
         "xyz:HOOD",
@@ -74,11 +74,9 @@
         "xyz:NOW",
         "xyz:NVDA",
         "xyz:ORCL",
-        "xyz:PLTR",
         "xyz:QNT",
         "xyz:RKLB",
         "xyz:SHAZ",
-        "xyz:SILVER",
         "xyz:SKHX",
         "xyz:SKHY",
         "xyz:SMSN",
@@ -90,11 +88,11 @@
         "xyz:WDC",
         "xyz:XYZ100"
       ],
-      "overlap_count": 3,
+      "overlap_count": 2,
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.0455
+      "jaccard": 0.0317
     },
     "market_rarity": {
       "shared_markets": [
@@ -107,36 +105,17 @@
       "description": "xyz:BRENTOIL (common, ~10.1% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.45,
+      "score_without_bonus": 0.2783,
       "explanations": [
         "xyz:BRENTOIL: traded by ~10.1% of scanned wallets \u2014 too common to be evidence (no bonus)",
         "Market bonus withheld: style veto in force"
       ],
       "frequencies": {
-        "xyz:BRENTOIL": 0.10114
+        "xyz:BRENTOIL": 0.10101
       }
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-20T01:28:24.096399+00:00",
-      "score": 0.2199,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.1003,
-        "timing_profile": 0.1078,
-        "leverage_profile": 0.6456,
-        "entry_exit_style": 0.032,
-        "hold_duration": 0.0,
-        "account_size": 0.3192,
-        "trade_sequencing": 0.5794,
-        "position_sizing": 0.5774,
-        "activity": 0.4158,
-        "direction_bias": 0.5964,
-        "position_management": 0.7083,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-20T05:28:20.817311+00:00",
       "score": 0.2695,
@@ -2017,8 +1996,27 @@
         "position_management": 0.7662,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-28T07:31:18.695694+00:00",
+      "score": 0.2783,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0989,
+        "timing_profile": null,
+        "leverage_profile": 0.6522,
+        "entry_exit_style": 0.0855,
+        "hold_duration": 0.8293,
+        "account_size": 0.294,
+        "trade_sequencing": 0.4894,
+        "position_sizing": 0.2774,
+        "activity": 0.4027,
+        "direction_bias": 0.4581,
+        "position_management": 0.767,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4016
+  "recent_avg_score": 0.3818
 }
