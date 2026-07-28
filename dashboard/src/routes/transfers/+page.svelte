@@ -22,9 +22,9 @@
 	});
 
 	// Strongest first; services are noise and collapse behind a toggle.
-	$: nodes = (graph?.nodes || []).filter(
-		(n) => showServices || n.classification !== 'SERVICE'
-	);
+	$: nodes = (graph?.nodes || [])
+		.filter((n) => showServices || n.classification !== 'SERVICE')
+		.filter(matchesFilter);
 	$: thresholds = getThresholds(scan);
 	$: edgesById = Object.fromEntries((graph?.edges || []).map((e) => [e.id, e]));
 
@@ -48,6 +48,78 @@
 		DIRECT_RECIPIENT: 'badge-grey',
 		SERVICE: 'badge-grey'
 	};
+
+	// --- wallet continuity -------------------------------------------------------
+	// Wording is deliberate: these are fund-flow LEADS, never ownership claims.
+	const LIFECYCLE_LABEL = {
+		HIGH_CONFIDENCE_SUCCESSOR: 'High-confidence continuity lead',
+		POSSIBLE_SUCCESSOR: 'Possible successor',
+		TRADING_STARTED: 'Funded, now trading',
+		FUNDED_BY_TARGET: 'Fund-flow-linked',
+		OBSERVED: 'Observed',
+		LEAD: 'Lead',
+		DORMANT: 'Dormant',
+		REJECTED_SERVICE: 'Exchange / bridge / service'
+	};
+	const LIFECYCLE_BADGE = {
+		HIGH_CONFIDENCE_SUCCESSOR: 'badge-red',
+		POSSIBLE_SUCCESSOR: 'badge-yellow',
+		TRADING_STARTED: 'badge-yellow',
+		FUNDED_BY_TARGET: 'badge-cyan',
+		OBSERVED: 'badge-grey',
+		LEAD: 'badge-grey',
+		DORMANT: 'badge-grey',
+		REJECTED_SERVICE: 'badge-grey'
+	};
+
+	let filterMode = 'all';
+	const FILTERS = [
+		['all', 'All'],
+		['successors', 'Possible successors'],
+		['trading', 'Active traders'],
+		['incomplete', 'Incomplete paths'],
+		['services', 'Services']
+	];
+
+	$: chainById = Object.fromEntries((graph?.chains || []).map((c) => [c.id, c]));
+
+	function chainFor(n) {
+		return n.chain_id ? chainById[n.chain_id] : null;
+	}
+
+	function lifecycleOf(n) {
+		return n.lifecycle?.state ?? null;
+	}
+
+	function matchesFilter(n) {
+		const life = lifecycleOf(n);
+		const ch = chainFor(n);
+		if (filterMode === 'successors')
+			return life === 'POSSIBLE_SUCCESSOR' || life === 'HIGH_CONFIDENCE_SUCCESSOR';
+		if (filterMode === 'trading') return !!n.evidence?.trades_on_hl;
+		if (filterMode === 'incomplete') return !!(ch && ch.breaks?.length);
+		if (filterMode === 'services') return n.classification === 'SERVICE';
+		return true;
+	}
+
+	/** One-line answer to "why does this wallet matter?" */
+	function whyItMatters(n) {
+		const life = lifecycleOf(n);
+		const ch = chainFor(n);
+		const hops = ch?.hop_count ?? n.depth;
+		const retained = ch ? ` retaining ${(ch.value_retained * 100).toFixed(0)}% of the value` : '';
+		if (life === 'HIGH_CONFIDENCE_SUCCESSOR')
+			return `Target funds reached this wallet across ${hops} hop(s)${retained}, and it trades like the target. Strongest continuity lead — still a lead, not proof of ownership.`;
+		if (life === 'POSSIBLE_SUCCESSOR')
+			return `Fund-flow-linked across ${hops} hop(s)${retained} with corroborating evidence, and trading. Worth watching.`;
+		if (life === 'TRADING_STARTED')
+			return `Received target funds and began trading afterwards${retained}. Needs a second independent signal to promote.`;
+		if (life === 'FUNDED_BY_TARGET')
+			return `Target funds reached this wallet over an unbroken path of ${hops} hop(s)${retained}.`;
+		if (life === 'REJECTED_SERVICE')
+			return 'Exchange, bridge or high-fan-degree address. Excluded from continuity scoring by design.';
+		return 'Appears on a fund-flow path from the target. Insufficient evidence to say more.';
+	}
 
 	// --- graph health -----------------------------------------------------------
 	$: health = graph?.health ?? null;
@@ -233,6 +305,16 @@
 			</div>
 		{/if}
 
+		<div class="filters">
+			{#each FILTERS as [key, label]}
+				<button
+					class="filter-btn"
+					class:active={filterMode === key}
+					onclick={() => (filterMode = key)}>{label}</button
+				>
+			{/each}
+		</div>
+
 		<div class="toolbar">
 			<span class="text-muted">
 				Updated {graph.computed_at ? new Date(graph.computed_at).toLocaleString() : '—'}
@@ -308,6 +390,67 @@
 						<span class="badge badge-yellow">trading on HL</span>
 					{/if}
 				</div>
+
+				{#if lifecycleOf(n)}
+					<div class="lifecycle">
+						<span class="badge {LIFECYCLE_BADGE[lifecycleOf(n)] || 'badge-grey'}"
+							>{LIFECYCLE_LABEL[lifecycleOf(n)] || lifecycleOf(n)}</span
+						>
+						{#if n.continuity}
+							<span class="text-muted">continuity</span>
+							<strong class="mono">{(n.continuity.confidence * 100).toFixed(0)}%</strong>
+						{/if}
+						{#if n.continuity?.families?.length}
+							<span class="text-muted"
+								>{n.continuity.families.length} evidence famil{n.continuity
+									.families.length === 1
+									? 'y'
+									: 'ies'}: {n.continuity.families.join(', ')}</span
+							>
+						{/if}
+					</div>
+					<p class="why">{whyItMatters(n)}</p>
+					{#if n.lifecycle?.blockers?.length}
+						<ul class="blockers">
+							{#each n.lifecycle.blockers as b}<li>{b}</li>{/each}
+						</ul>
+					{/if}
+				{/if}
+
+				{#if chainFor(n)}
+					{@const ch = chainFor(n)}
+					<div class="chain">
+						<div class="chain-head">
+							<strong>Fund-flow path</strong>
+							<span class="text-muted"
+								>{ch.hop_count} hop(s) · {(ch.value_retained * 100).toFixed(0)}% of
+								value retained · {ch.elapsed_hours}h
+								{#if ch.relay_hops?.length}· {ch.relay_hops.length} relay hop(s){/if}</span
+							>
+						</div>
+						{#each ch.hops as h, i}
+							<div class="hop-row">
+								<span class="hop-n mono">{i + 1}</span>
+								<span class="mono" title="{h.src} -> {h.dst}"
+									>{shortAddr(h.src)} → {shortAddr(h.dst)}</span
+								>
+								<span class="mono">{formatUSD(h.amount_usd)}</span>
+								<span class="text-muted">{h.chain}</span>
+								<span class="text-muted">{h.ts ? formatTime(h.ts * 1000) : '—'}</span>
+								{#if h.ref}
+									<a href={explorerTx(h)} target="_blank" rel="noopener noreferrer"
+										>{shortAddr(h.ref)}</a
+									>
+								{/if}
+							</div>
+						{/each}
+						{#each ch.breaks as b}
+							<div class="chain-break">
+								Path break at <span class="mono">{shortAddr(b.at)}</span>: {b.reason}
+							</div>
+						{/each}
+					</div>
+				{/if}
 
 				<ul class="reasons">
 					{#each n.confidence_reasons as r}
@@ -637,5 +780,76 @@
 		margin: 10px 0 0;
 		font-size: 0.72rem;
 		color: var(--accent-yellow, #f59e0b);
+	}
+
+	.filters {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+		margin-bottom: 10px;
+	}
+	.filter-btn {
+		font-size: 0.66rem;
+		padding: 3px 10px;
+		border-radius: 4px;
+		border: 1px solid var(--border, #2a2a4a);
+		background: transparent;
+		color: var(--text-muted, #8888a0);
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.filter-btn.active,
+	.filter-btn:hover {
+		color: var(--accent-cyan, #00ccdd);
+		border-color: var(--accent-cyan, #00ccdd);
+	}
+	.lifecycle {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+		font-size: 0.72rem;
+		margin: 8px 0 4px;
+	}
+	.why {
+		font-size: 0.74rem;
+		color: var(--text-secondary, #b0b0c8);
+		margin: 0 0 8px;
+		line-height: 1.45;
+	}
+	.blockers {
+		margin: 0 0 8px;
+		padding-left: 18px;
+		font-size: 0.7rem;
+		color: var(--accent-yellow, #f59e0b);
+	}
+	.chain {
+		border-left: 2px solid var(--accent-cyan, #00ccdd);
+		padding: 6px 10px;
+		margin: 8px 0;
+		background: rgba(0, 204, 221, 0.04);
+		font-size: 0.7rem;
+		overflow-x: auto;
+	}
+	.chain-head {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+		margin-bottom: 4px;
+	}
+	.hop-row {
+		display: flex;
+		gap: 10px;
+		align-items: center;
+		white-space: nowrap;
+		padding: 1px 0;
+	}
+	.hop-n {
+		color: var(--text-muted, #8888a0);
+		min-width: 1.2em;
+	}
+	.chain-break {
+		color: var(--accent-yellow, #f59e0b);
+		margin-top: 4px;
 	}
 </style>

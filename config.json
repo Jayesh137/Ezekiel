@@ -7,8 +7,13 @@
   "arbitrum_chain_id": 42161,
   "hl_bridge_contract": "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",
   "usdc_contract_arbitrum": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
-  "hip3_dexes": ["xyz"],
-  "twitter_accounts": ["GiganticRebirth", "GCRClassic"],
+  "hip3_dexes": [
+    "xyz"
+  ],
+  "twitter_accounts": [
+    "GiganticRebirth",
+    "GCRClassic"
+  ],
   "excluded_addresses": [
     "0x0000000000000000000000000000000000000000",
     "0x2000000000000000000000000000000000000000",
@@ -29,8 +34,8 @@
     "alert_confidence": 0.7
   },
   "alert_thresholds": {
-    "similarity_high": 0.90,
-    "similarity_medium": 0.80,
+    "similarity_high": 0.9,
+    "similarity_medium": 0.8,
     "similarity_low": 0.65
   },
   "scanner": {
@@ -40,13 +45,14 @@
     "candidate_threshold": 0.65
   },
   "transfer_graph": {
-    "max_depth": 3,
+    "max_depth": 4,
     "max_nodes": 300,
     "max_expansions": 40,
     "time_budget_seconds": 150,
     "dust_usd": 1.0,
     "service_fanout": 25,
-    "service_fanin": 25
+    "service_fanin": 25,
+    "max_branching": 8
   },
   "known_service_addresses": [
     "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",

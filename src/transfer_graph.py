@@ -34,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import continuity as ct
 from src.utils import (
     DATA_DIR,
     load_all_records,
@@ -73,8 +74,9 @@ CLASS_ORDER = {
 # --- traversal budget defaults (overridable via config.json) --------------------
 
 DEFAULTS = {
-    "max_depth": 3,
+    "max_depth": 4,
     "max_nodes": 300,
+    "max_branching": 8,
     "max_expansions": 40,     # Etherscan-backed hop expansions per run
     "time_budget_seconds": 150,
     "min_edge_usd": 1000.0,
@@ -486,6 +488,137 @@ def find_split_correlation(exit_amount: float, inbound: list[dict],
 
 # --- graph construction ---------------------------------------------------------
 
+SCHEMA_VERSION = 2
+
+
+def build_chains(target: str, nodes: list, edges: list, parents: dict,
+                 services: dict, now_ts: float) -> list:
+    """Assemble ordered, evidence-carrying paths from the target to each wallet.
+
+    The previous model kept only `path: [addr, addr]` — a bare address list with
+    no per-hop amount, timing or reference, so a conclusion could not be audited
+    and value flow could not be measured. Each hop here retains its full evidence.
+    """
+    by_pair = {}
+    for e in edges:
+        if e.get("bridge_event"):
+            continue
+        key = (e["src"], e["dst"])
+        prev = by_pair.get(key)
+        # Keep the largest transfer as the representative hop for the pair.
+        if prev is None or float(e.get("amount_usd", 0) or 0) > float(
+                prev.get("amount_usd", 0) or 0):
+            by_pair[key] = e
+
+    chains = []
+    for node in nodes:
+        addr = node["wallet"]
+        walk = node.get("path") or []
+        if len(walk) < 2:
+            continue
+        hops = []
+        breaks = []
+        relay_hops = []
+        for a, b in zip(walk, walk[1:], strict=False):
+            e = by_pair.get((a, b))
+            if e is None:
+                breaks.append({"at": a, "reason": "no recorded transfer for this hop",
+                               "type": ct.BREAK_INCOMPLETE})
+                continue
+            hops.append({
+                "src": e["src"], "dst": e["dst"], "chain": e["chain"],
+                "asset": e.get("asset"), "amount_usd": e.get("amount_usd"),
+                "ts": e.get("ts"), "timestamp": e.get("timestamp"),
+                "ref": e.get("ref"), "discovery_source": e.get("discovery_source"),
+            })
+            if b in services:
+                breaks.append({"at": b, "reason": services[b], "type": ct.BREAK_SERVICE})
+            prof = _relay_profile(b, edges)
+            if prof["relay"]["is_relay"]:
+                relay_hops.append(b)
+        if not hops:
+            continue
+        chain = ct.build_path(hops, breaks=breaks, relay_hops=relay_hops)
+        chain["endpoint"] = addr
+        chains.append(chain)
+    return chains
+
+
+def _continuity_for(node: dict, chain: dict | None, evidence: dict,
+                    disposition_alert: bool = False) -> dict:
+    """Translate node evidence + its best chain into continuity signals, a score
+    and a lifecycle state. Kept thin: all judgement lives in src/continuity.py."""
+    hops = chain["hop_count"] if chain else 1
+    retained = chain["value_retained"] if chain else 1.0
+    breaks = chain["breaks"] if chain else []
+
+    signals = {}
+    if evidence.get("direct_from_target"):
+        signals["direct_from_target"] = True
+    if evidence.get("gas_funded_by_target"):
+        signals["first_gas"] = True
+    if evidence.get("transfer_count", 0) >= 3:
+        signals["repeated_transfers"] = True
+    if evidence.get("bidirectional"):
+        signals["two_way_flow"] = True
+    if evidence.get("hl_native"):
+        signals["hl_native"] = True
+    if evidence.get("shared_deposit_address") or evidence.get("shared_funder"):
+        signals["shared_route"] = True
+    if evidence.get("amount_correlation"):
+        signals["amount_similarity"] = float(evidence["amount_correlation"])
+    gap = evidence.get("reentry_gap_hours")
+    if gap is not None:
+        signals["temporal_proximity"] = ct.temporal_proximity(gap)
+    b = evidence.get("behavioural_score")
+    if b is not None and float(b) >= 0.65:
+        signals["behavioural"] = float(b)
+    # "Funded by the target" must mean target money REACHED this wallet, whether
+    # directly or along an unbroken chain — tying it to a direct edge made every
+    # multi-hop endpoint permanently ineligible, which defeats the whole point of
+    # following funds through intermediaries.
+    reached_by_target_funds = bool(
+        evidence.get("direct_from_target")
+        or (chain and not breaks and retained >= 0.5)
+    )
+    if evidence.get("trades_on_hl") and reached_by_target_funds:
+        signals["funded_before_trading"] = True
+    if chain and chain.get("value_retained", 0) >= 0.7 and hops > 1:
+        signals["value_retained"] = chain["value_retained"]
+    if evidence.get("split_merge"):
+        signals["split_merge"] = float(evidence["split_merge"])
+    if evidence.get("bridge_correlated"):
+        signals["bridge_correlated"] = float(evidence["bridge_correlated"])
+    if evidence.get("rotation"):
+        signals["rotation"] = float(evidence["rotation"])
+
+    scored = ct.score_continuity(
+        signals,
+        hop_count=hops,
+        value_retained=retained,
+        age_days=evidence.get("age_days"),
+        is_service=evidence.get("is_service", False),
+        vetoes=evidence.get("vetoes"),
+        breaks=breaks,
+    )
+    life = ct.lifecycle_state(
+        is_service=evidence.get("is_service", False),
+        on_path=bool(chain),
+        transfer_count=int(evidence.get("transfer_count", 0) or 0),
+        runs_seen=int(evidence.get("runs_seen", 1) or 1),
+        funded_by_target=reached_by_target_funds,
+        has_unbroken_path=bool(chain) and not breaks,
+        trades_after_funding=bool(evidence.get("trades_on_hl")),
+        confidence=scored["confidence"],
+        families=scored["families"],
+        vetoes=evidence.get("vetoes"),
+        breaks=breaks,
+        days_inactive=evidence.get("age_days"),
+        disposition_alert=disposition_alert,
+    )
+    return {"signals": signals, "continuity": scored, "lifecycle": life}
+
+
 def build_graph(edges: list[dict], target: str, *,
                 known_services: set | None = None,
                 behavioural: dict | None = None,
@@ -625,6 +758,23 @@ def build_graph(edges: list[dict], target: str, *,
             "evidence": ev,
         })
 
+    # Ordered evidence-carrying paths, then continuity scoring and lifecycle.
+    chains = build_chains(target, nodes, wallet_edges, parents, services, now_ts)
+    chain_by_endpoint = {}
+    for ch in chains:
+        prev = chain_by_endpoint.get(ch["endpoint"])
+        if prev is None or ch["value_retained"] > prev["value_retained"]:
+            chain_by_endpoint[ch["endpoint"]] = ch
+    for n in nodes:
+        ch = chain_by_endpoint.get(n["wallet"])
+        cont = _continuity_for(n, ch, n["evidence"])
+        n["continuity"] = cont["continuity"]
+        n["lifecycle"] = cont["lifecycle"]
+        n["signals"] = sorted(cont["signals"])
+        n["chain_id"] = ch["id"] if ch else None
+        n["value_retained"] = ch["value_retained"] if ch else None
+        n["traced_value_usd"] = ch["value_end_usd"] if ch else None
+
     nodes.sort(key=lambda n: (-CLASS_ORDER[n["classification"]], -n["confidence"]))
 
     all_stamps = [e["ts"] for e in wallet_edges if e["ts"]]
@@ -637,8 +787,11 @@ def build_graph(edges: list[dict], target: str, *,
     sources = sorted({e["discovery_source"] for e in wallet_edges})
 
     return {
+        "schema_version": SCHEMA_VERSION,
         "computed_at": utc_now(),
         "target": target,
+        "chains": chains,
+        "chain_count": len(chains),
         "node_count": len(nodes),
         "edge_count": len(wallet_edges),
         "service_count": len(services),
@@ -870,38 +1023,94 @@ def collect_known_edges() -> list[dict]:
     return edges
 
 
-def expand_frontier(edges: list[dict], target: str,
-                    budget: dict) -> tuple[list[dict], dict]:
-    """Widen the graph with Etherscan lookups, under a hard budget.
+def _relay_profile(wallet: str, edges: list[dict]) -> dict:
+    """Measure pass-through behaviour for one wallet from the edges we hold."""
+    inbound = [e for e in edges if e["dst"] == wallet and not e.get("bridge_event")]
+    outbound = [e for e in edges if e["src"] == wallet and not e.get("bridge_event")]
+    recv = sum(float(e.get("amount_usd", 0) or 0) for e in inbound)
+    fwd = sum(float(e.get("amount_usd", 0) or 0) for e in outbound)
+    dests = {e["dst"] for e in outbound}
+    in_ts = [e["ts"] for e in inbound if e.get("ts")]
+    out_ts = [e["ts"] for e in outbound if e.get("ts")]
+    hours = max(0.0, (min(out_ts) - min(in_ts)) / 3600.0) if (in_ts and out_ts) else None
+    return {
+        "received_usd": recv,
+        "forwarded_usd": fwd,
+        "destination_count": len(dests),
+        "hours_to_forward": hours,
+        "relay": ct.classify_relay(recv, fwd, hours, len(dests)),
+        "likelihood": ct.relay_likelihood(recv, fwd, hours, len(dests)),
+        "last_seen_ts": max(out_ts + in_ts) if (out_ts or in_ts) else 0,
+    }
 
-    Returns (edges, diagnostics). The diagnostics say explicitly whether expansion
-    ran, was skipped, degraded or failed — without them a depth-1 graph is
-    ambiguous between "no deeper links exist" and "we never looked". In CI the
-    secret is present so this runs automatically; locally it degrades cleanly.
 
-    Only unexplored non-service wallets that received funds from the target are
-    expanded, newest-first, and only while the call and wall-clock budgets hold.
+def _frontier_priority(wallet: str, depth: int, edges: list[dict],
+                       now_ts: float) -> tuple:
+    """Rank a candidate by traced value x relay likelihood x recency.
+
+    Budget is finite, so it must go where a chain is most likely to continue. A
+    relay ranks high here even though its OWNERSHIP confidence is low - holding
+    nothing is exactly what a relay does, which is why confidence is the wrong
+    signal for deciding what to chase.
+    """
+    prof = _relay_profile(wallet, edges)
+    value = prof["received_usd"]
+    value_score = min(1.0, value / 1_000_000.0) if value > 0 else 0.0
+    age_days = ((now_ts - prof["last_seen_ts"]) / 86400.0
+                if prof["last_seen_ts"] else 999.0)
+    recency = ct.age_decay(age_days)
+    depth_penalty = 0.85 ** max(0, depth - 1)
+    score = (0.45 * value_score + 0.35 * prof["likelihood"]
+             + 0.20 * recency) * depth_penalty
+    return round(score, 4), prof
+
+
+def expand_frontier(edges: list[dict], target: str, budget: dict,
+                    resume: list | None = None,
+                    now_ts: float | None = None) -> tuple[list[dict], dict]:
+    """Iteratively widen the graph, level by level, under a hard budget.
+
+    Replaces a single round that only looked up the target's DIRECT recipients:
+    that revealed hop-2 edges but never expanded hop-2 wallets, so hop-3 and
+    beyond were structurally unreachable regardless of max_depth. The live graph
+    sat at depth 2 of 3 with 11 of 40 lookups unused.
+
+    Unfinished frontier is returned in `frontier_queue` so the next run resumes
+    rather than restarting the traversal.
+
+    Returns (edges, diagnostics). Diagnostics record, per wallet, whether it was
+    expanded / deferred / suppressed and why.
     """
     import os
 
+    now_ts = now_ts if now_ts is not None else time.time()
     diag = {
         "status": "not_attempted",
         "attempted_at": utc_now(),
         "lookups": 0,
         "lookup_budget": budget["max_expansions"],
         "time_budget_seconds": budget["time_budget_seconds"],
+        "max_depth": budget.get("max_depth", DEFAULTS["max_depth"]),
         "new_edges": 0,
         "wallets_expanded": [],
         "frontier_size": 0,
         "frontier_remaining": 0,
+        "frontier_queue": [],
+        "decisions": [],
+        "deepest_expanded": 0,
         "degraded_sources": [],
         "error": None,
     }
 
+    def decide(wallet, depth, action, reason, priority=None):
+        diag["decisions"].append({"wallet": wallet, "depth": depth,
+                                  "action": action, "reason": reason,
+                                  "priority": priority})
+
     if not os.environ.get("ETHERSCAN_API_KEY"):
         diag["status"] = "skipped_no_api_key"
         diag["degraded_sources"] = ["arbitrum_l1"]
-        print("[graph] ETHERSCAN_API_KEY absent — L1 frontier expansion SKIPPED. "
+        print("[graph] ETHERSCAN_API_KEY absent - L1 frontier expansion SKIPPED. "
               "Graph is limited to locally recorded edges (typically depth 1).")
         return edges, diag
 
@@ -909,60 +1118,106 @@ def expand_frontier(edges: list[dict], target: str,
 
     deadline = time.monotonic() + budget["time_budget_seconds"]
     max_calls = budget["max_expansions"]
+    max_depth = budget.get("max_depth", DEFAULTS["max_depth"])
+    branching = budget.get("max_branching", DEFAULTS.get("max_branching", 8))
     target = target.lower()
 
-    services = detect_services(edges, set())
+    edges = list(edges)
+    known_ids = {e["id"] for e in edges}
     explored = set()
-
-    # Expand wallets funded by the target first — those are the migration paths.
-    frontier = [e["dst"] for e in sorted(
-        (e for e in edges if e["src"] == target and not e.get("bridge_event")),
-        key=lambda e: -(e["ts"] or 0))]
-    frontier = [w for w in dict.fromkeys(frontier)
-                if w not in services and w != target]
-    diag["frontier_size"] = len(frontier)
-
     calls = 0
     added = []
-    known_ids = {x["id"] for x in edges}
-    budget_hit = False
+    stopped_reason = None
+
+    # Seed: resumed work first, then the target's direct recipients.
+    queue = []
+    queue.extend((int(item.get("depth", 1)), w)
+                 for item in (resume or [])
+                 if (w := (item.get("wallet") or "").lower()) and w != target)
+    queue.extend((1, e["dst"]) for e in edges
+                 if e["src"] == target and not e.get("bridge_event"))
+
+    services = detect_services(edges, set())
+
     try:
-        for wallet in frontier:
-            if calls >= max_calls or time.monotonic() > deadline:
-                budget_hit = True
-                print(f"[graph] expansion budget reached after {calls} lookup(s); stopping")
-                break
-            if wallet in explored:
+        depth = 1
+        while depth <= max_depth:
+            level = [(d, w) for d, w in queue
+                     if d == depth and w not in explored and w != target]
+            if not level:
+                depth += 1
                 continue
-            explored.add(wallet)
-            calls += 1
-            for tx in get_usdc_transfers(wallet):
-                e = normalise_l1_transfer(tx)
-                if e and e["id"] not in known_ids:
-                    known_ids.add(e["id"])
-                    added.append(e)
-    except Exception as exc:  # network/API failure must not lose partial results
+
+            ranked = []
+            for d, w in set(level):
+                if w in services:
+                    decide(w, d, "suppressed", f"service address: {services[w]}")
+                    explored.add(w)
+                    continue
+                pr, prof = _frontier_priority(w, d, edges, now_ts)
+                ranked.append((pr, w, d, prof))
+            ranked.sort(key=lambda x: -x[0])
+
+            for pr, wallet, d, prof in ranked[:branching]:
+                if calls >= max_calls:
+                    stopped_reason = f"lookup budget ({max_calls}) exhausted"
+                    decide(wallet, d, "deferred", stopped_reason, pr)
+                    continue
+                if time.monotonic() > deadline:
+                    stopped_reason = (f"time budget "
+                                      f"({budget['time_budget_seconds']}s) exhausted")
+                    decide(wallet, d, "deferred", stopped_reason, pr)
+                    continue
+                explored.add(wallet)
+                calls += 1
+                diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
+                found = 0
+                for tx in get_usdc_transfers(wallet):
+                    e = normalise_l1_transfer(tx)
+                    if e and e["id"] not in known_ids:
+                        known_ids.add(e["id"])
+                        added.append(e)
+                        edges.append(e)
+                        found += 1
+                        if e["src"] == wallet and d + 1 <= max_depth:
+                            queue.append((d + 1, e["dst"]))
+                decide(wallet, d, "expanded",
+                       f"{found} new edge(s); relay={prof['relay']['is_relay']} "
+                       f"({prof['relay']['reason']})", pr)
+
+            for pr, wallet, d, _p in ranked[branching:]:
+                decide(wallet, d, "deferred",
+                       f"beyond branching limit ({branching}) at depth {d}", pr)
+            depth += 1
+    except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
         diag["error"] = str(exc)[:200]
         diag["degraded_sources"] = ["arbitrum_l1"]
         print(f"[graph] frontier expansion FAILED after {calls} lookup(s): {exc}")
-        diag["lookups"] = calls
-        diag["new_edges"] = len(added)
-        diag["wallets_expanded"] = sorted(explored)
-        diag["frontier_remaining"] = max(0, len(frontier) - len(explored))
-        return edges + added, diag
 
+    pending = [{"wallet": w, "depth": d}
+               for d, w in {(d, w) for d, w in queue
+                            if w not in explored and w != target}]
     diag["lookups"] = calls
     diag["new_edges"] = len(added)
     diag["wallets_expanded"] = sorted(explored)
-    diag["frontier_remaining"] = max(0, len(frontier) - len(explored))
-    diag["status"] = "budget_exhausted" if budget_hit else "ok"
-    diag["completed_at"] = utc_now()
+    diag["frontier_size"] = len(explored) + len(pending)
+    diag["frontier_remaining"] = len(pending)
+    diag["frontier_queue"] = sorted(pending, key=lambda x: x["depth"])[:200]
 
-    print(f"[graph] L1 frontier expansion {diag['status']}: {calls} lookup(s), "
-          f"{len(added)} new edge(s), {diag['frontier_remaining']} wallet(s) unexplored")
+    if diag["status"] != "failed":
+        if stopped_reason or pending:
+            diag["status"] = "budget_exhausted" if stopped_reason else "partial"
+            diag["stopped_reason"] = stopped_reason or "frontier not fully drained"
+        else:
+            diag["status"] = "ok"
+        diag["completed_at"] = utc_now()
+
+    print(f"[graph] L1 expansion {diag['status']}: {calls} lookup(s) to depth "
+          f"{diag['deepest_expanded']}, {len(added)} new edge(s), "
+          f"{len(pending)} wallet(s) queued for next run")
     write_cursor("transfer_graph_last_expansion_ms", now_ms())
-    return edges + added, diag
+    return edges, diag
 
 
 def run_transfer_graph(expand: bool = True) -> dict:
@@ -976,10 +1231,25 @@ def run_transfer_graph(expand: bool = True) -> dict:
     known_services.add(config["usdc_contract_arbitrum"].lower())
     known_services |= {a.lower() for a in config.get("known_service_addresses", [])}
 
+    # Loaded before expansion: it carries the unfinished frontier to resume.
+    previous_graph = {}
+    _prev_path = DATA_DIR / "transfer_graph" / "latest.json"
+    if _prev_path.exists():
+        try:
+            with open(_prev_path) as f:
+                previous_graph = json.load(f)
+        except (OSError, ValueError):
+            previous_graph = {}
+
     edges = collect_known_edges()
     print(f"[graph] {len(edges)} edge(s) from local data")
     if expand:
-        edges, expansion = expand_frontier(edges, target, cfg)
+        resume = ((previous_graph.get("health", {}) or {})
+                  .get("expansion", {}) or {}).get("frontier_queue") or []
+        if resume:
+            print(f"[graph] resuming {len(resume)} wallet(s) queued by the "
+                  f"previous run")
+        edges, expansion = expand_frontier(edges, target, cfg, resume=resume)
     else:
         expansion = {"status": "disabled", "degraded_sources": ["arbitrum_l1"],
                      "attempted_at": utc_now()}
