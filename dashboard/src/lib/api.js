@@ -361,6 +361,51 @@ export function shortAddr(addr) {
 	return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+// --- explorer links ----------------------------------------------------------
+// Single source of truth. Wallet addresses go to Hypurrscan; building the URL
+// inline at each call site is how a shortened LABEL ends up in an href.
+
+const HYPURRSCAN = 'https://hypurrscan.io';
+
+/**
+ * Is this a complete, well-formed EVM address?
+ * A shortened label such as "0x45d2...4029" fails here by design.
+ * @param {unknown} addr
+ * @returns {boolean}
+ */
+export function isAddress(addr) {
+	return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr.trim());
+}
+
+/**
+ * Hypurrscan address page for a wallet, or null when the value is empty,
+ * partial or malformed — callers must render plain text rather than a dead link.
+ * Casing is preserved so a checksummed address stays checksummed.
+ * @param {string} addr
+ * @returns {string|null}
+ */
+export function addressUrl(addr) {
+	if (!isAddress(addr)) return null;
+	return `${HYPURRSCAN}/address/${encodeURIComponent(addr.trim())}`;
+}
+
+/**
+ * Transaction link. Transactions are NOT addresses: Hyperliquid hashes resolve
+ * on Hypurrscan, Arbitrum ones only on Arbiscan.
+ * @param {{ref?: string, chain?: string}|string} hop
+ * @param {string} [chain]
+ * @returns {string|null}
+ */
+export function explorerTx(hop, chain) {
+	const ref = typeof hop === 'string' ? hop : hop?.ref;
+	const on = (typeof hop === 'string' ? chain : hop?.chain) || '';
+	if (!ref || !/^0x[0-9a-fA-F]{6,}$/.test(String(ref).trim())) return null;
+	const hash = encodeURIComponent(String(ref).trim());
+	return on === 'arbitrum'
+		? `https://arbiscan.io/tx/${hash}`
+		: `${HYPURRSCAN}/tx/${hash}`;
+}
+
 /**
  * Format a timestamp (ms) to readable date/time.
  * @param {number} ms

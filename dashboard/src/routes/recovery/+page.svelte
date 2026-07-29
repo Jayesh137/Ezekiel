@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import Chart from 'chart.js/auto';
+	import Addr from '$lib/Addr.svelte';
 	import {
 		fetchLatest,
 		fetchIndex,
@@ -220,7 +221,7 @@
 
 <div class="page-header">
 	<h1>Recovery</h1>
-	<p class="text-muted">Wallet continuity, fund movement, and candidate leads for {shortAddr(TARGET)}</p>
+	<p class="text-muted">Wallet continuity, fund movement, and candidate leads for <Addr address={TARGET} /></p>
 </div>
 
 {#if loading}
@@ -290,9 +291,7 @@
 						{@const linkedCandidate = watchlist.find(c => c.wallet?.toLowerCase() === f.destination?.toLowerCase())}
 						<div class="flow-item">
 							<div>
-								<a href="https://app.hyperliquid.xyz/explorer/address/{f.destination}" target="_blank">
-									{shortAddr(f.destination)}
-								</a>
+								<Addr address={f.destination} className="" />
 								<span class="badge" class:badge-green={f.deposited_to_hl} class:badge-yellow={!f.deposited_to_hl}>
 									{f.deposited_to_hl ? 'HL deposit' : 'pending'}
 								</span>
@@ -336,7 +335,7 @@
 					{#each linkedWallets.slice(0, 10) as c}
 						<tr>
 							<td>
-								<a href="https://app.hyperliquid.xyz/explorer/address/{c.wallet}" target="_blank">{shortAddr(c.wallet)}</a>
+								<Addr address={c.wallet} className="" />
 								{#if c.known_self}
 									<span class="badge badge-blue" style="font-size:0.6rem">known linked</span>
 								{/if}
@@ -380,7 +379,7 @@
 				<tbody>
 					{#each correlations.matches.slice(0, 10) as m}
 						<tr>
-							<td><a href="https://app.hyperliquid.xyz/explorer/address/{m.wallet}" target="_blank">{shortAddr(m.wallet)}</a></td>
+							<td><Addr address={m.wallet} className="" /></td>
 							<td class="mono"><span class="badge" class:badge-red={m.confidence >= 0.7} class:badge-yellow={m.confidence < 0.7}>{scorePct(m.confidence)}</span></td>
 							<td class="mono">{formatUSD(m.deposit_amount_usd)} ≈ {formatUSD(m.exit_amount_usd)}</td>
 							<td class="mono text-muted">{m.gap_hours}h</td>
@@ -415,7 +414,7 @@
 						{#each watchlist.slice(0, 8) as c}
 							<tr>
 								<td>
-									<a href="https://app.hyperliquid.xyz/explorer/address/{c.wallet}" target="_blank">{shortAddr(c.wallet)}</a>
+									<Addr address={c.wallet} className="" />
 									{#if c.status === 'COOLING'}
 										<span class="badge badge-yellow" style="font-size:0.6rem">cooling</span>
 									{/if}
@@ -445,7 +444,7 @@
 					{#each topLeads() as r}
 						<div class="lead-row">
 							<div class="lead-main">
-								<a href="https://app.hyperliquid.xyz/explorer/address/{r.wallet}" target="_blank">{shortAddr(r.wallet)}</a>
+								<Addr address={r.wallet} className="" />
 								<span class="badge {tierClass(r.evidence?.tier)}">{r.evidence?.tier || 'LEAD'}</span>
 							</div>
 							<div class="lead-score mono">{scorePct(r.score)}</div>

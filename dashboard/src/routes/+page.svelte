@@ -6,6 +6,7 @@
 		fetchHlTransfers, formatUSD, shortAddr, getAlertState
 	} from '$lib/api.js';
 	import { base } from '$app/paths';
+	import Addr from '$lib/Addr.svelte';
 	import Chart from 'chart.js/auto';
 	import 'chartjs-adapter-date-fns';
 
@@ -368,7 +369,7 @@
 			<span class="alert-label">[{alertState.level.toUpperCase()}]</span>
 			{alertState.msg}
 			{#if alertState.wallet}
-				<span class="mono" style="margin: 0 8px;">{shortAddr(alertState.wallet)}</span>
+				<span style="margin: 0 8px;"><Addr address={alertState.wallet} /></span>
 			{/if}
 			<a href="{base}/recovery" class="alert-link">View Recovery →</a>
 		</div>
@@ -378,7 +379,7 @@
 <div class="page-header">
 	<h1>Dashboard</h1>
 	<p class="text-muted">
-		Tracking <span class="mono text-blue">{shortAddr('0x45d26f28196d226497130c4bac709d808fed4029')}</span>
+		Tracking <Addr address={'0x45d26f28196d226497130c4bac709d808fed4029'} className="mono text-blue" />
 	</p>
 </div>
 
@@ -615,9 +616,7 @@
 						{@const s = r.score}
 						<tr>
 							<td>
-								<a href="https://app.hyperliquid.xyz/explorer/address/{r.wallet}" target="_blank" class="text-blue">
-									{shortAddr(r.wallet)}
-								</a>
+								<Addr address={r.wallet} className="text-blue" />
 							</td>
 							<td>
 								<strong class:text-green={s >= 0.90} class:text-yellow={s >= 0.80 && s < 0.90} class:text-muted={s < 0.80}>

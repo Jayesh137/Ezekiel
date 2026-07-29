@@ -2,8 +2,9 @@
 	import { onMount } from 'svelte';
 	import {
 		fetchTransferGraph, fetchCandidates, fetchScanResults,
-		formatUSD, shortAddr, formatTime, getThresholds
+		formatUSD, shortAddr, formatTime, getThresholds, explorerTx
 	} from '$lib/api.js';
+	import Addr from '$lib/Addr.svelte';
 
 	let graph = null;
 	let candidates = null;
@@ -394,7 +395,7 @@
 						<span class="badge {CLASS_BADGE[n.classification]}">
 							{CLASS_LABEL[n.classification] || n.classification}
 						</span>
-						<span class="mono addr">{shortAddr(n.wallet)}</span>
+						<Addr address={n.wallet} className="mono addr" />
 						{#if n.multi_hop}<span class="badge badge-grey">{n.depth} hops</span>{/if}
 						{#each n.chains ?? [] as c}<span class="badge badge-grey">{c}</span>{/each}
 						{#if n.is_new}<span class="badge badge-cyan">new</span>{/if}
@@ -421,13 +422,13 @@
 
 				<div class="path mono">
 					{#each n.path ?? [] as hop, i}
-						{#if i > 0}<span class="arrow">→</span>{/if}<span
-							class="hop"
-							class:hop-target={i === 0}>{shortAddr(hop)}</span>
+						{#if i > 0}<span class="arrow">→</span>{/if}<Addr
+							address={hop}
+							className={i === 0 ? 'hop hop-target' : 'hop'} />
 					{/each}
 					{#if n.path_truncated}
 						<span class="text-yellow"
-							>· path unverified beyond {shortAddr(n.path_truncated_at)}</span
+							>· path unverified beyond <Addr address={n.path_truncated_at} className="" /></span
 						>
 					{/if}
 				</div>
@@ -533,13 +534,13 @@
 						{#each ch.hops ?? [] as h, i}
 							<div class="hop-row">
 								<span class="hop-n mono">{i + 1}</span>
-								<span class="mono" title="{h.src} -> {h.dst}"
-									>{shortAddr(h.src)} → {shortAddr(h.dst)}</span
+								<span class="mono"
+									><Addr address={h.src} /> → <Addr address={h.dst} /></span
 								>
 								<span class="mono">{formatUSD(h.amount_usd)}</span>
 								<span class="text-muted">{h.chain}</span>
 								<span class="text-muted">{h.ts ? formatTime(h.ts * 1000) : '—'}</span>
-								{#if h.ref}
+								{#if explorerTx(h)}
 									<a href={explorerTx(h)} target="_blank" rel="noopener noreferrer"
 										>{shortAddr(h.ref)}</a
 									>
@@ -548,7 +549,7 @@
 						{/each}
 						{#each ch.breaks ?? [] as b}
 							<div class="chain-break">
-								Path break at <span class="mono">{shortAddr(b.at)}</span>: {b.reason}
+								Path break at <Addr address={b.at} />: {b.reason}
 							</div>
 						{/each}
 					</div>
@@ -586,9 +587,15 @@
 											<td class="mono">{e.asset}</td>
 											<td class="num mono">{formatUSD(e.amount_usd)}</td>
 											<td class="mono dir"
-												>{shortAddr(e.src)} → {shortAddr(e.dst)}</td
+												><Addr address={e.src} /> → <Addr address={e.dst} /></td
 											>
-											<td class="mono ref">{e.ref ? shortAddr(e.ref) : '—'}</td>
+											<td class="mono ref"
+												>{#if explorerTx(e)}<a
+														href={explorerTx(e)}
+														target="_blank"
+														rel="noopener noreferrer">{shortAddr(e.ref)}</a
+													>{:else}—{/if}</td
+											>
 										</tr>
 									{/each}
 								</tbody>

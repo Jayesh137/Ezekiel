@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr,
 	         getThresholds, tierFor, getPolicy } from '$lib/api.js';
+	import Addr from '$lib/Addr.svelte';
 	import Chart from 'chart.js/auto';
 
 	let scan = null;
@@ -381,7 +382,7 @@
 						{/if}
 						<div class="result-main">
 							<div class="result-wallet">
-								<a href="https://app.hyperliquid.xyz/explorer/address/{r.wallet}" target="_blank" on:click|stopPropagation>{shortAddr(r.wallet)}</a>
+								<Addr address={r.wallet} className="" stopPropagation />
 								{#if hasFp}
 									<span class="expand-hint">{isExpanded ? '▾' : '▸'}</span>
 								{/if}
