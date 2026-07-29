@@ -159,12 +159,29 @@ def save_snapshot(directory: str, data: dict | list) -> str:
     return str(filepath)
 
 def save_latest(directory: str, data: dict | list) -> str:
-    """Save data as latest.json, overwriting previous."""
+    """Save data as latest.json, atomically.
+
+    Write-then-rename rather than truncate-in-place. `latest.json` carries state
+    the next run depends on — the transfer graph's unfinished frontier queue and
+    its undelivered-alert list — and the workflows that write it run under a
+    10-minute job timeout. A kill during a plain `open(..., "w")` leaves a
+    truncated file, which reads back as "no frontier, no undelivered alerts" and
+    silently discards both. os.replace is atomic on POSIX and Windows, so a
+    reader sees either the whole previous file or the whole new one.
+    """
     dir_path = Path(directory)
     dir_path.mkdir(parents=True, exist_ok=True)
     filepath = dir_path / "latest.json"
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
+    tmp = dir_path / f".latest.json.{os.getpid()}.tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, filepath)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
     return str(filepath)
 
 def load_all_records(directory: str) -> list[dict]:
