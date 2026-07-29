@@ -307,7 +307,15 @@
 					<div>
 						<span class="hl">Frontier</span>
 						<span class="mono">
-							{#if expansion?.frontier_remaining}
+							{#if expansion?.frontier_eligible}
+								<span class="text-yellow"
+									>{expansion.frontier_retained ?? expansion.frontier_eligible} retained
+									of {expansion.frontier_eligible} eligible</span
+								>
+								{#if expansion?.frontier_cap}<span class="text-muted"
+										>(cap {expansion.frontier_cap})</span
+									>{/if}
+							{:else if expansion?.frontier_remaining}
 								<span class="text-yellow"
 									>{expansion.frontier_remaining} queued for the next run</span
 								>
@@ -315,7 +323,8 @@
 								drained
 							{/if}
 							{#if expansion?.frontier_truncated}<span class="text-red"
-									>· {expansion.frontier_truncated} dropped over queue cap</span
+									>· {expansion.frontier_truncated} dropped permanently (lowest chase
+									priority)</span
 								>{/if}
 						</span>
 					</div>

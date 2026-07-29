@@ -88,8 +88,17 @@ DEFAULTS = {
 
 # Hard ceilings on the state the graph carries between runs, so a hub address
 # cannot grow latest.json without bound. Truncation is always reported.
-MAX_FRONTIER_QUEUE = 200
+#
+# Sizing evidence (live graph, 2026-07-29: 8.1 MB file, 17,405 edges):
+#   frontier entry ~70 B -> 2000 entries = 137 KB = 1.7% of the file, against
+#   6.2 MB of edges (77%). The previous cap of 200 saved 0.17% while discarding
+#   1,168 of 1,368 pending wallets, so it was costing chase coverage to protect
+#   nothing. Ranking the full frontier costs 0.019 s with EdgeIndex (was 4.4 s).
+MAX_FRONTIER_QUEUE = 2000
 MAX_EXPANDED_LEDGER = 2000
+# `decisions` is unbounded in practice — 1,409 entries / 225 KB on the live
+# graph, already larger than a full frontier queue — and grows with the frontier.
+MAX_DECISIONS = 3000
 
 # A wallet that both sends to and receives from the target this many times is
 # operationally entangled with it rather than a one-off recipient.
@@ -526,6 +535,10 @@ def migrate_graph(graph: dict | None) -> dict:
     expansion.setdefault("frontier_queue", [])
     expansion.setdefault("expanded_ledger", [])
     expansion.setdefault("frontier_truncated", 0)
+    expansion.setdefault("frontier_eligible", len(expansion.get("frontier_queue") or []))
+    expansion.setdefault("frontier_retained", len(expansion.get("frontier_queue") or []))
+    expansion.setdefault("frontier_cap", 0)
+    expansion.setdefault("decisions_truncated", 0)
     expansion.setdefault("partial_failures", [])
     health["expansion"] = expansion
     out["health"] = health
@@ -875,6 +888,8 @@ def build_graph(edges: list[dict], target: str, *,
         "status": "not_attempted", "lookups": 0, "lookup_budget": 0,
         "new_edges": 0, "wallets_expanded": [], "frontier_size": 0,
         "frontier_remaining": 0, "frontier_queue": [], "frontier_truncated": 0,
+        "frontier_eligible": 0, "frontier_retained": 0, "frontier_cap": 0,
+        "decisions_truncated": 0,
         "expanded_ledger": [], "skipped_already_expanded": 0,
         "partial_failures": [], "decisions": [], "deepest_expanded": 0,
         "degraded_sources": [], "error": None,
@@ -1215,10 +1230,57 @@ def collect_known_edges() -> list[dict]:
     return edges
 
 
-def _relay_profile(wallet: str, edges: list[dict]) -> dict:
-    """Measure pass-through behaviour for one wallet from the edges we hold."""
-    inbound = [e for e in edges if e["dst"] == wallet and not e.get("bridge_event")]
-    outbound = [e for e in edges if e["src"] == wallet and not e.get("bridge_event")]
+def _positive_int(value: object, fallback: int) -> int:
+    """A configured ceiling, or the default when absent/invalid.
+
+    Backward compatibility: configs written before these keys existed simply
+    omit them. A zero or negative value would mean "keep nothing", which is
+    never the intent, so it falls back too.
+    """
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return fallback
+    return n if n > 0 else fallback
+
+
+class EdgeIndex:
+    """Inbound/outbound edges bucketed by wallet, built once.
+
+    _relay_profile used to filter the whole edge list per wallet, so ranking the
+    frontier was O(wallets x edges): on the live graph (17,405 edges) that is
+    3.2 ms per wallet, or 4.4 s to rank a 1,368-wallet frontier — which is why
+    only a truncated slice was ever ranked. Indexing costs 7.7 ms once and drops
+    the per-wallet cost to 0.008 ms, making it affordable to rank the ENTIRE
+    frontier before deciding what to keep.
+    """
+
+    __slots__ = ("inbound", "outbound")
+
+    def __init__(self, edges: list[dict]):
+        self.inbound: dict[str, list[dict]] = {}
+        self.outbound: dict[str, list[dict]] = {}
+        for e in edges:
+            if e.get("bridge_event"):
+                continue
+            self.inbound.setdefault(e["dst"], []).append(e)
+            self.outbound.setdefault(e["src"], []).append(e)
+
+    def of(self, wallet: str) -> tuple[list[dict], list[dict]]:
+        return self.inbound.get(wallet, []), self.outbound.get(wallet, [])
+
+
+def _relay_profile(wallet: str, edges: "list[dict] | EdgeIndex") -> dict:
+    """Measure pass-through behaviour for one wallet from the edges we hold.
+
+    Accepts a prebuilt EdgeIndex or a raw edge list, so existing callers and
+    tests keep working unchanged.
+    """
+    if isinstance(edges, EdgeIndex):
+        inbound, outbound = edges.of(wallet)
+    else:
+        inbound = [e for e in edges if e["dst"] == wallet and not e.get("bridge_event")]
+        outbound = [e for e in edges if e["src"] == wallet and not e.get("bridge_event")]
     recv = sum(float(e.get("amount_usd", 0) or 0) for e in inbound)
     fwd = sum(float(e.get("amount_usd", 0) or 0) for e in outbound)
     dests = {e["dst"] for e in outbound}
@@ -1236,7 +1298,26 @@ def _relay_profile(wallet: str, edges: list[dict]) -> dict:
     }
 
 
-def _frontier_priority(wallet: str, depth: int, edges: list[dict],
+def _frontier_rank_key(wallet: str, depth: int, priority: float,
+                       prof: dict) -> tuple:
+    """Total ordering for frontier retention, strongest first.
+
+    The wallet address is the LAST field and breaks nothing but an exact tie on
+    every meaningful signal. Sorting by (depth, wallet) — as truncation used to —
+    discarded chase targets alphabetically: on the live graph that threw away
+    1,168 of 1,368 pending wallets on address order alone.
+    """
+    return (
+        -round(float(priority), 6),                    # composite chase priority
+        depth,                                         # shorter path first
+        -round(float(prof.get("received_usd", 0.0)), 2),   # traced value
+        -round(float(prof.get("likelihood", 0.0)), 6),     # relay likelihood
+        -int(prof.get("last_seen_ts", 0) or 0),        # recency
+        wallet,                                        # deterministic tie-break only
+    )
+
+
+def _frontier_priority(wallet: str, depth: int, edges: "list[dict] | EdgeIndex",
                        now_ts: float) -> tuple:
     """Rank a candidate by traced value x relay likelihood x recency.
 
@@ -1312,6 +1393,10 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         "frontier_remaining": 0,
         "frontier_queue": [],
         "frontier_truncated": 0,
+        "frontier_eligible": 0,
+        "frontier_retained": 0,
+        "frontier_cap": 0,
+        "decisions_truncated": 0,
         "expanded_ledger": [],
         "skipped_already_expanded": 0,
         "decisions": [],
@@ -1344,6 +1429,11 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     edges = list(edges)
     known_ids = {e["id"] for e in edges}
     dust_usd = budget.get("dust_usd", DEFAULTS["dust_usd"])
+    # Configurable, but never unbounded: a missing or nonsensical config value
+    # falls back to the module default rather than disabling the ceiling.
+    max_queue = _positive_int(budget.get("max_frontier_queue"), MAX_FRONTIER_QUEUE)
+    max_decisions = _positive_int(budget.get("max_decisions"), MAX_DECISIONS)
+    max_ledger = _positive_int(budget.get("max_expanded_ledger"), MAX_EXPANDED_LEDGER)
 
     # Wallets fully expanded on an earlier run. Without this the frontier
     # re-walked the target's direct recipients every single run, so the lookup
@@ -1459,21 +1549,45 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             continue
         if w not in shallowest or d < shallowest[w]:
             shallowest[w] = d
-    pending = [{"wallet": w, "depth": d} for w, d in shallowest.items()]
-    pending.sort(key=lambda x: (x["depth"], x["wallet"]))
+
+    # Rank the COMPLETE deduplicated frontier before the cap is applied, so what
+    # survives truncation is the strongest chase target rather than whatever
+    # sorted earliest by address. Ranking is affordable because the edge index
+    # above makes it O(frontier) instead of O(frontier x edges).
+    rank_index = EdgeIndex(walkable)
+    scored = []
+    for w, d in shallowest.items():
+        pr, prof = _frontier_priority(w, d, rank_index, now_ts)
+        scored.append((_frontier_rank_key(w, d, pr, prof), w, d, pr))
+    scored.sort(key=lambda x: x[0])
+    pending = [{"wallet": w, "depth": d, "priority": pr} for _k, w, d, pr in scored]
 
     diag["lookups"] = calls
     diag["new_edges"] = len(added)
     diag["wallets_expanded"] = sorted(expanded_now)
     diag["skipped_already_expanded"] = len(done)
     # Everything ever expanded, so the next run does not repeat finished work.
-    diag["expanded_ledger"] = sorted(explored)[:MAX_EXPANDED_LEDGER]
+    diag["expanded_ledger"] = sorted(explored)[:max_ledger]
     diag["frontier_size"] = len(explored) + len(pending)
+    # Eligible = deduplicated, in-depth, not already expanded, not a service.
+    diag["frontier_eligible"] = len(pending)
     diag["frontier_remaining"] = len(pending)
-    diag["frontier_queue"] = pending[:MAX_FRONTIER_QUEUE]
+    diag["frontier_queue"] = pending[:max_queue]
+    diag["frontier_retained"] = len(diag["frontier_queue"])
+    diag["frontier_cap"] = max_queue
     # Truncation has to be visible: silently dropping the tail of the queue
     # while still reporting the full remaining count makes lost work look done.
-    diag["frontier_truncated"] = max(0, len(pending) - MAX_FRONTIER_QUEUE)
+    # Anything dropped here is dropped PERMANENTLY — a queued wallet is only
+    # known because its parent was expanded, and that parent is now in the
+    # ledger and will never be expanded again to rediscover it.
+    diag["frontier_truncated"] = max(0, len(pending) - max_queue)
+    # `decisions` is per-wallet-per-level and grows with the frontier, so it has
+    # to be bounded too or raising the queue cap inflates the file indirectly.
+    if len(diag["decisions"]) > max_decisions:
+        diag["decisions_truncated"] = len(diag["decisions"]) - max_decisions
+        diag["decisions"] = diag["decisions"][:max_decisions]
+    else:
+        diag["decisions_truncated"] = 0
 
     failures = len(diag["partial_failures"])
     if diag["status"] != "failed":
@@ -1501,6 +1615,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     print(f"[graph] L1 expansion {diag['status']}: {calls} lookup(s) to depth "
           f"{diag['deepest_expanded']}, {len(added)} new edge(s), "
           f"{len(pending)} wallet(s) queued for next run")
+    print(f"[graph] frontier: {diag['frontier_eligible']} eligible, "
+          f"{diag['frontier_retained']} retained (cap {max_queue}), "
+          f"{diag['frontier_truncated']} truncated — retained by chase priority")
     # NB: the expansion cursor is written by run_transfer_graph, not here.
     # Writing it from inside the traversal meant every unit test that called
     # expand_frontier mutated data/state/ in the working tree — a dry run must
@@ -1620,7 +1737,15 @@ def run_transfer_graph(expand: bool = True) -> dict:
     for cls in sorted(by_class, key=lambda c: -CLASS_ORDER[c]):
         print(f"[graph]   {cls}: {by_class[cls]}")
     if alerts:
-        print(f"[graph] {graph['alerts_fired']}/{len(alerts)} discovery alert(s) sent")
+        # Never say "sent" for a delivery that failed. The old
+        # "0/4 discovery alert(s) sent" read as a send having happened, when in
+        # fact nothing left the process and four alerts were sitting in the
+        # retry queue.
+        attempted = len(alerts)
+        delivered = graph["alerts_fired"]
+        failed = len(graph["undelivered_alerts"])
+        print(f"[graph] alerts: {attempted} attempted, {delivered} delivered, "
+              f"{failed} failed, {len(graph['undelivered_alerts'])} queued for retry")
     return graph
 
 
