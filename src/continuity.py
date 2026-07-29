@@ -264,11 +264,13 @@ def lifecycle_state(*, is_service: bool = False, on_path: bool = False,
     if is_service:
         return {"state": LIFECYCLE_REJECTED_SERVICE,
                 "reason": "exchange / bridge / high-fan-degree service address",
-                "blockers": ["services are never continuity candidates"]}
+                "blockers": ["services are never continuity candidates"],
+                "dormant": False, "days_inactive": None}
 
     if not on_path:
         return {"state": LIFECYCLE_LEAD, "reason": "not currently on a path from "
-                "the target", "blockers": []}
+                "the target", "blockers": [], "dormant": False,
+                "days_inactive": None}
 
     state = LIFECYCLE_LEAD
     reasons.append("appears on a fund-flow path from the target")
@@ -326,12 +328,21 @@ def lifecycle_state(*, is_service: bool = False, on_path: bool = False,
             state = LIFECYCLE_HIGH_CONFIDENCE
             reasons.append("unbroken path, corroborated, disposition promoted")
 
-    if (days_inactive is not None and days_inactive >= DORMANT_AFTER_DAYS
-            and LIFECYCLE_ORDER[state] <= LIFECYCLE_ORDER[LIFECYCLE_TRADING]):
-        state = LIFECYCLE_DORMANT
+    # Dormancy is reported for EVERY state, but only demotes the weaker ones. A
+    # corroborated lead that has gone quiet is still the best lead there is —
+    # erasing it would discard the finding — yet a migration tracker that shows
+    # it without saying "silent for 200 days" is misleading about where the
+    # trader is now.
+    dormant = bool(days_inactive is not None and days_inactive >= DORMANT_AFTER_DAYS)
+    if dormant:
         reasons.append(f"no activity for {days_inactive:.0f} days")
+        if LIFECYCLE_ORDER[state] <= LIFECYCLE_ORDER[LIFECYCLE_TRADING]:
+            state = LIFECYCLE_DORMANT
 
-    return {"state": state, "reason": "; ".join(reasons), "blockers": blockers}
+    return {"state": state, "reason": "; ".join(reasons), "blockers": blockers,
+            "dormant": dormant,
+            "days_inactive": round(days_inactive, 1) if days_inactive is not None
+            else None}
 
 
 # --- paths -------------------------------------------------------------------------------

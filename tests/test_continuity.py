@@ -253,10 +253,30 @@ def test_failed_lookup_preserves_partial_edges_and_resume_queue(monkeypatch):
 
     monkeypatch.setattr("src.tracer.get_usdc_transfers", flaky)
     out, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
-    assert diag["status"] == "failed"
-    assert len(out) >= len(seed), "partial results must survive"
+    # One address failing must not abandon the walk: the successful lookup is
+    # kept and the failed ones are re-queued rather than recorded as finished.
+    assert diag["status"] == "partial"
+    assert diag["partial_failures"], "each failed lookup must be recorded"
+    assert len(out) > len(seed), "the successful lookup's edge must survive"
     assert diag["frontier_remaining"] >= 1
     assert diag["frontier_queue"], "unfinished work must be queued for resume"
+    failed = {f["wallet"] for f in diag["partial_failures"]}
+    assert not (failed & set(diag["expanded_ledger"])), \
+        "a wallet whose lookup failed must NOT be marked as already expanded"
+
+
+def test_total_lookup_outage_is_reported_as_failed(monkeypatch):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
+
+    def dead(address, start_block=0):
+        raise OSError("etherscan unreachable")
+
+    monkeypatch.setattr("src.tracer.get_usdc_transfers", dead)
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+    assert diag["status"] == "failed", "a total outage is not a partial result"
+    assert diag["error"]
+    assert diag["degraded_sources"] == ["arbitrum_l1"]
 
 
 def test_resume_queue_is_consumed_on_the_next_run(monkeypatch):

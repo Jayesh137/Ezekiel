@@ -86,6 +86,11 @@ DEFAULTS = {
     "service_fanin": 25,
 }
 
+# Hard ceilings on the state the graph carries between runs, so a hub address
+# cannot grow latest.json without bound. Truncation is always reported.
+MAX_FRONTIER_QUEUE = 200
+MAX_EXPANDED_LEDGER = 2000
+
 # A wallet that both sends to and receives from the target this many times is
 # operationally entangled with it rather than a one-off recipient.
 REPEATED_TRANSFER_MIN = 3
@@ -491,6 +496,55 @@ def find_split_correlation(exit_amount: float, inbound: list[dict],
 SCHEMA_VERSION = 2
 
 
+def migrate_graph(graph: dict | None) -> dict:
+    """Read any historical transfer_graph document as schema v2.
+
+    The live production file is v1: no `schema_version`, no `chains`, and no
+    per-node `lifecycle`/`continuity`. Migration is ADDITIVE and idempotent —
+    every historical node, edge, service and evidence reference is preserved
+    untouched; only absent v2 containers are filled in with empty defaults.
+    Nothing is recomputed here, because a stored v1 document has no hop
+    evidence to score and inventing one would fabricate history.
+    """
+    if not isinstance(graph, dict):
+        return {}
+    out = dict(graph)
+    version = int(out.get("schema_version") or 1)
+    out["schema_version"] = SCHEMA_VERSION
+    if version < 2:
+        out["migrated_from_schema"] = version
+
+    out.setdefault("chains", [])
+    out.setdefault("chain_count", len(out.get("chains") or []))
+    out.setdefault("undelivered_alerts", [])
+    out.setdefault("alerted_paths", [])
+    out.setdefault("alerted_lifecycle", {})
+
+    health = dict(out.get("health") or {})
+    expansion = dict(health.get("expansion") or {})
+    expansion.setdefault("status", "not_attempted")
+    expansion.setdefault("frontier_queue", [])
+    expansion.setdefault("expanded_ledger", [])
+    expansion.setdefault("frontier_truncated", 0)
+    expansion.setdefault("partial_failures", [])
+    health["expansion"] = expansion
+    out["health"] = health
+
+    nodes = []
+    for n in out.get("nodes") or []:
+        m = dict(n)
+        m.setdefault("continuity", None)
+        m.setdefault("lifecycle", None)
+        m.setdefault("signals", [])
+        m.setdefault("chain_id", None)
+        m.setdefault("value_retained", None)
+        m.setdefault("traced_value_usd", None)
+        m.setdefault("path_truncated", False)
+        nodes.append(m)
+    out["nodes"] = nodes
+    return out
+
+
 def build_chains(target: str, nodes: list, edges: list, parents: dict,
                  services: dict, now_ts: float) -> list:
     """Assemble ordered, evidence-carrying paths from the target to each wallet.
@@ -510,6 +564,13 @@ def build_chains(target: str, nodes: list, edges: list, parents: dict,
                 prev.get("amount_usd", 0) or 0):
             by_pair[key] = e
 
+    relay_cache: dict[str, dict] = {}
+
+    def is_relay(addr: str) -> bool:
+        if addr not in relay_cache:
+            relay_cache[addr] = _relay_profile(addr, edges)
+        return relay_cache[addr]["relay"]["is_relay"]
+
     chains = []
     for node in nodes:
         addr = node["wallet"]
@@ -522,9 +583,16 @@ def build_chains(target: str, nodes: list, edges: list, parents: dict,
         for a, b in zip(walk, walk[1:], strict=False):
             e = by_pair.get((a, b))
             if e is None:
-                breaks.append({"at": a, "reason": "no recorded transfer for this hop",
-                               "type": ct.BREAK_INCOMPLETE})
-                continue
+                # A hop with no recorded directed transfer TRUNCATES the chain.
+                # Skipping it and carrying on spliced two unconnected hops into
+                # one "ordered path" and measured value_retained between them —
+                # a wallet reached only by a reverse edge could therefore show a
+                # contiguous path retaining 100% of value it never received.
+                breaks.append({
+                    "at": a,
+                    "reason": f"no recorded transfer {a[:10]}… -> {b[:10]}…",
+                    "type": ct.BREAK_INCOMPLETE})
+                break
             hops.append({
                 "src": e["src"], "dst": e["dst"], "chain": e["chain"],
                 "asset": e.get("asset"), "amount_usd": e.get("amount_usd"),
@@ -533,13 +601,17 @@ def build_chains(target: str, nodes: list, edges: list, parents: dict,
             })
             if b in services:
                 breaks.append({"at": b, "reason": services[b], "type": ct.BREAK_SERVICE})
-            prof = _relay_profile(b, edges)
-            if prof["relay"]["is_relay"]:
+                break  # value entering a service leaves observable custody
+            if is_relay(b):
                 relay_hops.append(b)
         if not hops:
             continue
         chain = ct.build_path(hops, breaks=breaks, relay_hops=relay_hops)
-        chain["endpoint"] = addr
+        # The endpoint is wherever the traced value actually got to. Forcing it
+        # to the node address claimed reach the hops do not support.
+        chain["endpoint"] = hops[-1]["dst"]
+        chain["requested_endpoint"] = addr
+        chain["complete"] = (chain["endpoint"] == addr and not breaks)
         chains.append(chain)
     return chains
 
@@ -760,13 +832,21 @@ def build_graph(edges: list[dict], target: str, *,
 
     # Ordered evidence-carrying paths, then continuity scoring and lifecycle.
     chains = build_chains(target, nodes, wallet_edges, parents, services, now_ts)
+    # Scoring is keyed on where value ACTUALLY arrived, never on where a walk
+    # was headed. A truncated chain scores its real endpoint and leaves the
+    # unreached wallet with no chain — which is the honest outcome.
     chain_by_endpoint = {}
+    truncated_for = {}
     for ch in chains:
+        if not ch.get("complete"):
+            truncated_for.setdefault(ch["requested_endpoint"], ch)
         prev = chain_by_endpoint.get(ch["endpoint"])
         if prev is None or ch["value_retained"] > prev["value_retained"]:
             chain_by_endpoint[ch["endpoint"]] = ch
     for n in nodes:
         ch = chain_by_endpoint.get(n["wallet"])
+        if ch is not None and ch["endpoint"] != n["wallet"]:
+            ch = None
         cont = _continuity_for(n, ch, n["evidence"])
         n["continuity"] = cont["continuity"]
         n["lifecycle"] = cont["lifecycle"]
@@ -774,6 +854,11 @@ def build_graph(edges: list[dict], target: str, *,
         n["chain_id"] = ch["id"] if ch else None
         n["value_retained"] = ch["value_retained"] if ch else None
         n["traced_value_usd"] = ch["value_end_usd"] if ch else None
+        trunc = truncated_for.get(n["wallet"])
+        n["path_truncated"] = bool(trunc) and ch is None
+        n["path_truncated_at"] = (
+            (trunc["breaks"][0].get("at") if trunc.get("breaks") else None)
+            if n["path_truncated"] else None)
 
     nodes.sort(key=lambda n: (-CLASS_ORDER[n["classification"]], -n["confidence"]))
 
@@ -783,7 +868,18 @@ def build_graph(edges: list[dict], target: str, *,
     # running out of graph: budget exhausted, node cap hit, or depth cap reached
     # while expandable nodes remained.
     at_node_cap = len(depths) >= max_nodes
-    expansion = expansion or {"status": "not_attempted"}
+    # Always emit the full expansion shape. A caller that ran no expansion still
+    # has to produce the fields the dashboard and the next run's resume logic
+    # read, or they silently become "undefined" rather than "zero".
+    expansion = {
+        "status": "not_attempted", "lookups": 0, "lookup_budget": 0,
+        "new_edges": 0, "wallets_expanded": [], "frontier_size": 0,
+        "frontier_remaining": 0, "frontier_queue": [], "frontier_truncated": 0,
+        "expanded_ledger": [], "skipped_already_expanded": 0,
+        "partial_failures": [], "decisions": [], "deepest_expanded": 0,
+        "degraded_sources": [], "error": None,
+        **(expansion or {}),
+    }
     sources = sorted({e["discovery_source"] for e in wallet_edges})
 
     return {
@@ -840,23 +936,46 @@ def select_alerts(graph: dict, previous: dict | None = None,
     """Decide which discoveries are worth an email.
 
     Fires on: a genuinely new wallet, a new multi-hop path to a known wallet, a
-    funded wallet that has started trading, a classification upgrade, or a
-    material confidence increase. Everything else stays on the dashboard.
+    funded wallet that has started trading, a lifecycle promotion, a
+    classification upgrade, or a material confidence increase. Everything else
+    stays on the dashboard.
+
+    Every trigger is a TRANSITION against the previous saved graph, so rebuilding
+    an unchanged graph sends nothing.
     """
     prev_nodes = {n["wallet"].lower(): n for n in (previous or {}).get("nodes", [])}
     # Discoveries selected on a previous run but never delivered (SMTP down, auth
     # rejected). They must be re-selected even though the node itself is unchanged,
     # otherwise advancing the saved graph silently retires an undelivered alert.
     undelivered = {w.lower() for w in (previous or {}).get("undelivered_alerts", [])}
+    # Route signatures already alerted on. A resumed frontier rediscovers the
+    # same route with fresh transaction ids, which changes the path id but not
+    # the route — without this the same chain re-alerts on every resume.
+    alerted_paths = set((previous or {}).get("alerted_paths") or [])
+    prev_lifecycle = dict((previous or {}).get("alerted_lifecycle") or {})
+    chains_by_id = {c["id"]: c for c in (graph.get("chains") or [])}
+
     out = []
     for node in graph.get("nodes", []):
         if node["classification"] == CLASS_SERVICE:
             continue
-        prev = prev_nodes.get(node["wallet"].lower())
+        wallet = node["wallet"].lower()
+        life = (node.get("lifecycle") or {}).get("state")
+        # A service can never alert, whichever vocabulary named it one.
+        if life == ct.LIFECYCLE_REJECTED_SERVICE:
+            continue
+        prev = prev_nodes.get(wallet)
         reasons = []
 
-        if node["wallet"].lower() in undelivered:
-            out.append({"node": node,
+        # Resolved before the retry branch: a retry that finally lands must mark
+        # its route delivered too, or the same multi-hop chain alerts again on
+        # the following run.
+        chain = chains_by_id.get(node.get("chain_id"))
+        signature = chain.get("signature") if chain else None
+        new_route = bool(signature) and signature not in alerted_paths
+
+        if wallet in undelivered:
+            out.append({"node": node, "path_signature": signature,
                         "trigger_reasons": ["retry: previously selected but not delivered"]})
             continue
 
@@ -877,6 +996,24 @@ def select_alerts(graph: dict, previous: dict | None = None,
             if node["evidence"].get("trades_on_hl") and not (
                     prev.get("evidence") or {}).get("trades_on_hl"):
                 reasons.append("wallet funded by the target has started trading on Hyperliquid")
+            # Lifecycle promotion is the continuity tracker's material event.
+            # Without this a wallet could walk all the way to
+            # HIGH_CONFIDENCE_SUCCESSOR without ever sending an email.
+            #
+            # The baseline is the delivered high-water mark when we have one, and
+            # otherwise the state the previous graph recorded for this node.
+            # Reading only `alerted_lifecycle` made every wallet look newly
+            # promoted on any graph that predates that field — including every
+            # schema-v1 file in production — which would have emailed the whole
+            # graph on the first run after deploy.
+            was = prev_lifecycle.get(wallet) or (prev.get("lifecycle") or {}).get("state")
+            if (life and ct.LIFECYCLE_ORDER.get(life, 0)
+                    > ct.LIFECYCLE_ORDER.get(was, -99)):
+                reasons.append(f"continuity lifecycle {was or 'new'} -> {life}")
+            if new_route and node["depth"] > 1:
+                reasons.append(
+                    f"new {chain['hop_count']}-hop route retaining "
+                    f"{chain['value_retained']:.0%} of traced value")
             if not reasons:
                 continue
 
@@ -884,10 +1021,65 @@ def select_alerts(graph: dict, previous: dict | None = None,
                 CLASS_DIRECT_RECIPIENT,):
             # A bare recipient with no corroboration is watchlist material only.
             continue
-        out.append({"node": node, "trigger_reasons": reasons})
+        out.append({"node": node, "trigger_reasons": reasons,
+                    "path_signature": signature})
 
     out.sort(key=lambda a: -a["node"]["confidence"])
     return out
+
+
+def annotate_changes(graph: dict, previous: dict | None) -> None:
+    """Record what moved since the last run, in place on `graph`.
+
+    build_graph is pure and sees only the current edges, so "confidence rose 12
+    points" cannot be computed there. Without it the dashboard can show a
+    number but not whether that number is climbing — which is the part that
+    matters when watching for a migration in progress.
+    """
+    prev_nodes = {n["wallet"].lower(): n for n in (previous or {}).get("nodes") or []}
+    for n in graph.get("nodes") or []:
+        prev = prev_nodes.get(n["wallet"].lower())
+        cont = (n.get("continuity") or {}).get("confidence")
+        if prev is None:
+            n["is_new"] = True
+            n["confidence_delta"] = None
+            n["continuity_delta"] = None
+            n["previous_lifecycle"] = None
+            continue
+        prev_cont = (prev.get("continuity") or {}).get("confidence")
+        n["is_new"] = False
+        n["confidence_delta"] = round(
+            float(n["confidence"]) - float(prev.get("confidence") or 0.0), 4)
+        n["continuity_delta"] = (
+            round(float(cont) - float(prev_cont), 4)
+            if cont is not None and prev_cont is not None else None)
+        n["previous_lifecycle"] = (prev.get("lifecycle") or {}).get("state")
+
+
+def advance_alert_state(graph: dict, previous: dict | None,
+                        alerts: list[dict], undelivered: list[str]) -> None:
+    """Record what was actually DELIVERED, in place on `graph`.
+
+    Delivery state advances only for alerts that were sent. A wallet whose email
+    failed keeps its previous lifecycle/route marks, so the retry on the next run
+    still reads as a transition rather than as already-reported.
+    """
+    failed = {w.lower() for w in undelivered}
+    graph["alerted_paths"] = sorted(set((previous or {}).get("alerted_paths") or []))
+    lifecycle_state = dict((previous or {}).get("alerted_lifecycle") or {})
+
+    delivered_paths = set(graph["alerted_paths"])
+    for a in alerts:
+        wallet = a["node"]["wallet"].lower()
+        if wallet in failed:
+            continue
+        if a.get("path_signature"):
+            delivered_paths.add(a["path_signature"])
+        state = (a["node"].get("lifecycle") or {}).get("state")
+        if state:
+            lifecycle_state[wallet] = state
+    graph["alerted_paths"] = sorted(delivered_paths)
+    graph["alerted_lifecycle"] = lifecycle_state
 
 
 def _format_path(path: list[str]) -> str:
@@ -1065,9 +1257,32 @@ def _frontier_priority(wallet: str, depth: int, edges: list[dict],
     return round(score, 4), prof
 
 
+def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
+    """The edges the frontier is allowed to walk.
+
+    Must match build_graph's filter. When it did not, the frontier seeded itself
+    from raw edges while build_graph discarded sub-dust ones, so lookups were
+    spent on address-poisoning clones that never entered the graph: on the live
+    2026-07-28 run, 6 of 11 lookups went to six such addresses (770 of the
+    target's 874 recorded out-edges are sub-dollar poisoning transfers) and one
+    of them contributed zero edges to the finished graph.
+    """
+    keep = []
+    for e in edges:
+        if e.get("bridge_event"):
+            continue
+        if (float(e.get("amount_usd", 0) or 0) < dust_usd
+                and e.get("discovery_source") != SRC_GAS_FUNDING):
+            continue
+        keep.append(e)
+    return keep
+
+
 def expand_frontier(edges: list[dict], target: str, budget: dict,
                     resume: list | None = None,
-                    now_ts: float | None = None) -> tuple[list[dict], dict]:
+                    now_ts: float | None = None,
+                    known_services: set | None = None,
+                    already_expanded: list | None = None) -> tuple[list[dict], dict]:
     """Iteratively widen the graph, level by level, under a hard budget.
 
     Replaces a single round that only looked up the target's DIRECT recipients:
@@ -1096,9 +1311,13 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         "frontier_size": 0,
         "frontier_remaining": 0,
         "frontier_queue": [],
+        "frontier_truncated": 0,
+        "expanded_ledger": [],
+        "skipped_already_expanded": 0,
         "decisions": [],
         "deepest_expanded": 0,
         "degraded_sources": [],
+        "partial_failures": [],
         "error": None,
     }
 
@@ -1124,21 +1343,31 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
 
     edges = list(edges)
     known_ids = {e["id"] for e in edges}
-    explored = set()
+    dust_usd = budget.get("dust_usd", DEFAULTS["dust_usd"])
+
+    # Wallets fully expanded on an earlier run. Without this the frontier
+    # re-walked the target's direct recipients every single run, so the lookup
+    # budget was consumed by hop 1 forever and the deeper queue never drained.
+    done = {(w or "").lower() for w in (already_expanded or []) if w}
+    explored = set(done)
     calls = 0
     added = []
     stopped_reason = None
 
-    # Seed: resumed work first, then the target's direct recipients.
+    # Seed: resumed work first, then the target's direct recipients. Both are
+    # drawn from expandable edges only, so the frontier and build_graph agree on
+    # what counts as a real transfer.
+    walkable = _expandable_edges(edges, dust_usd)
     queue = []
     queue.extend((int(item.get("depth", 1)), w)
                  for item in (resume or [])
                  if (w := (item.get("wallet") or "").lower()) and w != target)
-    queue.extend((1, e["dst"]) for e in edges
-                 if e["src"] == target and not e.get("bridge_event"))
+    queue.extend((1, e["dst"]) for e in walkable if e["src"] == target)
 
-    services = detect_services(edges, set())
+    services = detect_services(edges, {(a or "").lower()
+                                       for a in (known_services or set())})
 
+    expanded_now = set()
     try:
         depth = 1
         while depth <= max_depth:
@@ -1149,14 +1378,16 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 continue
 
             ranked = []
-            for d, w in set(level):
+            for d, w in sorted(set(level)):
                 if w in services:
                     decide(w, d, "suppressed", f"service address: {services[w]}")
                     explored.add(w)
                     continue
-                pr, prof = _frontier_priority(w, d, edges, now_ts)
+                pr, prof = _frontier_priority(w, d, walkable, now_ts)
                 ranked.append((pr, w, d, prof))
-            ranked.sort(key=lambda x: -x[0])
+            # Deterministic: address breaks priority ties so two runs over the
+            # same data expand the same wallets in the same order.
+            ranked.sort(key=lambda x: (-x[0], x[1]))
 
             for pr, wallet, d, prof in ranked[:branching]:
                 if calls >= max_calls:
@@ -1168,19 +1399,36 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                                       f"({budget['time_budget_seconds']}s) exhausted")
                     decide(wallet, d, "deferred", stopped_reason, pr)
                     continue
-                explored.add(wallet)
                 calls += 1
-                diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
                 found = 0
-                for tx in get_usdc_transfers(wallet):
+                try:
+                    rows = list(get_usdc_transfers(wallet))
+                except Exception as exc:
+                    # One address failing must not abandon the rest of the walk.
+                    # The wallet stays OUT of `explored` so it is retried next
+                    # run rather than being recorded as finished.
+                    diag["partial_failures"].append(
+                        {"wallet": wallet, "depth": d, "error": str(exc)[:120]})
+                    diag["degraded_sources"] = ["arbitrum_l1"]
+                    decide(wallet, d, "deferred", f"lookup failed: {str(exc)[:80]}", pr)
+                    continue
+                explored.add(wallet)
+                expanded_now.add(wallet)
+                diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
+                for tx in rows:
                     e = normalise_l1_transfer(tx)
-                    if e and e["id"] not in known_ids:
-                        known_ids.add(e["id"])
-                        added.append(e)
-                        edges.append(e)
-                        found += 1
-                        if e["src"] == wallet and d + 1 <= max_depth:
-                            queue.append((d + 1, e["dst"]))
+                    if not e or e["id"] in known_ids:
+                        continue
+                    known_ids.add(e["id"])
+                    added.append(e)
+                    edges.append(e)
+                    found += 1
+                    if (float(e.get("amount_usd", 0) or 0) < dust_usd
+                            and e.get("discovery_source") != SRC_GAS_FUNDING):
+                        continue  # poisoning dust is never worth a lookup
+                    walkable.append(e)
+                    if e["src"] == wallet and d + 1 <= max_depth:
+                        queue.append((d + 1, e["dst"]))
                 decide(wallet, d, "expanded",
                        f"{found} new edge(s); relay={prof['relay']['is_relay']} "
                        f"({prof['relay']['reason']})", pr)
@@ -1188,6 +1436,10 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             for pr, wallet, d, _p in ranked[branching:]:
                 decide(wallet, d, "deferred",
                        f"beyond branching limit ({branching}) at depth {d}", pr)
+            # A wallet that just turned into a high-fan-degree hub must be
+            # suppressed before its recipients are walked, not after.
+            services = detect_services(edges, {(a or "").lower()
+                                               for a in (known_services or set())})
             depth += 1
     except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
@@ -1195,20 +1447,53 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         diag["degraded_sources"] = ["arbitrum_l1"]
         print(f"[graph] frontier expansion FAILED after {calls} lookup(s): {exc}")
 
-    pending = [{"wallet": w, "depth": d}
-               for d, w in {(d, w) for d, w in queue
-                            if w not in explored and w != target}]
+    # One entry per wallet at its SHALLOWEST outstanding depth. Keying on
+    # (depth, wallet) counted a wallet reachable at two depths as two units of
+    # remaining work, which both overstated `frontier_remaining` and re-queued
+    # the same address twice.
+    shallowest: dict[str, int] = {}
+    for d, w in queue:
+        if w in explored or w == target or w in services:
+            continue
+        if d > max_depth:
+            continue
+        if w not in shallowest or d < shallowest[w]:
+            shallowest[w] = d
+    pending = [{"wallet": w, "depth": d} for w, d in shallowest.items()]
+    pending.sort(key=lambda x: (x["depth"], x["wallet"]))
+
     diag["lookups"] = calls
     diag["new_edges"] = len(added)
-    diag["wallets_expanded"] = sorted(explored)
+    diag["wallets_expanded"] = sorted(expanded_now)
+    diag["skipped_already_expanded"] = len(done)
+    # Everything ever expanded, so the next run does not repeat finished work.
+    diag["expanded_ledger"] = sorted(explored)[:MAX_EXPANDED_LEDGER]
     diag["frontier_size"] = len(explored) + len(pending)
     diag["frontier_remaining"] = len(pending)
-    diag["frontier_queue"] = sorted(pending, key=lambda x: x["depth"])[:200]
+    diag["frontier_queue"] = pending[:MAX_FRONTIER_QUEUE]
+    # Truncation has to be visible: silently dropping the tail of the queue
+    # while still reporting the full remaining count makes lost work look done.
+    diag["frontier_truncated"] = max(0, len(pending) - MAX_FRONTIER_QUEUE)
 
+    failures = len(diag["partial_failures"])
     if diag["status"] != "failed":
-        if stopped_reason or pending:
-            diag["status"] = "budget_exhausted" if stopped_reason else "partial"
-            diag["stopped_reason"] = stopped_reason or "frontier not fully drained"
+        if failures and not expanded_now:
+            # Every attempted lookup failed: that is an outage, not a partial
+            # result, and must not read as a successful-but-thin expansion.
+            diag["status"] = "failed"
+            diag["error"] = diag["partial_failures"][0]["error"]
+            diag["degraded_sources"] = ["arbitrum_l1"]
+        elif stopped_reason or pending or failures:
+            if stopped_reason:
+                diag["status"] = "budget_exhausted"
+                diag["stopped_reason"] = stopped_reason
+            elif failures:
+                diag["status"] = "partial"
+                diag["stopped_reason"] = (
+                    f"{failures} lookup(s) failed and were re-queued")
+            else:
+                diag["status"] = "partial"
+                diag["stopped_reason"] = "frontier not fully drained"
         else:
             diag["status"] = "ok"
         diag["completed_at"] = utc_now()
@@ -1216,8 +1501,30 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     print(f"[graph] L1 expansion {diag['status']}: {calls} lookup(s) to depth "
           f"{diag['deepest_expanded']}, {len(added)} new edge(s), "
           f"{len(pending)} wallet(s) queued for next run")
-    write_cursor("transfer_graph_last_expansion_ms", now_ms())
+    # NB: the expansion cursor is written by run_transfer_graph, not here.
+    # Writing it from inside the traversal meant every unit test that called
+    # expand_frontier mutated data/state/ in the working tree — a dry run must
+    # never leave a production file behind.
     return edges, diag
+
+
+def _read_previous_graph() -> dict:
+    """Load the last saved graph, tolerating absence and a corrupt file.
+
+    A truncated latest.json must degrade to "no history" rather than crash the
+    run — losing the frontier is recoverable, losing the whole run is not.
+    """
+    path = DATA_DIR / "transfer_graph" / "latest.json"
+    if not path.exists():
+        return {}
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError) as exc:
+        print(f"[graph] previous graph unreadable ({exc}) — starting from empty "
+              f"history; frontier and delivered-alert state are reset")
+        return {}
 
 
 def run_transfer_graph(expand: bool = True) -> dict:
@@ -1231,43 +1538,44 @@ def run_transfer_graph(expand: bool = True) -> dict:
     known_services.add(config["usdc_contract_arbitrum"].lower())
     known_services |= {a.lower() for a in config.get("known_service_addresses", [])}
 
-    # Loaded before expansion: it carries the unfinished frontier to resume.
-    previous_graph = {}
-    _prev_path = DATA_DIR / "transfer_graph" / "latest.json"
-    if _prev_path.exists():
-        try:
-            with open(_prev_path) as f:
-                previous_graph = json.load(f)
-        except (OSError, ValueError):
-            previous_graph = {}
+    # Loaded ONCE, before expansion, and migrated to the current schema: it
+    # carries the unfinished frontier, the ledger of finished expansions and the
+    # delivered-alert state that the whole run depends on.
+    previous_graph = migrate_graph(_read_previous_graph())
 
     edges = collect_known_edges()
     print(f"[graph] {len(edges)} edge(s) from local data")
     if expand:
-        resume = ((previous_graph.get("health", {}) or {})
-                  .get("expansion", {}) or {}).get("frontier_queue") or []
+        prev_expansion = ((previous_graph.get("health") or {})
+                          .get("expansion") or {})
+        resume = prev_expansion.get("frontier_queue") or []
+        already = prev_expansion.get("expanded_ledger") or []
         if resume:
             print(f"[graph] resuming {len(resume)} wallet(s) queued by the "
                   f"previous run")
-        edges, expansion = expand_frontier(edges, target, cfg, resume=resume)
+        if already:
+            print(f"[graph] {len(already)} wallet(s) already expanded on an "
+                  f"earlier run — not repeating")
+        edges, expansion = expand_frontier(
+            edges, target, cfg, resume=resume,
+            known_services=known_services, already_expanded=already)
+        write_cursor("transfer_graph_last_expansion_ms", now_ms())
     else:
         expansion = {"status": "disabled", "degraded_sources": ["arbitrum_l1"],
                      "attempted_at": utc_now()}
     # Carry the previous successful expansion forward so the dashboard can show
     # "last successful L1 expansion" even on a run where it was skipped.
-    prev_path = DATA_DIR / "transfer_graph" / "latest.json"
-    if expansion.get("status") != "ok" and prev_path.exists():
-        try:
-            with open(prev_path) as f:
-                prev_health = (json.load(f).get("health") or {}).get("expansion") or {}
-            if prev_health.get("status") == "ok":
-                expansion["last_successful"] = prev_health.get("completed_at")
-            elif prev_health.get("last_successful"):
-                expansion["last_successful"] = prev_health["last_successful"]
-        except (OSError, ValueError):
-            pass
-    elif expansion.get("status") == "ok":
+    prev_health = (previous_graph.get("health") or {}).get("expansion") or {}
+    if expansion.get("status") == "ok":
         expansion["last_successful"] = expansion.get("completed_at")
+    elif prev_health.get("status") == "ok":
+        expansion["last_successful"] = prev_health.get("completed_at")
+    elif prev_health.get("last_successful"):
+        expansion["last_successful"] = prev_health["last_successful"]
+    # A run that did not expand must not erase what earlier runs finished.
+    if expansion.get("status") in ("disabled", "skipped_no_api_key"):
+        expansion.setdefault("expanded_ledger", prev_health.get("expanded_ledger") or [])
+        expansion.setdefault("frontier_queue", prev_health.get("frontier_queue") or [])
 
     behavioural, hl_active = _load_behavioural_scores()
     graph = build_graph(
@@ -1283,20 +1591,15 @@ def run_transfer_graph(expand: bool = True) -> dict:
         expansion=expansion,
     )
 
-    previous = None
-    prev_path = DATA_DIR / "transfer_graph" / "latest.json"
-    if prev_path.exists():
-        try:
-            with open(prev_path) as f:
-                previous = json.load(f)
-        except (OSError, ValueError):
-            previous = None
+    previous = previous_graph or None
+    annotate_changes(graph, previous)
 
     alerts = select_alerts(graph, previous)
     if alerts:
         sent, undelivered = fire_alerts(graph, alerts)
     else:
         sent, undelivered = 0, []
+    advance_alert_state(graph, previous, alerts, undelivered)
     graph["alerts_fired"] = sent
     graph["pending_alerts"] = len(alerts)
     # Persisted so the next run re-selects these. Without it the saved graph

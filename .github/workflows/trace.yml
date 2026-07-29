@@ -47,7 +47,10 @@ jobs:
           git commit -m "data: trace fund flows [automated]"
           for i in 1 2 3; do
             if git push origin main; then exit 0; fi
-            git pull --rebase origin main
+            # A conflicted rebase leaves the tree mid-rebase, so every later
+            # retry fails for the wrong reason. Abort back to our own commit —
+            # the graph evidence stays in it either way — and try again.
+            git pull --rebase origin main || git rebase --abort || true
           done
           git push origin main
       - name: Open failure issue
