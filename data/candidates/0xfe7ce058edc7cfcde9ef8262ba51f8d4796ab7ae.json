@@ -1,62 +1,75 @@
 {
   "wallet": "0xfe7ce058edc7cfcde9ef8262ba51f8d4796ab7ae",
   "first_seen": "2026-07-27T20:10:53.288089+00:00",
-  "last_seen": "2026-07-27T21:04:22.157178+00:00",
+  "last_seen": "2026-07-29T15:07:07.061583+00:00",
   "best_score": 0.45,
   "latest_score": 0.45,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
+      "Shares rare HIP-3 markets: xyz:BRENTOIL",
       "Similar market/limit execution style",
-      "Matching long/short bias"
+      "xyz:BRENTOIL: traded by ~9.8% of scanned wallets \u2014 too common to be evidence (no bonus)",
+      "Market bonus withheld: style veto in force"
     ],
     "warnings": [
-      "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Weak asset overlap"
     ],
     "vetoes": [
-      "Decision frequency 13x apart (1.41 vs 18.00 position episodes/day)"
+      "Decision frequency 11x apart (1.41 vs 16.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
-        "BTC"
+        "xyz:BRENTOIL"
       ],
       "target_only": [
         "@107",
+        "BTC",
         "CASHCAT",
-        "ETH",
-        "xyz:BRENTOIL"
+        "ETH"
       ],
       "candidate_only": [
         "GRAM",
-        "kBONK",
+        "xyz:AMD",
         "xyz:BB",
         "xyz:BOT",
         "xyz:CBRS",
-        "xyz:KIOXIA",
+        "xyz:GOOGL",
         "xyz:MINIMAX",
         "xyz:MU",
         "xyz:NOK",
-        "xyz:PURRDAT",
         "xyz:QNT",
         "xyz:SHAZ",
-        "xyz:SKHX",
         "xyz:SMH",
         "xyz:SNDK",
-        "xyz:STRC",
         "xyz:ZHIPU"
       ],
       "overlap_count": 1,
-      "rare_overlap": [],
-      "jaccard": 0.0455
+      "rare_overlap": [
+        "xyz:BRENTOIL"
+      ],
+      "jaccard": 0.0526
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:BRENTOIL"
+      ],
+      "rare_markets": [],
+      "classification": {
+        "xyz:BRENTOIL": "COMMON"
+      },
+      "description": "xyz:BRENTOIL (common, ~9.8% of wallets)",
+      "sample_sufficient": true,
       "bonus_applied": 0.0,
       "score_without_bonus": 0.45,
-      "explanations": [],
-      "frequencies": {}
+      "explanations": [
+        "xyz:BRENTOIL: traded by ~9.8% of scanned wallets \u2014 too common to be evidence (no bonus)",
+        "Market bonus withheld: style veto in force"
+      ],
+      "frequencies": {
+        "xyz:BRENTOIL": 0.09819
+      }
     }
   },
   "score_history": [
@@ -95,6 +108,25 @@
         "activity": 0.6103,
         "direction_bias": 0.875,
         "position_management": 0.7678,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-07-29T15:07:07.061583+00:00",
+      "score": 0.45,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0526,
+        "timing_profile": null,
+        "leverage_profile": 0.783,
+        "entry_exit_style": 0.9917,
+        "hold_duration": 0.6446,
+        "account_size": 0.5993,
+        "trade_sequencing": 0.8821,
+        "position_sizing": 0.7071,
+        "activity": 0.6188,
+        "direction_bias": 0.8388,
+        "position_management": 0.7385,
         "loss_handling": null
       }
     }
