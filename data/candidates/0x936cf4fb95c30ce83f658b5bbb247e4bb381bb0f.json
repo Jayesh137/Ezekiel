@@ -1,7 +1,7 @@
 {
   "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
   "first_seen": "2026-07-09T16:23:24.091306+00:00",
-  "last_seen": "2026-07-31T17:21:28.701337+00:00",
+  "last_seen": "2026-07-31T19:07:55.426038+00:00",
   "best_score": 0.57,
   "latest_score": 0.45,
   "latest_tier": "BACKGROUND",
@@ -9,13 +9,14 @@
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:BRENTOIL",
-      "Matching long/short bias",
+      "Similar account-size bracket",
       "xyz:BRENTOIL: traded by ~10.1% of scanned wallets \u2014 too common to be evidence (no bonus)",
       "Market bonus withheld: style veto in force"
     ],
     "warnings": [],
     "vetoes": [
-      "Decision frequency 7x apart (1.41 vs 10.00 position episodes/day)"
+      "Decision frequency 6x apart (1.41 vs 9.00 position episodes/day)",
+      "Incompatible hold style: 100% vs 11% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -30,7 +31,6 @@
       "candidate_only": [
         "@306",
         "CC",
-        "FARTCOIN",
         "GRASS",
         "JTO",
         "LIT",
@@ -41,7 +41,7 @@
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.2308
+      "jaccard": 0.25
     },
     "market_rarity": {
       "shared_markets": [
@@ -60,30 +60,11 @@
         "Market bonus withheld: style veto in force"
       ],
       "frequencies": {
-        "xyz:BRENTOIL": 0.1011
+        "xyz:BRENTOIL": 0.10119
       }
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-17T23:45:08.965575+00:00",
-      "score": 0.3899,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0769,
-        "timing_profile": 0.3532,
-        "leverage_profile": 0.772,
-        "entry_exit_style": 0.2773,
-        "hold_duration": 0.0,
-        "account_size": 0.7784,
-        "trade_sequencing": 0.7023,
-        "position_sizing": 0.5,
-        "activity": 0.4734,
-        "direction_bias": 0.0201,
-        "position_management": 0.8368,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-18T01:21:07.868242+00:00",
       "score": 0.3898,
@@ -1964,8 +1945,27 @@
         "position_management": 0.7124,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-07-31T19:07:55.426038+00:00",
+      "score": 0.45,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.2938,
+        "timing_profile": null,
+        "leverage_profile": 0.7611,
+        "entry_exit_style": 0.1345,
+        "hold_duration": 0.2887,
+        "account_size": 0.7519,
+        "trade_sequencing": 0.4152,
+        "position_sizing": 0.7071,
+        "activity": 0.5433,
+        "direction_bias": 0.848,
+        "position_management": 0.7375,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4411
+  "recent_avg_score": 0.45
 }
