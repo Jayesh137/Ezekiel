@@ -1,23 +1,23 @@
 {
   "wallet": "0x2e30c32738a28833e3d85189c04895c25ee54cb5",
   "first_seen": "2026-07-27T20:15:44.898760+00:00",
-  "last_seen": "2026-07-27T21:09:15.086636+00:00",
+  "last_seen": "2026-08-04T02:06:48.582007+00:00",
   "best_score": 0.45,
-  "latest_score": 0.45,
+  "latest_score": 0.3887,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Similar market/limit execution style",
-      "Matching long/short bias",
-      "Similar scaling/TWAP/clip-size habits"
+      "Matching long/short bias"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Very different trading frequency"
     ],
     "vetoes": [
-      "Incompatible hold style: 100% vs 0% of holds under 1h"
+      "Decision frequency 15x apart (0.30 vs 4.49 position episodes/day)",
+      "Incompatible hold style: 80% vs 0% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -40,8 +40,12 @@
     },
     "market_rarity": {
       "shared_markets": [],
+      "rare_markets": [],
+      "classification": {},
+      "description": "no shared markets",
+      "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.45,
+      "score_without_bonus": 0.3887,
       "explanations": [],
       "frequencies": {}
     }
@@ -82,6 +86,25 @@
         "activity": 0.7359,
         "direction_bias": 1.0,
         "position_management": 0.8107,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-08-04T02:06:48.582007+00:00",
+      "score": 0.3887,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.5731,
+        "timing_profile": null,
+        "leverage_profile": 0.2717,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.0744,
+        "account_size": 0.5531,
+        "trade_sequencing": 0.5903,
+        "position_sizing": 0.4629,
+        "activity": 0.3152,
+        "direction_bias": 1.0,
+        "position_management": 0.7881,
         "loss_handling": null
       }
     }

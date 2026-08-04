@@ -1,37 +1,40 @@
 {
   "wallet": "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36",
   "first_seen": "2026-07-06T11:35:24.225653+00:00",
-  "last_seen": "2026-08-03T12:15:32.439057+00:00",
+  "last_seen": "2026-08-04T02:00:07.687765+00:00",
   "best_score": 0.7326,
-  "latest_score": 0.6401,
-  "latest_tier": "WEAK_LEAD",
+  "latest_score": 0.45,
+  "latest_tier": "BACKGROUND",
   "latest_evidence": {
-    "tier": "WEAK_LEAD",
+    "tier": "BACKGROUND",
     "reasons": [
+      "Strong asset mix overlap",
       "Similar market/limit execution style",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
+      "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Decision frequency 7x apart (0.30 vs 2.00 position episodes/day)"
+    ],
     "asset_overlap": {
       "overlap": [
         "@107",
-        "BTC",
         "ETH"
       ],
       "target_only": [
+        "BTC",
         "CASHCAT",
         "xyz:BRENTOIL"
       ],
       "candidate_only": [
-        "HYPE",
-        "SOL"
+        "HYPE"
       ],
-      "overlap_count": 3,
+      "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.4286
+      "jaccard": 0.3333
     },
     "market_rarity": {
       "shared_markets": [],
@@ -40,7 +43,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.6401,
+      "score_without_bonus": 0.45,
       "explanations": [],
       "frequencies": {}
     }
@@ -919,8 +922,27 @@
         "position_management": 0.8808,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-04T02:00:07.687765+00:00",
+      "score": 0.45,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.6659,
+        "timing_profile": null,
+        "leverage_profile": 0.7948,
+        "entry_exit_style": 0.9977,
+        "hold_duration": null,
+        "account_size": 0.6067,
+        "trade_sequencing": 0.2515,
+        "position_sizing": 0.5,
+        "activity": 0.4982,
+        "direction_bias": null,
+        "position_management": 0.8965,
+        "loss_handling": null
+      }
     }
   ],
   "status": "ACTIVE",
-  "recent_avg_score": 0.6404
+  "recent_avg_score": 0.6131
 }

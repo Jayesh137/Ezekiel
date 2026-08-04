@@ -1,22 +1,19 @@
 {
   "wallet": "0x985f02b19dbc062e565c981aac5614baf2cf501f",
   "first_seen": "2026-07-27T20:14:30.171711+00:00",
-  "last_seen": "2026-07-27T21:08:09.612112+00:00",
+  "last_seen": "2026-08-04T02:05:35.828771+00:00",
   "best_score": 0.4363,
-  "latest_score": 0.4346,
+  "latest_score": 0.3091,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [
-      "Similar market/limit execution style",
-      "Similar scaling/TWAP/clip-size habits"
-    ],
+    "reasons": [],
     "warnings": [
-      "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Weak asset overlap"
     ],
     "vetoes": [
-      "Incompatible hold style: 100% vs 0% of holds under 1h"
+      "Decision frequency 30x apart (0.30 vs 9.00 position episodes/day)",
+      "Incompatible hold style: 80% vs 11% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -31,21 +28,26 @@
       "candidate_only": [
         "PURR",
         "PURR/USDC",
-        "xyz:BB",
+        "xyz:CBRS",
+        "xyz:CL",
+        "xyz:DRAM",
         "xyz:NBIS",
-        "xyz:PURRDAT",
         "xyz:SKHX",
         "xyz:SKHY",
-        "xyz:SMSN"
+        "xyz:STRC"
       ],
       "overlap_count": 1,
       "rare_overlap": [],
-      "jaccard": 0.0769
+      "jaccard": 0.0714
     },
     "market_rarity": {
       "shared_markets": [],
+      "rare_markets": [],
+      "classification": {},
+      "description": "no shared markets",
+      "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4346,
+      "score_without_bonus": 0.3091,
       "explanations": [],
       "frequencies": {}
     }
@@ -86,6 +88,25 @@
         "activity": 0.7383,
         "direction_bias": 0.5692,
         "position_management": 0.8391,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-08-04T02:05:35.828771+00:00",
+      "score": 0.3091,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0714,
+        "timing_profile": null,
+        "leverage_profile": 0.7853,
+        "entry_exit_style": 0.79,
+        "hold_duration": 0.3806,
+        "account_size": 0.5766,
+        "trade_sequencing": 0.2954,
+        "position_sizing": 0.3111,
+        "activity": 0.3965,
+        "direction_bias": 0.5773,
+        "position_management": 0.7492,
         "loss_handling": null
       }
     }

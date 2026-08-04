@@ -1,22 +1,21 @@
 {
   "wallet": "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
   "first_seen": "2026-07-27T20:08:27.716010+00:00",
-  "last_seen": "2026-07-27T21:01:56.733548+00:00",
+  "last_seen": "2026-08-04T01:59:33.482073+00:00",
   "best_score": 0.45,
-  "latest_score": 0.45,
+  "latest_score": 0.4055,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
-      "Matching long/short bias"
+      "Similar market/limit execution style"
     ],
     "warnings": [
-      "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Weak asset overlap"
     ],
     "vetoes": [
-      "Decision frequency 8x apart (1.41 vs 11.00 position episodes/day)"
+      "Decision frequency 41x apart (0.30 vs 12.00 position episodes/day)",
+      "Incompatible hold style: 80% vs 0% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
@@ -31,6 +30,7 @@
       "candidate_only": [
         "AVAX",
         "BNB",
+        "DOGE",
         "FARTCOIN",
         "HYPE",
         "PUMP",
@@ -41,12 +41,16 @@
       ],
       "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.1429
+      "jaccard": 0.1333
     },
     "market_rarity": {
       "shared_markets": [],
+      "rare_markets": [],
+      "classification": {},
+      "description": "no shared markets",
+      "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.45,
+      "score_without_bonus": 0.4055,
       "explanations": [],
       "frequencies": {}
     }
@@ -87,6 +91,25 @@
         "activity": 0.5244,
         "direction_bias": 0.9501,
         "position_management": 0.7945,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-08-04T01:59:33.482073+00:00",
+      "score": 0.4055,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.3429,
+        "timing_profile": null,
+        "leverage_profile": 0.707,
+        "entry_exit_style": 0.9986,
+        "hold_duration": 0.1996,
+        "account_size": 0.5326,
+        "trade_sequencing": 0.4162,
+        "position_sizing": 0.866,
+        "activity": 0.3843,
+        "direction_bias": 0.6695,
+        "position_management": 0.7741,
         "loss_handling": null
       }
     }
