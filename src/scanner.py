@@ -369,11 +369,16 @@ def compare_activity(sp_a: dict, sp_b: dict) -> float | None:
     act_a = sp_a.get("activity", {})
     act_b = sp_b.get("activity", {})
     scores = []
-    epd = _ratio_score(act_a.get("episodes_per_day", 0), act_b.get("episodes_per_day", 0))
+    # Per-ACTIVE-day keys. An older fingerprint carries the calendar-normalised
+    # `episodes_per_day` instead; it is deliberately not read, because comparing
+    # the two units would be worse than dropping the dimension for one rebuild.
+    epd = _ratio_score(act_a.get("episodes_per_active_day", 0),
+                       act_b.get("episodes_per_active_day", 0))
     if epd is not None:
         scores.append(epd)
         scores.append(epd)  # double weight vs the softer components
-    freq = _ratio_score(act_a.get("fills_per_day", 0), act_b.get("fills_per_day", 0))
+    freq = _ratio_score(act_a.get("fills_per_active_day", 0),
+                        act_b.get("fills_per_active_day", 0))
     if freq is not None:
         scores.append(freq)
     adr_a, adr_b = act_a.get("active_days_ratio", 0), act_b.get("active_days_ratio", 0)
@@ -437,9 +442,11 @@ def check_style_vetoes(ezekiel_fp: dict, candidate_fp: dict) -> list[str]:
 
     vetoes = []
     # Decision frequency, not raw fills: TWAP execution inflates fill counts
-    # ~10x for the same human depending on the period.
-    epd_a = sp_a.get("activity", {}).get("episodes_per_day", 0)
-    epd_b = sp_b.get("activity", {}).get("episodes_per_day", 0)
+    # ~10x for the same human depending on the period. Per ACTIVE day, so a
+    # trader who keeps trading the same way but shows up less often is not
+    # vetoed as a different person — see compute_style_profile.
+    epd_a = sp_a.get("activity", {}).get("episodes_per_active_day", 0)
+    epd_b = sp_b.get("activity", {}).get("episodes_per_active_day", 0)
     if epd_a > 0 and epd_b > 0:
         ratio = max(epd_a, epd_b) / min(epd_a, epd_b)
         if ratio > 5:

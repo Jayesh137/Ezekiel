@@ -494,16 +494,36 @@ def compute_style_profile(fills: list[dict], min_fills: int = 15) -> dict:
     episodes = _position_episodes(fills)
 
     # --- Activity: decision frequency is the most discriminative style trait.
-    # Episodes/day (position round-trips) is the primary measure — raw fill
-    # counts are inflated by TWAP execution and vary wildly for the same human.
+    # Episodes (position round-trips) rather than raw fills — TWAP execution
+    # inflates fill counts ~10x for the same human depending on the period.
+    #
+    # Normalised per ACTIVE day, not per calendar day. Dividing by the calendar
+    # span measures how often the trader shows up, which is regime, not identity —
+    # and `active_days_ratio` below already measures exactly that. Dividing both
+    # counts by the span too meant intermittency was counted three times, once of
+    # them as a hard veto, and on 2026-08-05 that rejected the target as an
+    # impostor against his own history: 12 active days packed into 19 calendar
+    # days scored 0.94 episodes/day, the same 12 active days spread over 72 scored
+    # 0.17, and "Decision frequency 6x apart" failed the self-match, dropping the
+    # scanner into OBSERVING and switching behavioural alerting off in production.
+    #
+    # The keys are deliberately renamed: a fingerprint written before this change
+    # holds calendar-normalised values, and comparing those against per-active-day
+    # ones would be worse than not comparing at all. Consumers see the old key as
+    # absent and drop the dimension until the fingerprint is rebuilt.
     timestamps = sorted(f.get("time", 0) for f in fills if f.get("time"))
     if timestamps:
         span_days = max(1.0, (timestamps[-1] - timestamps[0]) / 86_400_000)
         active_days = len({ts // 86_400_000 for ts in timestamps})
         profile["activity"] = {
-            "episodes_per_day": round(len(episodes) / span_days, 3),
-            "fills_per_day": round(len(fills) / span_days, 2),
-            "active_days_ratio": round(active_days / max(1, int(span_days) + 1), 4),
+            "episodes_per_active_day": round(len(episodes) / max(1, active_days), 3),
+            "fills_per_active_day": round(len(fills) / max(1, active_days), 2),
+            # Presence, measured once and on its own. Clamped: a position opened
+            # near midnight closes on the next calendar day, which could push the
+            # ratio above 1.0 and distort the 1.0 - |difference| comparison.
+            "active_days_ratio": round(
+                min(1.0, active_days / max(1, int(span_days) + 1)), 4),
+            "active_days": active_days,
             "span_days": round(span_days, 1),
         }
 

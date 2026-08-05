@@ -66,7 +66,9 @@ def scalper_fills(days=21, per_day=60, hold_min=20, start=1_700_000_000_000, coi
 def test_style_profile_activity_and_direction():
     sp = compute_style_profile(swing_fills())
     assert sp["sufficient_data"]
-    assert 3.0 < sp["activity"]["fills_per_day"] < 5.0
+    # Per ACTIVE day — see compute_style_profile on why calendar-span
+    # normalisation vetoed the target against his own history.
+    assert 3.0 < sp["activity"]["fills_per_active_day"] < 5.0
     assert sp["direction"]["total_opens"] == 42
     # per_day=2 with long=(i % 3 != 0) → i=0 short, i=1 long → 50% long opens
     assert abs(sp["direction"]["long_open_pct"] - 0.5) < 0.05

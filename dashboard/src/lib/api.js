@@ -288,6 +288,39 @@ export function getPolicy(scan) {
 	};
 }
 
+/**
+ * How well a candidate matches the target *now*.
+ *
+ * Mirrors utils.candidate_current_score in the backend. `best_score` is a
+ * high-water mark that only ratchets up, so tiering on it made the dashboard
+ * assert a peak the wallet had already left — live data had a candidate showing
+ * "75.1%" whose current score was 61.2%. The backend scores, grades and alerts
+ * on the current value, and the displayed tier has to be the emailed tier.
+ *
+ * `best_score` is still the right thing to show as a labelled peak (the Recovery
+ * table shows both); it is just not the answer to "does this wallet match?".
+ * @param {{latest_score?:number, best_score?:number}|null|undefined} c
+ * @returns {number}
+ */
+export function currentScore(c) {
+	const v = c?.latest_score ?? c?.best_score;
+	return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
+
+/**
+ * The candidate that matches best right now.
+ *
+ * candidates/latest.json is persisted sorted by best_score, so [0] is the
+ * all-time leader rather than the current one. Re-rank instead of trusting the
+ * file order, or the dashboard names a different wallet than risk.py does.
+ * @param {Array<object>|null|undefined} cands
+ * @returns {object|null}
+ */
+export function topCandidate(cands) {
+	if (!Array.isArray(cands) || cands.length === 0) return null;
+	return cands.reduce((best, c) => (currentScore(c) > currentScore(best) ? c : best));
+}
+
 export function getThresholds(scan) {
 	const t = scan?.thresholds;
 	if (t && typeof t.high === 'number') return t;
@@ -458,9 +491,9 @@ export function getAlertState(fundFlows, candidates, hlTransfers, scan = null) {
 	if (findings.length > 0) {
 		return { level: 'warn', msg: 'Outbound USDC transfers detected from target wallet.' };
 	}
-	const top = cands[0];
-	const score = top?.best_score;
-	if (typeof score === 'number') {
+	const top = topCandidate(cands);
+	const score = top ? currentScore(top) : null;
+	if (typeof score === 'number' && score > 0) {
 		const pct = (score * 100).toFixed(1);
 		if (score >= th.high) {
 			return { level: 'high', msg: `Confirmed behavioral match at ${pct}%`, wallet: top.wallet };

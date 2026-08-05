@@ -589,7 +589,12 @@
 		padding: 10px 14px;
 	}
 
-	.result-wallet a {
+	/* The anchor is rendered by <Addr>, so scoped CSS cannot reach it — this
+	   selector silently stopped matching when the markup moved into that
+	   component, leaving scanner addresses in the body font while every other
+	   address on the site is mono. :global() is what crosses the boundary. */
+	.result-wallet :global(a),
+	.result-wallet :global(span) {
 		font-family: var(--font-mono);
 		font-size: 0.85rem;
 	}

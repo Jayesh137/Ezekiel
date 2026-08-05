@@ -38,7 +38,11 @@ ACTION_BACKGROUND = "BACKGROUND"
 # Bump whenever scoring dimensions, weights or normalisation change. A validated
 # threshold set is only reusable while the thing it validated still exists; a
 # ceiling proven under different weights says nothing about the current scorer.
-SCORING_SCHEMA = "2026-07-27.1"
+# 2026-08-05.1: activity normalisation changed from per-calendar-day to
+# per-active-day (episodes_per_active_day / fills_per_active_day). That moves
+# every activity score and the decision-frequency veto, so any ceiling proven
+# under 2026-07-27.1 is not evidence about this scorer and must not carry over.
+SCORING_SCHEMA = "2026-08-05.1"
 
 # Where the thresholds in force came from. Published in scans/latest.json and
 # rendered on the dashboard so the operating mode is never ambiguous.

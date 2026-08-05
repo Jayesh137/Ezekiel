@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import {
 		fetchTransferGraph, fetchCandidates, fetchScanResults,
-		formatUSD, shortAddr, formatTime, getThresholds, explorerTx
+		formatUSD, shortAddr, formatTime, getThresholds, explorerTx, currentScore
 	} from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
 
@@ -165,12 +165,15 @@
 		return isNaN(d) ? '—' : d.toLocaleString();
 	}
 
-	/** Behavioural watchlist score for a wallet, if the scanner has one. */
+	/** Behavioural watchlist score for a wallet, if the scanner has one.
+	 *  Current score, not the all-time best: transfer_graph.py grades and alerts
+	 *  on the current value, so showing the peak here made the page disagree with
+	 *  the classification it was displaying next to it. */
 	function behaviouralScore(wallet) {
 		const c = (candidates?.candidates || []).find(
 			(x) => x.wallet?.toLowerCase() === wallet?.toLowerCase()
 		);
-		return c ? c.best_score : null;
+		return c ? currentScore(c) : null;
 	}
 
 	function edgesFor(node) {

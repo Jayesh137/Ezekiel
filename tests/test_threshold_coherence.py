@@ -230,6 +230,94 @@ def test_every_scanner_route_has_a_declared_threshold():
                                    "x")[0] in th.COMBINED_ROUTE_THRESHOLDS
 
 
+# --- decision frequency: intensity, not presence ----------------------------------
+#
+# On 2026-08-05 the live self-match FAILED: the target scored 0.45 against his own
+# history, ranked 8th behind strangers, and tripped his own style veto with
+# "Decision frequency 6x apart (0.17 vs 0.94 position episodes/day)". That put the
+# scanner into OBSERVING and switched behavioural alerting off in production.
+#
+# The two windows held the SAME number of active trading days (12 each). They
+# differed only in how far apart those days were spread — 19 calendar days in the
+# older window, 72 in the recent one. episodes_per_day divided by calendar span,
+# so a trader who kept trading the same way but showed up less often read as a
+# different human. active_days_ratio already measures presence; dividing episode
+# counts by span counted it a second time, and as a hard veto.
+
+# A UTC midnight, so a session sits inside one day bucket. active_days counts
+# distinct UTC days, so a session straddling midnight would count as two and the
+# fixture would measure the fixture rather than the code.
+_MIDNIGHT = 19675 * 86_400_000
+
+
+def _sessions(day_offsets, episodes_per_session=3, start=_MIDNIGHT):
+    """Identical trading sessions placed on the given days, 08:00-12:00 UTC."""
+    from tests.test_style_matching import episode_fills
+    fills = []
+    for d in day_offsets:
+        for i in range(episodes_per_session):
+            t = start + d * 86_400_000 + (8 + i) * 3_600_000
+            fills.extend(episode_fills("ETH", t, hold_min=120, long=(i % 2 == 0)))
+    return fills
+
+
+def _style(fills):
+    from src.fingerprint import compute_style_profile
+    return {"style_profile": compute_style_profile(fills)}
+
+
+def test_decision_frequency_measures_intensity_not_presence():
+    """12 sessions packed into 19 days vs the same 12 spread over 72. Same trader,
+    same behaviour when trading — taking a break is regime, not identity."""
+    from src.scanner import check_style_vetoes
+    dense = _style(_sessions(list(range(12))))
+    sparse = _style(_sessions([d * 6 for d in range(12)]))
+    assert check_style_vetoes(dense, sparse) == []
+    assert check_style_vetoes(sparse, dense) == []
+
+
+def test_decision_frequency_is_per_active_day():
+    from src.fingerprint import compute_style_profile
+    dense = compute_style_profile(_sessions(list(range(12))))
+    sparse = compute_style_profile(_sessions([d * 6 for d in range(12)]))
+    assert dense["activity"]["episodes_per_active_day"] == pytest.approx(
+        sparse["activity"]["episodes_per_active_day"], rel=0.05)
+    # Presence is still measured — just once, and not as a veto.
+    assert dense["activity"]["active_days_ratio"] > sparse["activity"]["active_days_ratio"]
+    assert dense["activity"]["active_days_ratio"] <= 1.0
+
+
+def test_activity_metrics_do_not_mix_units_with_an_old_fingerprint():
+    """The key was renamed deliberately. A fingerprint written before the change
+    holds calendar-normalised numbers; comparing those against per-active-day ones
+    would be worse than not comparing at all, so the dimension must drop out."""
+    from src.scanner import check_style_vetoes, compare_activity
+    old = {"style_profile": {"sufficient_data": True,
+                             "activity": {"episodes_per_day": 0.17, "fills_per_day": 3.0}}}
+    new = _style(_sessions(list(range(12))))
+    assert compare_activity(old["style_profile"], new["style_profile"]) is None
+    assert check_style_vetoes(old, new) == []
+
+
+def test_a_genuine_frequency_difference_still_vetoes():
+    """The veto must keep its teeth: a scalper taking 60 round-trips a session is
+    not the same person as a swing trader taking 3."""
+    from src.scanner import check_style_vetoes
+    from tests.test_style_matching import scalper_fills, swing_fills
+    swing = _style(swing_fills())
+    scalp = _style(scalper_fills())
+    assert any("Decision frequency" in v for v in check_style_vetoes(swing, scalp))
+
+
+def test_activity_similarity_survives_a_trading_break():
+    """The soft dimension should also stop punishing intermittency three times —
+    presence is still carried by active_days_ratio."""
+    from src.scanner import compare_activity
+    dense = _style(_sessions(list(range(12))))["style_profile"]
+    sparse = _style(_sessions([d * 6 for d in range(12)]))["style_profile"]
+    assert compare_activity(dense, sparse) > 0.5
+
+
 # --- transfer graph corroboration ------------------------------------------------
 
 def test_transfer_graph_corroborates_at_the_resolved_gate(eff):

@@ -12,7 +12,8 @@
 		fetchRisk,
 		fetchCorrelations,
 		formatUSD,
-		shortAddr
+		shortAddr,
+		currentScore
 	} from '$lib/api.js';
 
 	const TARGET = '0x45d26f28196d226497130c4bac709d808fed4029';
@@ -296,7 +297,7 @@
 									{f.deposited_to_hl ? 'HL deposit' : 'pending'}
 								</span>
 								{#if linkedCandidate}
-									<span class="badge badge-red">Behavioral match {scorePct(linkedCandidate.best_score)}</span>
+									<span class="badge badge-red">Behavioral match {scorePct(currentScore(linkedCandidate))}</span>
 								{/if}
 							</div>
 							<div class="text-muted mono">{f.amount_usdc || formatUSD(f.amount_usdc_raw || 0)} USDC | {f.method}{#if f.hop_count > 1} ({f.hop_count}-hop){/if}</div>

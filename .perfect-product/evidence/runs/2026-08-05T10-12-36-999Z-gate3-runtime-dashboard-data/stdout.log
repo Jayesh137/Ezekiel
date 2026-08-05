@@ -1,0 +1,42 @@
+=== LIVE DATA REACHABLE ===
+  index   ok
+  scan    ok
+  cands   ok
+  risk    ok
+  flows   ok
+  hl      ok
+  graph   ok
+
+  data freshness: 63 min (last_updated 2026-08-05T09:09:52.901969+00:00)
+
+=== THRESHOLDS THE UI TIERS ON ===
+  high=0.9 medium=0.8 low=0.65 source=config
+  policy=OBSERVING (Observing)  behaviouralAlerts=false  schema=2026-07-27.1
+
+=== TOP CANDIDATE: file order vs current-score ranking ===
+  candidates[0]   0xcbd909bc348c  best=0.7505  latest=0.45
+  topCandidate()  0x12e16e3dc4a4  best=0.7019  latest=0.7019
+  currentScore(top) = 0.7019  -> tier WEAK
+  (old behaviour) best_score of [0] = 0.7505 -> tier WEAK
+
+=== BANNER (getAlertState) ===
+  {"level":"critical","msg":"Fund trace found a wallet that deposited to Hyperliquid."}
+
+=== AGREEMENT WITH BACKEND risk/latest.json ===
+  risk.json top_candidate_wallet = 0xcbd909bc348c  score=0.75
+  dashboard topCandidate()       = 0x12e16e3dc4a4  score=0.7019
+  behavioural_band published?    = null
+
+=== TRANSFER GRAPH ===
+  node classifications: {"MIGRATION_CANDIDATE":1,"OPERATIONAL_COUNTERPARTY":7,"DIRECT_RECIPIENT":9,"SERVICE":5}
+  graph generated_at: (none)
+
+=== EDGE CASES ===
+  currentScore(null)      = 0
+  currentScore({})        = 0
+  currentScore({best:.7}) = 0.7
+  topCandidate([])        = null
+  topCandidate(null)      = null
+  getAlertState(null,null,null,null) = null
+  getThresholds(null)     = {"high":0.9,"medium":0.8,"low":0.65,"source":"default"}
+  getPolicy(null)         = {"policy":null,"label":"unknown","behaviouralAlerts":false,"schema":null,"validatedAt":null,"provenance":null,"carryForwardRejected":null}
