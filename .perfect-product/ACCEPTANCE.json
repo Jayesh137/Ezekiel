@@ -91,7 +91,7 @@
         ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-002 fixed. No module compares a similarity score against a literal; risk.py, tracer.py and transfer_graph.py (3 sites) now resolve through thresholds.py. continuity.HIGH_CONFIDENCE_MIN was checked and deliberately left alone: it gates an aggregated continuity confidence, not a similarity score. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
+      "notes": "F-002 fixed. No module compares a similarity score against a literal; risk.py, tracer.py and transfer_graph.py (3 sites) now resolve through thresholds.py. continuity.HIGH_CONFIDENCE_MIN was checked and deliberately left alone: it gates an aggregated continuity confidence, not a similarity score. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "correctness.risk-score-calibration",
@@ -115,7 +115,7 @@
       "dependencies": [
         "correctness.threshold-single-source"
       ],
-      "notes": "F-003 fixed. Was: CONFIRMED tier 2.91/22 pts, ceiling 4.17/22, max achievable 18.9%. Now anchored between the resolved gate and the proven ceiling. On live data the posture reads 40.5 not 26.1. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
+      "notes": "F-003 fixed. Was: CONFIRMED tier 2.91/22 pts, ceiling 4.17/22, max achievable 18.9%. Now anchored between the resolved gate and the proven ceiling. On live data the posture reads 40.5 not 26.1. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "correctness.alert-freshness",
@@ -137,7 +137,7 @@
         ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-004 fixed in all four consumers (tracer, risk, transfer_graph, dashboard). Live worst case was best 0.7113 / current 0.1322 still emailing as a behavioural match. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
+      "notes": "F-004 fixed in all four consumers (tracer, risk, transfer_graph, dashboard). Live worst case was best 0.7113 / current 0.1322 still emailing as a behavioural match. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "correctness.backtest-validation",
@@ -157,7 +157,7 @@
         ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-010 fixed. This was a genuine live production outage of the primary detection vector, not a latent risk: live origin/main on 2026-08-05 had passed=false, self_score 0.45, rank 8, policy OBSERVING, behavioural alerting OFF. Local end-to-end after the fix: PASS, self-match 0.7461, rank 1/21, margin 0.1434, self_vetoes [], failures [], zero_dimensions []. LIMITATION: verified on local data through 2026-07-29; the production verdict on data through 2026-08-04 is decided by the next analyze.yml run. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
+      "notes": "F-010 fixed. This was a genuine live production outage of the primary detection vector, not a latent risk: live origin/main on 2026-08-05 had passed=false, self_score 0.45, rank 8, policy OBSERVING, behavioural alerting OFF. Local end-to-end after the fix: PASS, self-match 0.7461, rank 1/21, margin 0.1434, self_vetoes [], failures [], zero_dimensions []. LIMITATION: verified on local data through 2026-07-29; the production verdict on data through 2026-08-04 is decided by the next analyze.yml run. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "data.compaction-safety",
@@ -217,7 +217,7 @@
         "commit 7319d60dc"
       ],
       "dependencies": [],
-      "notes": "Acceptance NARROWED from the original wording, which also required in-browser rendering and screenshots. Disclosed deliberately: no browser automation is available in this environment (Chrome extension not connected), so pixel rendering is split out as visual.dashboard-render. Verified here: all 7 live endpoints reachable, thresholds and policy resolve, topCandidate() correctly picks 0x12e16e (0.7019 now) over candidates[0] 0xcbd909 (best 0.7505, now 0.45), and every null/empty input returns a safe default."
+      "notes": "Acceptance NARROWED from the original wording, which also required in-browser rendering and screenshots. Disclosed deliberately: no browser automation is available in this environment (Chrome extension not connected), so pixel rendering is split out as visual.dashboard-render. Verified here: all 7 live endpoints reachable, thresholds and policy resolve, topCandidate() correctly picks 0x12e16e (0.7019 now) over candidates[0] 0xcbd909 (best 0.7505, now 0.45), and every null/empty input returns a safe default. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "content.alert-truthfulness",
@@ -237,7 +237,7 @@
         "commit 7319d60dc"
       ],
       "dependencies": [],
-      "notes": "F-011 fixed. The banner, the recovery flow badge and the transfers page all now show the current score the backend actually graded on, so the displayed tier is the emailed tier as the README promises. NOT independently reviewed: the content-reviewer agent was not run."
+      "notes": "F-011 fixed. The banner, the recovery flow badge and the transfers page all now show the current score the backend actually graded on, so the displayed tier is the emailed tier as the README promises. NOT independently reviewed: the content-reviewer agent was not run. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "visual.dashboard-quality",
@@ -271,7 +271,7 @@
       ],
       "evidence": [],
       "dependencies": [],
-      "notes": "BLOCKED for the same reason as visual.dashboard-render: accessibility cannot be honestly assessed without loading the pages. No accessibility work was done and none is claimed. Source inspection only: <Addr> emits real anchors with rel=\"noopener noreferrer\" and a title carrying the full address, and renders plain text rather than a dead link when an address is malformed."
+      "notes": "STILL BLOCKED, deliberately. Headless rendering gave pixels and DOM but no keyboard path, no focus-visibility check, no contrast measurement and no screen-reader pass, so no accessibility claim is made. See RELEASE-MATRIX.csv RM-19 and RM-20. Source inspection only: <Addr> emits real anchors with rel=\"noopener noreferrer\" and a title carrying the full address, and renders plain text rather than a dead link when an address is malformed. Unblock with a keyboard-only pass over each route plus a contrast check on the tier badges, which currently carry text labels as well as colour."
     },
     {
       "id": "security.secrets-and-privacy",
@@ -331,7 +331,7 @@
         ".perfect-product/evidence/runs/*final-integration"
       ],
       "dependencies": [],
-      "notes": "No regression introduced, and one avoided: build_graph resolves thresholds once and passes them to every node rather than the per-node disk read a naive fix would have caused across up to 300 nodes. Suite 369 tests in ~12s; dashboard build 100-165s; traversal budgets in config.json untouched. No independent performance review was run."
+      "notes": "No regression introduced, and one avoided: build_graph resolves thresholds once and passes them to every node rather than the per-node disk read a naive fix would have caused across up to 300 nodes. Suite 369 tests in ~12s; dashboard build 100-165s; traversal budgets in config.json untouched. No independent performance review was run. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "compat.targets",
@@ -348,10 +348,11 @@
       "evidence": [
         ".perfect-product/evidence/runs/*final-static",
         ".perfect-product/evidence/runs/*final-integration",
-        ".github/workflows/test.yml"
+        ".github/workflows/test.yml",
+        ".perfect-product/RELEASE-MATRIX.csv (20 rows)"
       ],
       "dependencies": [],
-      "notes": "Verified on the local target: Windows 11, Python 3.12 venv, Node 22. CI parity checked by reading test.yml, which runs the same ruff and pytest commands on ubuntu-latest. NOT executed on ubuntu in this pass: no such runner is available here."
+      "notes": "Verified on the local target: Windows 11, Python 3.12 venv, Node 22. CI parity checked by reading test.yml, which runs the same ruff and pytest commands on ubuntu-latest. NOT executed on ubuntu in this pass: no such runner is available here. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "docs.accuracy",
@@ -387,7 +388,7 @@
       ],
       "evidence": [],
       "dependencies": [],
-      "notes": "BLOCKED and NOT SATISFIED. All three independent reviewers dispatched (security, adversarial, release-auditor) terminated on API session limits before producing any finding. Every finding in this pass was produced and verified by the implementing agent, which is exactly the single-judge situation this gate exists to prevent. Unblock by running perfect-product-release-auditor against cd545723f or later in a fresh session; see FINAL-REPORT.md section 6 for where to attack hardest."
+      "notes": "An independent release auditor COMPLETED against 2f816fcdd and returned BLOCK. It found NO defect in any of the four code paths it was asked to attack — recall regression, veto strength, scanner behaviour preservation and test honesty all held up under hostile scrutiny, and it independently confirmed the scanner refactor is a faithful transcription and that no production code still reads the retired episodes_per_day keys. Its blockers were process, and they were correct: (1) the branch would not hold still — the mutation-test harness ran concurrently with the audit, so it caught the working tree mid-mutation with the NaN guard disabled and 3 tests failing, and development continued during the audit; (2) evidence was attributed to commits it was not produced at; (3) RELEASE-MATRIX.csv was empty. All three are now addressed: concurrent tooling stopped, attributions corrected above, matrix populated with 20 rows. The gate stays BLOCKED until a fresh audit runs against a frozen commit with nothing else touching the tree."
     },
     {
       "id": "release.final-validation",
@@ -411,7 +412,7 @@
         ".perfect-product/evidence/runs/*final-runtime"
       ],
       "dependencies": [],
-      "notes": "Recorded after the final run against final HEAD; see FINAL-REPORT.md."
+      "notes": "Recorded after the final run against final HEAD; see FINAL-REPORT.md. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
     },
     {
       "id": "visual.dashboard-render",
@@ -419,15 +420,19 @@
       "title": "Rendered dashboard inspected in a real browser at representative viewports",
       "value": "J3",
       "severity": "MINOR",
-      "status": "BLOCKED",
-      "acceptance": "Each route is loaded in a browser at desktop and mobile viewports and inspected for hierarchy, spacing, responsive behaviour and console errors.",
+      "status": "PASS",
+      "acceptance": "Every route is rendered in a real browser against the production build and live production data, at desktop and mobile viewports, and inspected for hierarchy, spacing, responsive behaviour and page errors.",
       "required_evidence": [
         "screenshot",
         "real-runtime-journey"
       ],
-      "evidence": [],
+      "evidence": [
+        "scratchpad/captures/*-desktop.png and *-mobile.png (12 renders)",
+        ".perfect-product/RELEASE-MATRIX.csv RM-01..RM-12",
+        "evidence/runs/*runtime"
+      ],
       "dependencies": [],
-      "notes": "BLOCKED: no browser automation available (Chrome extension not connected) and the project has no JS test harness. Unblock by running npm --prefix dashboard run preview (serves at /Ezekiel/) and loading each route. Residual risk is low but real: the production build is clean and only three value-source swaps plus one CSS selector changed, but no pixels were observed by this pass."
+      "notes": "UNBLOCKED. The Chrome extension was never connected, but Chrome itself is installed, so the production build was served with npm run preview and driven with headless Chrome directly. All 6 routes render at 1440x2400 and 390x2200 against live data: no route left loading text in the DOM, wallet addresses resolved (7 home / 371 scanner / 15 transfers / 13 recovery), and no page errors. The banner fix and the Margin Account Value / Portfolio Value relabel were both confirmed in the rendered pixels, not just in the DOM. Screenshots were inspected, not merely captured."
     }
   ]
 }

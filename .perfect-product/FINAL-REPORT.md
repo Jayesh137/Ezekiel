@@ -289,33 +289,44 @@ one unused-CSS warning, backtest PASS 0.7163.
 
 ### Genuine external blockers
 
-- **`release.independent-audit` — NOT SATISFIED.** This is the significant one.
-  **All three** independent reviewers dispatched — security, adversarial, and the
-  release auditor — terminated on API session limits before producing any
-  finding. **Every finding in this report was therefore produced and verified by
-  the implementing agent**, which is precisely the single-judge situation this
-  gate exists to prevent. Unblock by running `perfect-product-release-auditor`
-  against `cd545723f` in a fresh session; the highest-value things to attack are
-  listed below.
+- **`release.independent-audit` — an audit ran, and returned BLOCK.** After three
+  reviewers died on session limits, a fourth completed against `2f816fcdd`.
 
-  Where an independent reviewer should push hardest:
+  **On the code it found nothing.** All four attack vectors it was given held up
+  under hostile scrutiny: recall regression, veto strength, scanner behaviour
+  preservation and test honesty. It independently confirmed the scanner refactor
+  is a faithful line-for-line transcription of the original elif-chain, that no
+  production code still reads the retired `episodes_per_day` keys, and — usefully
+  — it verified the tests empirically rather than by argument, having caught a
+  transient regression and watched exactly the right tests fail and then pass.
 
-  1. **Recall.** Several changes make alerting stricter — the tracer route now
-     uses the current score and the resolved `medium` threshold, and the higher
-     ceiling (0.7461) raises every threshold to 0.7261/0.6761/0.6261. Could any
-     real migration now be missed? This product's dominant failure mode is the
-     false negative, not the false positive.
-  2. **The veto's remaining teeth.** Per-active-day normalisation removed a false
-     veto against the target. Does it also weaken discrimination against
-     genuinely different traders?
-  3. **Test honesty.** Do the 29 new tests assert real behaviour, or constants
-     they define themselves?
-- **`visual.dashboard-render` and `a11y.dashboard` — BLOCKED.** No browser
-  automation was available (Chrome extension not connected) and the project has
-  no JS test harness, so **no pixels were observed and no accessibility work was
-  done or is claimed**. Residual risk is low but real: the build is clean and
-  only three value-source swaps plus one CSS selector changed. Unblock with
-  `npm --prefix dashboard run preview` (serves at `/Ezekiel/`).
+  **On process it found three real blockers, and it was right about all three:**
+
+  1. **The branch would not hold still.** The mutation-test harness ran
+     *concurrently with the audit*, so the auditor caught the working tree
+     mid-mutation with the NaN guard disabled and three tests failing — and then
+     development continued (the account/drawdown fix, the dashboard relabel)
+     while it worked. Auditing a moving target is my error, not its.
+  2. **Evidence was attributed to commits it was not produced at.** The runs
+     labelled `final-*` were recorded at `7319d60dc`/`dbb8f350e`, not
+     `a24d5ecf0` as this report and `ACCEPTANCE.json` claimed, and some ran
+     dirty. That is an honesty defect in my own reporting, and the worst finding
+     of the three.
+  3. **`RELEASE-MATRIX.csv` was empty** — header row only.
+
+  **All three are now addressed:** concurrent tooling stopped, every attribution
+  corrected in `ACCEPTANCE.json`, matrix populated with 20 rows, and a single
+  atomic verification pass run against one frozen commit (§4).
+
+  The gate nonetheless **stays BLOCKED**: an audit that returned BLOCK does not
+  become a PASS because the findings were fixed afterwards. It needs one more
+  fresh audit against the frozen commit. That is the honest state.
+- **`a11y.dashboard` — BLOCKED, deliberately.** Headless rendering gave pixels
+  and DOM but no keyboard path, no focus-visibility check, no contrast
+  measurement and no screen-reader pass, so **no accessibility claim is made**.
+  See `RELEASE-MATRIX.csv` RM-19/RM-20. Unblock with a keyboard-only pass over
+  each route plus a contrast check on the tier badges (which do already carry
+  text labels, not colour alone).
 
 ### Release-safe limitations
 
@@ -351,15 +362,22 @@ one unused-CSS warning, backtest PASS 0.7163.
 - Every check reported here was **executed by an AI agent** in this session, with
   raw exit codes captured by the evidence runner. Each claim in §4 has a recorded
   run behind it.
-- **No independent review of this work was completed.** The security and
-  adversarial reviewers failed on a session limit; the release auditor ran
-  against the previous commit. The security and resilience audits reported here
-  were performed *by the same agent that wrote the code*, and are labelled as
-  such in `ACCEPTANCE.json`. This does not meet the skill's independence bar.
+- **One independent review completed, and it returned BLOCK** (§6). It found no
+  code defect but three process failures, including that I had been attributing
+  evidence to commits it was not produced at. Those attributions are corrected in
+  `ACCEPTANCE.json`; the originals are described rather than erased. The
+  security and resilience audits reported here were still performed *by the same
+  agent that wrote the code* and are labelled as such — the completed audit
+  covered the four code paths it was given, not those gates.
 - **No human review, and no certification of any kind** — security, legal,
   accessibility or financial — took place or is claimed.
-- No accessibility testing was performed. No screenshots were captured. No
-  browser rendered these pages.
+- No accessibility testing was performed and none is claimed.
+- The pages **were** rendered and inspected, after an initial pass concluded they
+  could not be: the Chrome extension was never connected, but Chrome itself is
+  installed, so the production build was served and driven with headless Chrome
+  directly. Twelve renders across six routes at two viewports, against live data.
+  That earlier "no pixels were observed" statement was true when written and is
+  now superseded — recorded here rather than quietly edited away.
 - Live production data was read from `raw.githubusercontent.com` and is quoted
   with its timestamps. Nothing was written to production; nothing was pushed.
 - `ux.dashboard-journeys` had its acceptance statement **narrowed** mid-pass,
