@@ -1,9 +1,9 @@
 {
   "wallet": "0xf27ebb91ea420f73b59b205ac7e0b77a90ec8f3c",
   "first_seen": "2026-07-01T22:12:45.047733+00:00",
-  "last_seen": "2026-08-05T01:23:13.275039+00:00",
+  "last_seen": "2026-08-05T07:31:43.618564+00:00",
   "best_score": 0.6558,
-  "latest_score": 0.4228,
+  "latest_score": 0.307,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -14,20 +14,21 @@
       "Market bonus withheld: style veto in force"
     ],
     "warnings": [
+      "Weak asset overlap",
       "Very different trading frequency"
     ],
     "vetoes": [
-      "Decision frequency 304x apart (0.30 vs 90.00 position episodes/day)"
+      "Decision frequency 248x apart (0.28 vs 70.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
         "BTC",
-        "ETH",
         "xyz:BRENTOIL"
       ],
       "target_only": [
         "@107",
-        "CASHCAT"
+        "CASHCAT",
+        "ETH"
       ],
       "candidate_only": [
         "@184",
@@ -36,14 +37,12 @@
         "HYPE",
         "LIT",
         "MNT",
-        "PAXG",
         "SOL",
         "TAO",
         "WLD",
         "ZEC",
         "xyz:AAPL",
         "xyz:AMAT",
-        "xyz:AMD",
         "xyz:AMZN",
         "xyz:ARM",
         "xyz:ASML",
@@ -57,6 +56,7 @@
         "xyz:CRCL",
         "xyz:CRWV",
         "xyz:DRAM",
+        "xyz:EWJ",
         "xyz:EWY",
         "xyz:GOLD",
         "xyz:GOOGL",
@@ -78,24 +78,21 @@
         "xyz:QNT",
         "xyz:RKLB",
         "xyz:SHAZ",
-        "xyz:SILVER",
-        "xyz:SKHX",
         "xyz:SKHY",
         "xyz:SMH",
         "xyz:SMSN",
         "xyz:SNDK",
-        "xyz:SPCX",
+        "xyz:SP500",
         "xyz:TSLA",
         "xyz:TSM",
         "xyz:WDC",
-        "xyz:XLE",
         "xyz:XYZ100"
       ],
-      "overlap_count": 3,
+      "overlap_count": 2,
       "rare_overlap": [
         "xyz:BRENTOIL"
       ],
-      "jaccard": 0.0462
+      "jaccard": 0.0328
     },
     "market_rarity": {
       "shared_markets": [
@@ -108,36 +105,17 @@
       "description": "xyz:BRENTOIL (common, ~11.4% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4228,
+      "score_without_bonus": 0.307,
       "explanations": [
         "xyz:BRENTOIL: traded by ~11.4% of scanned wallets \u2014 too common to be evidence (no bonus)",
         "Market bonus withheld: style veto in force"
       ],
       "frequencies": {
-        "xyz:BRENTOIL": 0.11356
+        "xyz:BRENTOIL": 0.11396
       }
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-27T21:29:32.580916+00:00",
-      "score": 0.3857,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.1168,
-        "timing_profile": null,
-        "leverage_profile": 0.6522,
-        "entry_exit_style": 0.0438,
-        "hold_duration": 0.6842,
-        "account_size": 0.2918,
-        "trade_sequencing": 0.4744,
-        "position_sizing": 0.2887,
-        "activity": 0.4121,
-        "direction_bias": 0.514,
-        "position_management": 0.7628,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-27T22:04:19.116473+00:00",
       "score": 0.3857,
@@ -2018,8 +1996,27 @@
         "position_management": 0.7634,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-05T07:31:43.618564+00:00",
+      "score": 0.307,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.2141,
+        "timing_profile": null,
+        "leverage_profile": 0.6495,
+        "entry_exit_style": 0.0283,
+        "hold_duration": 0.872,
+        "account_size": 0.3479,
+        "trade_sequencing": 0.4345,
+        "position_sizing": 0.4201,
+        "activity": 0.3481,
+        "direction_bias": 0.5318,
+        "position_management": 0.7332,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3731
+  "recent_avg_score": 0.3738
 }
