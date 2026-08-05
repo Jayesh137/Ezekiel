@@ -139,6 +139,42 @@ sessions spread differently must measure the same).
   `[WATCH] Watchlisted behavioral lead at 70.2%` — which is true, agrees with the
   backend, and names the wallet that actually matches best now.
 
+#### Self-challenge: could a real migration now be missed?
+
+This product's dominant failure mode is the false negative, and several changes
+made alerting stricter, so this was checked directly rather than assumed.
+
+**The raised thresholds cost nothing.** `high` is defined as `ceiling - 0.02`, so
+lifting the ceiling lifts the bar by exactly what the target gained. The true
+trader's headroom above the alert bar is **identical before and after**:
+
+| | alert bar | target | headroom | best stranger clears? |
+|---|---|---|---|---|
+| before | 0.6963 | 0.7163 | **+0.0200** | no (0.4500) |
+| after | 0.7261 | 0.7461 | **+0.0200** | no (0.6027) |
+
+The trader still clears; no stranger does, in either configuration. The absolute
+numbers moved; the decision did not.
+
+**The tracer route did get stricter, and that is a convergence, not a loss.** It
+now applies the bar `scanner.py` already applied to the identical rule
+(`deposited_to_hl` → `eff["medium"]`, current score, veto-checked). If the looser
+bar were needed for recall, the scanner — which runs hourly and is the primary
+route — would have had the same gap.
+
+**Three independent safety nets are untouched.** A wallet receiving target funds
+still alerts on its own merits, with no behavioural match required:
+
+- `alert_fund_movement` and `alert_new_wallet_found` at 1, 2 and 3 hops
+  (`tracer.py:245, 251, 273, 306`);
+- `alert_hl_native_transfer` (`ledger_analyzer.py:185`) — the in-platform path,
+  invisible to L1, and the most likely migration route;
+- `alert_deposit_correlation` (`correlator.py:240`) — the CEX-gap re-link.
+
+**Suppression still never discards.** `scanner.py:1332` and `1487` persist any
+candidate whose disposition is not `BACKGROUND`, so everything suppressed from
+alerting stays on the watchlist with its evidence and its specific blockers.
+
 ### The number the operator reads
 
 **F-003.** `top_candidate` (weight 22, the largest) scaled to full weight only at
