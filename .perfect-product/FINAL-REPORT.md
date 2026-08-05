@@ -197,12 +197,26 @@ one unused-CSS warning, backtest PASS 0.7163.
 ### Genuine external blockers
 
 - **`release.independent-audit` — NOT SATISFIED.** This is the significant one.
-  Two specialist reviewers (security, adversarial) terminated on an API session
-  limit before reporting. A release auditor was dispatched but against
-  `dbb8f350e`, one commit behind final HEAD. **Every finding in this report was
-  produced and verified by the implementing agent** — precisely the single-judge
-  situation this gate exists to prevent. Unblock by running
-  `perfect-product-release-auditor` against `a24d5ecf0` in a fresh session.
+  **All three** independent reviewers dispatched — security, adversarial, and the
+  release auditor — terminated on API session limits before producing any
+  finding. **Every finding in this report was therefore produced and verified by
+  the implementing agent**, which is precisely the single-judge situation this
+  gate exists to prevent. Unblock by running `perfect-product-release-auditor`
+  against `cd545723f` in a fresh session; the highest-value things to attack are
+  listed below.
+
+  Where an independent reviewer should push hardest:
+
+  1. **Recall.** Several changes make alerting stricter — the tracer route now
+     uses the current score and the resolved `medium` threshold, and the higher
+     ceiling (0.7461) raises every threshold to 0.7261/0.6761/0.6261. Could any
+     real migration now be missed? This product's dominant failure mode is the
+     false negative, not the false positive.
+  2. **The veto's remaining teeth.** Per-active-day normalisation removed a false
+     veto against the target. Does it also weaken discrimination against
+     genuinely different traders?
+  3. **Test honesty.** Do the 29 new tests assert real behaviour, or constants
+     they define themselves?
 - **`visual.dashboard-render` and `a11y.dashboard` — BLOCKED.** No browser
   automation was available (Chrome extension not connected) and the project has
   no JS test harness, so **no pixels were observed and no accessibility work was
