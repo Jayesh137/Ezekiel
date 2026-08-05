@@ -41,7 +41,15 @@ def collect_positions(wallet: str) -> None:
             save_snapshot(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
             save_latest(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
 
-    save_snapshot(str(DATA_DIR / "account"), {"perp": state, "spot": spot, "hip3": hip3_positions})
+    # Publish the composite as latest, not only as a dated snapshot. Without
+    # this, account/latest.json was never written by this code at all — it still
+    # held a portfolio payload (a LIST) left by an older collector. Both readers
+    # do `data.get("perp", data)`, which raises AttributeError on a list, and
+    # both swallowed it, so risk.py scored drawdown as 0.0 forever and
+    # check_account_value_drop never fired once.
+    account_state = {"perp": state, "spot": spot, "hip3": hip3_positions}
+    save_snapshot(str(DATA_DIR / "account"), account_state)
+    save_latest(str(DATA_DIR / "account"), account_state)
 
 
 # Hyperliquid returns at most ~2000 records per userFillsByTime call. A single
@@ -287,10 +295,17 @@ def check_account_value_drop() -> None:
     try:
         with open(latest_path) as f:
             latest = _json.load(f)
+        if not isinstance(latest, dict):
+            raise TypeError(
+                f"expected an object with a 'perp' key, got {type(latest).__name__}")
         perp = latest.get("perp", latest) or {}
         ms_data = perp.get("marginSummary", {}) or {}
         current_value = float(ms_data.get("accountValue", 0))
-    except Exception:
+    except Exception as e:
+        # Returning quietly here is how this alert stayed dead: the file held a
+        # stale portfolio payload and every run bailed out before the comparison.
+        print(f"[collector] WARNING: cannot check account-value drop, "
+              f"{latest_path} is unreadable: {e}")
         return
 
     if current_value <= 0:

@@ -154,15 +154,25 @@ def _gather_signals() -> dict:
     # drop alert, which drove drawdown_pct to 0.0 precisely when the account had
     # just collapsed. account_high_water_cents only ever ratchets upward.
     hw_cents = read_cursor("account_high_water_cents") or read_cursor("prev_account_value_cents")
+    # A drawdown of 0.0 must mean "measured, no drawdown" — never "could not read
+    # the file". This swallowed an AttributeError for as long as
+    # account/latest.json held a stale portfolio payload (a list), pinning the
+    # signal at 0.0 and quietly forfeiting its 12 points.
     cur = 0.0
     acct_path = DATA_DIR / "account" / "latest.json"
     if acct_path.exists():
         try:
-            data = json.load(open(acct_path))
+            with open(acct_path) as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                raise TypeError(
+                    f"expected an object with a 'perp' key, got {type(data).__name__}")
             perp = data.get("perp", data) or {}
-            cur = float(perp.get("marginSummary", {}).get("accountValue", 0) or 0)
-        except Exception:
-            pass
+            cur = float((perp.get("marginSummary") or {}).get("accountValue", 0) or 0)
+        except Exception as e:
+            print(f"[risk] WARNING: could not read account value from {acct_path}: {e}. "
+                  f"Drawdown cannot be measured and is reported as 0.0 — this is a "
+                  f"missing signal, not an absence of drawdown.")
     if hw_cents and hw_cents > 0 and cur > 0:
         hw = hw_cents / 100.0
         signals["drawdown_pct"] = max(0.0, (hw - cur) / hw)

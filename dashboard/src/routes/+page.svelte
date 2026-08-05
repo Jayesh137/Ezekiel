@@ -396,7 +396,13 @@
 	<div class="grid-4 stats-row">
 		<div class="card">
 			<div class="stat-value text-blue">{formatUSD(accountValue)}</div>
-			<div class="stat-label">Account Value</div>
+			<!-- Perp + HIP-3 margin accounts only. The chart below plots
+			     Hyperliquid's portfolio series, which also includes spot, so the
+			     two differ by roughly 3x — measured 2026-08-05: $6.07M perp +
+			     $5.60M HIP-3 = $11.67M here, against $34.51M there, with $28.6M
+			     of spot USDC making up the gap. Both were labelled "Account
+			     Value", which read as one number contradicting itself. -->
+			<div class="stat-label">Margin Account Value</div>
 		</div>
 		<div class="card">
 			<div class="stat-value" class:text-green={totalPnl >= 0} class:text-red={totalPnl < 0}>
@@ -440,7 +446,7 @@
 		<div class="chart-row">
 			<div class="card chart-card">
 				<div class="chart-header">
-					<h2>Account Value</h2>
+					<h2>Portfolio Value <span class="chart-note">incl. spot</span></h2>
 					{#if !chartsLoading && portfolio?.accountValueHistory?.length > 0}
 						<span class="chart-badge">{portfolio.accountValueHistory.length} data points</span>
 					{/if}
@@ -725,6 +731,15 @@
 		background: rgba(255,255,255,0.04);
 		padding: 3px 8px;
 		border-radius: 4px;
+	}
+	/* Scope note on a heading — quieter than the h2 so it reads as a qualifier
+	   rather than part of the title. */
+	.chart-note {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		font-weight: 400;
+		color: var(--text-muted);
+		margin-left: 6px;
 	}
 	.chart-container {
 		position: relative;
