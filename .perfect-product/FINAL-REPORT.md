@@ -291,10 +291,13 @@ one unused-CSS warning, backtest PASS 0.7163.
   - **Substantive:** `release.independent-audit` is BLOCKED and the
     `release-audit` evidence kind is absent. No independent reviewer confirmed
     this work. This is the real, unmet gate.
-  - **Bookkeeping:** the four HEAD-mismatch lines. The evidence was produced at
-    `303c66cb0` and then committed, which advanced HEAD to `f7938ee85` — the act
-    of recording evidence inside the repository invalidates its own SHA match.
-    The runs are genuine and their recorded SHAs are correct; only the comparison
-    against the later HEAD fails. A future pass should gitignore
-    `.perfect-product/evidence/` so the check can settle. Nothing was re-run or
-    massaged to make this go away.
+  - **Bookkeeping, since fixed:** the four HEAD-mismatch lines. Evidence produced
+    at `303c66cb0` was then committed, advancing HEAD to `f7938ee85` — the act of
+    recording evidence inside the repository invalidated its own SHA match, and
+    no amount of re-running could ever settle it. Evidence logs are
+    machine-generated artifacts, so `.perfect-product/evidence/` and
+    `EVIDENCE.jsonl` are now gitignored and untracked (`--cached` only; every
+    file remains on disk and no history was rewritten). The curated contract
+    documents stay tracked, and this report quotes each result with the SHA it
+    was produced at. Evidence runs no longer dirty the tree, so the check can
+    settle. Nothing was re-run or massaged to make the earlier failure disappear.

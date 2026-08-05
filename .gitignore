@@ -16,3 +16,13 @@ dashboard/.svelte-kit/
 # full snapshot. Keep backups out of the index; better still, keep them outside
 # the working tree entirely.
 Ezekiel-backup-*/
+
+# Perfect Product run logs. These are machine-generated build artifacts, and
+# tracking them makes the contract unverifiable: every evidence run dirties the
+# tree, and committing the run advances HEAD past the SHA the run recorded, so
+# `validate --final` can never see evidence matching the current commit. The
+# curated documents beside them — PRODUCT-INTENT, ACCEPTANCE, FINDINGS,
+# CHECKPOINT, FINAL-REPORT — stay tracked, and FINAL-REPORT quotes each result
+# with the SHA it was produced at.
+.perfect-product/evidence/
+.perfect-product/EVIDENCE.jsonl
