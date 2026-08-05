@@ -66,10 +66,11 @@
         "tests/test_threshold_coherence.py::test_combined_alert_refuses_a_style_vetoed_candidate",
         "src/thresholds.py::combined_alert_ok",
         "src/tracer.py:329-390",
-        "commit dd6391485"
+        "commit dd6391485",
+        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-001 fixed. can_alert() is now reached from every alert route via combined_alert_ok(). Measured on live candidates: the tracer route would fire for 9 wallets instead of 29; the 20 suppressed are 15 style-vetoed and 5 score-decayed. Suppressed candidates keep their evidence."
+      "notes": "F-001 fixed. can_alert() is now reached from every alert route via combined_alert_ok(). Measured on live candidates: the tracer route would fire for 9 wallets instead of 29; the 20 suppressed are 15 style-vetoed and 5 score-decayed. Suppressed candidates keep their evidence. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
     },
     {
       "id": "correctness.threshold-single-source",
@@ -86,10 +87,11 @@
       "evidence": [
         "tests/test_threshold_coherence.py (behavioural_gate/behavioural_strength/combined_alert_ok)",
         "src/thresholds.py",
-        "commit dd6391485"
+        "commit dd6391485",
+        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-002 fixed. No module compares a similarity score against a literal; risk.py, tracer.py and transfer_graph.py (3 sites) now resolve through thresholds.py. continuity.HIGH_CONFIDENCE_MIN was checked and deliberately left alone: it gates an aggregated continuity confidence, not a similarity score."
+      "notes": "F-002 fixed. No module compares a similarity score against a literal; risk.py, tracer.py and transfer_graph.py (3 sites) now resolve through thresholds.py. continuity.HIGH_CONFIDENCE_MIN was checked and deliberately left alone: it gates an aggregated continuity confidence, not a similarity score. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
     },
     {
       "id": "correctness.risk-score-calibration",
@@ -107,12 +109,13 @@
         "tests/test_threshold_coherence.py::test_confirmed_tier_candidate_contributes_most_of_the_top_candidate_weight",
         "tests/test_threshold_coherence.py::test_self_match_ceiling_candidate_earns_full_top_candidate_weight",
         ".perfect-product/evidence/runs/*gate1-unit-tests",
-        "commit dd6391485"
+        "commit dd6391485",
+        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [
         "correctness.threshold-single-source"
       ],
-      "notes": "F-003 fixed. Was: CONFIRMED tier 2.91/22 pts, ceiling 4.17/22, max achievable 18.9%. Now anchored between the resolved gate and the proven ceiling. On live data the posture reads 40.5 not 26.1."
+      "notes": "F-003 fixed. Was: CONFIRMED tier 2.91/22 pts, ceiling 4.17/22, max achievable 18.9%. Now anchored between the resolved gate and the proven ceiling. On live data the posture reads 40.5 not 26.1. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
     },
     {
       "id": "correctness.alert-freshness",
@@ -130,10 +133,11 @@
         "tests/test_threshold_coherence.py::test_combined_alert_refuses_a_candidate_whose_score_has_decayed",
         "src/utils.py::candidate_current_score",
         "commit dd6391485",
-        "commit 7319d60dc"
+        "commit 7319d60dc",
+        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-004 fixed in all four consumers (tracer, risk, transfer_graph, dashboard). Live worst case was best 0.7113 / current 0.1322 still emailing as a behavioural match."
+      "notes": "F-004 fixed in all four consumers (tracer, risk, transfer_graph, dashboard). Live worst case was best 0.7113 / current 0.1322 still emailing as a behavioural match. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
     },
     {
       "id": "correctness.backtest-validation",
@@ -149,10 +153,11 @@
       "evidence": [
         ".perfect-product/evidence/runs/*gate1-fingerprint-backtest",
         "profile/backtest.json",
-        "commit 7319d60dc"
+        "commit 7319d60dc",
+        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
       ],
       "dependencies": [],
-      "notes": "F-010 fixed. This was a genuine live production outage of the primary detection vector, not a latent risk: live origin/main on 2026-08-05 had passed=false, self_score 0.45, rank 8, policy OBSERVING, behavioural alerting OFF. Local end-to-end after the fix: PASS, self-match 0.7461, rank 1/21, margin 0.1434, self_vetoes [], failures [], zero_dimensions []. LIMITATION: verified on local data through 2026-07-29; the production verdict on data through 2026-08-04 is decided by the next analyze.yml run."
+      "notes": "F-010 fixed. This was a genuine live production outage of the primary detection vector, not a latent risk: live origin/main on 2026-08-05 had passed=false, self_score 0.45, rank 8, policy OBSERVING, behavioural alerting OFF. Local end-to-end after the fix: PASS, self-match 0.7461, rank 1/21, margin 0.1434, self_vetoes [], failures [], zero_dimensions []. LIMITATION: verified on local data through 2026-07-29; the production verdict on data through 2026-08-04 is decided by the next analyze.yml run. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants."
     },
     {
       "id": "data.compaction-safety",
@@ -303,7 +308,8 @@
       ],
       "evidence": [
         "tests/test_threshold_coherence.py::test_a_non_finite_score_is_not_maximum_confidence",
-        "tests/test_threshold_coherence.py::test_behavioural_scores_survive_a_wrongly_shaped_file"
+        "tests/test_threshold_coherence.py::test_behavioural_scores_survive_a_wrongly_shaped_file",
+        ".perfect-product/evidence/runs/*mutation-test (8/8 mutations caught)"
       ],
       "dependencies": [],
       "notes": "Two real defects found by probing, both fixed. (1) NaN survives json.load and compares False against everything, so max(0, min(1, nan)) returned 1.0 and a corrupt score earned the FULL 22-point risk weight, labelled \"Behavioral candidate at nan%\". (2) A list-shaped latest.json raised AttributeError past an except clause catching only (OSError, ValueError), killing the transfer-graph job; list-shaped latest.json files really do exist here (data/portfolio). NOT independently reviewed: the adversarial-tester agent failed on a session limit."

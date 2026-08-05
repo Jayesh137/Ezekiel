@@ -184,6 +184,31 @@ reach at most **4.17 (18.9%)**. Now anchored between the resolved gate and the
 proven ceiling. On live data the posture reads **40.5, not 26.1**, and names the
 lead that is genuinely strongest now.
 
+#### Self-challenge: are the tests real, or tautological?
+
+A test that passes is worthless if it would also pass with the bug back in. Some
+of the new assertions do read circularly — `behavioural_gate(eff) == eff["medium"]`
+asserts a function returns a field of its own input — so the tests were checked
+by **mutation**: each fix was reverted to the exact code that shipped before this
+pass, and the suite re-run.
+
+| Re-introduced defect | Result |
+|---|---|
+| `behavioural_gate` returns the literal 0.65 | **caught** |
+| `behavioural_strength` scaled to an unreachable 1.0 | **caught** |
+| `combined_alert_ok` stops checking style vetoes | **caught** |
+| `candidate_current_score` returns the all-time best | **caught** |
+| decision frequency back to per calendar day | **caught** |
+| NaN guard removed from `behavioural_strength` | **caught** |
+| NaN guard removed from `candidate_current_score` | **caught** |
+| wrong-shape guard removed from `_load_behavioural_scores` | **caught** |
+
+**8 of 8.** Every file was restored from its saved contents and the run asserted
+a clean `git status` and a passing suite before exiting; evidence label
+`mutation-test`. The harness lives in the session scratchpad and is deliberately
+not shipped — it rewrites source files, which is not something that should sit in
+a repository where scheduled jobs run.
+
 ### Coherence
 
 - **F-002.** Four modules compared similarity against a literal `0.65` — a number
