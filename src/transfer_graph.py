@@ -1162,16 +1162,24 @@ def _load_behavioural_scores() -> tuple[dict, set]:
     if path.exists():
         try:
             with open(path) as f:
-                for c in json.load(f).get("candidates", []):
-                    w = (c.get("wallet") or "").lower()
-                    if not w:
-                        continue
-                    # Current score, not the all-time high-water mark: the graph
-                    # asserts "Trades like the target (behavioural similarity
-                    # X%)" inside a CRITICAL email, so X has to be true now.
-                    scores[w] = candidate_current_score(c)
-                    if c.get("status") == "ACTIVE":
-                        active.add(w)
+                payload = json.load(f)
+            # save_latest writes dict OR list, and data/portfolio/latest.json
+            # really is a list — a wrongly shaped file used to raise
+            # AttributeError past the except clause and kill the whole job.
+            if not isinstance(payload, dict):
+                raise ValueError(f"expected an object, got {type(payload).__name__}")
+            for c in payload.get("candidates", []):
+                if not isinstance(c, dict):
+                    continue
+                w = (c.get("wallet") or "").lower()
+                if not w:
+                    continue
+                # Current score, not the all-time high-water mark: the graph
+                # asserts "Trades like the target (behavioural similarity
+                # X%)" inside a CRITICAL email, so X has to be true now.
+                scores[w] = candidate_current_score(c)
+                if c.get("status") == "ACTIVE":
+                    active.add(w)
         except (OSError, ValueError) as e:
             print(f"[graph] could not read candidates: {e}")
     return scores, active

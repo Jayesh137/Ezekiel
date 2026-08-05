@@ -35,7 +35,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 156 passed
+.\.venv\Scripts\python.exe -m pytest -q          # expect: 369 passed
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
@@ -151,6 +151,25 @@ fills in a single session). Windows widen — never relax — until both the day
 and the fill floor are met, and the report publishes the dates, active-day counts,
 fill counts, excluded days and a leakage check.
 
+**Active days, all the way down.** The same rule governs the style metrics, not
+just window selection. `episodes_per_active_day` and `fills_per_active_day`
+divide by days the trader actually traded, never by the calendar span. Dividing
+by the span measures how often someone *shows up*, which is regime, not identity
+— and `active_days_ratio` already measures exactly that, once.
+
+Getting this wrong is not theoretical. On 2026-08-05 the live self-match failed
+with `Decision frequency 6x apart (0.17 vs 0.94 position episodes/day)`: the
+target was rejected as an impostor against his own history. Both windows held the
+same 12 active trading days and differed only in spread — 19 calendar days versus
+72. That failure dropped the scanner into `OBSERVING` on unreachable config
+thresholds with behavioural alerting off, which is the detection vector this
+system exists to run. Per active day the ratio is 1.5x and the self-match passes
+at 0.7461.
+
+If you change how any dimension is measured, bump `SCORING_SCHEMA` in
+`src/thresholds.py` — a ceiling proven under the old scorer is not evidence about
+the new one, and `resolve()` will refuse to carry it forward.
+
 Whatever the outcome, the scanner always operates under one of four named
 policies, published in `scans/latest.json`, logged, and shown on the scanner page:
 
@@ -181,10 +200,28 @@ failure never lowers them.
 
 `src/thresholds.py` is the only place match thresholds are decided. Config
 declares 0.90/0.80/0.65, but those are lowered toward the self-match ceiling from
-`profile/backtest.json` — the trader only scores ~0.54 against their own adjacent
-history, so an unreachable threshold would guarantee missing the migration.
-Resolved values are written into `scans/latest.json` and the dashboard reads them,
-so an emailed tier and a displayed tier always agree.
+`profile/backtest.json` — the trader scores ~0.75 against their own adjacent
+history, never near 1.0, so an unreachable threshold would guarantee missing the
+migration. Resolved values are written into `scans/latest.json` and the dashboard
+reads them, so an emailed tier and a displayed tier always agree.
+
+"Only place" is enforceable, not aspirational: nothing may compare a similarity
+score against a literal. Ask `thresholds.py` instead —
+
+| Need | Use |
+|---|---|
+| "does this wallet trade like the target?" | `behavioural_gate(eff)` |
+| "how strongly?" (0–1, for weighting) | `behavioural_strength(score, eff)` |
+| "may this combined route alert?" | `combined_alert_ok(score, eff, vetoes, route=…)` |
+
+`behavioural_strength` reaches 1.0 at the **proven self-match ceiling**, not at a
+notional 1.0 — scaling to a score nothing can reach is what left the headline risk
+number awarding a perfect re-identification under a fifth of its own weight.
+
+Ask `utils.candidate_current_score(candidate)` for how well a wallet matches
+**now**. `best_score` is a high-water mark that only ratchets up; using it to
+answer a present-tense question is what let a wallet whose score had decayed to
+0.13 keep emailing as a behavioural match.
 
 Precision comes from three gates instead, and every candidate gets a recorded
 disposition:
@@ -247,6 +284,16 @@ docs/           architecture.md (see caveat below), plans, specs
 - `scripts/dedupe_fills_by_tid.py` looks like a one-off. Not reviewed.
 - The repo must stay public for `raw.githubusercontent.com` and Pages to work, so
   `research/` documents are world-readable. Deliberate, but worth remembering.
+  Local `Ezekiel-backup-*/` trees are gitignored for the same reason — keep
+  backups outside the working tree if you can.
+- The dashboard has **no test harness**. Its data layer (`src/lib/api.js`) is
+  verified by running it against live `raw.githubusercontent.com` data rather
+  than by unit tests, so a change there needs a real fetch to prove it.
+- A fingerprint written before `SCORING_SCHEMA` `2026-08-05.1` carries
+  `episodes_per_day` / `fills_per_day`, which were normalised per calendar day.
+  Those keys are deliberately not read any more: comparing them against the
+  per-active-day ones would silently mix units. The activity dimension drops out
+  for one `analyze.yml` cycle after the change, then returns.
 
 ## Monitoring limits (read this before trusting the heartbeat)
 

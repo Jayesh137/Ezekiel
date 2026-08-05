@@ -2,6 +2,7 @@
 """Core utilities for the Ezekiel trader intelligence system."""
 
 import json
+import math
 import os
 import time
 from datetime import UTC, datetime
@@ -122,9 +123,13 @@ def candidate_current_score(candidate: dict) -> float:
     if latest is None:
         latest = candidate.get("best_score")
     try:
-        return float(latest or 0.0)
+        value = float(latest or 0.0)
     except (TypeError, ValueError):
         return 0.0
+    # json.load accepts NaN and Infinity, and every NaN comparison is False, so a
+    # corrupt score slipped through range clamps as though it were the maximum.
+    # A value that is not a real number is no evidence, not perfect evidence.
+    return value if math.isfinite(value) else 0.0
 
 # --- File I/O ---
 

@@ -15,6 +15,7 @@ vetoes and the percentile gate downgrade rather than erase.
 """
 
 import json
+import math
 from pathlib import Path
 
 # A style-vetoed candidate is capped here for ranking/display so it always sorts
@@ -238,6 +239,14 @@ def behavioural_strength(score: float, thresholds: dict) -> float:
     function stays defined under OBSERVING and after a failed self-match.
     """
     t = normalise(thresholds)
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        return 0.0
+    # NaN survives json.load and compares False against everything, so the clamp
+    # max(0.0, min(1.0, nan)) returned 1.0 and a corrupt score earned full weight.
+    if not math.isfinite(score):
+        return 0.0
     gate = float(t["medium"])
     ceiling = t.get("self_match_ceiling") or t["high"]
     ceiling = float(ceiling)

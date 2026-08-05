@@ -230,6 +230,38 @@ def test_every_scanner_route_has_a_declared_threshold():
                                    "x")[0] in th.COMBINED_ROUTE_THRESHOLDS
 
 
+# --- garbage must never read as confidence ----------------------------------------
+
+def test_a_non_finite_score_is_not_maximum_confidence(eff):
+    """NaN survives json.load, and NaN comparisons are all False, so the clamp
+    max(0, min(1, nan)) returned 1.0 — a corrupt score scored full marks. For a
+    system whose job is to be trusted, garbage must read as no-evidence."""
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        assert th.behavioural_strength(bad, eff) == 0.0
+    r = risk.compute_risk_score({"top_candidate_score": float("nan")}, eff)
+    assert all(f["signal"] != "top_candidate" for f in r["factors"])
+    assert r["score"] == 0.0
+
+
+def test_candidate_current_score_rejects_non_finite_values():
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        assert candidate_current_score({"latest_score": bad}) == 0.0
+    assert candidate_current_score({"latest_score": "0.7"}) == pytest.approx(0.7)
+    assert candidate_current_score({"latest_score": "not-a-number"}) == 0.0
+
+
+def test_behavioural_scores_survive_a_wrongly_shaped_file(tmp_path, monkeypatch):
+    """save_latest writes dict OR list, and data/portfolio/latest.json really is
+    a list. A list where a dict was expected raised AttributeError straight out
+    of the except clause and killed the whole transfer-graph job."""
+    monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
+    (tmp_path / "candidates").mkdir(parents=True)
+    for body in ("[1,2,3]", '"a string"', "null", "{}"):
+        (tmp_path / "candidates" / "latest.json").write_text(body)
+        scores, active = tg._load_behavioural_scores()
+        assert scores == {} and active == set()
+
+
 # --- decision frequency: intensity, not presence ----------------------------------
 #
 # On 2026-08-05 the live self-match FAILED: the target scored 0.45 against his own
