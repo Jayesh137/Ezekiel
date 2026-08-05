@@ -1,18 +1,22 @@
 {
   "wallet": "0x4044570e13b5184f7eb2709de25a4eb766a4794c",
   "first_seen": "2026-07-27T20:16:26.657532+00:00",
-  "last_seen": "2026-08-05T01:31:23.010605+00:00",
+  "last_seen": "2026-08-05T05:02:19.356929+00:00",
   "best_score": 0.3094,
-  "latest_score": 0.2641,
+  "latest_score": 0.2436,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Similar market/limit execution style"
+    ],
     "warnings": [
       "Weak asset overlap",
+      "Very different trading frequency",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
+      "Decision frequency 5x apart (0.28 vs 1.53 position episodes/day)",
       "Incompatible hold style: 80% vs 0% of holds under 1h"
     ],
     "asset_overlap": {
@@ -40,7 +44,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2641,
+      "score_without_bonus": 0.2436,
       "explanations": [],
       "frequencies": {}
     }
@@ -311,8 +315,27 @@
         "position_management": 0.7825,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-05T05:02:19.356929+00:00",
+      "score": 0.2436,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": null,
+        "leverage_profile": 0.2944,
+        "entry_exit_style": 0.8646,
+        "hold_duration": null,
+        "account_size": 0.4884,
+        "trade_sequencing": 0.5204,
+        "position_sizing": 0.1913,
+        "activity": 0.3246,
+        "direction_bias": 0.0,
+        "position_management": 0.7449,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2275
+  "recent_avg_score": 0.2287
 }
