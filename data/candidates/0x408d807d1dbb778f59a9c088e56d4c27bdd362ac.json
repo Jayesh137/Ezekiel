@@ -1,9 +1,9 @@
 {
   "wallet": "0x408d807d1dbb778f59a9c088e56d4c27bdd362ac",
   "first_seen": "2026-07-06T11:23:19.064945+00:00",
-  "last_seen": "2026-08-05T15:06:51.645245+00:00",
+  "last_seen": "2026-08-05T17:17:29.517938+00:00",
   "best_score": 0.6098,
-  "latest_score": 0.4051,
+  "latest_score": 0.3946,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -12,10 +12,12 @@
       "Similar market/limit execution style"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Very different account-size bracket",
+      "Very different trading frequency"
     ],
     "vetoes": [
-      "Decision frequency 20x apart (0.28 vs 5.68 position episodes/day)"
+      "Decision frequency 23x apart (0.28 vs 6.57 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
@@ -39,31 +41,12 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4051,
+      "score_without_bonus": 0.3946,
       "explanations": [],
       "frequencies": {}
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-17T17:57:08.480842+00:00",
-      "score": 0.3896,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.125,
-        "timing_profile": 0.5597,
-        "leverage_profile": 0.1863,
-        "entry_exit_style": 1.0,
-        "hold_duration": 0.0,
-        "account_size": 0.1922,
-        "trade_sequencing": 0.3958,
-        "position_sizing": 0.0798,
-        "activity": 0.5856,
-        "direction_bias": 0.6842,
-        "position_management": 0.9214,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-17T18:51:51.840606+00:00",
       "score": 0.392,
@@ -1944,8 +1927,27 @@
         "position_management": 0.7249,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-05T17:17:29.517938+00:00",
+      "score": 0.3946,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.6934,
+        "timing_profile": null,
+        "leverage_profile": 0.2453,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.5951,
+        "account_size": 0.2452,
+        "trade_sequencing": 0.4524,
+        "position_sizing": 0.0311,
+        "activity": 0.2079,
+        "direction_bias": 0.2561,
+        "position_management": 0.7291,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3996
+  "recent_avg_score": 0.4019
 }
