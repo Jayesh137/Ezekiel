@@ -260,6 +260,27 @@ one unused-CSS warning, backtest PASS 0.7163.
   correctness, because no browser was available. That change is disclosed here
   and in the item's own notes, and the removed half is tracked separately as
   `visual.dashboard-render` (BLOCKED) rather than quietly dropped.
-- `pp.mjs validate --final` is expected to **fail** while
-  `release.independent-audit` remains BLOCKED. That is the contract working as
-  designed, not an incidental error.
+- `pp.mjs validate --final` **fails**, and should. Its output:
+
+  ```
+  Validation failed:
+  - Final validation blocked by RELEASE_BLOCKER release.independent-audit in status BLOCKED.
+  - Required final evidence 'static'      does not include current HEAD f7938ee85...
+  - Required final evidence 'build'       does not include current HEAD f7938ee85...
+  - Required final evidence 'runtime'     does not include current HEAD f7938ee85...
+  - Required final evidence 'integration' does not include current HEAD f7938ee85...
+  - Missing required final evidence kind: release-audit.
+  ```
+
+  Two of these are substantive and one is bookkeeping:
+
+  - **Substantive:** `release.independent-audit` is BLOCKED and the
+    `release-audit` evidence kind is absent. No independent reviewer confirmed
+    this work. This is the real, unmet gate.
+  - **Bookkeeping:** the four HEAD-mismatch lines. The evidence was produced at
+    `303c66cb0` and then committed, which advanced HEAD to `f7938ee85` — the act
+    of recording evidence inside the repository invalidates its own SHA match.
+    The runs are genuine and their recorded SHAs are correct; only the comparison
+    against the later HEAD fails. A future pass should gitignore
+    `.perfect-product/evidence/` so the check can settle. Nothing was re-run or
+    massaged to make this go away.
