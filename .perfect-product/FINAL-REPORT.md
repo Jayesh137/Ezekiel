@@ -83,6 +83,38 @@ End-to-end after the fix: **PASS, self-match 0.7461** (was 0.7163 locally), rank
 1/21, `self_vetoes: []`, `failures: []`, activity dimension **0.834** against
 production's 0.4583.
 
+#### Self-challenge: did relaxing that veto cost discrimination?
+
+It looks like it might have. The self-match margin **fell from 0.2663 to
+0.1434**, and where the old run's top strangers all sat at exactly **0.45** —
+`VETO_SCORE_CAP`, i.e. veto-capped — **none** of the new run's top five are
+capped. Strangers gained more than the target did. That is the strongest
+argument against this change, so it was tested rather than waved away.
+
+The metric could not identify anyone. The veto declares "different human" above
+a **5x** ratio, so the measure is only usable if the *same* person stays well
+inside that. Measured on the live failed run's own two windows:
+
+| | within-person spread |
+|---|---|
+| per calendar day (old) | **5.5x** — exceeds the 5x veto threshold |
+| per active day (new) | **1.5x** |
+
+A metric whose variation *within one individual* is larger than the threshold at
+which it declares two individuals different is not a weak identity signal; it is
+noise wired to a hard veto. The old margin was wide because the veto was capping
+strangers at 0.45 — and, in production, capping the target too, which is exactly
+why he ranked 8th behind them.
+
+The veto keeps its teeth. The target measures 1.00 episodes per active day, so a
+wallet is still vetoed outside **[0.20, 5.00]**: a scalper at 60 round-trips per
+session is a 60x ratio, a near-dormant wallet at 0.1 is 10x. What no longer
+triggers it is the same trader having a quieter month — which was the bug.
+
+Pinned by `test_a_genuine_frequency_difference_still_vetoes` (swing vs scalper
+must still veto) and `test_decision_frequency_is_per_active_day` (identical
+sessions spread differently must measure the same).
+
 ### Trust: alerts that were not true
 
 - **F-001, veto bypass.** `can_alert()` was reached only from `scanner.py`.
