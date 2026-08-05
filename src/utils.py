@@ -104,6 +104,28 @@ def now_ms() -> int:
     """Return current time as Unix milliseconds."""
     return int(time.time() * 1000)
 
+# --- Candidate records ---
+
+def candidate_current_score(candidate: dict) -> float:
+    """How well this candidate matches the target *now*.
+
+    `best_score` is a high-water mark that only ever ratchets up, so reading it
+    to answer "does this wallet match?" keeps asserting a peak the wallet may
+    have left weeks ago. Three separate callers did exactly that — the tracer's
+    combined alert, the risk score and the transfer graph — and all three could
+    report a wallet at 0.75 while it currently scored 0.13.
+
+    `best_score` remains the right field for ranking discovery history; it is
+    simply not an answer to a present-tense question.
+    """
+    latest = candidate.get("latest_score")
+    if latest is None:
+        latest = candidate.get("best_score")
+    try:
+        return float(latest or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
 # --- File I/O ---
 
 def deduplicate_by_key(records: list[dict], key_field: str) -> list[dict]:

@@ -206,6 +206,79 @@ def classify(score: float, thresholds: dict) -> str:
     return TIER_BACKGROUND
 
 
+def behavioural_gate(thresholds: dict) -> float:
+    """The similarity at which a wallet starts counting as "trades like the target".
+
+    This is the medium threshold — the tier the system itself labels
+    WATCH_CLOSELY. Four modules used to compare against a literal 0.65 instead:
+    risk.py, tracer.py and transfer_graph.py (three sites). Once thresholds
+    adapted to the measured self-match ceiling the operating boundaries became
+    0.5963 / 0.6463 / 0.6963, so 0.65 sat between tiers and meant nothing — a
+    WATCH_CLOSELY wallet at 0.6463 contributed no corroboration and no risk
+    points, while the literal itself never moved when the ceiling was
+    re-validated.
+    """
+    return float(normalise(thresholds)["medium"])
+
+
+def behavioural_strength(score: float, thresholds: dict) -> float:
+    """Normalise a similarity score to 0.0–1.0 for weighting.
+
+    0.0 at the gate, 1.0 at the proven self-match ceiling — what the REAL trader
+    scores against his own adjacent history, and therefore the most any wallet
+    can be expected to score. Weighting against a notional 1.0 instead was a
+    structural under-count: with a ceiling of 0.7163 a perfect re-identification
+    could reach only 19% of the weight allocated to it.
+
+    Falls back to the high threshold when nothing has been validated, so the
+    function stays defined under OBSERVING and after a failed self-match.
+    """
+    t = normalise(thresholds)
+    gate = float(t["medium"])
+    ceiling = t.get("self_match_ceiling") or t["high"]
+    ceiling = float(ceiling)
+    if ceiling <= gate:
+        # Degenerate resolution (e.g. a ceiling at or below the gate). Keep the
+        # function total rather than dividing by zero; anything at the gate or
+        # above is then full strength.
+        return 1.0 if float(score) >= gate else 0.0
+    return max(0.0, min(1.0, (float(score) - gate) / (ceiling - gate)))
+
+
+# Which threshold each combined-alert route is held to. These mirror the bars
+# scanner.py already applied inline: a bridge depositor must clear `high`, while
+# an amount+timing correlation is independent enough to alert from `low`.
+COMBINED_ROUTE_THRESHOLDS = {
+    "deposited_to_hl": "medium",
+    "bridge_depositor": "high",
+    "hl_transfer": "medium",
+    "known_linked": "medium",
+    "correlation": "low",
+}
+
+
+def combined_alert_ok(score: float, thresholds: dict, vetoes: list | None, *,
+                      route: str) -> bool:
+    """Whether a wallet carrying independent evidence AND a behavioural match may
+    be promoted to a combined alert.
+
+    The same rule lived in two places: scanner.py's priority sweep (veto-checked,
+    current score, per-route threshold) and tracer.py's cross-reference
+    (unchecked, all-time best score, hardcoded 0.65). Two systems deciding one
+    outcome differently is exactly what this module exists to prevent, so both
+    now route through here.
+    """
+    if not can_alert(vetoes):
+        return False
+    try:
+        key = COMBINED_ROUTE_THRESHOLDS[route]
+    except KeyError:
+        raise ValueError(
+            f"unknown combined-alert route {route!r}; "
+            f"expected one of {sorted(COMBINED_ROUTE_THRESHOLDS)}") from None
+    return float(score) >= float(normalise(thresholds)[key])
+
+
 def can_alert(vetoes: list | None) -> bool:
     """A style-vetoed wallet never produces a high-confidence alert on ANY route.
 

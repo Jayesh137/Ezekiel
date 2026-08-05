@@ -8,10 +8,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import thresholds as th
 from src.alerts import alert_combined_match, alert_fund_movement, alert_new_wallet_found
 from src.utils import (
     DATA_DIR,
     append_records,
+    candidate_current_score,
     etherscan_get,
     load_config,
     read_cursor,
@@ -326,8 +328,22 @@ def trace_fund_flow(wallet: str) -> list[dict]:
     return findings
 
 
-def _crossref_findings_with_candidates(findings: list[dict]) -> None:
-    """If a fund-flow destination is also a behavioral candidate, fire the combined alert."""
+def _crossref_findings_with_candidates(findings: list[dict],
+                                       eff: dict | None = None) -> None:
+    """If a fund-flow destination is also a behavioral candidate, fire the combined alert.
+
+    This is the same rule scanner.py applies to a `deposited_to_hl` candidate, and
+    it now shares scanner's decision function. Independently, this route used to:
+
+      * skip the style-veto check entirely, so a wallet the scorer had rejected as
+        behaviourally incompatible could still be emailed as a CRITICAL match —
+        the "sideways to the inbox" hole thresholds.can_alert() documents as
+        closed, and the README asserts as an invariant;
+      * gate on a hardcoded 0.65 that matched no tier boundary;
+      * quote `best_score`, an all-time high-water mark, in an email asserting the
+        wallet "matches the behavioral fingerprint" — live data had a candidate at
+        best 0.7113 whose current score was 0.1322.
+    """
     import json as _json
 
     hl_findings = [f for f in findings if f.get("deposited_to_hl")]
@@ -345,18 +361,33 @@ def _crossref_findings_with_candidates(findings: list[dict]) -> None:
     except Exception:
         return
 
+    if eff is None:
+        report = th.load_backtest_report(DATA_DIR.parent / "profile")
+        eff = th.resolve(load_config()["alert_thresholds"], report)
+
     for finding in hl_findings:
         dest = finding.get("destination", "").lower()
-        if dest in candidates:
-            c = candidates[dest]
-            score = float(c.get("best_score", 0))
-            if score >= 0.65:
-                print(f"[tracer] COMBINED SIGNAL: {dest} is both a fund-flow destination and behavioral candidate (score={score:.2f})")
-                alert_combined_match(
-                    dest, score,
-                    finding.get("amount_usdc", "unknown"),
-                    finding.get("method", "fund_trace"),
-                )
+        if dest not in candidates:
+            continue
+        c = candidates[dest]
+        score = candidate_current_score(c)
+        vetoes = (c.get("latest_evidence") or {}).get("vetoes")
+        if not th.combined_alert_ok(score, eff, vetoes, route="deposited_to_hl"):
+            if vetoes:
+                print(f"[tracer] combined alert suppressed for {dest} "
+                      f"(style veto: {'; '.join(vetoes)}); evidence retained")
+            else:
+                print(f"[tracer] {dest} is a fund-flow destination but scores "
+                      f"{score:.4f}, below the combined-alert threshold "
+                      f"{th.behavioural_gate(eff):.4f} — no alert")
+            continue
+        print(f"[tracer] COMBINED SIGNAL: {dest} is both a fund-flow destination "
+              f"and behavioral candidate (score={score:.2f})")
+        alert_combined_match(
+            dest, score,
+            finding.get("amount_usdc", "unknown"),
+            finding.get("method", "fund_trace"),
+        )
 
 
 def main():

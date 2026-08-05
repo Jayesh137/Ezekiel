@@ -35,14 +35,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import continuity as ct
+from src import thresholds as th
 from src.utils import (
     DATA_DIR,
+    candidate_current_score,
     load_all_records,
     load_config,
     now_ms,
     save_latest,
     write_cursor,
 )
+
+
+def _resolved_thresholds() -> dict:
+    """The thresholds in force, resolved the same way the scanner resolves them.
+
+    Looked up lazily so the pure scoring functions below stay callable with just
+    their evidence, while build_graph resolves once and passes the same set to
+    every node rather than re-reading per wallet.
+    """
+    report = th.load_backtest_report(DATA_DIR.parent / "profile")
+    return th.resolve(load_config()["alert_thresholds"], report)
 
 # --- chains / sources -----------------------------------------------------------
 
@@ -340,7 +353,7 @@ def recency_factor(age_days: float | None) -> float:
     return max(RECENCY_FLOOR, min(1.0, decayed))
 
 
-def score_confidence(ev: dict) -> tuple[float, list[str]]:
+def score_confidence(ev: dict, thresholds: dict | None = None) -> tuple[float, list[str]]:
     """Combine evidence into a 0-1 linkage confidence plus readable reasons.
 
     Pure: `ev` is a plain dict of already-measured facts. Negative evidence
@@ -355,6 +368,7 @@ def score_confidence(ev: dict) -> tuple[float, list[str]]:
     if ev.get("is_service"):
         return 0.0, [f"Excluded: {ev.get('service_reason', 'service address')}"]
 
+    t = thresholds if thresholds is not None else _resolved_thresholds()
     relationship = 0.0
     corroboration = 0.0
 
@@ -403,8 +417,13 @@ def score_confidence(ev: dict) -> tuple[float, list[str]]:
     behavioural = ev.get("behavioural_score")
     if behavioural is not None:
         b = float(behavioural)
-        if b >= 0.65:
-            corroboration += 0.25 * min(1.0, (b - 0.65) / 0.35 + 0.4)
+        # Gate and scale on the thresholds in force, not a literal 0.65. The band
+        # keeps its original shape — a wallet at the gate contributes 40% of this
+        # weight, rising to all of it — but the top now anchors on the proven
+        # self-match ceiling rather than an unreachable 1.0.
+        if b >= th.behavioural_gate(t):
+            strength = th.behavioural_strength(b, t)
+            corroboration += 0.25 * (0.4 + 0.6 * strength)
             reasons.append(f"Trades like the target (behavioural similarity {b * 100:.0f}%)")
         elif b > 0:
             reasons.append(f"Behavioural similarity only {b * 100:.0f}% — weak on its own")
@@ -435,7 +454,7 @@ def score_confidence(ev: dict) -> tuple[float, list[str]]:
     return round(max(0.0, min(1.0, score)), 4), reasons
 
 
-def classify_node(ev: dict, confidence: float) -> str:
+def classify_node(ev: dict, confidence: float, thresholds: dict | None = None) -> str:
     """Grade a wallet from its evidence. Deliberately conservative.
 
     MIGRATION_CANDIDATE requires an independent corroborating vector, so a large
@@ -444,8 +463,9 @@ def classify_node(ev: dict, confidence: float) -> str:
     if ev.get("is_service"):
         return CLASS_SERVICE
 
+    t = thresholds if thresholds is not None else _resolved_thresholds()
     corroborated = bool(
-        (ev.get("behavioural_score") or 0) >= 0.65
+        (ev.get("behavioural_score") or 0) >= th.behavioural_gate(t)
         or ev.get("amount_correlation")
         or ev.get("shared_deposit_address")
         or ev.get("gas_funded_by_target")
@@ -630,7 +650,8 @@ def build_chains(target: str, nodes: list, edges: list, parents: dict,
 
 
 def _continuity_for(node: dict, chain: dict | None, evidence: dict,
-                    disposition_alert: bool = False) -> dict:
+                    disposition_alert: bool = False,
+                    thresholds: dict | None = None) -> dict:
     """Translate node evidence + its best chain into continuity signals, a score
     and a lifecycle state. Kept thin: all judgement lives in src/continuity.py."""
     hops = chain["hop_count"] if chain else 1
@@ -656,7 +677,8 @@ def _continuity_for(node: dict, chain: dict | None, evidence: dict,
     if gap is not None:
         signals["temporal_proximity"] = ct.temporal_proximity(gap)
     b = evidence.get("behavioural_score")
-    if b is not None and float(b) >= 0.65:
+    if b is not None and float(b) >= th.behavioural_gate(
+            thresholds if thresholds is not None else _resolved_thresholds()):
         signals["behavioural"] = float(b)
     # "Funded by the target" must mean target money REACHED this wallet, whether
     # directly or along an unbroken chain — tying it to a direct edge made every
@@ -714,13 +736,16 @@ def build_graph(edges: list[dict], target: str, *,
                 max_nodes: int = DEFAULTS["max_nodes"],
                 dust_usd: float = DEFAULTS["dust_usd"],
                 now_ts: float | None = None,
-                expansion: dict | None = None) -> dict:
+                expansion: dict | None = None,
+                thresholds: dict | None = None) -> dict:
     """Walk outward from the target, classifying and scoring every wallet reached.
 
     Pure function — every external input is passed in, so traversal and scoring
-    are fully testable offline.
+    are fully testable offline. `thresholds` is resolved once here and handed to
+    every node rather than re-read per wallet.
     """
     target = target.lower()
+    thresholds = thresholds if thresholds is not None else _resolved_thresholds()
     now_ts = now_ts if now_ts is not None else time.time()
     known_services = {a.lower() for a in (known_services or set())}
     behavioural = {k.lower(): v for k, v in (behavioural or {}).items()}
@@ -818,8 +843,8 @@ def build_graph(edges: list[dict], target: str, *,
             "reentry_gap_hours": corr.get("gap_hours"),
             "age_days": round(age_days, 1) if age_days is not None else None,
         }
-        confidence, reasons = score_confidence(ev)
-        classification = classify_node(ev, confidence)
+        confidence, reasons = score_confidence(ev, thresholds)
+        classification = classify_node(ev, confidence, thresholds)
 
         nodes.append({
             "wallet": addr,
@@ -860,7 +885,7 @@ def build_graph(edges: list[dict], target: str, *,
         ch = chain_by_endpoint.get(n["wallet"])
         if ch is not None and ch["endpoint"] != n["wallet"]:
             ch = None
-        cont = _continuity_for(n, ch, n["evidence"])
+        cont = _continuity_for(n, ch, n["evidence"], thresholds=thresholds)
         n["continuity"] = cont["continuity"]
         n["lifecycle"] = cont["lifecycle"]
         n["signals"] = sorted(cont["signals"])
@@ -1141,7 +1166,10 @@ def _load_behavioural_scores() -> tuple[dict, set]:
                     w = (c.get("wallet") or "").lower()
                     if not w:
                         continue
-                    scores[w] = float(c.get("best_score", 0) or 0)
+                    # Current score, not the all-time high-water mark: the graph
+                    # asserts "Trades like the target (behavioural similarity
+                    # X%)" inside a CRITICAL email, so X has to be true now.
+                    scores[w] = candidate_current_score(c)
                     if c.get("status") == "ACTIVE":
                         active.add(w)
         except (OSError, ValueError) as e:

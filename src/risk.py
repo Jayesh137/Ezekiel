@@ -13,9 +13,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import thresholds as th
 from src.utils import (
     DATA_DIR,
+    candidate_current_score,
     load_all_records,
+    load_config,
     now_ms,
     read_cursor,
     save_latest,
@@ -62,8 +65,21 @@ def _level(score: float) -> str:
     return "LOW"
 
 
-def compute_risk_score(signals: dict) -> dict:
-    """Pure scoring. `signals` carries normalized inputs; returns score + factors."""
+def _resolved_thresholds() -> dict:
+    """The thresholds actually in force, same resolution the scanner uses."""
+    report = th.load_backtest_report(DATA_DIR.parent / "profile")
+    return th.resolve(load_config()["alert_thresholds"], report)
+
+
+def compute_risk_score(signals: dict, thresholds: dict | None = None) -> dict:
+    """Pure scoring. `signals` carries normalized inputs; returns score + factors.
+
+    `thresholds` must be a resolved set from thresholds.resolve(); when omitted it
+    is loaded, so a direct caller still scores against the thresholds in force
+    rather than a literal.
+    """
+    if thresholds is None:
+        thresholds = _resolved_thresholds()
     factors = []
 
     def add(key, fraction, label):
@@ -85,9 +101,16 @@ def compute_risk_score(signals: dict) -> dict:
     if signals.get("hl_native_outbound"):
         total += add("hl_native_outbound", 1.0, "Funds sent to a new wallet inside Hyperliquid")
 
+    # Scaled between the resolved gate and the proven self-match ceiling. The old
+    # (top - 0.65) / 0.35 band reached full weight only at a similarity of 1.0,
+    # which no wallet can attain: the trader scores 0.7163 against his own
+    # history. A candidate at the CONFIRMED threshold therefore earned 2.9 of 22
+    # points, and the single strongest signal the system has was worth almost
+    # nothing in the number it reports.
     top = signals.get("top_candidate_score", 0) or 0
-    if top >= 0.65:
-        total += add("top_candidate", (top - 0.65) / 0.35, f"Behavioral candidate at {top*100:.0f}%")
+    strength = th.behavioural_strength(top, thresholds)
+    if strength > 0:
+        total += add("top_candidate", strength, f"Behavioral candidate at {top*100:.0f}%")
 
     corr = signals.get("correlation_confidence", 0) or 0
     if corr > 0:
@@ -179,9 +202,13 @@ def _gather_signals() -> dict:
     if cand_path.exists():
         try:
             cands = json.load(open(cand_path)).get("candidates", [])
-            cands.sort(key=lambda c: c.get("best_score", 0), reverse=True)
+            # Rank on the CURRENT score, not the all-time best. This question is
+            # present-tense — "is he migrating right now" — and best_score only
+            # ratchets up, so it both named the wrong strongest lead and quoted a
+            # peak the wallet had already left (live: 0.7505 reported, 0.6117 now).
+            cands.sort(key=candidate_current_score, reverse=True)
             if cands:
-                signals["top_candidate_score"] = float(cands[0].get("best_score", 0))
+                signals["top_candidate_score"] = candidate_current_score(cands[0])
                 signals["top_candidate_wallet"] = cands[0].get("wallet")
                 signals["linkage_hit"] = any(
                     c.get("latest_evidence", {}).get("linkage", {}).get("shared_funder")
@@ -210,9 +237,17 @@ def run_risk() -> dict:
     """Compute and persist the risk score; alert when the level rises."""
     from src.alerts import alert_risk_level
 
+    eff = _resolved_thresholds()
     signals = _gather_signals()
-    result = compute_risk_score(signals)
+    result = compute_risk_score(signals, eff)
     result["computed_at"] = datetime.now(UTC).isoformat()
+    # Publish the band the behavioural signal was scored against, so the number
+    # can be audited against the thresholds that were actually in force.
+    result["behavioural_band"] = {
+        "gate": th.behavioural_gate(eff),
+        "full_strength_at": eff.get("self_match_ceiling") or eff["high"],
+        "policy": eff.get("policy"),
+    }
     result["signals"] = {k: (round(v, 3) if isinstance(v, float) else v) for k, v in signals.items()}
     save_latest(str(DATA_DIR / "risk"), result)
 

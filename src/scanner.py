@@ -1024,6 +1024,32 @@ def _is_corroborated(result: dict, source: str | None = None) -> bool:
     return bool(link.get("shared_funder") or link.get("shared_deposit_addresses"))
 
 
+def _combined_route(meta: dict, source: str) -> tuple[str, str, str] | None:
+    """Which combined-alert route this candidate qualifies for, and how to describe it.
+
+    Returns (route, flow_amount, flow_method), or None when the candidate carries
+    no independent fund-flow evidence. Route selection only — the threshold for
+    each route and the style-veto check both live in thresholds.combined_alert_ok
+    so scanner and tracer cannot answer the same question differently.
+
+    Precedence matches the elif-chain this replaced: a wallet that actually
+    deposited to Hyperliquid is judged on that, whatever else also reached it.
+    """
+    if meta.get("deposited_to_hl"):
+        return "deposited_to_hl", meta["amount"], meta["method"]
+    if source == "bridge_depositor":
+        return "bridge_depositor", "large bridge deposit", "bridge_depositor"
+    if source in ("hl_transfer", "known_linked"):
+        # Funds moved HL-natively to this wallet AND it trades like the target —
+        # the strongest possible in-platform migration signal.
+        return (source, f"${meta.get('out_usd', 0):,.0f} sent in-platform",
+                f"hl_native_transfer ({source})")
+    if source == "correlation":
+        # Deposit/withdrawal amount+timing correlation AND behavioral match.
+        return "correlation", meta.get("amount", "amount match"), "deposit_correlation"
+    return None
+
+
 def _market_free_score(result: dict) -> float | None:
     """The candidate's score with the shared-market bonus removed.
 
@@ -1304,22 +1330,13 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
             alert_behavioral_match(wallet, score, result["dimensions"])
 
         # Combined alerts: fund-flow/HL-native/correlation evidence AND behaviour.
-        # All require `alertable` so a style-vetoed wallet cannot be promoted by a
-        # side route — previously only the behavioural route checked vetoes.
-        if alertable:
-            if meta.get("deposited_to_hl") and score >= eff["medium"]:
-                alert_combined_match(wallet, score, meta["amount"], meta["method"])
-            elif source == "bridge_depositor" and score >= eff["high"]:
-                alert_combined_match(wallet, score, "large bridge deposit", "bridge_depositor")
-            elif source in ("hl_transfer", "known_linked") and score >= eff["medium"]:
-                # Funds moved HL-natively to this wallet AND it trades like the target —
-                # the strongest possible in-platform migration signal.
-                amount = f"${meta.get('out_usd', 0):,.0f} sent in-platform"
-                alert_combined_match(wallet, score, amount, f"hl_native_transfer ({source})")
-            elif source == "correlation" and score >= eff["low"]:
-                # Deposit/withdrawal amount+timing correlation AND behavioral match.
-                alert_combined_match(wallet, score, meta.get("amount", "amount match"),
-                                     "deposit_correlation")
+        # Both the veto check and the per-route threshold live in
+        # thresholds.combined_alert_ok, which tracer.py also calls — the same rule
+        # used to exist here and there with different gates, a different score
+        # field and no veto check on the tracer side.
+        combined = _combined_route(meta, source)
+        if combined and th.combined_alert_ok(score, eff, vetoes, route=combined[0]):
+            alert_combined_match(wallet, score, combined[1], combined[2])
 
         time.sleep(0.5)
 
