@@ -188,7 +188,7 @@ def _gather_signals() -> dict:
     if hl_path.exists():
         try:
             cps = json.load(open(hl_path)).get("counterparties", [])
-            recent_cut = now_ms() - 21 * 86_400_000
+            recent_cut = now_ms() - RECENT_SIGNAL_DAYS * 86_400_000
             signals["hl_native_outbound"] = any(
                 (not c.get("known_self")) and c.get("total_out_usd", 0) >= 50_000
                 and c.get("last_seen_ms", 0) >= recent_cut

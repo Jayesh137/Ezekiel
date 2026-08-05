@@ -1,0 +1,50 @@
+=== LIVE DATA REACHABLE ===
+  index   ok
+  scan    ok
+  cands   ok
+  risk    ok
+  flows   ok
+  hl      ok
+  graph   ok
+
+  data freshness: 102 min (last_updated 2026-08-05T09:09:52.901969+00:00)
+
+=== THRESHOLDS THE UI TIERS ON ===
+  high=0.9 medium=0.8 low=0.65 source=config
+  policy=OBSERVING (Observing)  behaviouralAlerts=false  schema=2026-07-27.1
+
+=== TOP CANDIDATE: file order vs current-score ranking ===
+  candidates[0]   0xcbd909bc348c  best=0.7505  latest=0.45
+  topCandidate()  0x12e16e3dc4a4  best=0.7019  latest=0.7019
+  currentScore(top) = 0.7019  -> tier WEAK
+  (old behaviour) best_score of [0] = 0.7505 -> tier WEAK
+
+=== BANNER (getAlertState) ===
+  {"level":"watch","msg":"Watchlisted behavioral lead at 70.2%","wallet":"0x12e16e3dc4a4fb3c802be62105f15783eb95f92a"}
+
+=== AGREEMENT WITH BACKEND risk/latest.json ===
+  risk.json top_candidate_wallet = 0xcbd909bc348c  score=0.75
+  dashboard topCandidate()       = 0x12e16e3dc4a4  score=0.7019
+  behavioural_band published?    = null
+
+=== TRANSFER GRAPH ===
+  node classifications: {"MIGRATION_CANDIDATE":1,"OPERATIONAL_COUNTERPARTY":3,"DIRECT_RECIPIENT":7,"SERVICE":3}
+  graph generated_at: (none)
+
+=== EDGE CASES ===
+  currentScore(null)      = 0
+  currentScore({})        = 0
+  currentScore({best:.7}) = 0.7
+  topCandidate([])        = null
+  topCandidate(null)      = null
+  getAlertState(null,null,null,null) = null
+  getThresholds(null)     = {"high":0.9,"medium":0.8,"low":0.65,"source":"default"}
+  getPolicy(null)         = {"policy":null,"label":"unknown","behaviouralAlerts":false,"schema":null,"validatedAt":null,"provenance":null,"carryForwardRejected":null}
+
+=== STALE-SIGNAL BOUNDING (window 21d) ===
+  deposited_to_hl findings: 2 total, 0 within window
+    detected 2026-07-03T03:36:08.463818+00:00 -> 33.3d old, recent=false
+    detected 2026-07-03T03:36:07.699732+00:00 -> 33.3d old, recent=false
+  banner now: {"level":"watch","msg":"Watchlisted behavioral lead at 70.2%","wallet":"0x12e16e3dc4a4fb3c802be62105f15783eb95f92a"}
+  backend risk l1_outbound: false
+  isRecentSignal(null/undefined/garbage/0): false false false false

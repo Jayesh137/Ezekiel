@@ -289,6 +289,34 @@ export function getPolicy(scan) {
 }
 
 /**
+ * How long a fund-movement signal counts as "happening now".
+ *
+ * Mirrors RECENT_SIGNAL_DAYS in src/risk.py. fund_flows/latest.json keeps its
+ * last 100 findings with no expiry, so an unbounded check latches on forever:
+ * the backend expired two 33-day-old deposited_to_hl findings (l1_outbound
+ * false) while this banner still showed CRITICAL about them, every day, for a
+ * month. A banner that is always red is not a signal.
+ */
+export const RECENT_SIGNAL_DAYS = 21;
+
+/**
+ * Is this signal recent enough to describe the present?
+ *
+ * Accepts an ISO string or epoch milliseconds. A missing or unparseable
+ * timestamp is treated as ancient, matching risk._detected_ts — an undated
+ * finding must not be able to latch a banner on.
+ * @param {string|number|null|undefined} when
+ * @param {number} [days]
+ * @returns {boolean}
+ */
+export function isRecentSignal(when, days = RECENT_SIGNAL_DAYS) {
+	if (when == null) return false;
+	const ms = typeof when === 'number' ? when : Date.parse(when);
+	if (!Number.isFinite(ms) || ms <= 0) return false;
+	return Date.now() - ms <= days * 86_400_000;
+}
+
+/**
  * How well a candidate matches the target *now*.
  *
  * Mirrors utils.candidate_current_score in the backend. `best_score` is a
@@ -471,7 +499,7 @@ export function getDataFreshnessMinutes(index) {
  * @param {object|null} hlTransfers
  */
 export function getAlertState(fundFlows, candidates, hlTransfers, scan = null) {
-	const findings = fundFlows?.findings || [];
+	const findings = (fundFlows?.findings || []).filter((f) => isRecentSignal(f.detected_at));
 	const cands = candidates?.candidates || [];
 	// Tier against the backend's effective thresholds. Hardcoding 0.90/0.80 here
 	// meant the banner stayed silent on wallets the backend had already emailed
@@ -482,8 +510,10 @@ export function getAlertState(fundFlows, candidates, hlTransfers, scan = null) {
 		return { level: 'critical', msg: 'Fund trace found a wallet that deposited to Hyperliquid.' };
 	}
 	// Large in-platform outbound transfer to a wallet that isn't already known-linked.
+	// Bounded by last_seen_ms, matching risk._gather_signals — the variable was
+	// already called freshOut but nothing checked that it was fresh.
 	const freshOut = (hlTransfers?.counterparties || [])
-		.filter(c => !c.known_self && c.total_out_usd >= 50000)
+		.filter(c => !c.known_self && c.total_out_usd >= 50000 && isRecentSignal(c.last_seen_ms))
 		.sort((a, b) => b.total_out_usd - a.total_out_usd)[0];
 	if (freshOut) {
 		return { level: 'critical', msg: `Target sent ${formatUSD(freshOut.total_out_usd)} to a new wallet inside Hyperliquid.`, wallet: freshOut.wallet };
