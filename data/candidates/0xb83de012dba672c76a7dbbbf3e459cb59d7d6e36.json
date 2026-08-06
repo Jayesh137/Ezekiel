@@ -1,40 +1,40 @@
 {
   "wallet": "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36",
   "first_seen": "2026-07-06T11:35:24.225653+00:00",
-  "last_seen": "2026-08-05T23:47:38.474800+00:00",
+  "last_seen": "2026-08-06T01:21:11.554366+00:00",
   "best_score": 0.7326,
   "latest_score": 0.45,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Strong asset mix overlap",
       "Similar market/limit execution style",
-      "Matching long/short bias",
-      "Similar scaling/TWAP/clip-size habits"
+      "Matching long/short bias"
     ],
     "warnings": [
+      "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 11x apart (0.28 vs 3.00 position episodes/day)"
+      "Decision frequency 7x apart (0.28 vs 2.00 position episodes/day)",
+      "Incompatible hold style: 80% vs 0% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [
         "@107",
-        "BTC",
         "ETH"
       ],
       "target_only": [
+        "BTC",
         "CASHCAT",
         "xyz:BRENTOIL"
       ],
       "candidate_only": [
         "HYPE"
       ],
-      "overlap_count": 3,
+      "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.5
+      "jaccard": 0.3333
     },
     "market_rarity": {
       "shared_markets": [],
@@ -1338,6 +1338,25 @@
         "activity": 0.4697,
         "direction_bias": 1.0,
         "position_management": 0.9169,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-08-06T01:21:11.554366+00:00",
+      "score": 0.45,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.563,
+        "timing_profile": null,
+        "leverage_profile": 0.7948,
+        "entry_exit_style": 0.9889,
+        "hold_duration": null,
+        "account_size": 0.4822,
+        "trade_sequencing": 0.4383,
+        "position_sizing": 0.5,
+        "activity": 0.5041,
+        "direction_bias": 1.0,
+        "position_management": 0.7867,
         "loss_handling": null
       }
     }

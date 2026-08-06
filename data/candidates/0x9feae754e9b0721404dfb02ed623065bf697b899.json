@@ -1,25 +1,24 @@
 {
   "wallet": "0x9feae754e9b0721404dfb02ed623065bf697b899",
   "first_seen": "2026-07-27T20:12:27.263519+00:00",
-  "last_seen": "2026-08-04T02:03:37.880758+00:00",
-  "best_score": 0.2705,
-  "latest_score": 0.2705,
+  "last_seen": "2026-08-06T01:24:37.863846+00:00",
+  "best_score": 0.2718,
+  "latest_score": 0.2718,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Similar market/limit execution style",
+      "Similar holding-duration profile",
       "Similar account-size bracket",
-      "Matching long/short bias",
-      "Similar scaling/TWAP/clip-size habits"
+      "Matching long/short bias"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Very different trading frequency"
     ],
     "vetoes": [
-      "Decision frequency 7x apart (0.30 vs 2.00 position episodes/day)",
-      "Incompatible hold style: 80% vs 0% of holds under 1h"
+      "Decision frequency 12x apart (0.28 vs 3.50 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -31,7 +30,8 @@
         "xyz:BRENTOIL"
       ],
       "candidate_only": [
-        "xyz:SKHX"
+        "xyz:SKHX",
+        "xyz:SMSN"
       ],
       "overlap_count": 0,
       "rare_overlap": [],
@@ -44,7 +44,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2705,
+      "score_without_bonus": 0.2718,
       "explanations": [],
       "frequencies": {}
     }
@@ -104,6 +104,25 @@
         "activity": 0.4982,
         "direction_bias": 1.0,
         "position_management": 0.9143,
+        "loss_handling": null
+      }
+    },
+    {
+      "scan_time": "2026-08-06T01:24:37.863846+00:00",
+      "score": 0.2718,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.8738,
+        "account_size": 0.9049,
+        "trade_sequencing": 0.6263,
+        "position_sizing": 0.5,
+        "activity": 0.253,
+        "direction_bias": 1.0,
+        "position_management": 0.7784,
         "loss_handling": null
       }
     }
