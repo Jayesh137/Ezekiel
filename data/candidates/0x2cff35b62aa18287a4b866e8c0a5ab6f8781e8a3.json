@@ -1,21 +1,23 @@
 {
   "wallet": "0x2cff35b62aa18287a4b866e8c0a5ab6f8781e8a3",
   "first_seen": "2026-07-09T10:30:24.680779+00:00",
-  "last_seen": "2026-08-06T15:04:03.312953+00:00",
+  "last_seen": "2026-08-06T23:51:33.983023+00:00",
   "best_score": 0.4523,
-  "latest_score": 0.2078,
+  "latest_score": 0.1486,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style"
+      "Similar market/limit execution style",
+      "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Very different trading frequency"
+      "Very different trading frequency",
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 27x apart (0.26 vs 7.00 position episodes/day)"
+      "Decision frequency 15x apart (0.26 vs 4.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -28,11 +30,9 @@
       ],
       "candidate_only": [
         "xyz:CL",
-        "xyz:DRAM",
         "xyz:SKHX",
         "xyz:SKHY",
-        "xyz:SMSN",
-        "xyz:SNDK"
+        "xyz:SPCX"
       ],
       "overlap_count": 0,
       "rare_overlap": [],
@@ -45,31 +45,12 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2078,
+      "score_without_bonus": 0.1486,
       "explanations": [],
       "frequencies": {}
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-07-23T22:01:12.496018+00:00",
-      "score": 0.4191,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.1,
-        "timing_profile": 0.3852,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 1.0,
-        "hold_duration": 1.0,
-        "account_size": 0.2442,
-        "trade_sequencing": 0.3059,
-        "position_sizing": 0.5,
-        "activity": 0.5878,
-        "direction_bias": 0.0,
-        "position_management": 0.8622,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-07-23T22:52:24.411711+00:00",
       "score": 0.4191,
@@ -1950,8 +1931,27 @@
         "position_management": 0.7851,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-06T23:51:33.983023+00:00",
+      "score": 0.1486,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.5599,
+        "trade_sequencing": 0.1274,
+        "position_sizing": 0.5,
+        "activity": 0.3255,
+        "direction_bias": 0.1684,
+        "position_management": 0.8142,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2224
+  "recent_avg_score": 0.2097
 }

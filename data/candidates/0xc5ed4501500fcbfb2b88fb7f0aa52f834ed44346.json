@@ -1,9 +1,9 @@
 {
   "wallet": "0xc5ed4501500fcbfb2b88fb7f0aa52f834ed44346",
   "first_seen": "2026-07-27T20:08:21.919304+00:00",
-  "last_seen": "2026-08-06T15:07:08.907090+00:00",
+  "last_seen": "2026-08-06T23:49:16.885888+00:00",
   "best_score": 0.2355,
-  "latest_score": 0.2104,
+  "latest_score": 0.1895,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -11,10 +11,11 @@
       "Similar market/limit execution style"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Very different trading frequency"
     ],
     "vetoes": [
-      "Decision frequency 131x apart (0.26 vs 34.00 position episodes/day)"
+      "Decision frequency 142x apart (0.26 vs 37.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -28,13 +29,12 @@
       "candidate_only": [
         "hyna:BTC",
         "hyna:ETH",
+        "hyna:SOL",
         "mkts:US500",
         "mkts:USTECH",
         "xyz:AMAT",
         "xyz:BB",
         "xyz:COIN",
-        "xyz:CXMT",
-        "xyz:DRAM",
         "xyz:EWT",
         "xyz:EWY",
         "xyz:INTC",
@@ -53,7 +53,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2104,
+      "score_without_bonus": 0.1895,
       "explanations": [],
       "frequencies": {}
     }
@@ -628,8 +628,27 @@
         "position_management": 0.7762,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-06T23:49:16.885888+00:00",
+      "score": 0.1895,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.0,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.696,
+        "account_size": 0.2801,
+        "trade_sequencing": 0.4683,
+        "position_sizing": 0.0292,
+        "activity": 0.2399,
+        "direction_bias": 0.4833,
+        "position_management": 0.7725,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.1827
+  "recent_avg_score": 0.183
 }
