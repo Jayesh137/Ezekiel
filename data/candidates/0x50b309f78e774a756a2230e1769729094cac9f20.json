@@ -1,14 +1,15 @@
 {
   "wallet": "0x50b309f78e774a756a2230e1769729094cac9f20",
   "first_seen": "2026-08-04T01:58:03.300172+00:00",
-  "last_seen": "2026-08-10T00:47:54.526201+00:00",
-  "best_score": 0.3984,
-  "latest_score": 0.3339,
-  "latest_tier": "BACKGROUND",
+  "last_seen": "2026-08-10T10:55:19.760911+00:00",
+  "best_score": 0.45,
+  "latest_score": 0.45,
+  "latest_tier": "WEAK_LEAD",
   "latest_evidence": {
-    "tier": "BACKGROUND",
+    "tier": "WEAK_LEAD",
     "reasons": [
       "Similar market/limit execution style",
+      "Matching long/short bias",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
@@ -16,22 +17,23 @@
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 12x apart (0.26 vs 3.00 position episodes/day)"
+      "Decision frequency 11x apart (0.27 vs 3.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
+        "BTC",
         "ETH"
       ],
       "target_only": [
         "@107",
-        "BTC",
         "CASHCAT",
-        "xyz:BRENTOIL"
+        "MON",
+        "XPL"
       ],
       "candidate_only": [],
-      "overlap_count": 1,
+      "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.2
+      "jaccard": 0.3333
     },
     "market_rarity": {
       "shared_markets": [],
@@ -40,7 +42,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3339,
+      "score_without_bonus": 0.45,
       "explanations": [],
       "frequencies": {}
     }
@@ -1489,8 +1491,27 @@
         "position_management": 0.8201,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-10T10:55:19.760911+00:00",
+      "score": 0.45,
+      "tier": "WEAK_LEAD",
+      "dimensions": {
+        "asset_preferences": 0.5838,
+        "timing_profile": null,
+        "leverage_profile": 0.368,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.3329,
+        "trade_sequencing": 0.9296,
+        "position_sizing": 0.0902,
+        "activity": 0.4526,
+        "direction_bias": 1.0,
+        "position_management": 0.8419,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3331
+  "recent_avg_score": 0.3498
 }
