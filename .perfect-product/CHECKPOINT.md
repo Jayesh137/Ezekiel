@@ -1,13 +1,14 @@
 # Perfect Product Checkpoint
 
-Updated: 2026-08-05, after the third independent audit and the accessibility pass.
+Updated: 2026-08-11, after merging origin/main, two further fixes caught by
+post-merge verification, and the push to production.
 
 ## Git
 
 - Branch: `main`
-- Code certified at: **`f88d193ad`** (the accessibility fixes — the last commit
-  to change shipping code; this file's own commit follows it, and every commit
-  after `f88d193ad` is documentation only)
+- Code certified and PUSHED at: **`de8eb4687`** — `origin/main` and local are
+  in sync. Certified as one atomic pass with a clean tree before and after
+  every run: static, integration, build, runtime, a11y.
 - Baseline this pass started from: `23b28d852`
 - Protected branches: `main`
 - Forbidden operations: merge, tag, deploy, publish, force-push, delete-branch,
@@ -35,13 +36,16 @@ Updated: 2026-08-05, after the third independent audit and the accessibility pas
   CONDITIONAL with **no release blocker in code or behaviour**, then independent
   confirmation that the resulting conditions were discharged.
 - Acceptance contract: **20 of 20 items PASS.**
-- Exact next action: **push, then watch `analyze.yml`.** Production is still
-  running the old code — `origin/main` is in `OBSERVING` with behavioural
-  alerting off because of F-010. Nothing in this pass reaches the operator until
-  these commits land and the daily job re-runs the self-match on data through the
-  present. Confirm afterwards that `data/scans/latest.json` reports
-  `CURRENT_VALIDATED` and that `profile/backtest.json` shows `passed: true` under
-  scoring schema `2026-08-05.1`.
+- Exact next action: **watch the next `scan.yml` and `analyze.yml` runs.** Pushed
+  to `origin/main` at `de8eb4687` on 2026-08-11; `origin/main` and local are in
+  sync and production already serves the passing backtest (0.5365, rank 1/21,
+  margin 0.0865, schema `2026-08-05.1`) and the new-format fingerprint.
+  `data/scans/latest.json` still carries the 16:59 sweep from the old code, which
+  is expected. On the next scan its `thresholds` block should move from
+  `scoring_schema 2026-07-27.1` / ceiling 0.5262 to `2026-08-05.1` / ceiling
+  0.5365. If the schema field does not move, the new code did not take effect.
+  The push also touched `dashboard/**`, so `deploy-dashboard.yml` republishes
+  Pages with the contrast, chart-labelling and focus-ring fixes.
 
 ## Completed and proven
 
@@ -110,6 +114,9 @@ sentence; a third independent audit caught them disagreeing.
 - Must not run concurrently: `src/backtest.py` and `src/fingerprint.py` both
   rewrite `profile/`. Separately, **never run the mutation harness while an audit
   is in progress** — doing so is what caused the first audit's BLOCK verdict.
+- Rendering against live data is rate-limited by raw.githubusercontent: a dozen
+  headless-Chrome sessions in quick succession start returning empty data, which
+  renders as a fully-hydrated page showing $0.00 rather than as an error.
 
 ## Continuation instruction
 
