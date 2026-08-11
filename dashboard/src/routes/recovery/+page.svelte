@@ -13,7 +13,8 @@
 		fetchCorrelations,
 		formatUSD,
 		shortAddr,
-		currentScore
+		currentScore,
+		getThresholds
 	} from '$lib/api.js';
 
 	const TARGET = '0x45d26f28196d226497130c4bac709d808fed4029';
@@ -214,8 +215,17 @@
 	}
 
 	function topLeads() {
+		// Tier against the thresholds the backend actually resolved, never a
+		// literal. This filtered at 0.65 — ABOVE the scorer's own self-match
+		// ceiling, which is what the real trader scores against his own history
+		// (0.5365 when this was found). Nothing could ever reach it, so the one
+		// page you open when the trader may have migrated showed zero leads,
+		// permanently, while the backend held 2 wallets above the alert threshold
+		// and 27 above the low threshold.
+		const th = getThresholds(scan);
 		return (scan?.results || [])
-			.filter(r => r.score >= 0.65)
+			.filter(r => r.score >= th.low)
+			.sort((a, b) => (b.score || 0) - (a.score || 0))
 			.slice(0, 10);
 	}
 </script>

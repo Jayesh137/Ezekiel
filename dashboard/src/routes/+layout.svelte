@@ -15,13 +15,30 @@
 	];
 
 	let freshnessMinutes = null;
+	// Mirrors heartbeat.STALE_AFTER_MINUTES. GitHub honours roughly 5% of this
+	// repo's requested cron — measured median gap 83 min, p90 160, max 220 — so
+	// the backend deliberately does not call collection stalled until 360 min.
+	// This pill used 10/30, which painted it red at two hours and kept it red
+	// essentially always: the one indicator for the failure mode that silently
+	// loses unrecoverable history, trained to be ignored. Warn at the observed
+	// p90, stale only where the backend would alert.
 	$: freshnessStatus = freshnessMinutes === null ? 'ok'
-		: freshnessMinutes > 30 ? 'stale'
-		: freshnessMinutes > 10 ? 'warn'
+		: freshnessMinutes > 360 ? 'stale'
+		: freshnessMinutes > 160 ? 'warn'
 		: 'ok';
 	$: freshnessLabel = freshnessMinutes === null ? null
 		: freshnessMinutes < 60 ? `${freshnessMinutes}m ago`
 		: `${Math.floor(freshnessMinutes / 60)}h ago`;
+	$: freshnessTitle = freshnessMinutes === null ? 'Collection age unknown'
+		: freshnessStatus === 'stale'
+			? `Collection has not run for ${Math.floor(freshnessMinutes / 60)}h. The backend `
+				+ `treats this as stalled past 6h — while it is down a migration cannot be `
+				+ `detected, and Hyperliquid serves only ~2000 recent records per endpoint.`
+		: freshnessStatus === 'warn'
+			? `Last collection ${freshnessMinutes} min ago — longer than the usual p90 gap `
+				+ `of 160 min, but not yet the 6h stall threshold.`
+		: `Last collection ${freshnessMinutes} min ago. Gaps of an hour or two are normal: `
+			+ `GitHub honours only about 5% of the requested schedule.`;
 
 	onMount(async () => {
 		const index = await fetchIndex();
@@ -51,7 +68,9 @@
 		<div class="sidebar-footer">
 			<span class="text-muted" style="font-size:0.7rem">Trader Intelligence</span>
 			{#if freshnessLabel}
-				<span class="freshness-pill freshness-{freshnessStatus}">Data: {freshnessLabel}</span>
+				<span class="freshness-pill freshness-{freshnessStatus}" title={freshnessTitle}>
+					{freshnessStatus === 'stale' ? 'STALLED' : 'Data'}: {freshnessLabel}
+				</span>
 			{/if}
 		</div>
 	</nav>
