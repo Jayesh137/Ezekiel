@@ -1,6 +1,7 @@
 # Ezekiel — Perfect Product Final Report
 
-Date: 2026-08-05 · Branch `main` · Baseline `23b28d852` → final `33208e7c1`
+Date: 2026-08-05 · Branch `main` · Baseline `23b28d852` → code certified at
+`33208e7c1` (every later commit is documentation only; see §2)
 
 ---
 
@@ -401,11 +402,25 @@ one unused-CSS warning, backtest PASS 0.7163.
   RELEASE_BLOCKER-severity fix was missing from the account of what shipped is
   exactly the sort of thing a single judge does not catch about their own work.
 
-  All three are discharged in the commit that follows this text, and the
-  discharge is objectively checkable against the auditor's own retest criteria:
-  final commit restated, §3 and §5 narrate F-013/F-014, §4 cites the
-  `2026-08-05T15-4x` run set, `ACCEPTANCE.json` cites F-013, `CHECKPOINT.md`
-  rewritten to current state.
+  All three were discharged, and **a third audit then verified that discharge
+  independently** rather than taking my word for it. Against `ee7ab7a4d` it
+  reported all three **DISCHARGED**, each with the evidence used, and separately
+  re-confirmed the evidence SHAs, the empty code-drift diff, the stopped preview
+  servers, 375 passing tests and a clean ruff run. The self-verification
+  limitation this report previously carried is therefore **resolved**.
+
+  That third pass also found a defect the discharge had **missed and in fact
+  extended**: `FINDINGS.jsonl` still marked F-001–F-009 `OPEN` while every other
+  document called them fixed, and my discharge commit had widened that summary
+  sentence from "F-001 … F-012" to "F-001 … F-014" without ever touching the
+  ledger. It also noted, correctly, that a blanket "FIXED" would itself be false,
+  because **F-007 was deliberately carried, not fixed**.
+
+  Corrected: the ledger now carries terminal statuses — **13 FIXED, 1 CARRIED** —
+  each with `fix` and `verification` fields, and the `release-audit` evidence
+  record now asserts ledger/summary agreement on every run, so the same drift
+  cannot recur silently. Three audits, three rounds of findings, each one
+  catching something the previous pass and I had both missed.
 - **`a11y.dashboard` — BLOCKED, deliberately.** Headless rendering gave pixels
   and DOM but no keyboard path, no focus-visibility check, no contrast
   measurement and no screen-reader pass, so **no accessibility claim is made**.
@@ -447,13 +462,17 @@ one unused-CSS warning, backtest PASS 0.7163.
 - Every check reported here was **executed by an AI agent** in this session, with
   raw exit codes captured by the evidence runner. Each claim in §4 has a recorded
   run behind it.
-- **One independent review completed, and it returned BLOCK** (§6). It found no
-  code defect but three process failures, including that I had been attributing
-  evidence to commits it was not produced at. Those attributions are corrected in
-  `ACCEPTANCE.json`; the originals are described rather than erased. The
-  security and resilience audits reported here were still performed *by the same
-  agent that wrote the code* and are labelled as such — the completed audit
-  covered the four code paths it was given, not those gates.
+- **Three independent reviews completed** (§6), none by the agent that wrote the
+  code. Verdicts: BLOCK (process), CONDITIONAL (no release blocker in code or
+  behaviour), and independent confirmation that the resulting conditions were
+  discharged. Each round found something the previous pass and I had both missed
+  — misattributed evidence, a RELEASE_BLOCKER-severity fix absent from my own
+  narrative, and a findings ledger contradicting every document summarising it.
+  Originals are described rather than erased.
+- The **security and resilience audits** reported here were still performed *by
+  the same agent that wrote the code* and are labelled as such in
+  `ACCEPTANCE.json`. The independent audits covered the code paths, evidence
+  integrity and document consistency they were given — not those two gates.
 - **No human review, and no certification of any kind** — security, legal,
   accessibility or financial — took place or is claimed.
 - No accessibility testing was performed and none is claimed.

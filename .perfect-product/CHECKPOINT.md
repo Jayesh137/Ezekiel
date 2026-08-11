@@ -71,7 +71,10 @@ is empty, which the release auditor verified independently.
 | — | MINOR | a11y | `a11y.dashboard` BLOCKED. Headless rendering gave pixels and DOM but no keyboard path, no focus-visibility check, no contrast measurement, no screen-reader pass. **No accessibility claim is made.** | Keyboard-only pass over each route; contrast check on the tier badges (which already carry text labels, not colour alone). See RELEASE-MATRIX.csv RM-19/RM-20. |
 | — | MINOR | compat | RM-18: ubuntu CI parity inferred from `test.yml` running identical commands, not executed here. | Run the workflow. |
 
-F-001 … F-014 are all FIXED; see FINDINGS.jsonl.
+F-001 … F-014: **13 FIXED, 1 CARRIED** (F-007, `docs/architecture.md` — it already
+carries an accurate staleness banner and rewriting it is outside the V1
+boundary). See FINDINGS.jsonl, whose `status` fields now agree with this
+sentence; a third independent audit caught them disagreeing.
 
 ## Carried, not fixed (outside boundary or judged unreachable)
 
