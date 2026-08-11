@@ -244,7 +244,7 @@
 			<h2 style="margin-bottom:12px;font-size:1.1rem">Dimension Weights</h2>
 			<p class="text-muted" style="font-size:0.75rem;margin-bottom:12px">Scanner uses these weights to compare wallets. Higher weight = more influence on match score.</p>
 			<div style="height:280px;position:relative">
-				<canvas bind:this={radarEl}></canvas>
+				<canvas bind:this={radarEl} role="img" aria-label="Behavioural fingerprint across scoring dimensions"></canvas>
 			</div>
 		</div>
 		<div class="card" style="flex:1">
@@ -308,7 +308,7 @@
 		<div class="card" style="flex:1">
 			<h2 style="margin-bottom:16px;font-size:1.1rem">Day of Week</h2>
 			<div style="height:140px;position:relative">
-				<canvas bind:this={dowEl}></canvas>
+				<canvas bind:this={dowEl} role="img" aria-label="Trading activity by day of week"></canvas>
 			</div>
 		</div>
 	</div>

@@ -457,7 +457,7 @@
 					<div class="chart-loading">No snapshot data available</div>
 				{/if}
 				<div class="chart-container">
-					<canvas bind:this={accountChartEl}></canvas>
+					<canvas bind:this={accountChartEl} role="img" aria-label="Portfolio value over time, including spot holdings"></canvas>
 				</div>
 			</div>
 			<div class="card chart-card chart-card-sm">
@@ -465,7 +465,7 @@
 					<h2>Position Allocation</h2>
 				</div>
 				<div class="chart-container">
-					<canvas bind:this={allocChartEl}></canvas>
+					<canvas bind:this={allocChartEl} role="img" aria-label="Position allocation by market"></canvas>
 				</div>
 			</div>
 		</div>
@@ -475,7 +475,7 @@
 					<h2>Unrealized PnL</h2>
 				</div>
 				<div class="chart-container">
-					<canvas bind:this={pnlChartEl}></canvas>
+					<canvas bind:this={pnlChartEl} role="img" aria-label="Unrealized profit and loss over time"></canvas>
 				</div>
 			</div>
 			<div class="card chart-card">
@@ -486,7 +486,7 @@
 					{/if}
 				</div>
 				<div class="chart-container">
-					<canvas bind:this={fundingChartEl}></canvas>
+					<canvas bind:this={fundingChartEl} role="img" aria-label="Cumulative funding paid and received"></canvas>
 				</div>
 			</div>
 		</div>

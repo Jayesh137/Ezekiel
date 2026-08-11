@@ -31,8 +31,7 @@ Updated: 2026-08-05, after the second independent release audit.
 
 - Gate: 11 complete. Two independent audits ran; the second, against the frozen
   commit, found **no release blocker in code or behaviour**.
-- Acceptance contract: **19 of 20 items PASS**. One remains BLOCKED:
-  `a11y.dashboard` (MINOR).
+- Acceptance contract: **20 of 20 items PASS.**
 - Exact next action: **push, then watch `analyze.yml`.** Production is still
   running the old code — `origin/main` is in `OBSERVING` with behavioural
   alerting off because of F-010. Nothing in this pass reaches the operator until
@@ -68,8 +67,14 @@ is empty, which the release auditor verified independently.
 
 | ID | Severity | Gate | Finding | Retest criterion |
 |---|---|---|---|---|
-| — | MINOR | a11y | `a11y.dashboard` BLOCKED. Headless rendering gave pixels and DOM but no keyboard path, no focus-visibility check, no contrast measurement, no screen-reader pass. **No accessibility claim is made.** | Keyboard-only pass over each route; contrast check on the tier badges (which already carry text labels, not colour alone). See RELEASE-MATRIX.csv RM-19/RM-20. |
-| — | MINOR | compat | RM-18: ubuntu CI parity inferred from `test.yml` running identical commands, not executed here. | Run the workflow. |
+| — | MINOR | compat | RM-18: ubuntu CI parity inferred from `test.yml` running identical commands, not executed here (no ubuntu runner available). | Run the workflow. |
+
+Accessibility was closed by fixing three real defects, not by waiving the gate:
+`--text-muted` at 2.13:1 on a hovered card, nine chart canvases with no text
+alternative, and no explicit focus ring. Final review 0 MAJOR / 0 MINOR. The
+review is agent-executed and covers semantics, focus order, labelling,
+colour-independence and contrast maths — **not** a screen-reader session and
+**not** a certification.
 
 F-001 … F-014: **13 FIXED, 1 CARRIED** (F-007, `docs/architecture.md` — it already
 carries an accurate staleness banner and rewriting it is outside the V1

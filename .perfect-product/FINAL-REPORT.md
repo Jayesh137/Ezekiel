@@ -286,6 +286,27 @@ partially-written file a failed Actions job can leave:
   transfer-graph run. `save_latest` is typed `dict | list` and
   `data/portfolio/latest.json` really is a list.
 
+**Accessibility.** Initially recorded as unverifiable, then done properly once it
+turned out Chrome was installed even though the extension was not. Three real
+defects fixed rather than the gate being waved through:
+
+- `--text-muted` was `#555570` — **2.13:1** on a hovered card, below even the
+  3:1 large-text floor — while carrying the data-freshness indicator, chart axis
+  labels and secondary table columns. `--text-secondary` was 4.43:1, marginally
+  under AA. Both raised (to 4.58:1 and 6.61:1 worst-surface) with the luminance
+  ordering preserved, so the visual hierarchy is unchanged.
+- **All nine chart canvases had no text alternative at all**; each now carries
+  `role="img"` and an `aria-label` naming what it plots.
+- **No explicit focus style.** The UA ring was never removed, so focus was
+  technically visible — but thin and low-contrast on a near-black page carrying
+  380+ wallet links on the scanner route. An explicit `:focus-visible` ring was
+  added.
+
+Already sound and verified: `h1` on every route, `nav`/`main` landmarks, zero
+positive tabindex, zero empty links, no unlabelled images, and status conveyed in
+words (`[WATCH]` on the banner, tier names on the scanner) rather than hue alone.
+Final review: **0 MAJOR, 0 MINOR**.
+
 **Security.** `Ezekiel-backup-*/` gitignored (F-008). Verified clean: no
 credentials in tracked files; secrets read only via `os.environ` and never
 logged; workflows use first-party actions with scoped permissions, no
@@ -421,12 +442,10 @@ one unused-CSS warning, backtest PASS 0.7163.
   record now asserts ledger/summary agreement on every run, so the same drift
   cannot recur silently. Three audits, three rounds of findings, each one
   catching something the previous pass and I had both missed.
-- **`a11y.dashboard` — BLOCKED, deliberately.** Headless rendering gave pixels
-  and DOM but no keyboard path, no focus-visibility check, no contrast
-  measurement and no screen-reader pass, so **no accessibility claim is made**.
-  See `RELEASE-MATRIX.csv` RM-19/RM-20. Unblock with a keyboard-only pass over
-  each route plus a contrast check on the tier badges (which do already carry
-  text labels, not colour alone).
+- **`compat.targets` / RM-18 — ubuntu CI parity not executed here.** No ubuntu
+  runner is available in this environment; parity is inferred from `test.yml`
+  running the identical `ruff` and `pytest` commands. Closed by running the
+  workflow.
 
 ### Release-safe limitations
 
@@ -475,7 +494,13 @@ one unused-CSS warning, backtest PASS 0.7163.
   integrity and document consistency they were given — not those two gates.
 - **No human review, and no certification of any kind** — security, legal,
   accessibility or financial — took place or is claimed.
-- No accessibility testing was performed and none is claimed.
+- Accessibility **was** reviewed, and the review is agent-executed: semantics,
+  focus order, labelling, colour-independence and WCAG contrast maths on the
+  built stylesheet, against the post-hydration DOM from real Chrome. It does
+  **not** include a screen-reader session, magnification, or testing with
+  assistive-technology users, and it is **not a certification**. Two accent
+  colours (`--accent-red` 4.27:1, `--accent-purple` 4.42:1) remain AA-large only
+  and are used for large numerals and badges.
 - The pages **were** rendered and inspected, after an initial pass concluded they
   could not be: the Chrome extension was never connected, but Chrome itself is
   installed, so the production build was served and driven with headless Chrome

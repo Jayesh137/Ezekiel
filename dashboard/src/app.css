@@ -6,9 +6,17 @@
 	--bg-card: #1a1a2e;
 	--bg-card-hover: #222240;
 	--border: #2a2a4a;
-	--text-primary: #e0e0e8;
-	--text-secondary: #8888a0;
-	--text-muted: #555570;
+	/* Contrast measured against the darkest AND lightest surfaces these sit on
+	   (--bg-primary #0a0a0f through --bg-card-hover #222240), so the figures hold
+	   on a hovered card, not just on the page. --text-muted was #555570, which is
+	   2.13:1 on a hovered card — below even the 3:1 large-text floor — while
+	   carrying real content: the data-freshness indicator, chart axis labels and
+	   secondary table columns. --text-secondary was 4.43:1, marginally under AA.
+	   Both raised; the luminance ordering primary > secondary > muted is
+	   preserved, so the visual hierarchy is unchanged. */
+	--text-primary: #e0e0e8;   /* 11.67:1 worst case */
+	--text-secondary: #a8a8c4; /*  6.61:1 worst case */
+	--text-muted: #8a8aa8;     /*  4.58:1 worst case — clears AA for body text */
 	--accent-green: #00ff88;
 	--accent-red: #ff3355;
 	--accent-blue: #4488ff;
@@ -35,6 +43,18 @@ body {
 
 a { color: var(--accent-blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Keyboard focus. The UA default ring was never removed, so focus was already
+   visible — but on a near-black background it is thin and low-contrast, and this
+   page is a dense grid of 380+ wallet links on the scanner route. An explicit
+   high-contrast ring makes the focused element findable at a glance. Scoped to
+   :focus-visible so it appears for keyboard and programmatic focus without
+   ringing every mouse click. */
+:focus-visible {
+	outline: 2px solid var(--accent-cyan);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
 
 .card {
 	background: var(--bg-card);

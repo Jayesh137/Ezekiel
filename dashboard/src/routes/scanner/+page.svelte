@@ -436,13 +436,13 @@
 									<div class="comparison-chart">
 										<h3>Dimension Comparison</h3>
 										<div class="chart-wrap">
-											<canvas id="radar-{r.wallet.slice(0, 8)}"></canvas>
+											<canvas id="radar-{r.wallet.slice(0, 8)}" role="img" aria-label="Behavioural fingerprint comparison for wallet {r.wallet.slice(0, 10)}"></canvas>
 										</div>
 									</div>
 									<div class="comparison-chart">
 										<h3>Activity Hours (UTC)</h3>
 										<div class="chart-wrap">
-											<canvas id="timing-{r.wallet.slice(0, 8)}"></canvas>
+											<canvas id="timing-{r.wallet.slice(0, 8)}" role="img" aria-label="Trading time-of-day comparison for wallet {r.wallet.slice(0, 10)}"></canvas>
 										</div>
 									</div>
 								</div>

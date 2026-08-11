@@ -479,7 +479,7 @@
 				Cyan bars = target active days. Orange line = top candidate similarity. Correlation between target silence and rising score indicates migration.
 			</p>
 			<div style="height:180px;position:relative">
-				<canvas bind:this={timelineChartEl}></canvas>
+				<canvas bind:this={timelineChartEl} role="img" aria-label="Candidate wallet score history over time"></canvas>
 			</div>
 		</section>
 	{/if}
