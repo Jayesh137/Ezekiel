@@ -95,6 +95,25 @@ def resolve(alert_thresholds: dict, backtest_report: dict | None = None) -> dict
         return eff
 
     if backtest_report.get("passed") and backtest_report.get("self_score"):
+        # A ceiling is evidence about the scorer that produced it, and nothing
+        # else. This branch used to skip the schema check that CARRIED_FORWARD
+        # applies, which was harmless only while the schema never changed.
+        # Bumping SCORING_SCHEMA for the per-active-day normalisation made it
+        # live: production's report of 2026-08-11 passed at 0.5262 under
+        # 2026-07-27.1 — measured with the old calendar-day maths — and was
+        # accepted as CURRENT_VALIDATED, pulling thresholds down to
+        # 0.5062/0.4562/0.4062 for a scorer that had never produced that number.
+        if not schema_compatible(backtest_report.get("scoring_schema")):
+            eff["policy"] = SRC_OBSERVING
+            eff["validation_rejected"] = (
+                f"self-match passed under scoring schema "
+                f"{backtest_report.get('scoring_schema')!r}, current is "
+                f"{SCORING_SCHEMA!r} — revalidation required before this ceiling "
+                f"can set thresholds")
+            print(f"[thresholds] WARNING: {eff['validation_rejected']}. "
+                  f"Operating in {SRC_OBSERVING} on conservative config thresholds "
+                  f"until the next backtest runs under the current scorer.")
+            return eff
         achievable = float(backtest_report["self_score"])
         eff["policy"] = SRC_CURRENT_VALIDATED
         eff["validated_at"] = backtest_report.get("run_at")

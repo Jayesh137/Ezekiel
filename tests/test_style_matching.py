@@ -208,10 +208,14 @@ def test_effective_thresholds_lowered_by_backtest_ceiling(tmp_path, monkeypatch)
     import json as _json
 
     from src import scanner
+    from src import thresholds as th_mod
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
     (profile_dir / "backtest.json").write_text(
-        _json.dumps({"passed": True, "self_score": 0.52}))
+        # scoring_schema is required: resolve() refuses a ceiling proven under a
+        # different scorer, so a fixture without it is not a valid passing report.
+        _json.dumps({"passed": True, "self_score": 0.52,
+                     "scoring_schema": th_mod.SCORING_SCHEMA}))
     monkeypatch.setattr(scanner, "DATA_DIR", tmp_path / "data")
     eff = scanner._effective_thresholds(RAW_THRESHOLDS)
     assert eff["high"] == 0.50  # self-score - 0.02
@@ -226,7 +230,8 @@ def test_effective_thresholds_stay_reachable_for_true_trader():
     against his own history — that would guarantee missing the migration."""
     from src import thresholds as th
     for ceiling in (0.48, 0.53, 0.62, 0.80):
-        eff = th.resolve(RAW_THRESHOLDS, {"passed": True, "self_score": ceiling})
+        eff = th.resolve(RAW_THRESHOLDS, {"passed": True, "self_score": ceiling,
+                                          "scoring_schema": th.SCORING_SCHEMA})
         assert eff["high"] <= max(ceiling, th.MIN_HIGH), (
             f"high {eff['high']} unreachable at ceiling {ceiling}")
 
@@ -304,7 +309,8 @@ def test_tier_labels_track_effective_thresholds():
     0.90/0.80/0.65 while alerts ran near 0.51, so a wallet emailed as HIGH while
     displaying as WEAK_LEAD."""
     from src import thresholds as th
-    eff = th.resolve(RAW_THRESHOLDS, {"passed": True, "self_score": 0.53})
+    eff = th.resolve(RAW_THRESHOLDS, {"passed": True, "self_score": 0.53,
+                                      "scoring_schema": th.SCORING_SCHEMA})
     assert th.classify(0.75, eff) == th.TIER_CONFIRMED
     assert th.classify(0.10, eff) == th.TIER_BACKGROUND
     # Same score under raw config thresholds is merely a weak lead — proving the

@@ -78,6 +78,49 @@ def test_behavioural_strength_falls_back_to_high_without_a_validated_ceiling():
     assert th.behavioural_strength(unvalidated["medium"], unvalidated) == pytest.approx(0.0)
 
 
+# --- a ceiling is only evidence about the scorer that produced it -----------------
+
+def test_a_passed_backtest_from_a_different_scorer_does_not_validate():
+    """SCORING_SCHEMA exists so a ceiling proven under different maths cannot be
+    reused. resolve() enforced that on the CARRIED_FORWARD branch but not on the
+    plain `passed` branch, where it matters just as much.
+
+    Caught for real: production's report of 2026-08-11 passed at 0.5262 under
+    schema 2026-07-27.1 — measured with the old calendar-day normalisation. With
+    the schema bumped to 2026-08-05.1 for the per-active-day change, resolve()
+    accepted it as CURRENT_VALIDATED and set thresholds to 0.5062/0.4562/0.4062
+    from a ceiling the current scorer never produced.
+    """
+    stale = {"passed": True, "self_score": 0.5262, "run_at": "2026-08-11T01:04:15+00:00",
+             "scoring_schema": "2026-07-27.1"}
+    eff = th.resolve(
+        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}, stale)
+
+    assert eff["policy"] == th.SRC_OBSERVING, "a foreign-schema ceiling must not validate"
+    assert eff["self_match_ceiling"] is None
+    assert (eff["high"], eff["medium"], eff["low"]) == (0.90, 0.80, 0.65), \
+        "thresholds must stay at the conservative config values"
+    assert "schema" in (eff.get("validation_rejected") or "").lower()
+
+
+def test_a_passed_backtest_from_this_scorer_still_validates():
+    """The guard must not break the normal path."""
+    current = {"passed": True, "self_score": 0.7461, "run_at": "2026-08-05T04:00:00+00:00",
+               "scoring_schema": th.SCORING_SCHEMA}
+    eff = th.resolve(
+        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}, current)
+    assert eff["policy"] == th.SRC_CURRENT_VALIDATED
+    assert eff["self_match_ceiling"] == pytest.approx(0.7461)
+
+
+def test_a_report_predating_schema_tracking_does_not_validate():
+    """A report with no scoring_schema cannot be shown to match this scorer."""
+    old = {"passed": True, "self_score": 0.70, "run_at": "2026-01-01T00:00:00+00:00"}
+    eff = th.resolve(
+        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}, old)
+    assert eff["policy"] == th.SRC_OBSERVING
+
+
 # --- current vs all-time score ---------------------------------------------------
 
 def test_candidate_current_score_prefers_latest_over_all_time_best():
