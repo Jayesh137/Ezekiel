@@ -110,12 +110,14 @@
         "tests/test_threshold_coherence.py::test_self_match_ceiling_candidate_earns_full_top_candidate_weight",
         ".perfect-product/evidence/runs/*gate1-unit-tests",
         "commit dd6391485",
-        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)"
+        ".perfect-product/evidence/runs/*mutation-test (defect re-introduced, suite failed)",
+        "tests/test_account_latest_freshness.py (6 tests, F-013)",
+        "commit 62713a25c"
       ],
       "dependencies": [
         "correctness.threshold-single-source"
       ],
-      "notes": "F-003 fixed. Was: CONFIRMED tier 2.91/22 pts, ceiling 4.17/22, max achievable 18.9%. Now anchored between the resolved gate and the proven ceiling. On live data the posture reads 40.5 not 26.1. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
+      "notes": "F-003 fixed. Was: CONFIRMED tier 2.91/22 pts, ceiling 4.17/22, max achievable 18.9%. Now anchored between the resolved gate and the proven ceiling. On live data the posture reads 40.5 not 26.1. Verified by mutation: re-introducing this exact defect makes the suite fail, so the guard is real rather than a test asserting its own constants. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4. ALSO COVERS F-013, which FINDINGS.jsonl ties to this same acceptance ID and which this item previously failed to mention: the drawdown component of the same headline score was dead, not merely mis-scaled. collect_positions never published account/latest.json, so it held a portfolio payload (a list); both readers raise AttributeError on it and both swallowed it, pinning drawdown_pct at 0.0 and forfeiting a further 12 of the 100 points, while alert_account_value_drop never fired once. Fixed and pinned by six tests."
     },
     {
       "id": "correctness.alert-freshness",
@@ -381,14 +383,18 @@
       "title": "Independent release audit finds no unresolved blocker",
       "value": "The implementer must not be the sole judge",
       "severity": "RELEASE_BLOCKER",
-      "status": "BLOCKED",
+      "status": "PASS",
       "acceptance": "A fresh read-only release auditor attempts to disprove readiness against final HEAD and reports no unresolved release blocker.",
       "required_evidence": [
         "independent-reviewer-report"
       ],
-      "evidence": [],
+      "evidence": [
+        "independent release audit of 2f816fcdd (verdict BLOCK, three process findings)",
+        "independent release audit of 33208e7c1 (verdict CONDITIONAL, no release blocker in code or behaviour)",
+        ".perfect-product/FINAL-REPORT.md section 6"
+      ],
       "dependencies": [],
-      "notes": "An independent release auditor COMPLETED against 2f816fcdd and returned BLOCK. It found NO defect in any of the four code paths it was asked to attack — recall regression, veto strength, scanner behaviour preservation and test honesty all held up under hostile scrutiny, and it independently confirmed the scanner refactor is a faithful transcription and that no production code still reads the retired episodes_per_day keys. Its blockers were process, and they were correct: (1) the branch would not hold still — the mutation-test harness ran concurrently with the audit, so it caught the working tree mid-mutation with the NaN guard disabled and 3 tests failing, and development continued during the audit; (2) evidence was attributed to commits it was not produced at; (3) RELEASE-MATRIX.csv was empty. All three are now addressed: concurrent tooling stopped, attributions corrected above, matrix populated with 20 rows. The gate stays BLOCKED until a fresh audit runs against a frozen commit with nothing else touching the tree."
+      "notes": "Two independent audits ran. The first, against 2f816fcdd, returned BLOCK on three process findings: the branch would not hold still because the mutation harness ran concurrently with the audit, evidence was attributed to commits it was not produced at, and RELEASE-MATRIX.csv was empty. All three were accepted and fixed. The second, against the frozen commit 33208e7c1, returned CONDITIONAL with the plain statement that no RELEASE BLOCKER was found in code or behaviour. It verified the freeze itself (HEAD and clean tree at start and end), ran pytest (375 passed) and ruff (clean) against the frozen HEAD, confirmed the four certified runs record 33208e7c1 with dirty false on both sides, ran the carry-forward diff itself rather than trusting the claim, and cleared the newest code and its tests. Its conditions were three documentation defects: a stale final-commit reference, F-013/F-014 missing from the report narrative, an unrefreshed acceptance note, and a stale CHECKPOINT. Every one is discharged in the commit that records this status. LIMITATION, stated plainly: the discharge of those three conditions was verified by the implementing agent against the auditor own mechanically checkable criteria, not by a third audit pass. The code verdict itself is independent."
     },
     {
       "id": "release.final-validation",

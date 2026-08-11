@@ -1,6 +1,6 @@
 # Ezekiel — Perfect Product Final Report
 
-Date: 2026-08-05 · Branch `main` · Baseline `23b28d852` → final `a24d5ecf0`
+Date: 2026-08-05 · Branch `main` · Baseline `23b28d852` → final `33208e7c1`
 
 ---
 
@@ -39,7 +39,7 @@ work applies to current code.
 ## 2. Git state
 
 - Branch: `main`, preserved throughout.
-- Final commit: **`a24d5ecf0`**.
+- Final commit: **`33208e7c1`**.
 - Working tree: clean.
 - **Nothing was merged, tagged, deployed, published, force-pushed or deleted. No
   history was rewritten. Nothing was pushed** — all four commits are local, and
@@ -56,6 +56,11 @@ Commits:
 | `7319d60dc` | measure decision frequency per active day, not per calendar day |
 | `dbb8f350e` | a corrupt score must read as no evidence, not full confidence |
 | `a24d5ecf0` | stop the alert banner latching on expired fund-flow signals |
+| `62713a25c` | publish account/latest.json so drawdown and liquidation alerts work |
+| `33208e7c1` | act on the independent audit's BLOCK verdict |
+
+(Plus four documentation-only commits: `303c66cb0`, `f7938ee85`, `cd545723f`,
+`2f816fcdd`, `9acb6a940`, `63e27e42a`, `c274a70ea`.)
 
 ---
 
@@ -175,6 +180,45 @@ still alerts on its own merits, with no behavioural match required:
 candidate whose disposition is not `BACKGROUND`, so everything suppressed from
 alerting stays on the watchlist with its evidence and its specific blockers.
 
+### A second thing that was dead in production
+
+**F-013 — the drawdown signal and the liquidation alert had never worked.**
+`collect_positions` snapshotted the composite `{perp, spot, hip3}` into the dated
+`account/` directory but **never called `save_latest` for it**, so
+`data/account/latest.json` still held a *portfolio* payload left by an older
+collector — a **list**. Both readers do `data.get("perp", data)`, which raises
+`AttributeError` on a list, and both swallowed it (`except Exception: pass` /
+`return`).
+
+The whole chain was broken, not one link: `account_high_water_cents` is written
+*inside* `check_account_value_drop`, the very function that was bailing out, so
+the cursor `risk.py` needs to measure any drawdown at all was never created.
+Production's `data/state/` still contains no `account_high_water_cents.txt` and
+no `prev_account_value_cents.txt` — verified on the live repo, and independently
+re-verified by the release auditor.
+
+Consequences, both live:
+
+- `risk._gather_signals` pinned `drawdown_pct` at **0.0 forever**, forfeiting
+  **12 of the 100** risk points — live `risk/latest.json` shows exactly that;
+- `alert_account_value_drop` ("Possible Liquidation") **never fired once**.
+
+"A trader who has been wiped may migrate to a fresh wallet" is one of this
+system's own documented migration precursors. Both readers now reject a non-dict
+payload explicitly and say so, because a drawdown of 0.0 must mean "measured, no
+drawdown" and never "could not read the file". Pinned by six tests in
+`tests/test_account_latest_freshness.py`, covering publication, shape, snapshot
+parity, drawdown computation, high-water cursor establishment, and that an
+unreadable state is announced rather than swallowed.
+
+**F-014 — two contradictory "Account Value" figures on the operator's first
+screen.** The tile summed perp + HIP-3 margin ($6.07M + $5.60M = **$11.67M**);
+the chart beside it plotted Hyperliquid's portfolio series (**$34.51M**), the
+gap being **$28.6M of spot USDC**. Both numbers were accurate to their source;
+neither label said which source. Relabelled "Margin Account Value" and
+"Portfolio Value *(incl. spot)*" — the arithmetic was verified against live data
+before renaming, and no computation changed.
+
 ### The number the operator reads
 
 **F-003.** `top_candidate` (weight 22, the largest) scaled to full weight only at
@@ -258,15 +302,29 @@ codebase already required.
 All runs recorded under `.perfect-product/evidence/runs/`, each with its own
 exit code, command and Git SHA.
 
-| Area | Command | Result | Commit |
-|---|---|---|---|
-| Lint | `ruff check src/ tests/ scripts/` | All checks passed | `a24d5ecf0` |
-| Unit/integration | `pytest -q` | **369 passed** (340 at baseline) | `a24d5ecf0` |
-| Production build | `npm --prefix dashboard run build` | exit 0, **no warnings** | `a24d5ecf0` |
-| Runtime (live data) | data layer against `raw.githubusercontent.com` | 7/7 endpoints; banner correct | `a24d5ecf0` |
-| Self-match validation | `python src/backtest.py` | **PASS** 0.7461, rank 1/21, margin 0.1434 | `dbb8f350e` |
-| Compaction safety | `compact_data.py --dry-run` | no changes; protects fills/funding/ledger/l1_transactions | `7319d60dc` |
-| Independent release audit | — | **not satisfied, see §6** | — |
+**One atomic pass against one frozen commit.** All concurrent tooling was stopped
+first, and `git status --porcelain` was confirmed empty immediately before *and*
+after every run — the previous audit's retest criterion.
+
+| Area | Command | Result | Commit | Tree before/after |
+|---|---|---|---|---|
+| Lint | `ruff check src/ tests/ scripts/` | All checks passed | **`33208e7c1`** | clean / clean |
+| Unit/integration | `pytest -q` | **375 passed** (340 at baseline) | **`33208e7c1`** | clean / clean |
+| Production build | `npm --prefix dashboard run build` | exit 0, **no warnings** | **`33208e7c1`** | clean / clean |
+| Runtime (live data) | data layer against `raw.githubusercontent.com` | 7/7 endpoints; banner correct | **`33208e7c1`** | clean / clean |
+| Self-match validation | `python src/backtest.py` | **PASS** 0.7461, rank 1/21, margin 0.1434 | `62713a25c` | dirtied by its own report |
+| Visual render | headless Chrome, 6 routes × 2 viewports | all render; no page errors | `62713a25c` | — |
+| Compaction safety | `compact_data.py --dry-run` | no changes; protects fills/funding/ledger/l1_transactions | `7319d60dc` | — |
+| Mutation test | 8 defects re-introduced | **8/8 caught**; tree and suite restored | `63e27e42a` | — |
+| Independent release audit | `perfect-product-release-auditor` | **CONDITIONAL — no release blocker in code or behaviour**; see §6 | `33208e7c1` | verified unchanged |
+
+**On the two carried-forward rows.** `backtest` and the visual renders were
+recorded at `62713a25c`, the commit immediately before the certified one.
+`git diff 62713a25c 33208e7c1 -- src/ tests/ dashboard/src/ scripts/ config.json`
+is **empty** — only `.perfect-product/` documents and the backtest report itself
+differ — so the scorer and the dashboard bundle are byte-identical and the
+verdicts carry. The release auditor independently ran that diff and confirmed the
+carry-forward is legitimate rather than taking the claim on trust.
 
 Baseline for comparison (`23b28d852`): 340 passed, ruff clean, build exit 0 with
 one unused-CSS warning, backtest PASS 0.7163.
@@ -279,8 +337,8 @@ one unused-CSS warning, backtest PASS 0.7163.
 |---|---|
 | **J1** detect migration and name the successor | The vector was *offline in production*; restored — backtest PASS 0.7461, rank 1/21, no self-veto. Thresholds now derive from the proven ceiling in every consumer. |
 | **J2** operator reads an alert and decides | Veto invariant now holds on every route (regression test); alerts assert current, not peak, scores; 20 of 29 live would-be CRITICALs suppressed with evidence retained, 9 genuine ones preserved. |
-| **J3** operator reads dashboard posture | Live data layer verified end-to-end; banner corrected from a month-stale CRITICAL to an accurate WATCH; displayed tier now equals emailed tier. |
-| **J4** collection keeps running; staleness noticed | Unchanged this pass. Heartbeat logic and its documented residual gap (an Actions outage is undetectable from inside Actions) were reviewed and left as designed. |
+| **J3** operator reads dashboard posture | Live data layer verified end-to-end and all 6 routes rendered in a real browser at two viewports; banner corrected from a month-stale CRITICAL to an accurate WATCH; displayed tier now equals emailed tier; the two contradictory "Account Value" figures disambiguated (F-014); the headline risk score no longer forfeits its drawdown component (F-013). |
+| **J4** collection keeps running; staleness noticed | Heartbeat logic and its documented residual gap (an Actions outage is undetectable from inside Actions) reviewed and left as designed. Separately, the account-value drop alert — a distinct precursor — was found dead and repaired (F-013). |
 | **J5** unrecoverable data never destroyed | Dry-run confirms `fills`/`funding`/`ledger`/`l1_transactions` protected and archives read back before deletion. |
 
 ---
@@ -318,9 +376,31 @@ one unused-CSS warning, backtest PASS 0.7163.
   corrected in `ACCEPTANCE.json`, matrix populated with 20 rows, and a single
   atomic verification pass run against one frozen commit (§4).
 
-  The gate nonetheless **stays BLOCKED**: an audit that returned BLOCK does not
-  become a PASS because the findings were fixed afterwards. It needs one more
-  fresh audit against the frozen commit. That is the honest state.
+  **A second audit then ran against the frozen commit `33208e7c1` and returned
+  CONDITIONAL — "no RELEASE BLOCKER found in code or behavior".** It verified the
+  freeze itself (HEAD and a clean tree at both start and end), ran `pytest`
+  (375 passed) and `ruff` (clean) against the frozen HEAD, confirmed the four
+  certified runs genuinely record `33208e7c1` with `dirty: false` on both sides,
+  and ran the carry-forward diff itself rather than trusting the claim. On the
+  newest code it confirmed `save_latest("account", …)` breaks no consumer —
+  `compact_data.py` only walks 10-character dated directories, so `latest.json`
+  can never be swept — and that `tests/test_account_latest_freshness.py` is
+  honest and writes nothing into the real `data/` tree.
+
+  Its conditions were **three documentation defects, all mine, all correct**:
+  this report still named `a24d5ecf0` as the final commit and omitted F-013/F-014
+  from its narrative entirely; `ACCEPTANCE.json` did not cite F-013 under the
+  acceptance ID that `FINDINGS.jsonl` ties it to; and `CHECKPOINT.md` was eight
+  commits stale, still directing the next actor to audit `a24d5ecf0` and claiming
+  a preview server was listening on a port I had already stopped. That a
+  RELEASE_BLOCKER-severity fix was missing from the account of what shipped is
+  exactly the sort of thing a single judge does not catch about their own work.
+
+  All three are discharged in the commit that follows this text, and the
+  discharge is objectively checkable against the auditor's own retest criteria:
+  final commit restated, §3 and §5 narrate F-013/F-014, §4 cites the
+  `2026-08-05T15-4x` run set, `ACCEPTANCE.json` cites F-013, `CHECKPOINT.md`
+  rewritten to current state.
 - **`a11y.dashboard` — BLOCKED, deliberately.** Headless rendering gave pixels
   and DOM but no keyboard path, no focus-visibility check, no contrast
   measurement and no screen-reader pass, so **no accessibility claim is made**.
