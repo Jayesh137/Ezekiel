@@ -78,6 +78,76 @@ def test_behavioural_strength_falls_back_to_high_without_a_validated_ceiling():
     assert th.behavioural_strength(unvalidated["medium"], unvalidated) == pytest.approx(0.0)
 
 
+# --- how much room does the scorer actually have? ---------------------------------
+#
+# A CONFIRMED badge says a wallet cleared the alert bar. It does not say whether
+# that bar means much. On live data the bar sits 0.0665 above what a KNOWN
+# STRANGER already scores, and the CONFIRMED band is 0.02 wide — so "confirmed"
+# and "stranger" are much closer together than the label suggests. That is the
+# single most important caveat on any match, and nothing published it.
+
+def _report(self_score=0.5365, best_stranger=0.45):
+    return {"passed": True, "self_score": self_score,
+            "best_stranger_score": best_stranger,
+            "run_at": "2026-08-11T17:29:15+00:00",
+            "scoring_schema": th.SCORING_SCHEMA}
+
+
+def test_separation_reports_the_room_between_stranger_and_trader(eff):
+    """The gap the scorer has to work in, in the operator's terms."""
+    rep = _report()
+    sep = th.separation(th.resolve(
+        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}, rep), rep)
+
+    assert sep["best_stranger"] == pytest.approx(0.45)
+    assert sep["ceiling"] == pytest.approx(0.5365)
+    assert sep["margin"] == pytest.approx(0.0865)          # ceiling - stranger
+    assert sep["alert_headroom"] == pytest.approx(0.0665)  # alert bar - stranger
+    assert sep["confirmed_band"] == pytest.approx(0.02)    # ceiling - alert bar
+
+
+def test_separation_grades_a_thin_scorer_honestly():
+    """The backtest only demands a 0.05 margin, which is not much. A scorer
+    scraping past that must not read the same as a decisive one."""
+    rep = _report()
+    cfg = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+    thin = th.separation(th.resolve(cfg, rep), rep)
+    assert thin["quality"] == "THIN"
+
+    strong_rep = _report(self_score=0.80, best_stranger=0.40)
+    strong = th.separation(th.resolve(cfg, strong_rep), strong_rep)
+    assert strong["quality"] == "STRONG"
+    assert strong["margin"] > thin["margin"]
+
+
+def test_separation_position_places_a_score_between_stranger_and_trader(eff):
+    """0.0 = scores like a stranger, 1.0 = scores like the trader against his own
+    history. A raw percentage cannot say that; this can."""
+    rep = _report()
+    sep = th.separation(th.resolve(
+        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}, rep), rep)
+
+    assert th.separation_position(0.45, sep) == pytest.approx(0.0)
+    assert th.separation_position(0.5365, sep) == pytest.approx(1.0)
+    assert th.separation_position(0.49, sep) == pytest.approx(0.4624, abs=0.01)
+    # clamped, never nonsensical
+    assert th.separation_position(0.10, sep) == 0.0
+    assert th.separation_position(0.99, sep) == 1.0
+    assert th.separation_position(float("nan"), sep) is None
+
+
+def test_separation_is_absent_when_nothing_was_validated():
+    """No proven ceiling means no measured separation to report — say nothing
+    rather than invent a number."""
+    cfg = {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65}
+    assert th.separation(th.resolve(cfg, None), None) is None
+    failed = {"passed": False, "self_score": 0.45, "scoring_schema": th.SCORING_SCHEMA}
+    assert th.separation(th.resolve(cfg, failed), failed) is None
+    # a passing report that never recorded a stranger score cannot be graded either
+    no_stranger = {"passed": True, "self_score": 0.70, "scoring_schema": th.SCORING_SCHEMA}
+    assert th.separation(th.resolve(cfg, no_stranger), no_stranger) is None
+
+
 # --- a ceiling is only evidence about the scorer that produced it -----------------
 
 def test_a_passed_backtest_from_a_different_scorer_does_not_validate():

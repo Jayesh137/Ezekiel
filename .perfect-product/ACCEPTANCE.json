@@ -236,10 +236,11 @@
       "evidence": [
         "src/alerts.py (plain-text bodies, no html_body caller)",
         "commit dd6391485",
-        "commit 7319d60dc"
+        "commit 7319d60dc",
+        "src/thresholds.py::separation + separation_position; scans/latest.json separation block"
       ],
       "dependencies": [],
-      "notes": "F-011 fixed. The banner, the recovery flow badge and the transfers page all now show the current score the backend actually graded on, so the displayed tier is the emailed tier as the README promises. NOT independently reviewed: the content-reviewer agent was not run. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
+      "notes": "F-011 fixed. The banner, the recovery flow badge and the transfers page all now show the current score the backend actually graded on, so the displayed tier is the emailed tier as the README promises. NOT independently reviewed: the content-reviewer agent was not run. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4. Extended: a tier badge now carries the caveat it needs. The scanner publishes a separation block - best_stranger, ceiling, margin, alert_headroom, confirmed_band and a THIN/MODERATE/STRONG grade - and each result shows where it sits between stranger territory and the target own self-match. On live data this exposes that the alert bar sits only 0.0665 above what a known stranger scores, that the confirmed band is 0.02 wide, and that a wallet labelled WEAK_LEAD at 0.4500 is in fact at 0.0% of range - indistinguishable from a stranger, which the label alone implied was a lead."
     },
     {
       "id": "visual.dashboard-quality",
@@ -355,10 +356,11 @@
         ".perfect-product/evidence/runs/*final-static",
         ".perfect-product/evidence/runs/*final-integration",
         ".github/workflows/test.yml",
-        ".perfect-product/RELEASE-MATRIX.csv (20 rows)"
+        ".perfect-product/RELEASE-MATRIX.csv (20 rows)",
+        "GitHub Actions test.yml runs #32 (de8eb4687) and #33 (887d51869) on ubuntu-latest: success"
       ],
       "dependencies": [],
-      "notes": "Verified on the local target: Windows 11, Python 3.12 venv, Node 22. CI parity checked by reading test.yml, which runs the same ruff and pytest commands on ubuntu-latest. NOT executed on ubuntu in this pass: no such runner is available here. EVIDENCE ATTRIBUTION CORRECTED after the independent audit caught it: the runs labelled final-* were recorded at 7319d60dc/dbb8f350e, not a24d5ecf0 as this file and CHECKPOINT.md previously claimed, and some ran against a dirty tree. Superseded by the single atomic verification pass at the frozen commit recorded in FINAL-REPORT.md section 4."
+      "notes": "CLOSED PROPERLY. Previously inferred from test.yml running identical commands; now executed. The workflow ran on ubuntu-latest against both pushed commits and passed - run #32 at de8eb4687 and #33 at 887d51869, each running ruff, the full pytest suite and the dashboard build. Verified through the public GitHub Actions API rather than taken on trust. Local target (Windows 11, Python 3.12, Node 22) verified throughout."
     },
     {
       "id": "docs.accuracy",

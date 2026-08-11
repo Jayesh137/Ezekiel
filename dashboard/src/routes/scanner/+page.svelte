@@ -1,7 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { fetchScanResults, fetchFingerprint, fetchCandidates, fetchFundFlows, shortAddr,
-	         getThresholds, tierFor, getPolicy } from '$lib/api.js';
+	         getThresholds, tierFor, getPolicy, getSeparation, separationPosition,
+	         separationCaveat } from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
 	import Chart from 'chart.js/auto';
 
@@ -48,6 +49,11 @@
 	// operating mode ambiguous: "no matches" and "not currently able to alert"
 	// look identical otherwise.
 	$: policy = getPolicy(scan);
+
+	// How much room the scorer actually has. A tier badge says a wallet cleared
+	// the bar; this says what clearing it is worth.
+	$: separation = getSeparation(scan);
+	$: separationNote = separationCaveat(separation);
 
 	/** Per-result market-bonus detail, or null when no markets were shared. */
 	function marketRarity(r) {
@@ -309,6 +315,14 @@
 		{#if policy.carryForwardRejected}
 			<span class="policy-note">Carry-forward rejected: {policy.carryForwardRejected}</span>
 		{/if}
+		{#if policy.validationRejected}
+			<span class="policy-note">Validation rejected: {policy.validationRejected}</span>
+		{/if}
+		{#if separationNote}
+			<span class="policy-note separation-{separation.quality.toLowerCase()}">
+				<strong>Scorer separation: {separation.quality}</strong> — {separationNote}
+			</span>
+		{/if}
 	</div>
 {/if}
 
@@ -392,6 +406,18 @@
 									{(r.score * 100).toFixed(1)}%
 								</strong>
 								<span class="badge {getConfidenceClass(r.score)}">{getConfidenceLabel(r.score)}</span>
+								{#if separation}
+									<!-- Where this sits between a known stranger and the target's own
+									     self-match. The raw percentage cannot say this: the meaningful
+									     range is not 0-100% but stranger-to-ceiling. -->
+									{@const pos = separationPosition(r.score, separation)}
+									{#if pos !== null}
+										<span class="result-position"
+										      title="{(pos * 100).toFixed(0)}% of the way from a known stranger ({(separation.best_stranger * 100).toFixed(1)}%) to the target's own self-match ({(separation.ceiling * 100).toFixed(1)}%)">
+											{(pos * 100).toFixed(0)}% of range
+										</span>
+									{/if}
+								{/if}
 							</div>
 							<div class="result-dims">
 								{#each DIM_KEYS as k}
@@ -597,6 +623,16 @@
 	.result-wallet :global(span) {
 		font-family: var(--font-mono);
 		font-size: 0.85rem;
+	}
+	.separation-thin { color: var(--accent-yellow); }
+	.separation-moderate { color: var(--text-secondary); }
+	.separation-strong { color: var(--accent-green); }
+	.result-position {
+		display: block;
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		color: var(--text-muted);
+		margin-top: 2px;
 	}
 	.expand-hint {
 		color: var(--text-muted);

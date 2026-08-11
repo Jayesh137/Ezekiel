@@ -284,7 +284,8 @@ export function getPolicy(scan) {
 		schema: detail.scoring_schema ?? null,
 		validatedAt: detail.validated_at ?? null,
 		provenance: detail.provenance ?? null,
-		carryForwardRejected: detail.carry_forward_rejected ?? null
+		carryForwardRejected: detail.carry_forward_rejected ?? null,
+		validationRejected: detail.validation_rejected ?? null
 	};
 }
 
@@ -314,6 +315,54 @@ export function isRecentSignal(when, days = RECENT_SIGNAL_DAYS) {
 	const ms = typeof when === 'number' ? when : Date.parse(when);
 	if (!Number.isFinite(ms) || ms <= 0) return false;
 	return Date.now() - ms <= days * 86_400_000;
+}
+
+/**
+ * How much room the scorer has between a known stranger and the target's own
+ * self-match, as published by the backend. Null when nothing was validated.
+ * @param {object|null} scan - data/scans/latest.json
+ */
+export function getSeparation(scan) {
+	return scan?.separation ?? null;
+}
+
+/**
+ * Where a score sits between stranger territory and the trader himself.
+ *
+ * Mirrors thresholds.separation_position. 0 means it scores like a known
+ * stranger, 1 means it scores as much like the target as the target does against
+ * his own history. A raw percentage cannot convey this, because the meaningful
+ * range is not 0..1 — on live data it is 0.45..0.5365, so 52% and 45% are much
+ * further apart in meaning than they look.
+ * @param {number} score
+ * @param {object|null} sep
+ * @returns {number|null}
+ */
+export function separationPosition(score, sep) {
+	if (!sep) return null;
+	const span = sep.ceiling - sep.best_stranger;
+	if (!(span > 0) || !Number.isFinite(score)) return null;
+	return Math.max(0, Math.min(1, (score - sep.best_stranger) / span));
+}
+
+/**
+ * One sentence an operator can act on, qualifying what a tier badge is worth.
+ * @param {object|null} sep
+ */
+export function separationCaveat(sep) {
+	if (!sep) return null;
+	const pct = (n) => `${(n * 100).toFixed(1)}%`;
+	const base =
+		`The alert bar sits ${pct(sep.alert_headroom)} above what a known stranger ` +
+		`already scores (${pct(sep.best_stranger)}), and the confirmed band is ` +
+		`${pct(sep.confirmed_band)} wide.`;
+	if (sep.quality === 'THIN') {
+		return `${base} That is a narrow separation — treat a match as a lead to check, not a finding.`;
+	}
+	if (sep.quality === 'MODERATE') {
+		return `${base} Moderate separation — corroborate before acting.`;
+	}
+	return `${base} A wide separation for this scorer.`;
 }
 
 /**

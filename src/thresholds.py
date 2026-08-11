@@ -230,6 +230,78 @@ def classify(score: float, thresholds: dict) -> str:
     return TIER_BACKGROUND
 
 
+# How wide the gap between "a known stranger" and "the trader against his own
+# history" has to be before a match tier means much. The backtest only demands
+# 0.05, which is a floor for "the scorer works at all", not a mark of confidence.
+SEPARATION_THIN = 0.10
+SEPARATION_STRONG = 0.20
+
+
+def separation(thresholds: dict, backtest_report: dict | None) -> dict | None:
+    """How much discriminative room the scorer actually has, in the operator's terms.
+
+    A CONFIRMED badge says a wallet cleared the alert bar. It says nothing about
+    whether that bar means much — and on live data the bar sits only 0.0665 above
+    what a KNOWN STRANGER already scores, with a CONFIRMED band 0.02 wide. That
+    caveat belongs next to the badge, not buried in a backtest report.
+
+    Returns None when nothing has been validated, or when the report never
+    recorded a stranger score: there is then no measured separation, and inventing
+    one would be worse than saying nothing.
+    """
+    if not backtest_report or not thresholds:
+        return None
+    t = normalise(thresholds)
+    ceiling = t.get("self_match_ceiling")
+    stranger = backtest_report.get("best_stranger_score")
+    if ceiling is None or stranger is None:
+        return None
+    try:
+        ceiling, stranger = float(ceiling), float(stranger)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(ceiling) and math.isfinite(stranger)) or ceiling <= stranger:
+        return None
+
+    margin = ceiling - stranger
+    high = float(t["high"])
+    return {
+        "best_stranger": round(stranger, 4),
+        "ceiling": round(ceiling, 4),
+        "margin": round(margin, 4),
+        # How far the alert bar sits above what strangers reach. This is the
+        # number that decides whether an alert is meaningful.
+        "alert_headroom": round(high - stranger, 4),
+        # How much room a wallet has between clearing the bar and matching the
+        # trader as well as he matches himself.
+        "confirmed_band": round(ceiling - high, 4),
+        "quality": ("THIN" if margin < SEPARATION_THIN
+                    else "STRONG" if margin >= SEPARATION_STRONG else "MODERATE"),
+    }
+
+
+def separation_position(score: float, sep: dict | None) -> float | None:
+    """Where a score sits between stranger territory and the trader himself.
+
+    0.0 means it scores like a known stranger; 1.0 means it scores as much like
+    the target as the target does against his own adjacent history. A raw
+    percentage cannot convey that, because the meaningful range is not 0..1 —
+    on live data it is 0.45..0.5365.
+    """
+    if not sep:
+        return None
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(score):
+        return None
+    span = sep["ceiling"] - sep["best_stranger"]
+    if span <= 0:
+        return None
+    return round(max(0.0, min(1.0, (score - sep["best_stranger"]) / span)), 4)
+
+
 def behavioural_gate(thresholds: dict) -> float:
     """The similarity at which a wallet starts counting as "trades like the target".
 

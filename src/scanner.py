@@ -1569,9 +1569,16 @@ def scan_leaderboard():
             "validated_at": eff.get("validated_at"),
             "provenance": eff.get("provenance"),
             "carry_forward_rejected": eff.get("carry_forward_rejected"),
+            "validation_rejected": eff.get("validation_rejected"),
             "fallback_percentile": th.FALLBACK_WATCHLIST_PERCENTILE,
             "fallback_min_population": th.FALLBACK_MIN_POPULATION,
         },
+        # How much room the scorer actually has between a known stranger and the
+        # target's own self-match. A tier label alone cannot say whether clearing
+        # the bar means much: on live data the bar sits 0.0665 above what a
+        # stranger already scores. Published so the dashboard can qualify a
+        # CONFIRMED badge instead of presenting it as settled fact.
+        "separation": th.separation(eff, th.load_backtest_report(DATA_DIR.parent / "profile")),
         "calibration": {
             "population_size": len(population),
             "gate_active": calibration.gate_active(population),
