@@ -363,11 +363,52 @@ def _ratio_score(a: float, b: float) -> float | None:
     return float(np.sqrt(min(a, b) / max(a, b)))
 
 
+def activity_per_active_day(activity: dict | None) -> dict | None:
+    """Activity metrics in per-ACTIVE-day units, whatever dialect they arrive in.
+
+    Fingerprints written before scoring schema 2026-08-05.1 store
+    `episodes_per_day` / `fills_per_day` normalised by calendar span. They also
+    store `span_days` and `active_days_ratio`, so the per-active-day value is
+    exactly recoverable:
+
+        active_days = active_days_ratio * (int(span_days) + 1)
+        per_active   = per_calendar * span_days / active_days
+
+    Converting matters more than it looks. The first version of this migration
+    simply ignored the old keys and let the dimension drop out, which is not
+    fail-safe: the dimension carries a hard veto, and dropping a veto removes a
+    guard rather than applying a conservative one. On production data a stranger
+    running 43 episodes per calendar day — 46x the target's rate, plainly a
+    different trader — escaped the veto because its stored fingerprint spoke the
+    old dialect, and outranked the target in his own self-match.
+
+    Returns None only when the values genuinely cannot be reconciled.
+    """
+    if not activity:
+        return None
+    if "episodes_per_active_day" in activity:
+        return activity
+    span = float(activity.get("span_days") or 0)
+    ratio = float(activity.get("active_days_ratio") or 0)
+    if span <= 0 or ratio <= 0:
+        return None
+    active_days = ratio * (int(span) + 1)
+    if active_days <= 0:
+        return None
+    scale = span / active_days
+    out = dict(activity)
+    for old_key, new_key in (("episodes_per_day", "episodes_per_active_day"),
+                             ("fills_per_day", "fills_per_active_day")):
+        if activity.get(old_key) is not None:
+            out[new_key] = float(activity[old_key]) * scale
+    return out if "episodes_per_active_day" in out else None
+
+
 def compare_activity(sp_a: dict, sp_b: dict) -> float | None:
     """Decision frequency and cadence — the most discriminative style trait.
     Episodes/day is primary; raw fills/day is TWAP-inflated and only secondary."""
-    act_a = sp_a.get("activity", {})
-    act_b = sp_b.get("activity", {})
+    act_a = activity_per_active_day(sp_a.get("activity")) or {}
+    act_b = activity_per_active_day(sp_b.get("activity")) or {}
     scores = []
     # Per-ACTIVE-day keys. An older fingerprint carries the calendar-normalised
     # `episodes_per_day` instead; it is deliberately not read, because comparing
@@ -445,8 +486,8 @@ def check_style_vetoes(ezekiel_fp: dict, candidate_fp: dict) -> list[str]:
     # ~10x for the same human depending on the period. Per ACTIVE day, so a
     # trader who keeps trading the same way but shows up less often is not
     # vetoed as a different person — see compute_style_profile.
-    epd_a = sp_a.get("activity", {}).get("episodes_per_active_day", 0)
-    epd_b = sp_b.get("activity", {}).get("episodes_per_active_day", 0)
+    epd_a = (activity_per_active_day(sp_a.get("activity")) or {}).get("episodes_per_active_day", 0)
+    epd_b = (activity_per_active_day(sp_b.get("activity")) or {}).get("episodes_per_active_day", 0)
     if epd_a > 0 and epd_b > 0:
         ratio = max(epd_a, epd_b) / min(epd_a, epd_b)
         if ratio > 5:

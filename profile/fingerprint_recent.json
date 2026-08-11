@@ -1,9 +1,9 @@
 {
   "version": "1.0-recent",
-  "computed_at": "2026-08-11T01:04:14.968541+00:00",
+  "computed_at": "2026-08-11T17:25:41.434168+00:00",
   "lookback_days": 21,
   "data_range": {
-    "total_fills": 5652
+    "total_fills": 3459
   },
   "asset_preferences": {
     "weight": 0.15,
@@ -11,26 +11,24 @@
       "@107",
       "BTC",
       "CASHCAT",
-      "ETH",
       "MON",
       "XPL"
     ],
     "coin_frequency": {
-      "CASHCAT": 0.5285,
-      "@107": 0.1826,
-      "BTC": 0.1279,
-      "ETH": 0.1223,
-      "MON": 0.0258,
-      "XPL": 0.0129
+      "CASHCAT": 0.4293,
+      "@107": 0.2984,
+      "BTC": 0.209,
+      "MON": 0.0422,
+      "XPL": 0.0211
     },
     "top_5_by_volume": [
       "BTC",
       "@107",
-      "ETH",
       "CASHCAT",
-      "MON"
+      "MON",
+      "XPL"
     ],
-    "total_unique_coins": 6
+    "total_unique_coins": 5
   },
   "leverage_profile": {
     "weight": 0.15,
@@ -225,16 +223,6 @@
   "position_sizing": {
     "weight": 0.12,
     "notional_ranges": {
-      "CASHCAT": {
-        "typical_min_usd": 15.36,
-        "typical_max_usd": 398.89,
-        "mean_usd": 202.41
-      },
-      "ETH": {
-        "typical_min_usd": 170.99,
-        "typical_max_usd": 1937.8,
-        "mean_usd": 1451.3
-      },
       "BTC": {
         "typical_min_usd": 101.05,
         "typical_max_usd": 6389.4,
@@ -244,6 +232,11 @@
         "typical_min_usd": 219.66,
         "typical_max_usd": 3509.24,
         "mean_usd": 1602.56
+      },
+      "CASHCAT": {
+        "typical_min_usd": 36.82,
+        "typical_max_usd": 758.95,
+        "mean_usd": 307.61
       },
       "MON": {
         "typical_min_usd": 87.25,
@@ -261,7 +254,7 @@
       "median": 0.0,
       "std": 0.0002
     },
-    "account_value_usd": 9384583.23
+    "account_value_usd": 10103734.14
   },
   "timing_profile": {
     "weight": 0.15,
@@ -271,42 +264,42 @@
       0.0,
       0.0,
       0.0,
-      0.0828,
-      0.3052,
       0.0,
       0.0,
       0.0,
-      0.0695,
-      0.0258,
-      0.1315,
-      0.0858,
-      0.0879,
-      0.0529,
-      0.0092,
       0.0,
       0.0,
-      0.0598,
+      0.1136,
+      0.0422,
+      0.2148,
+      0.1402,
+      0.1437,
+      0.0864,
+      0.015,
       0.0,
-      0.0147,
       0.0,
-      0.0748
+      0.0977,
+      0.0,
+      0.024,
+      0.0,
+      0.1223
     ],
     "day_of_week_distribution": [
-      0.1279,
-      0.4575,
-      0.1585,
-      0.2431,
+      0.209,
+      0.1136,
+      0.259,
+      0.3972,
       0.0,
-      0.0129,
+      0.0211,
       0.0
     ],
     "most_active_hours_utc": [
-      5,
-      6,
       10,
       12,
       13,
       14,
+      15,
+      19,
       23
     ],
     "least_active_hours_utc": [
@@ -316,30 +309,26 @@
       20,
       22
     ],
-    "inferred_timezone_offset": 10,
-    "distinct_days": 6,
+    "inferred_timezone_offset": 4,
+    "distinct_days": 5,
     "sufficient_data": false
   },
   "hold_duration": {
     "weight": 0.1,
     "overall_minutes": {
-      "mean": 4704.5,
-      "median": 14.3,
-      "p25": 1.0,
-      "p75": 16.3
+      "mean": 317.2,
+      "median": 8.6,
+      "p25": 0.8,
+      "p75": 325.0
     },
     "per_coin": {
-      "CASHCAT": {
-        "mean_minutes": 23490.8,
-        "median_minutes": 23490.8
-      },
-      "ETH": {
-        "mean_minutes": 14.3,
-        "median_minutes": 14.3
-      },
       "BTC": {
         "mean_minutes": 16.3,
         "median_minutes": 16.3
+      },
+      "CASHCAT": {
+        "mean_minutes": 1251.1,
+        "median_minutes": 1251.1
       },
       "MON": {
         "mean_minutes": 1.0,
@@ -351,20 +340,20 @@
       }
     },
     "distribution_buckets": {
-      "under_1h": 0.8,
+      "under_1h": 0.75,
       "1h_to_4h": 0.0,
-      "4h_to_24h": 0.0,
+      "4h_to_24h": 0.25,
       "1d_to_7d": 0.0,
-      "over_7d": 0.2
+      "over_7d": 0.0
     },
-    "episode_count": 5,
-    "sufficient_data": true
+    "episode_count": 4,
+    "sufficient_data": false
   },
   "entry_exit_style": {
     "weight": 0.1,
     "order_type_ratio": {
-      "market": 0.9996,
-      "limit": 0.0004
+      "market": 0.9994,
+      "limit": 0.0006
     },
     "take_profit_pnl": {
       "mean": 2.8,
@@ -375,55 +364,56 @@
       "median": -1.29
     },
     "fee_stats": {
-      "total": 2105.47,
-      "mean": 0.3725
+      "total": 1783.29,
+      "mean": 0.5156
     },
-    "total_closed_trades": 5652,
-    "win_rate": 0.064
+    "total_closed_trades": 3459,
+    "win_rate": 0.1047
   },
   "trade_sequencing": {
     "weight": 0.08,
     "inter_fill_timing": {
-      "mean_minutes": 11.4,
+      "mean_minutes": 6.9,
       "median_minutes": 0.0
     },
     "buy_sell_ratio": {
       "buy_pct": 0.0,
       "sell_pct": 1.0
     },
-    "total_fills": 5652
+    "total_fills": 3459
   },
   "account_characteristics": {
     "weight": 0.07,
-    "account_value_usd": 9384583.23,
-    "total_volume_usd": 5898878.36,
-    "weekly_volume_usd": 2247985.44
+    "account_value_usd": 10103734.14,
+    "total_volume_usd": 4748225.28,
+    "weekly_volume_usd": 4748225.28
   },
   "style_profile": {
     "sufficient_data": true,
     "activity": {
-      "episodes_per_day": 0.272,
-      "fills_per_day": 307.7,
-      "active_days_ratio": 0.3158,
-      "span_days": 18.4
+      "episodes_per_active_day": 0.8,
+      "fills_per_active_day": 691.8,
+      "active_days_ratio": 1.0,
+      "active_days": 5,
+      "span_days": 5.0
     },
     "direction": {
       "long_open_pct": 0.0,
       "short_open_pct": 1.0,
-      "total_opens": 4620
+      "total_opens": 2427
     },
     "position_management": {
-      "episodes": 5,
-      "mean_fills_per_episode": 924.0,
-      "median_fills_per_episode": 691.0
+      "episodes": 4,
+      "mean_fills_per_episode": 606.75,
+      "median_fills_per_episode": 434.5
     },
     "execution": {
       "twap_ratio": 0.0,
-      "spot_fill_ratio": 0.1826
+      "spot_fill_ratio": 0.2984
     },
     "clip_sizes": {
-      "notional_cv": 1.6545,
-      "round_size_pref": 0.1805
+      "notional_cv": 1.5006,
+      "round_size_pref": 0.1535
     }
   }
 }

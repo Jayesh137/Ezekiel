@@ -362,16 +362,56 @@ def test_decision_frequency_is_per_active_day():
     assert dense["activity"]["active_days_ratio"] <= 1.0
 
 
-def test_activity_metrics_do_not_mix_units_with_an_old_fingerprint():
-    """The key was renamed deliberately. A fingerprint written before the change
-    holds calendar-normalised numbers; comparing those against per-active-day ones
-    would be worse than not comparing at all, so the dimension must drop out."""
+def test_an_old_fingerprint_is_converted_not_dropped():
+    """A fingerprint written before the rename holds calendar-normalised numbers,
+    but it also stores span_days and active_days_ratio — so the per-active-day
+    value is exactly recoverable and must be recovered.
+
+    Dropping the dimension instead was my first design, and it is NOT fail-safe:
+    the dimension carries a hard veto, and dropping a veto removes a guard. Caught
+    on production data — a stranger at 43 episodes per calendar day, 46x the
+    target's rate and unmistakably a different trader, escaped the veto entirely
+    because its stored fingerprint spoke the old dialect, and outranked the target
+    in the self-match.
+    """
+    from src.scanner import activity_per_active_day
+    # 24 episodes over 12 active days inside a 48-day span:
+    #   old-style episodes_per_day = 24/48 = 0.5 ; active_days_ratio = 12/49
+    old = {"episodes_per_day": 0.5, "fills_per_day": 1.0,
+           "span_days": 48.0, "active_days_ratio": round(12 / 49, 4)}
+    got = activity_per_active_day(old)
+    assert got["episodes_per_active_day"] == pytest.approx(2.0, rel=0.05)
+    assert got["fills_per_active_day"] == pytest.approx(4.0, rel=0.05)
+
+
+def test_a_new_fingerprint_passes_through_unchanged():
+    from src.scanner import activity_per_active_day
+    new = _style(_sessions(list(range(12))))["style_profile"]["activity"]
+    got = activity_per_active_day(new)
+    assert got["episodes_per_active_day"] == new["episodes_per_active_day"]
+
+
+def test_the_veto_still_fires_across_mixed_fingerprint_formats():
+    """The production case: new-format target vs old-format stranger, 46x apart."""
+    from src.scanner import check_style_vetoes
+    target = _style(_sessions(list(range(12))))           # ~3 episodes/active day
+    stranger = {"style_profile": {"sufficient_data": True, "activity": {
+        # 43 episodes per calendar day over a fully-active span
+        "episodes_per_day": 43.0, "fills_per_day": 86.0,
+        "span_days": 30.0, "active_days_ratio": 1.0}}}
+    vetoes = check_style_vetoes(target, stranger)
+    assert any("Decision frequency" in v for v in vetoes), \
+        "an old-format stranger must still be vetoed, not silently exempted"
+
+
+def test_an_unconvertible_fingerprint_still_drops_out():
+    """No span/ratio to convert from — then dropping is the only honest option."""
     from src.scanner import check_style_vetoes, compare_activity
-    old = {"style_profile": {"sufficient_data": True,
-                             "activity": {"episodes_per_day": 0.17, "fills_per_day": 3.0}}}
+    unconvertible = {"style_profile": {"sufficient_data": True,
+                                       "activity": {"episodes_per_day": 0.17}}}
     new = _style(_sessions(list(range(12))))
-    assert compare_activity(old["style_profile"], new["style_profile"]) is None
-    assert check_style_vetoes(old, new) == []
+    assert compare_activity(unconvertible["style_profile"], new["style_profile"]) is None
+    assert check_style_vetoes(unconvertible, new) == []
 
 
 def test_a_genuine_frequency_difference_still_vetoes():
