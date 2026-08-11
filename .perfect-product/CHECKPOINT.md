@@ -1,11 +1,13 @@
 # Perfect Product Checkpoint
 
-Updated: 2026-08-05, after the second independent release audit.
+Updated: 2026-08-05, after the third independent audit and the accessibility pass.
 
 ## Git
 
 - Branch: `main`
-- HEAD at certification: **`33208e7c1`** (this file's own commit follows it)
+- Code certified at: **`f88d193ad`** (the accessibility fixes — the last commit
+  to change shipping code; this file's own commit follows it, and every commit
+  after `f88d193ad` is documentation only)
 - Baseline this pass started from: `23b28d852`
 - Protected branches: `main`
 - Forbidden operations: merge, tag, deploy, publish, force-push, delete-branch,
@@ -29,8 +31,9 @@ Updated: 2026-08-05, after the second independent release audit.
 
 ## Current position
 
-- Gate: 11 complete. Two independent audits ran; the second, against the frozen
-  commit, found **no release blocker in code or behaviour**.
+- Gate: 11 complete. Three independent audits ran: BLOCK on process, then
+  CONDITIONAL with **no release blocker in code or behaviour**, then independent
+  confirmation that the resulting conditions were discharged.
 - Acceptance contract: **20 of 20 items PASS.**
 - Exact next action: **push, then watch `analyze.yml`.** Production is still
   running the old code — `origin/main` is in `OBSERVING` with behavioural
@@ -42,7 +45,7 @@ Updated: 2026-08-05, after the second independent release audit.
 
 ## Completed and proven
 
-All 19 PASS items and their evidence are listed in ACCEPTANCE.json; the
+All 20 PASS items and their evidence are listed in ACCEPTANCE.json; the
 verification table is in FINAL-REPORT.md §4. Headlines:
 
 | Area | Result |
@@ -53,11 +56,12 @@ verification table is in FINAL-REPORT.md §4. Headlines:
 | Self-match | PASS 0.7461, rank 1/21, margin 0.1434, no self-veto |
 | Visual | 6 routes × 2 viewports rendered in real Chrome, no page errors |
 | Mutation test | 8/8 re-introduced defects caught |
-| Independent audit | CONDITIONAL — no release blocker in code or behaviour |
+| Accessibility | 0 MAJOR, 0 MINOR after fixing contrast, chart labels, focus ring |
+| Independent audits | ×3: BLOCK (process) → CONDITIONAL (no code blocker) → discharge verified |
 
 ## Current verification baseline
 
-Certified as one atomic pass at **`33208e7c1`**, tree confirmed clean
+Certified as one atomic pass at the final commit, tree confirmed clean
 immediately before and after each run: `static`, `integration`, `build`,
 `runtime`. `backtest` and the visual renders carry forward from `62713a25c`;
 `git diff 62713a25c 33208e7c1 -- src/ tests/ dashboard/src/ scripts/ config.json`
@@ -99,7 +103,7 @@ sentence; a third independent audit caught them disagreeing.
 ## Runtime/process state
 
 - Repository-owned servers: **none running.** The `vite preview` instances on
-  ports 4173 and 4174 were both stopped; verified nothing is listening.
+  ports 4173, 4174 and 4175 were all stopped; verified nothing is listening.
 - Repository-owned browsers: none. Headless Chrome was invoked per-render with an
   isolated `--user-data-dir` and exited each time.
 - Long-running commands: none.

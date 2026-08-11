@@ -1,7 +1,7 @@
 # Ezekiel — Perfect Product Final Report
 
 Date: 2026-08-05 · Branch `main` · Baseline `23b28d852` → code certified at
-`33208e7c1` (every later commit is documentation only; see §2)
+`f88d193ad` (every later commit is documentation only; see §2)
 
 ---
 
@@ -40,12 +40,21 @@ work applies to current code.
 ## 2. Git state
 
 - Branch: `main`, preserved throughout.
-- **Code certified at `33208e7c1`.** Every commit after it is documentation only:
-  `git diff 33208e7c1..HEAD -- src/ tests/ dashboard/src/ scripts/ config.json`
+- **Code certified at `f88d193ad`** (the accessibility fixes — the last commit to
+  change shipping code). Every commit after it is documentation only:
+  `git diff f88d193ad..HEAD -- src/ tests/ dashboard/src/ scripts/ config.json`
   is **empty**. A commit cannot name itself as final, so the certified commit is
   stated as the last one that changed shipping code, and that invariant is
   asserted mechanically by the `release-audit` evidence record rather than
   claimed in prose.
+- **Audit coverage, stated precisely.** The three independent audits ran against
+  `2f816fcdd`, `33208e7c1` and `ee7ab7a4d`. The accessibility commit
+  `f88d193ad` landed **after** all of them and was therefore **not independently
+  audited**. It changes three CSS custom properties, adds `role="img"` and
+  `aria-label` to nine `<canvas>` elements, and adds one `:focus-visible` rule —
+  no logic, no data path. It is covered by the `a11y` evidence run (0 MAJOR,
+  0 MINOR), 375 passing tests and a warning-free build, but not by a fourth
+  audit. Recorded here rather than left for a reader to infer from SHAs.
 - Working tree: clean.
 - **Nothing was merged, tagged, deployed, published, force-pushed or deleted. No
   history was rewritten. Nothing was pushed** — all four commits are local, and
@@ -335,15 +344,23 @@ after every run — the previous audit's retest criterion.
 
 | Area | Command | Result | Commit | Tree before/after |
 |---|---|---|---|---|
-| Lint | `ruff check src/ tests/ scripts/` | All checks passed | **`33208e7c1`** | clean / clean |
-| Unit/integration | `pytest -q` | **375 passed** (340 at baseline) | **`33208e7c1`** | clean / clean |
-| Production build | `npm --prefix dashboard run build` | exit 0, **no warnings** | **`33208e7c1`** | clean / clean |
-| Runtime (live data) | data layer against `raw.githubusercontent.com` | 7/7 endpoints; banner correct | **`33208e7c1`** | clean / clean |
+| Lint | `ruff check src/ tests/ scripts/` | All checks passed | **final** | clean / clean |
+| Unit/integration | `pytest -q` | **375 passed** (340 at baseline) | **final** | clean / clean |
+| Production build | `npm --prefix dashboard run build` | exit 0, **no warnings** | **final** | clean / clean |
+| Runtime (live data) | data layer against `raw.githubusercontent.com` | 7/7 endpoints; banner correct | **final** | clean / clean |
+| Accessibility | semantics, focus, labelling, WCAG contrast | **0 MAJOR, 0 MINOR** | **final** | clean / clean |
+| Release-audit record | contract/ledger consistency assertions | consistent | **final** | clean / clean |
 | Self-match validation | `python src/backtest.py` | **PASS** 0.7461, rank 1/21, margin 0.1434 | `62713a25c` | dirtied by its own report |
 | Visual render | headless Chrome, 6 routes × 2 viewports | all render; no page errors | `62713a25c` | — |
 | Compaction safety | `compact_data.py --dry-run` | no changes; protects fills/funding/ledger/l1_transactions | `7319d60dc` | — |
 | Mutation test | 8 defects re-introduced | **8/8 caught**; tree and suite restored | `63e27e42a` | — |
-| Independent release audit | `perfect-product-release-auditor` | **CONDITIONAL — no release blocker in code or behaviour**; see §6 | `33208e7c1` | verified unchanged |
+| Independent release audits | `perfect-product-release-auditor` ×3 | BLOCK → **CONDITIONAL, no release blocker in code or behaviour** → discharge verified; see §6 | `2f816fcdd`, `33208e7c1`, `ee7ab7a4d` | verified unchanged during each |
+
+Rows marked **final** were re-run as one atomic pass at the final commit; their
+exact SHAs are in each run's `meta.json`, which records `git_before`,
+`git_after` and `dirty` on both sides. The report names the certified *code*
+commit (§2) rather than repeating a SHA that changes every time this file is
+edited — the earlier version of this table did exactly that and went stale.
 
 **On the two carried-forward rows.** `backtest` and the visual renders were
 recorded at `62713a25c`, the commit immediately before the certified one.
