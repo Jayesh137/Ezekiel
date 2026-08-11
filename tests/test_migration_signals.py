@@ -110,8 +110,26 @@ def test_risk_critical_when_everything_fires():
 
 
 def test_risk_top_candidate_below_threshold_scores_zero_there():
-    r = risk.compute_risk_score({"top_candidate_score": 0.60})
+    """A candidate below the behavioural gate contributes nothing.
+
+    The bar is derived from the thresholds rather than hardcoded. compute_risk_score
+    falls back to reading profile/backtest.json when no thresholds are passed, so a
+    literal score is a hostage to whatever ceiling was last measured: this test used
+    0.60 and broke the moment a real backtest landed a ceiling of 0.5365, which put
+    the gate at 0.4665 and made 0.60 a legitimately scoring candidate.
+    """
+    from src import thresholds as th
+    eff = th.resolve(
+        {"similarity_high": 0.90, "similarity_medium": 0.80, "similarity_low": 0.65},
+        {"passed": True, "self_score": 0.75, "scoring_schema": th.SCORING_SCHEMA})
+    below_gate = th.behavioural_gate(eff) - 0.01
+
+    r = risk.compute_risk_score({"top_candidate_score": below_gate}, eff)
     assert all(f["signal"] != "top_candidate" for f in r["factors"])
+
+    # and just above it, the signal does appear — otherwise this proves nothing
+    r2 = risk.compute_risk_score({"top_candidate_score": th.behavioural_gate(eff) + 0.01}, eff)
+    assert any(f["signal"] == "top_candidate" for f in r2["factors"])
 
 
 def test_risk_levels_monotonic():
