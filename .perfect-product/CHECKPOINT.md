@@ -6,9 +6,10 @@ post-merge verification, and the push to production.
 ## Git
 
 - Branch: `main`
-- Code certified and PUSHED at: **`de8eb4687`** — `origin/main` and local are
-  in sync. Certified as one atomic pass with a clean tree before and after
-  every run: static, integration, build, runtime, a11y.
+- Code certified at: **`ee0e1dbc7`** — certified as one atomic pass with a
+  clean tree before and after every run: static, integration, build, runtime,
+  a11y. `de8eb4687` and earlier are on `origin/main`; the two commits after it
+  are local only.
 - Baseline this pass started from: `23b28d852`
 - Protected branches: `main`
 - Forbidden operations: merge, tag, deploy, publish, force-push, delete-branch,
@@ -36,16 +37,14 @@ post-merge verification, and the push to production.
   CONDITIONAL with **no release blocker in code or behaviour**, then independent
   confirmation that the resulting conditions were discharged.
 - Acceptance contract: **20 of 20 items PASS.**
-- Exact next action: **watch the next `scan.yml` and `analyze.yml` runs.** Pushed
-  to `origin/main` at `de8eb4687` on 2026-08-11; `origin/main` and local are in
-  sync and production already serves the passing backtest (0.5365, rank 1/21,
-  margin 0.0865, schema `2026-08-05.1`) and the new-format fingerprint.
-  `data/scans/latest.json` still carries the 16:59 sweep from the old code, which
-  is expected. On the next scan its `thresholds` block should move from
-  `scoring_schema 2026-07-27.1` / ceiling 0.5262 to `2026-08-05.1` / ceiling
-  0.5365. If the schema field does not move, the new code did not take effect.
-  The push also touched `dashboard/**`, so `deploy-dashboard.yml` republishes
-  Pages with the contrast, chart-labelling and focus-ring fixes.
+- Exact next action: **push, then watch the next `scan.yml`.** Two commits are
+  committed and certified but NOT pushed (`b0c0a29fd`, `ee0e1dbc7`) — the safety
+  hook requires a human to trigger a push, since it also deploys Pages. Run
+  `git push origin main`.
+- After pushing, `data/scans/latest.json` should move from
+  `scoring_schema 2026-07-27.1` / ceiling 0.5262 to `2026-08-05.1` / 0.5365 on
+  the next scan. If the schema field does not move, the new code did not take
+  effect.
 
 ## Completed and proven
 
