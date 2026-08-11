@@ -1,7 +1,7 @@
 # Ezekiel — Perfect Product Final Report
 
 Date: 2026-08-05 · Branch `main` · Baseline `23b28d852` → code certified at
-`f88d193ad` (every later commit is documentation only; see §2)
+`ffb779b6a` (every later commit is documentation only; see §2)
 
 ---
 
@@ -40,21 +40,25 @@ work applies to current code.
 ## 2. Git state
 
 - Branch: `main`, preserved throughout.
-- **Code certified at `f88d193ad`** (the accessibility fixes — the last commit to
-  change shipping code). Every commit after it is documentation only:
-  `git diff f88d193ad..HEAD -- src/ tests/ dashboard/src/ scripts/ config.json`
+- **Code certified at `ffb779b6a`** (the scorer-separation metric — the last
+  commit to change shipping code). Every commit after it is documentation only:
+  `git diff ffb779b6a..HEAD -- src/ tests/ dashboard/src/ scripts/ config.json`
   is **empty**. A commit cannot name itself as final, so the certified commit is
   stated as the last one that changed shipping code, and that invariant is
   asserted mechanically by the `release-audit` evidence record rather than
   claimed in prose.
 - **Audit coverage, stated precisely.** The three independent audits ran against
   `2f816fcdd`, `33208e7c1` and `ee7ab7a4d`. The accessibility commit
-  `f88d193ad` landed **after** all of them and was therefore **not independently
-  audited**. It changes three CSS custom properties, adds `role="img"` and
-  `aria-label` to nine `<canvas>` elements, and adds one `:focus-visible` rule —
-  no logic, no data path. It is covered by the `a11y` evidence run (0 MAJOR,
-  0 MINOR), 375 passing tests and a warning-free build, but not by a fourth
-  audit. Recorded here rather than left for a reader to infer from SHAs.
+  five later commits changed shipping code **after** all of them and were
+  therefore **not independently audited**: `f88d193ad` (accessibility),
+  `fecc54937` and `0a98977fa` (the schema guard and the old-fingerprint
+  conversion, both found by post-merge verification), `ee0e1dbc7` (Recovery leads
+  and the freshness pill) and `ffb779b6a` (the separation metric). Each is
+  covered by the full certification set — 385 passing tests, clean lint,
+  warning-free build, live-data runtime check, accessibility 0 MAJOR/0 MINOR —
+  and the two that reached origin are additionally covered by ubuntu CI runs #32
+  and #33. None is covered by a fresh audit pass. Recorded plainly rather than
+  left for a reader to infer from SHAs.
 - Working tree: clean.
 - **Nothing was merged, tagged, deployed, published, force-pushed or deleted. No
   history was rewritten. Nothing was pushed** — all four commits are local, and

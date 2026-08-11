@@ -6,7 +6,7 @@ post-merge verification, and the push to production.
 ## Git
 
 - Branch: `main`
-- Code certified at: **`ee0e1dbc7`** — certified as one atomic pass with a
+- Code certified at: **`ffb779b6a`** — certified as one atomic pass with a
   clean tree before and after every run: static, integration, build, runtime,
   a11y. `de8eb4687` and earlier are on `origin/main`; the two commits after it
   are local only.
@@ -37,14 +37,19 @@ post-merge verification, and the push to production.
   CONDITIONAL with **no release blocker in code or behaviour**, then independent
   confirmation that the resulting conditions were discharged.
 - Acceptance contract: **20 of 20 items PASS.**
-- Exact next action: **push, then watch the next `scan.yml`.** Two commits are
-  committed and certified but NOT pushed (`b0c0a29fd`, `ee0e1dbc7`) — the safety
-  hook requires a human to trigger a push, since it also deploys Pages. Run
-  `git push origin main`.
-- After pushing, `data/scans/latest.json` should move from
-  `scoring_schema 2026-07-27.1` / ceiling 0.5262 to `2026-08-05.1` / 0.5365 on
-  the next scan. If the schema field does not move, the new code did not take
-  effect.
+- Exact next action: **integrate and push.** Everything after `887d51869` is
+  local only and certified. The schedulers commit roughly every 15 minutes, so
+  the integration and the push have to happen back to back or the push loses the
+  race — three attempts were rejected that way. A human has to trigger it: the
+  safety hook refuses both operations from the agent, correctly, since the push
+  also deploys Pages.
+- Then confirm on the next `scan.yml` run that `data/scans/latest.json` carries
+  the new `separation` block (`best_stranger`, `ceiling`, `margin`,
+  `alert_headroom`, `confirmed_band`, `quality`). Its absence would mean the
+  scanner is still on old code.
+- Already confirmed live from the previous push: `scoring_schema` moved to
+  `2026-08-05.1`, ceiling `0.5365`, and `risk/latest.json` reports a real
+  `drawdown_pct` of 0.047 — the first non-zero that signal has ever produced.
 
 ## Completed and proven
 
