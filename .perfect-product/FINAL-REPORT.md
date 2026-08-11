@@ -39,7 +39,12 @@ work applies to current code.
 ## 2. Git state
 
 - Branch: `main`, preserved throughout.
-- Final commit: **`33208e7c1`**.
+- **Code certified at `33208e7c1`.** Every commit after it is documentation only:
+  `git diff 33208e7c1..HEAD -- src/ tests/ dashboard/src/ scripts/ config.json`
+  is **empty**. A commit cannot name itself as final, so the certified commit is
+  stated as the last one that changed shipping code, and that invariant is
+  asserted mechanically by the `release-audit` evidence record rather than
+  claimed in prose.
 - Working tree: clean.
 - **Nothing was merged, tagged, deployed, published, force-pushed or deleted. No
   history was rewritten. Nothing was pushed** — all four commits are local, and
