@@ -28,6 +28,27 @@ import pytest
 from src import alerts
 
 
+def test_the_suite_cannot_write_to_the_real_data_directory():
+    """The guard that stops this file's own mechanism corrupting production.
+
+    _record_delivery writes on every send attempt, and ten existing tests
+    exercise send_alert without redirecting DATA_DIR. Running the suite once
+    filled the real data/alerts/latest.json with fixture rows — subjects "s",
+    "s1", "first" — and it reached a commit. Pushed, the dashboard would have
+    announced ALERTING IS DOWN on the strength of unit-test data, which is a
+    worse failure than having no monitor at all.
+
+    conftest redirects DATA_DIR for every test. This asserts the redirect is
+    actually in force, so the protection cannot silently lapse.
+    """
+    from src import utils
+    from tests.conftest import REAL_DATA_DIR
+
+    assert alerts.DATA_DIR != REAL_DATA_DIR, "alerts.DATA_DIR must be sandboxed"
+    assert utils.DATA_DIR != REAL_DATA_DIR, "utils.DATA_DIR must be sandboxed"
+    assert "data" in str(alerts.DATA_DIR)
+
+
 @pytest.fixture
 def wired(tmp_path, monkeypatch):
     """Alerting pointed at a temp data dir, with credentials present."""
