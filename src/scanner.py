@@ -151,6 +151,49 @@ def fetch_leaderboard() -> list[dict]:
     return []
 
 
+def _account_value(entry: dict) -> float:
+    """Account value from a leaderboard row, or -1 when it cannot be read.
+
+    Unparseable rows sort last rather than being dropped: the endpoint is
+    untrusted and a row we cannot rank is still a wallet that might matter.
+    """
+    raw = entry.get("accountValue", entry.get("account_value"))
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return -1.0
+    return v if v == v and v not in (float("inf"), float("-inf")) else -1.0
+
+
+def select_leaderboard_wallets(rows: list[dict], max_wallets: int) -> list[dict]:
+    """Which leaderboard wallets to scan, largest account first.
+
+    The endpoint returns tens of thousands of rows in no meaningful order —
+    measured 2026-08-12, consecutive accountValues ran 61M, 59M, 15M, 82M, 10M
+    across 41,589 rows. Taking `leaderboard[:500]` therefore scanned an arbitrary
+    slice, and the consequences were not subtle:
+
+      * the TARGET HIMSELF sat at raw position 1,686 and was never scanned,
+        despite ranking 53rd of 41,589 by account value;
+      * of the 124 wallets within 0.5x-2x his account size — the most plausible
+        profile for a wallet he moved his capital into — only 24 were scanned;
+      * the backtest draws its strangers from this same slice, so `account_size`
+        separated trivially against randomly-sized wallets and inflated the
+        reported margin with an artefact of who happened to be in the slice.
+
+    A successor holding the target's capital ranks near him by account value, so
+    ordering by it puts the wallets he could plausibly BE inside the population,
+    and makes the stranger set size-comparable — a harder, more honest self-match.
+
+    Deterministic: the calibration population and the backtest's stranger set
+    must not wander between runs over identical input.
+    """
+    if max_wallets <= 0:
+        return []
+    ordered = sorted(enumerate(rows), key=lambda p: (-_account_value(p[1]), p[0]))
+    return [row for _, row in ordered[:max_wallets]]
+
+
 def get_candidate_fills(wallet: str, lookback_days: int = 7) -> list[dict]:
     """Get recent fills for a candidate wallet."""
     now_ms = int(time.time() * 1000)
@@ -1449,7 +1492,10 @@ def scan_leaderboard():
     sweep_scores = []  # this sweep's scores → next sweep's null distribution
     sweep_markets = {}  # eligible wallet → markets traded → rarity calibration
 
-    for entry in leaderboard[:max_wallets]:
+    # Largest accounts first, not the API's arbitrary order — see
+    # select_leaderboard_wallets for why the previous slice excluded the
+    # target himself and 80% of the wallets he could plausibly have become.
+    for entry in select_leaderboard_wallets(leaderboard, max_wallets):
         wallet = entry.get("ethAddress", entry.get("address", ""))
         if not wallet or wallet.lower() == target:
             continue
