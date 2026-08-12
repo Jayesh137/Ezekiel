@@ -318,6 +318,41 @@ export function isRecentSignal(when, days = RECENT_SIGNAL_DAYS) {
 }
 
 /**
+ * Alert delivery health, written by src/alerts.py on every send attempt.
+ *
+ * Email cannot report its own failure, and a failed send does not fail the job —
+ * so a dead output channel is invisible from the Actions tab. An audit on
+ * 2026-08-12 found 25 candidates promoted to ALERT and not one delivered, with
+ * the SMTP check having failed once in July and never been re-run. This is the
+ * signal that makes that state legible.
+ */
+export async function fetchAlertHealth() {
+	return fetchJSON('data/alerts/latest.json');
+}
+
+/**
+ * Is the alerting channel dead, and how badly?
+ * Returns null when there is nothing to report.
+ * @param {object|null} health - data/alerts/latest.json
+ */
+export function getAlertDelivery(health) {
+	if (!health) return null;
+	if (health.healthy) {
+		return { down: false, msg: `Alerting healthy — last delivered ${health.last_success_at ?? 'unknown'}.` };
+	}
+	const n = health.undelivered ?? health.consecutive_failures ?? 0;
+	return {
+		down: true,
+		undelivered: n,
+		since: health.last_failure_at,
+		reason: health.last_failure_reason,
+		msg:
+			`ALERTING IS DOWN — ${n} alert${n === 1 ? '' : 's'} not delivered. ` +
+			`You will not be told if the trader migrates. ${health.last_failure_reason ?? ''}`
+	};
+}
+
+/**
  * How much room the scorer has between a known stranger and the target's own
  * self-match, as published by the backend. Null when nothing was validated.
  * @param {object|null} scan - data/scans/latest.json

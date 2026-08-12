@@ -3,7 +3,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { fetchIndex, getDataFreshnessMinutes } from '$lib/api.js';
+	import { fetchIndex, getDataFreshnessMinutes, fetchAlertHealth,
+         getAlertDelivery } from '$lib/api.js';
 
 	const navItems = [
 		{ href: `${base}/recovery`, label: 'Recovery', icon: 'R' },
@@ -15,6 +16,10 @@
 	];
 
 	let freshnessMinutes = null;
+	// Alert delivery health. This sits above everything else because if alerting
+	// is down, nothing else on this dashboard can reach the operator in time to
+	// matter — the whole product is an alert.
+	let alertDelivery = null;
 	// Mirrors heartbeat.STALE_AFTER_MINUTES. GitHub honours roughly 5% of this
 	// repo's requested cron — measured median gap 83 min, p90 160, max 220 — so
 	// the backend deliberately does not call collection stalled until 360 min.
@@ -41,8 +46,9 @@
 			+ `GitHub honours only about 5% of the requested schedule.`;
 
 	onMount(async () => {
-		const index = await fetchIndex();
+		const [index, health] = await Promise.all([fetchIndex(), fetchAlertHealth()]);
 		freshnessMinutes = getDataFreshnessMinutes(index);
+		alertDelivery = getAlertDelivery(health);
 	});
 </script>
 
@@ -75,6 +81,23 @@
 		</div>
 	</nav>
 	<main class="main-content">
+		{#if alertDelivery?.down}
+			<!-- Deliberately the loudest thing on the page and above the content on
+			     every route. A detection system whose output channel is dead looks
+			     exactly like a quiet week; this is the only place that difference is
+			     visible, because email cannot report its own failure. -->
+			<div class="alert-down" role="alert">
+				<strong>ALERTING IS DOWN</strong>
+				<span>
+					{alertDelivery.undelivered} alert{alertDelivery.undelivered === 1 ? '' : 's'}
+					not delivered{alertDelivery.since ? ` since ${alertDelivery.since.slice(0, 16).replace('T', ' ')}` : ''}.
+					You will not be emailed if the trader migrates — check this dashboard directly until it is fixed.
+				</span>
+				{#if alertDelivery.reason}
+					<span class="alert-down-reason">{alertDelivery.reason}</span>
+				{/if}
+			</div>
+		{/if}
 		<slot />
 	</main>
 </div>
@@ -176,6 +199,29 @@
 	.freshness-ok { background: rgba(0,255,136,0.12); color: var(--accent-green); }
 	.freshness-warn { background: rgba(255,170,0,0.12); color: var(--accent-yellow); }
 	.freshness-stale { background: rgba(255,51,85,0.12); color: var(--accent-red); }
+	.alert-down {
+		background: rgba(255, 51, 85, 0.14);
+		border: 1px solid var(--accent-red);
+		border-left-width: 4px;
+		border-radius: 6px;
+		padding: 12px 16px;
+		margin-bottom: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.alert-down strong {
+		color: var(--accent-red);
+		font-family: var(--font-mono);
+		letter-spacing: 0.06em;
+		font-size: 0.85rem;
+	}
+	.alert-down span { font-size: 0.85rem; color: var(--text-primary); }
+	.alert-down-reason {
+		font-family: var(--font-mono);
+		font-size: 0.7rem !important;
+		color: var(--text-secondary) !important;
+	}
 	.main-content {
 		flex: 1;
 		margin-left: 220px;

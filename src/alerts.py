@@ -16,13 +16,15 @@ SendGrid's convention — Brevo does not accept it and answered every send with
 535 5.7.8 Authentication failed, no matter how valid the key was.
 """
 
+import json
 import os
 import smtplib
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from src.links import address_line, address_path
-from src.utils import now_ms, read_cursor, write_cursor
+from src.utils import DATA_DIR, now_ms, read_cursor, save_latest, write_cursor
 
 SMTP_HOST = "smtp-relay.brevo.com"
 SMTP_PORT = 587  # STARTTLS
@@ -31,6 +33,54 @@ SMTP_PORT = 587  # STARTTLS
 # rest of this run. Short-circuit so a batch of alerts doesn't attempt hundreds
 # of dead SMTP connections and blow the job timeout / spam the log.
 _smtp_disabled_this_run = False
+
+
+def _record_delivery(subject: str, delivered: bool, reason: str | None = None) -> None:
+    """Persist alert delivery health where the operator can actually see it.
+
+    Email cannot report its own failure, and a failed send returns False without
+    failing the job — so a dead output channel looks exactly like a quiet week
+    from the Actions tab, the data and the dashboard alike.
+
+    That is not hypothetical. On 2026-08-12 an audit found 25 candidates promoted
+    to ALERT across the scan history, not one alert cursor ever committed (they
+    are written only after a successful send), and the SMTP Delivery Check run
+    once — on 2026-07-27 — and failed. Six months of collection and three
+    detection vectors feeding an output that went nowhere, with every scan run
+    reporting success.
+
+    The dashboard reads this file, so the outage becomes visible where the
+    operator already looks. Never raises: a diagnostic that can take down the
+    thing it diagnoses is worse than no diagnostic.
+    """
+    try:
+        path = DATA_DIR / "alerts" / "latest.json"
+        prev = {}
+        if path.exists():
+            try:
+                with open(path) as f:
+                    prev = json.load(f) or {}
+            except (OSError, ValueError):
+                prev = {}
+        now = datetime.now(UTC).isoformat()
+        fails = 0 if delivered else int(prev.get("consecutive_failures", 0) or 0) + 1
+        recent = list(prev.get("recent") or [])
+        recent.append({"at": now, "subject": subject,
+                       "delivered": delivered, "reason": reason})
+        state = {
+            "updated_at": now,
+            "healthy": delivered,
+            "consecutive_failures": fails,
+            # How many alerts the operator was never told about.
+            "undelivered": 0 if delivered else int(prev.get("undelivered", 0) or 0) + 1,
+            "last_success_at": now if delivered else prev.get("last_success_at"),
+            "last_failure_at": prev.get("last_failure_at") if delivered else now,
+            "last_failure_reason": prev.get("last_failure_reason") if delivered else reason,
+            "recent": recent[-20:],
+        }
+        save_latest(str(DATA_DIR / "alerts"), state)
+    except Exception as e:  # noqa: BLE001 - must never break alerting
+        print(f"[alerts] could not record delivery health: {type(e).__name__}: {e}")
 
 
 def _cooldown_ok(key: str, hours: float) -> bool:
@@ -55,6 +105,7 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
 
     if _smtp_disabled_this_run:
         print(f"[alerts] SMTP disabled after earlier failure this run, skipping: {subject}")
+        _record_delivery(subject, False, "skipped: SMTP disabled after an earlier failure this run")
         return False
 
     smtp_login = os.environ.get("BREVO_SMTP_LOGIN")
@@ -75,6 +126,8 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
                   "Settings -> SMTP & API (<id>@smtp-brevo.com), not the account "
                   "email and not an API key.")
         print(f"[alerts] {body[:200]}")
+        # Unconfigured is a delivery outage too. Name the variables, never values.
+        _record_delivery(subject, False, f"not configured: missing {', '.join(missing)}")
         return False
 
     msg = MIMEMultipart("alternative")
@@ -95,6 +148,7 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
             server.login(smtp_login, smtp_key)
             server.sendmail(msg["From"], [alert_email], msg.as_string())
         print(f"[alerts] Sent: {subject}")
+        _record_delivery(subject, True)
         return True
     except smtplib.SMTPAuthenticationError as e:
         # Credentials were rejected. Report the server's code and the variable
@@ -106,17 +160,24 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
               f"account password and v3 API keys are not accepted.")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
+        _record_delivery(subject, False,
+                         f"SMTP authentication rejected (code {e.smtp_code}) - check "
+                         f"BREVO_SMTP_LOGIN and BREVO_SMTP_KEY")
         return False
     except smtplib.SMTPSenderRefused as e:
         print(f"[alerts] Sender address refused (code {e.smtp_code}). ALERT_EMAIL "
               f"must be a verified sender on the Brevo account.")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
+        _record_delivery(subject, False,
+                         f"sender address refused (code {e.smtp_code}) - ALERT_EMAIL must be "
+                         f"a verified sender on the Brevo account")
         return False
     except Exception as e:
         print(f"[alerts] Failed to send ({type(e).__name__}): {e}")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
+        _record_delivery(subject, False, f"{type(e).__name__}: {e}")
         return False
 
 
