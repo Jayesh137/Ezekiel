@@ -1,27 +1,28 @@
 {
   "wallet": "0x9ffdf919da72213588f7517598394cc5535bce40",
   "first_seen": "2026-08-13T00:59:29.210675+00:00",
-  "last_seen": "2026-08-13T12:43:41.984464+00:00",
-  "best_score": 0.436,
-  "latest_score": 0.436,
+  "last_seen": "2026-08-14T03:22:13.089505+00:00",
+  "best_score": 0.5403,
+  "latest_score": 0.5403,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
+      "Shares rare HIP-3 markets: xyz:SKHX",
       "Matching trade frequency and cadence",
       "Matching long/short bias",
-      "Similar scaling/TWAP/clip-size habits"
+      "Similar scaling/TWAP/clip-size habits",
+      "xyz:SKHX: traded by ~30.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [
-      "Incompatible hold style: 75% vs 0% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
       "overlap": [
-        "@107"
+        "@107",
+        "xyz:SKHX"
       ],
       "target_only": [
         "BTC",
@@ -31,24 +32,33 @@
       ],
       "candidate_only": [
         "HYPE",
-        "xyz:SKHX",
         "xyz:SNDK",
         "xyz:SPCX"
       ],
-      "overlap_count": 1,
-      "rare_overlap": [],
-      "jaccard": 0.1111
+      "overlap_count": 2,
+      "rare_overlap": [
+        "xyz:SKHX"
+      ],
+      "jaccard": 0.2222
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:SKHX"
+      ],
       "rare_markets": [],
-      "classification": {},
-      "description": "no shared markets",
+      "classification": {
+        "xyz:SKHX": "COMMON"
+      },
+      "description": "xyz:SKHX (common, ~30.5% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.436,
-      "explanations": [],
-      "frequencies": {}
+      "score_without_bonus": 0.5403,
+      "explanations": [
+        "xyz:SKHX: traded by ~30.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      ],
+      "frequencies": {
+        "xyz:SKHX": 0.3054
+      }
     }
   },
   "score_history": [
@@ -184,8 +194,27 @@
         "position_management": 0.893,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-14T03:22:13.089505+00:00",
+      "score": 0.5403,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.6018,
+        "timing_profile": null,
+        "leverage_profile": 0.736,
+        "entry_exit_style": 0.7068,
+        "hold_duration": null,
+        "account_size": 0.4909,
+        "trade_sequencing": 0.6396,
+        "position_sizing": 0.1162,
+        "activity": 0.8277,
+        "direction_bias": 0.8526,
+        "position_management": 0.9151,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4331
+  "recent_avg_score": 0.4508
 }

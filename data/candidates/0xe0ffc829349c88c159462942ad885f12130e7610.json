@@ -1,54 +1,64 @@
 {
   "wallet": "0xe0ffc829349c88c159462942ad885f12130e7610",
   "first_seen": "2026-08-04T02:10:03.440144+00:00",
-  "last_seen": "2026-08-05T22:18:26.679385+00:00",
-  "best_score": 0.3233,
-  "latest_score": 0.2915,
+  "last_seen": "2026-08-14T03:22:41.898487+00:00",
+  "best_score": 0.5119,
+  "latest_score": 0.5119,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
-      "Similar account-size bracket",
-      "Similar scaling/TWAP/clip-size habits"
+      "Shares rare HIP-3 markets: xyz:SKHX",
+      "Matching trade frequency and cadence",
+      "Matching long/short bias",
+      "Similar scaling/TWAP/clip-size habits",
+      "xyz:SKHX: traded by ~30.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Very different trading frequency",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [
-      "Decision frequency 9x apart (0.28 vs 2.40 position episodes/day)",
-      "Incompatible hold style: 80% vs 0% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
-      "overlap": [],
-      "target_only": [
+      "overlap": [
         "@107",
+        "xyz:SKHX"
+      ],
+      "target_only": [
         "BTC",
         "CASHCAT",
-        "ETH",
-        "xyz:BRENTOIL"
+        "MON",
+        "XPL"
       ],
       "candidate_only": [
         "LIT",
-        "xyz:SKHX",
+        "xyz:CXMT",
         "xyz:SMSN"
       ],
-      "overlap_count": 0,
-      "rare_overlap": [],
-      "jaccard": 0.0
+      "overlap_count": 2,
+      "rare_overlap": [
+        "xyz:SKHX"
+      ],
+      "jaccard": 0.2222
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:SKHX"
+      ],
       "rare_markets": [],
-      "classification": {},
-      "description": "no shared markets",
+      "classification": {
+        "xyz:SKHX": "COMMON"
+      },
+      "description": "xyz:SKHX (common, ~30.5% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2915,
-      "explanations": [],
-      "frequencies": {}
+      "score_without_bonus": 0.5119,
+      "explanations": [
+        "xyz:SKHX: traded by ~30.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      ],
+      "frequencies": {
+        "xyz:SKHX": 0.3054
+      }
     }
   },
   "score_history": [
@@ -450,8 +460,27 @@
         "position_management": 0.8014,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-14T03:22:41.898487+00:00",
+      "score": 0.5119,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.5488,
+        "timing_profile": null,
+        "leverage_profile": 0.4076,
+        "entry_exit_style": 0.6413,
+        "hold_duration": null,
+        "account_size": 0.5655,
+        "trade_sequencing": 0.9078,
+        "position_sizing": 0.2357,
+        "activity": 0.8178,
+        "direction_bias": 1.0,
+        "position_management": 0.8679,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2948
+  "recent_avg_score": 0.3246
 }
