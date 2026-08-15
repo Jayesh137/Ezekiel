@@ -1,64 +1,51 @@
 {
   "wallet": "0x9ffdf919da72213588f7517598394cc5535bce40",
   "first_seen": "2026-08-13T00:59:29.210675+00:00",
-  "last_seen": "2026-08-14T09:00:09.304263+00:00",
+  "last_seen": "2026-08-15T10:14:03.137832+00:00",
   "best_score": 0.5403,
-  "latest_score": 0.5403,
+  "latest_score": 0.4141,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Shares rare HIP-3 markets: xyz:SKHX",
-      "Matching trade frequency and cadence",
       "Matching long/short bias",
-      "Similar scaling/TWAP/clip-size habits",
-      "xyz:SKHX: traded by ~30.4% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Incompatible hold style: 80% vs 0% of holds under 1h"
+    ],
     "asset_overlap": {
       "overlap": [
-        "@107",
-        "xyz:SKHX"
+        "@107"
       ],
       "target_only": [
         "BTC",
         "CASHCAT",
         "MON",
-        "XPL"
+        "XPL",
+        "xyz:SKHX"
       ],
       "candidate_only": [
-        "HYPE",
-        "xyz:SNDK",
-        "xyz:SPCX"
+        "HYPE"
       ],
-      "overlap_count": 2,
-      "rare_overlap": [
-        "xyz:SKHX"
-      ],
-      "jaccard": 0.2222
+      "overlap_count": 1,
+      "rare_overlap": [],
+      "jaccard": 0.1429
     },
     "market_rarity": {
-      "shared_markets": [
-        "xyz:SKHX"
-      ],
+      "shared_markets": [],
       "rare_markets": [],
-      "classification": {
-        "xyz:SKHX": "COMMON"
-      },
-      "description": "xyz:SKHX (common, ~30.4% of wallets)",
+      "classification": {},
+      "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.5403,
-      "explanations": [
-        "xyz:SKHX: traded by ~30.4% of scanned wallets \u2014 too common to be evidence (no bonus)"
-      ],
-      "frequencies": {
-        "xyz:SKHX": 0.30444
-      }
+      "score_without_bonus": 0.4141,
+      "explanations": [],
+      "frequencies": {}
     }
   },
   "score_history": [
@@ -270,8 +257,27 @@
         "position_management": 0.9151,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-15T10:14:03.137832+00:00",
+      "score": 0.4141,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": null,
+        "leverage_profile": 0.736,
+        "entry_exit_style": 0.8096,
+        "hold_duration": null,
+        "account_size": 0.5706,
+        "trade_sequencing": 0.6789,
+        "position_sizing": 0.1213,
+        "activity": 0.6552,
+        "direction_bias": 1.0,
+        "position_management": 0.8876,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4955
+  "recent_avg_score": 0.4924
 }
