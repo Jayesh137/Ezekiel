@@ -1,13 +1,17 @@
 {
   "wallet": "0xf1e79e5cf063073deec9a0d86c178f7cde84d479",
   "first_seen": "2026-07-27T09:23:28.294547+00:00",
-  "last_seen": "2026-08-17T16:16:57.107487+00:00",
+  "last_seen": "2026-08-17T17:19:42.139065+00:00",
   "best_score": 0.3122,
-  "latest_score": 0.2504,
+  "latest_score": 0.2519,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Shares rare HIP-3 markets: xyz:SKHX",
+      "xyz:SKHX: traded by ~27.6% of scanned wallets \u2014 too common to be evidence (no bonus)",
+      "Market bonus withheld: style veto in force"
+    ],
     "warnings": [
       "Weak asset overlap",
       "Very different account-size bracket"
@@ -16,18 +20,20 @@
       "Decision frequency 49x apart (0.75 vs 37.00 position episodes/day)"
     ],
     "asset_overlap": {
-      "overlap": [],
+      "overlap": [
+        "xyz:SKHX"
+      ],
       "target_only": [
         "@107",
         "BTC",
         "CASHCAT",
         "ETH",
         "MON",
-        "XPL",
-        "xyz:SKHX"
+        "XPL"
       ],
       "candidate_only": [
         "HEMI",
+        "PEOPLE",
         "xyz:AAPL",
         "xyz:AMD",
         "xyz:AMZN",
@@ -38,6 +44,7 @@
         "xyz:CBRS",
         "xyz:COIN",
         "xyz:CRCL",
+        "xyz:DELL",
         "xyz:DRAM",
         "xyz:GME",
         "xyz:HOOD",
@@ -45,7 +52,7 @@
         "xyz:META",
         "xyz:MRVL",
         "xyz:MSFT",
-        "xyz:MU",
+        "xyz:NBIS",
         "xyz:NCLD",
         "xyz:NOK",
         "xyz:NOW",
@@ -53,54 +60,43 @@
         "xyz:PURRDAT",
         "xyz:QCOM",
         "xyz:QNT",
-        "xyz:RIVN",
         "xyz:RKLB",
-        "xyz:SHAZ",
         "xyz:SKHY",
         "xyz:SMH",
         "xyz:SMSN",
         "xyz:SNDK",
         "xyz:SOXL",
         "xyz:SPCX",
-        "xyz:TSM",
         "xyz:WDC"
       ],
-      "overlap_count": 0,
-      "rare_overlap": [],
-      "jaccard": 0.0
+      "overlap_count": 1,
+      "rare_overlap": [
+        "xyz:SKHX"
+      ],
+      "jaccard": 0.0233
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:SKHX"
+      ],
       "rare_markets": [],
-      "classification": {},
-      "description": "no shared markets",
+      "classification": {
+        "xyz:SKHX": "COMMON"
+      },
+      "description": "xyz:SKHX (common, ~27.6% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2504,
-      "explanations": [],
-      "frequencies": {}
+      "score_without_bonus": 0.2519,
+      "explanations": [
+        "xyz:SKHX: traded by ~27.6% of scanned wallets \u2014 too common to be evidence (no bonus)",
+        "Market bonus withheld: style veto in force"
+      ],
+      "frequencies": {
+        "xyz:SKHX": 0.27559
+      }
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-09T22:31:33.296907+00:00",
-      "score": 0.1667,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0303,
-        "timing_profile": null,
-        "leverage_profile": 0.1359,
-        "entry_exit_style": 0.6419,
-        "hold_duration": 0.4872,
-        "account_size": 0.1957,
-        "trade_sequencing": 0.4882,
-        "position_sizing": 0.8165,
-        "activity": 0.3703,
-        "direction_bias": 0.1968,
-        "position_management": 0.709,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-09T23:31:32.673371+00:00",
       "score": 0.1092,
@@ -1981,8 +1977,27 @@
         "position_management": 0.6742,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-17T17:19:42.139065+00:00",
+      "score": 0.2519,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0233,
+        "timing_profile": null,
+        "leverage_profile": 0.1359,
+        "entry_exit_style": 0.6212,
+        "hold_duration": 0.498,
+        "account_size": 0.2063,
+        "trade_sequencing": 0.9376,
+        "position_sizing": 0.8165,
+        "activity": 0.4445,
+        "direction_bias": 0.116,
+        "position_management": 0.6708,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2052
+  "recent_avg_score": 0.2133
 }
