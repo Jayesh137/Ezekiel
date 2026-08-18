@@ -1,13 +1,17 @@
 {
   "wallet": "0xf517639a8872e756ac98d3c65507d2ebc25cc032",
   "first_seen": "2026-07-06T11:22:11.515538+00:00",
-  "last_seen": "2026-08-18T08:26:44.999663+00:00",
+  "last_seen": "2026-08-18T09:26:48.210378+00:00",
   "best_score": 0.4211,
-  "latest_score": 0.3988,
+  "latest_score": 0.4166,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Shares rare HIP-3 markets: xyz:SKHX",
+      "xyz:SKHX: traded by ~27.3% of scanned wallets \u2014 too common to be evidence (no bonus)",
+      "Market bonus withheld: style veto in force"
+    ],
     "warnings": [
       "Weak asset overlap"
     ],
@@ -17,56 +21,50 @@
     "asset_overlap": {
       "overlap": [
         "BTC",
-        "ETH"
+        "xyz:SKHX"
       ],
       "target_only": [
         "@107",
         "CASHCAT",
+        "ETH",
         "MON",
-        "XPL",
-        "xyz:SKHX"
+        "XPL"
       ],
       "candidate_only": [
-        "xyz:SKHY",
-        "xyz:SNDK",
+        "GMT",
+        "SOL",
+        "WLFI",
+        "xyz:CXMT",
         "xyz:SPCX"
       ],
       "overlap_count": 2,
-      "rare_overlap": [],
-      "jaccard": 0.2
+      "rare_overlap": [
+        "xyz:SKHX"
+      ],
+      "jaccard": 0.1667
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:SKHX"
+      ],
       "rare_markets": [],
-      "classification": {},
-      "description": "no shared markets",
+      "classification": {
+        "xyz:SKHX": "COMMON"
+      },
+      "description": "xyz:SKHX (common, ~27.3% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3988,
-      "explanations": [],
-      "frequencies": {}
+      "score_without_bonus": 0.4166,
+      "explanations": [
+        "xyz:SKHX: traded by ~27.3% of scanned wallets \u2014 too common to be evidence (no bonus)",
+        "Market bonus withheld: style veto in force"
+      ],
+      "frequencies": {
+        "xyz:SKHX": 0.27282
+      }
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-08T20:17:12.026792+00:00",
-      "score": 0.2633,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0,
-        "timing_profile": null,
-        "leverage_profile": 0.6508,
-        "entry_exit_style": 0.2057,
-        "hold_duration": 0.7323,
-        "account_size": 0.5941,
-        "trade_sequencing": 0.459,
-        "position_sizing": 0.2828,
-        "activity": 0.4131,
-        "direction_bias": 0.2352,
-        "position_management": 0.7159,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-08T21:20:42.196709+00:00",
       "score": 0.2629,
@@ -1947,8 +1945,27 @@
         "position_management": 0.7562,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-18T09:26:48.210378+00:00",
+      "score": 0.4166,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.5291,
+        "timing_profile": null,
+        "leverage_profile": 0.7427,
+        "entry_exit_style": 0.203,
+        "hold_duration": 0.459,
+        "account_size": 0.5772,
+        "trade_sequencing": 0.6381,
+        "position_sizing": 0.254,
+        "activity": 0.537,
+        "direction_bias": 0.6464,
+        "position_management": 0.7608,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3984
+  "recent_avg_score": 0.4012
 }
