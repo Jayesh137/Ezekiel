@@ -1,24 +1,24 @@
 {
   "wallet": "0xf8bb001a9e55d81fd6a5834f8e64865ef4e231c9",
   "first_seen": "2026-08-04T15:14:15.258789+00:00",
-  "last_seen": "2026-08-14T12:35:58.485996+00:00",
-  "best_score": 0.3204,
-  "latest_score": 0.3204,
+  "last_seen": "2026-08-20T00:31:21.035605+00:00",
+  "best_score": 0.3628,
+  "latest_score": 0.3628,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:SKHX",
       "Similar market/limit execution style",
-      "xyz:SKHX: traded by ~30.3% of scanned wallets \u2014 too common to be evidence (no bonus)",
+      "Similar scaling/TWAP/clip-size habits",
+      "xyz:SKHX: traded by ~26.7% of scanned wallets \u2014 too common to be evidence (no bonus)",
       "Market bonus withheld: style veto in force"
     ],
     "warnings": [
-      "Weak asset overlap",
-      "Very different account-size bracket"
+      "Weak asset overlap"
     ],
     "vetoes": [
-      "Incompatible hold style: 80% vs 0% of holds under 1h"
+      "Decision frequency 7x apart (0.75 vs 5.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
@@ -28,11 +28,13 @@
         "@107",
         "BTC",
         "CASHCAT",
+        "ETH",
         "MON",
         "XPL"
       ],
       "candidate_only": [
         "xyz:MU",
+        "xyz:SKHY",
         "xyz:SNDK",
         "xyz:SPCX"
       ],
@@ -40,7 +42,7 @@
       "rare_overlap": [
         "xyz:SKHX"
       ],
-      "jaccard": 0.1111
+      "jaccard": 0.0909
     },
     "market_rarity": {
       "shared_markets": [
@@ -50,16 +52,16 @@
       "classification": {
         "xyz:SKHX": "COMMON"
       },
-      "description": "xyz:SKHX (common, ~30.3% of wallets)",
+      "description": "xyz:SKHX (common, ~26.7% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3204,
+      "score_without_bonus": 0.3628,
       "explanations": [
-        "xyz:SKHX: traded by ~30.3% of scanned wallets \u2014 too common to be evidence (no bonus)",
+        "xyz:SKHX: traded by ~26.7% of scanned wallets \u2014 too common to be evidence (no bonus)",
         "Market bonus withheld: style veto in force"
       ],
       "frequencies": {
-        "xyz:SKHX": 0.30283
+        "xyz:SKHX": 0.26706
       }
     }
   },
@@ -234,8 +236,27 @@
         "position_management": 0.772,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-20T00:31:21.035605+00:00",
+      "score": 0.3628,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0909,
+        "timing_profile": null,
+        "leverage_profile": 0.736,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.5872,
+        "account_size": 0.3398,
+        "trade_sequencing": 0.601,
+        "position_sizing": 0.0344,
+        "activity": 0.567,
+        "direction_bias": 0.6282,
+        "position_management": 0.8702,
+        "loss_handling": null
+      }
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3031
+  "recent_avg_score": 0.3173
 }
