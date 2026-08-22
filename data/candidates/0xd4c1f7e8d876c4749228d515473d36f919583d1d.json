@@ -1,15 +1,16 @@
 {
   "wallet": "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
   "first_seen": "2026-07-27T20:08:27.716010+00:00",
-  "last_seen": "2026-08-22T10:16:06.309002+00:00",
+  "last_seen": "2026-08-22T11:15:31.263971+00:00",
   "best_score": 0.7141,
-  "latest_score": 0.7061,
+  "latest_score": 0.7126,
   "latest_tier": "CONFIRMED_CANDIDATE",
   "latest_evidence": {
     "tier": "CONFIRMED_CANDIDATE",
     "reasons": [
       "Similar market/limit execution style",
-      "Matching long/short bias"
+      "Matching long/short bias",
+      "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [],
     "vetoes": [],
@@ -42,11 +43,12 @@
       ],
       "candidate_only": [
         "HYPE",
+        "WLFI",
         "ZEC"
       ],
       "overlap_count": 6,
       "rare_overlap": [],
-      "jaccard": 0.25
+      "jaccard": 0.24
     },
     "market_rarity": {
       "shared_markets": [],
@@ -55,31 +57,12 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.7061,
+      "score_without_bonus": 0.7126,
       "explanations": [],
       "frequencies": {}
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-09T10:23:27.215808+00:00",
-      "score": 0.4241,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.2233,
-        "timing_profile": null,
-        "leverage_profile": 0.707,
-        "entry_exit_style": 1.0,
-        "hold_duration": 0.5428,
-        "account_size": 0.4913,
-        "trade_sequencing": 0.4492,
-        "position_sizing": 1.0,
-        "activity": 0.3999,
-        "direction_bias": 0.6507,
-        "position_management": 0.7909,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-09T11:20:28.429612+00:00",
       "score": 0.4242,
@@ -1960,8 +1943,27 @@
         "position_management": 0.7974,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-22T11:15:31.263971+00:00",
+      "score": 0.7126,
+      "tier": "CONFIRMED_CANDIDATE",
+      "dimensions": {
+        "asset_preferences": 0.4486,
+        "timing_profile": null,
+        "leverage_profile": 0.7166,
+        "entry_exit_style": 0.9953,
+        "hold_duration": 0.7563,
+        "account_size": 0.5144,
+        "trade_sequencing": 0.9705,
+        "position_sizing": 1.0,
+        "activity": 0.6812,
+        "direction_bias": 1.0,
+        "position_management": 0.805,
+        "loss_handling": null
+      }
     }
   ],
   "status": "ACTIVE",
-  "recent_avg_score": 0.6827
+  "recent_avg_score": 0.6832
 }
