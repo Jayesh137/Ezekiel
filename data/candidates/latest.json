@@ -1723,16 +1723,20 @@
     {
       "wallet": "0xecb63caa47c7c4e77f60f1ce858cf28dc2b82b00",
       "first_seen": "2026-06-30T16:13:49.520831+00:00",
-      "last_seen": "2026-08-23T07:23:50.824735+00:00",
+      "last_seen": "2026-08-23T08:15:54.230719+00:00",
       "best_score": 0.7493,
       "latest_score": 0.45,
       "latest_tier": "BACKGROUND",
       "latest_evidence": {
         "tier": "BACKGROUND",
-        "reasons": [],
+        "reasons": [
+          "Shares rare HIP-3 markets: xyz:SKHX",
+          "xyz:SKHX: traded by ~16.1% of scanned wallets \u2014 too common to be evidence (no bonus)",
+          "Market bonus withheld: style veto in force"
+        ],
         "warnings": [],
         "vetoes": [
-          "Decision frequency 35x apart (2.30 vs 81.00 position episodes/day)"
+          "Decision frequency 33x apart (2.30 vs 76.00 position episodes/day)"
         ],
         "asset_overlap": {
           "overlap": [
@@ -1745,23 +1749,23 @@
             "ENA",
             "ETH",
             "FARTCOIN",
-            "LINK",
-            "ONDO",
             "PUMP",
             "SOL",
             "XPL",
             "XRP",
             "ZEC",
-            "kPEPE"
+            "kPEPE",
+            "xyz:SKHX"
           ],
           "target_only": [
             "ASTER",
             "ETHFI",
             "GRAM",
+            "LINK",
             "MON",
             "NEAR",
-            "ZRO",
-            "xyz:SKHX"
+            "ONDO",
+            "ZRO"
           ],
           "candidate_only": [
             "2Z",
@@ -1769,33 +1773,25 @@
             "@151",
             "@156",
             "@162",
-            "@166",
             "@188",
-            "@193",
-            "@194",
-            "@207",
-            "@210",
-            "@243",
             "@272",
+            "@702",
             "@705",
+            "@706",
             "APT",
             "ARB",
-            "ATOM",
-            "AVNT",
+            "AVAX",
             "BCH",
             "BNB",
             "CRV",
-            "EIGEN",
             "HYPE",
             "JUP",
             "LDO",
             "LIT",
-            "LTC",
             "MELANIA",
             "PENGU",
-            "POPCAT",
-            "PYTH",
-            "SEI",
+            "SNX",
+            "SPX",
             "STBL",
             "SUI",
             "TAO",
@@ -1807,26 +1803,25 @@
             "VVV",
             "WIF",
             "WLD",
-            "WLFI",
             "XLM",
             "kBONK",
             "kFLOKI",
             "xyz:AAPL",
-            "xyz:AMD",
+            "xyz:AMZN",
             "xyz:ARM",
-            "xyz:AVGO",
+            "xyz:ASML",
             "xyz:BRENTOIL",
             "xyz:CL",
             "xyz:COIN",
             "xyz:CRCL",
             "xyz:CRWV",
+            "xyz:DRAM",
             "xyz:EWY",
-            "xyz:GOOGL",
             "xyz:HOOD",
             "xyz:INTC",
             "xyz:LITE",
-            "xyz:META",
             "xyz:MRVL",
+            "xyz:MSFT",
             "xyz:MSTR",
             "xyz:MU",
             "xyz:NATGAS",
@@ -1834,51 +1829,44 @@
             "xyz:NVDA",
             "xyz:ORCL",
             "xyz:PLTR",
-            "xyz:RKLB",
             "xyz:SILVER",
             "xyz:SKHY",
+            "xyz:SMSN",
             "xyz:SNDK",
             "xyz:SP500",
             "xyz:SPCX",
             "xyz:TSLA",
-            "xyz:TSM"
+            "xyz:TSM",
+            "xyz:XYZ100"
           ],
-          "overlap_count": 17,
-          "rare_overlap": [],
-          "jaccard": 0.1667
+          "overlap_count": 16,
+          "rare_overlap": [
+            "xyz:SKHX"
+          ],
+          "jaccard": 0.1702
         },
         "market_rarity": {
-          "shared_markets": [],
+          "shared_markets": [
+            "xyz:SKHX"
+          ],
           "rare_markets": [],
-          "classification": {},
-          "description": "no shared markets",
+          "classification": {
+            "xyz:SKHX": "COMMON"
+          },
+          "description": "xyz:SKHX (common, ~16.1% of wallets)",
           "sample_sufficient": true,
           "bonus_applied": 0.0,
           "score_without_bonus": 0.45,
-          "explanations": [],
-          "frequencies": {}
+          "explanations": [
+            "xyz:SKHX: traded by ~16.1% of scanned wallets \u2014 too common to be evidence (no bonus)",
+            "Market bonus withheld: style veto in force"
+          ],
+          "frequencies": {
+            "xyz:SKHX": 0.16145
+          }
         }
       },
       "score_history": [
-        {
-          "scan_time": "2026-08-17T23:11:21.132306+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4274,
-            "timing_profile": null,
-            "leverage_profile": 0.8125,
-            "entry_exit_style": 0.2828,
-            "hold_duration": 0.4765,
-            "account_size": 0.6589,
-            "trade_sequencing": 0.8278,
-            "position_sizing": 0.5,
-            "activity": 0.4237,
-            "direction_bias": 0.8552,
-            "position_management": 0.6714,
-            "loss_handling": null
-          }
-        },
         {
           "scan_time": "2026-08-18T00:31:14.788380+00:00",
           "score": 0.45,
@@ -3757,6 +3745,25 @@
             "activity": 0.4746,
             "direction_bias": 0.7006,
             "position_management": 0.6741,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-23T08:15:54.230719+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.3808,
+            "timing_profile": null,
+            "leverage_profile": 0.8114,
+            "entry_exit_style": 0.2649,
+            "hold_duration": 0.431,
+            "account_size": 0.5989,
+            "trade_sequencing": 0.605,
+            "position_sizing": 0.5,
+            "activity": 0.4774,
+            "direction_bias": 0.6114,
+            "position_management": 0.6654,
             "loss_handling": null
           }
         }
@@ -7351,11 +7358,1983 @@
       "recent_avg_score": 0.6332
     },
     {
+      "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
+      "first_seen": "2026-07-27T20:12:49.458680+00:00",
+      "last_seen": "2026-08-23T08:15:52.041602+00:00",
+      "best_score": 0.7387,
+      "latest_score": 0.7387,
+      "latest_tier": "WEAK_LEAD",
+      "latest_evidence": {
+        "tier": "WEAK_LEAD",
+        "reasons": [
+          "Similar market/limit execution style",
+          "Matching trade frequency and cadence",
+          "Matching long/short bias",
+          "Similar scaling/TWAP/clip-size habits"
+        ],
+        "warnings": [
+          "Too few position episodes to compare holding style"
+        ],
+        "vetoes": [],
+        "asset_overlap": {
+          "overlap": [
+            "@107",
+            "BTC",
+            "PUMP",
+            "SOL"
+          ],
+          "target_only": [
+            "AAVE",
+            "ADA",
+            "ASTER",
+            "CASHCAT",
+            "DOGE",
+            "ENA",
+            "ETH",
+            "ETHFI",
+            "FARTCOIN",
+            "GRAM",
+            "LINK",
+            "MON",
+            "NEAR",
+            "ONDO",
+            "XPL",
+            "XRP",
+            "ZEC",
+            "ZRO",
+            "kPEPE",
+            "xyz:SKHX"
+          ],
+          "candidate_only": [
+            "HYPE"
+          ],
+          "overlap_count": 4,
+          "rare_overlap": [],
+          "jaccard": 0.16
+        },
+        "market_rarity": {
+          "shared_markets": [],
+          "rare_markets": [],
+          "classification": {},
+          "description": "no shared markets",
+          "sample_sufficient": true,
+          "bonus_applied": 0.0,
+          "score_without_bonus": 0.7387,
+          "explanations": [],
+          "frequencies": {}
+        }
+      },
+      "score_history": [
+        {
+          "scan_time": "2026-08-17T17:15:37.560451+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6574,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9896,
+            "hold_duration": null,
+            "account_size": 0.6145,
+            "trade_sequencing": 0.4637,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8278,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-17T18:20:16.505138+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6574,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9896,
+            "hold_duration": null,
+            "account_size": 0.6138,
+            "trade_sequencing": 0.4637,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8278,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-17T19:19:10.666571+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6563,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9782,
+            "hold_duration": null,
+            "account_size": 0.6837,
+            "trade_sequencing": 0.5181,
+            "position_sizing": 0.7071,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8568,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-17T20:13:05.495479+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6563,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9782,
+            "hold_duration": null,
+            "account_size": 0.6839,
+            "trade_sequencing": 0.5181,
+            "position_sizing": 0.7071,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8568,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T05:18:33.642645+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1915,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.8648,
+            "hold_duration": 0.5367,
+            "account_size": 0.6467,
+            "trade_sequencing": 0.5697,
+            "position_sizing": 0.7071,
+            "activity": 0.5265,
+            "direction_bias": 1.0,
+            "position_management": 0.8217,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T06:21:30.621109+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1915,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.8648,
+            "hold_duration": 0.5367,
+            "account_size": 0.6462,
+            "trade_sequencing": 0.5697,
+            "position_sizing": 0.7071,
+            "activity": 0.5265,
+            "direction_bias": 1.0,
+            "position_management": 0.8217,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T07:28:00.564002+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.2195,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9569,
+            "hold_duration": 0.5898,
+            "account_size": 0.5136,
+            "trade_sequencing": 0.5911,
+            "position_sizing": 0.5,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.8438,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T08:21:09.980757+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5999,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9682,
+            "hold_duration": null,
+            "account_size": 0.5096,
+            "trade_sequencing": 0.8451,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8463,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T09:20:20.883715+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5462,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9901,
+            "hold_duration": 0.5048,
+            "account_size": 0.588,
+            "trade_sequencing": 0.5148,
+            "position_sizing": 0.5,
+            "activity": 0.5501,
+            "direction_bias": 1.0,
+            "position_management": 0.8404,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T10:16:01.277900+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4051,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.997,
+            "hold_duration": 0.3756,
+            "account_size": 0.5655,
+            "trade_sequencing": 0.4594,
+            "position_sizing": 0.5,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.8392,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T11:14:24.419111+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4051,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.997,
+            "hold_duration": 0.3756,
+            "account_size": 0.565,
+            "trade_sequencing": 0.4594,
+            "position_sizing": 0.5,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.8392,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T12:19:49.537144+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5711,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.979,
+            "hold_duration": 0.2875,
+            "account_size": 0.5007,
+            "trade_sequencing": 0.4333,
+            "position_sizing": 0.5,
+            "activity": 0.5501,
+            "direction_bias": 1.0,
+            "position_management": 0.8021,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T13:33:46.397074+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5017,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9882,
+            "hold_duration": null,
+            "account_size": 0.4561,
+            "trade_sequencing": 0.3168,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7968,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-18T14:21:06.607719+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5017,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9882,
+            "hold_duration": null,
+            "account_size": 0.4556,
+            "trade_sequencing": 0.3168,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7968,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T02:09:53.000122+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6681,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T03:36:04.732828+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6681,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T04:24:34.942818+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.668,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T05:18:30.104461+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.668,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T06:22:16.643533+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6682,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T07:28:46.540449+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.668,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T08:22:06.660833+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6683,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T09:21:21.237233+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6679,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T10:16:14.770130+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6681,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T11:13:58.731982+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5403,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9873,
+            "hold_duration": 0.5069,
+            "account_size": 0.6684,
+            "trade_sequencing": 0.5072,
+            "position_sizing": 0.7071,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7674,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T12:19:48.221823+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.562,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T13:35:43.061594+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.5654,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T14:21:54.550836+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.5662,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T15:19:19.208661+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.5763,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T16:17:29.837170+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.5878,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T17:16:26.178087+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.56,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T18:16:12.186552+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.561,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T19:17:11.869412+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.443,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9903,
+            "hold_duration": null,
+            "account_size": 0.5738,
+            "trade_sequencing": 0.533,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7658,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T20:13:25.482566+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5339,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9126,
+            "hold_duration": 0.3974,
+            "account_size": 0.5787,
+            "trade_sequencing": 0.439,
+            "position_sizing": 0.5,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.7664,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T21:15:09.328092+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4871,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9583,
+            "hold_duration": 0.2902,
+            "account_size": 0.559,
+            "trade_sequencing": 0.4865,
+            "position_sizing": 0.5,
+            "activity": 0.5265,
+            "direction_bias": 1.0,
+            "position_management": 0.8007,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T22:12:52.000699+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4871,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9583,
+            "hold_duration": 0.2902,
+            "account_size": 0.5648,
+            "trade_sequencing": 0.4865,
+            "position_sizing": 0.5,
+            "activity": 0.5265,
+            "direction_bias": 1.0,
+            "position_management": 0.8007,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-19T23:13:11.572480+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5963,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9094,
+            "hold_duration": 0.3011,
+            "account_size": 0.6921,
+            "trade_sequencing": 0.3651,
+            "position_sizing": 0.7071,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.8421,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T00:32:04.500479+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6247,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9532,
+            "hold_duration": 0.3358,
+            "account_size": 0.7043,
+            "trade_sequencing": 0.3817,
+            "position_sizing": 0.7071,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.8309,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T02:10:12.237128+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.6247,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9532,
+            "hold_duration": 0.3358,
+            "account_size": 0.7369,
+            "trade_sequencing": 0.3817,
+            "position_sizing": 0.7071,
+            "activity": 0.537,
+            "direction_bias": 1.0,
+            "position_management": 0.8309,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T03:36:36.040689+00:00",
+          "score": 0.5998,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.625,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9994,
+            "hold_duration": null,
+            "account_size": 0.5112,
+            "trade_sequencing": 0.6605,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.7831,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T04:25:03.962463+00:00",
+          "score": 0.6069,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.6117,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9957,
+            "hold_duration": null,
+            "account_size": 0.5295,
+            "trade_sequencing": 0.7475,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8147,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T05:20:51.548569+00:00",
+          "score": 0.6056,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.599,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9964,
+            "hold_duration": null,
+            "account_size": 0.5446,
+            "trade_sequencing": 0.7612,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8105,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T06:22:59.849788+00:00",
+          "score": 0.6057,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.599,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9964,
+            "hold_duration": null,
+            "account_size": 0.5468,
+            "trade_sequencing": 0.7612,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8105,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T07:31:02.059004+00:00",
+          "score": 0.6058,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.599,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9964,
+            "hold_duration": null,
+            "account_size": 0.5476,
+            "trade_sequencing": 0.7612,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8105,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T08:22:54.878962+00:00",
+          "score": 0.605,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.599,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9964,
+            "hold_duration": null,
+            "account_size": 0.5383,
+            "trade_sequencing": 0.7612,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8105,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T09:21:50.787419+00:00",
+          "score": 0.606,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.599,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9964,
+            "hold_duration": null,
+            "account_size": 0.5497,
+            "trade_sequencing": 0.7612,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8105,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T10:17:55.521303+00:00",
+          "score": 0.6059,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.599,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9964,
+            "hold_duration": null,
+            "account_size": 0.5492,
+            "trade_sequencing": 0.7612,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8105,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T11:16:08.095685+00:00",
+          "score": 0.5658,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.6087,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9977,
+            "hold_duration": null,
+            "account_size": 0.5141,
+            "trade_sequencing": 0.4179,
+            "position_sizing": 0.5,
+            "activity": 0.6234,
+            "direction_bias": 1.0,
+            "position_management": 0.7624,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T12:22:01.765139+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.0909,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9956,
+            "hold_duration": null,
+            "account_size": 0.4907,
+            "trade_sequencing": 0.8048,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7766,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T13:37:28.597384+00:00",
+          "score": 0.4535,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.1111,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9923,
+            "hold_duration": null,
+            "account_size": 0.4838,
+            "trade_sequencing": 0.6132,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.7755,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T14:24:05.119560+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.5874,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9841,
+            "hold_duration": 0.5275,
+            "account_size": 0.5347,
+            "trade_sequencing": 0.6116,
+            "position_sizing": 0.5,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7995,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T15:22:21.159262+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.2958,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9774,
+            "hold_duration": null,
+            "account_size": 0.6187,
+            "trade_sequencing": 0.9861,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.879,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T16:19:59.808611+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.5022,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9787,
+            "hold_duration": null,
+            "account_size": 0.4982,
+            "trade_sequencing": 0.8094,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7873,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T17:17:40.607417+00:00",
+          "score": 0.5612,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.4587,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9878,
+            "hold_duration": null,
+            "account_size": 0.4825,
+            "trade_sequencing": 0.8496,
+            "position_sizing": 0.5,
+            "activity": 0.6234,
+            "direction_bias": 1.0,
+            "position_management": 0.8176,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T18:20:11.921382+00:00",
+          "score": 0.561,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.4587,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9878,
+            "hold_duration": null,
+            "account_size": 0.4806,
+            "trade_sequencing": 0.8496,
+            "position_sizing": 0.5,
+            "activity": 0.6234,
+            "direction_bias": 1.0,
+            "position_management": 0.8176,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T19:22:03.968312+00:00",
+          "score": 0.553,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.4475,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9952,
+            "hold_duration": null,
+            "account_size": 0.4703,
+            "trade_sequencing": 0.7995,
+            "position_sizing": 0.5,
+            "activity": 0.6234,
+            "direction_bias": 1.0,
+            "position_management": 0.807,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T20:15:43.108059+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.4534,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9954,
+            "hold_duration": null,
+            "account_size": 0.5237,
+            "trade_sequencing": 0.8734,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.7569,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T21:16:36.078267+00:00",
+          "score": 0.5493,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.4605,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9932,
+            "hold_duration": null,
+            "account_size": 0.486,
+            "trade_sequencing": 0.7294,
+            "position_sizing": 0.5,
+            "activity": 0.6234,
+            "direction_bias": 1.0,
+            "position_management": 0.7749,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T22:14:49.200600+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.5997,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9673,
+            "hold_duration": null,
+            "account_size": 0.5605,
+            "trade_sequencing": 0.9096,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8053,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-20T23:14:38.252373+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.2572,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9743,
+            "hold_duration": null,
+            "account_size": 0.5803,
+            "trade_sequencing": 0.9998,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8266,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T00:34:04.671339+00:00",
+          "score": 0.45,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.2004,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9745,
+            "hold_duration": 0.4486,
+            "account_size": 0.5522,
+            "trade_sequencing": 0.5505,
+            "position_sizing": 0.5,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.8448,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T04:27:01.567798+00:00",
+          "score": 0.5996,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6228,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9985,
+            "hold_duration": null,
+            "account_size": 0.4861,
+            "trade_sequencing": 0.6739,
+            "position_sizing": 0.5,
+            "activity": 0.6795,
+            "direction_bias": 1.0,
+            "position_management": 0.8012,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T05:22:05.433363+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4878,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9931,
+            "hold_duration": 0.4671,
+            "account_size": 0.5293,
+            "trade_sequencing": 0.8506,
+            "position_sizing": 0.5,
+            "activity": 0.567,
+            "direction_bias": 1.0,
+            "position_management": 0.7738,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T06:24:12.039824+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4777,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9475,
+            "hold_duration": null,
+            "account_size": 0.4919,
+            "trade_sequencing": 0.9407,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.844,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T12:21:36.450401+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4798,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9076,
+            "hold_duration": null,
+            "account_size": 0.4836,
+            "trade_sequencing": 0.9402,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8468,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T13:36:29.214559+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.3775,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9893,
+            "hold_duration": null,
+            "account_size": 0.5199,
+            "trade_sequencing": 0.9939,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8506,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T15:21:56.664381+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4714,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9931,
+            "hold_duration": null,
+            "account_size": 0.4421,
+            "trade_sequencing": 0.9157,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.848,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T16:18:22.614332+00:00",
+          "score": 0.5908,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.6111,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9994,
+            "hold_duration": null,
+            "account_size": 0.4398,
+            "trade_sequencing": 0.7721,
+            "position_sizing": 0.5,
+            "activity": 0.6234,
+            "direction_bias": 1.0,
+            "position_management": 0.7812,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T17:18:03.430467+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.3458,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9912,
+            "hold_duration": null,
+            "account_size": 0.4625,
+            "trade_sequencing": 0.9987,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8409,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T18:19:55.602345+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1441,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9952,
+            "hold_duration": null,
+            "account_size": 0.4673,
+            "trade_sequencing": 1.0,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8341,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T19:18:23.503166+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1441,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9952,
+            "hold_duration": null,
+            "account_size": 0.4675,
+            "trade_sequencing": 1.0,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8341,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T20:12:26.267515+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1441,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9952,
+            "hold_duration": null,
+            "account_size": 0.4697,
+            "trade_sequencing": 1.0,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8341,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T21:12:35.778469+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1441,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9952,
+            "hold_duration": null,
+            "account_size": 0.4703,
+            "trade_sequencing": 1.0,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8341,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T22:11:53.368624+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.1441,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9952,
+            "hold_duration": null,
+            "account_size": 0.4847,
+            "trade_sequencing": 1.0,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8341,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-21T23:13:05.036272+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.5968,
+            "timing_profile": null,
+            "leverage_profile": 0.9064,
+            "entry_exit_style": 0.9966,
+            "hold_duration": null,
+            "account_size": 0.4369,
+            "trade_sequencing": 0.9838,
+            "position_sizing": 0.5,
+            "activity": 0.5899,
+            "direction_bias": 1.0,
+            "position_management": 0.8592,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T02:08:04.925451+00:00",
+          "score": 0.6824,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.3973,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9841,
+            "hold_duration": 0.6787,
+            "account_size": 0.4558,
+            "trade_sequencing": 0.8665,
+            "position_sizing": 0.5,
+            "activity": 0.7682,
+            "direction_bias": 1.0,
+            "position_management": 0.7702,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T03:32:43.867033+00:00",
+          "score": 0.6882,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.3303,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.971,
+            "hold_duration": null,
+            "account_size": 0.5299,
+            "trade_sequencing": 0.9951,
+            "position_sizing": 0.5,
+            "activity": 0.8085,
+            "direction_bias": 1.0,
+            "position_management": 0.7994,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T04:21:10.364178+00:00",
+          "score": 0.7255,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.551,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9814,
+            "hold_duration": 0.6518,
+            "account_size": 0.4559,
+            "trade_sequencing": 0.9968,
+            "position_sizing": 0.5,
+            "activity": 0.7384,
+            "direction_bias": 1.0,
+            "position_management": 0.8218,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T05:16:20.157305+00:00",
+          "score": 0.6939,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.4872,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9935,
+            "hold_duration": null,
+            "account_size": 0.4735,
+            "trade_sequencing": 0.695,
+            "position_sizing": 0.5,
+            "activity": 0.8085,
+            "direction_bias": 1.0,
+            "position_management": 0.6764,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T06:19:06.706383+00:00",
+          "score": 0.7045,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.3603,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9989,
+            "hold_duration": null,
+            "account_size": 0.4703,
+            "trade_sequencing": 0.9984,
+            "position_sizing": 0.5,
+            "activity": 0.8676,
+            "direction_bias": 1.0,
+            "position_management": 0.8155,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T07:22:06.324845+00:00",
+          "score": 0.6722,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.2366,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9999,
+            "hold_duration": null,
+            "account_size": 0.4708,
+            "trade_sequencing": 0.9986,
+            "position_sizing": 0.5,
+            "activity": 0.8676,
+            "direction_bias": 1.0,
+            "position_management": 0.8274,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T08:15:32.143750+00:00",
+          "score": 0.6664,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.3038,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9974,
+            "hold_duration": 0.6611,
+            "account_size": 0.4788,
+            "trade_sequencing": 0.9972,
+            "position_sizing": 0.5,
+            "activity": 0.7384,
+            "direction_bias": 1.0,
+            "position_management": 0.7735,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T09:16:03.126108+00:00",
+          "score": 0.5994,
+          "tier": "WATCH_CLOSELY",
+          "dimensions": {
+            "asset_preferences": 0.5429,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9781,
+            "hold_duration": null,
+            "account_size": 0.4352,
+            "trade_sequencing": 0.6849,
+            "position_sizing": 0.5,
+            "activity": 0.8896,
+            "direction_bias": 1.0,
+            "position_management": 0.7229,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T10:11:00.234350+00:00",
+          "score": 0.7101,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4559,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T11:10:02.792726+00:00",
+          "score": 0.71,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.455,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T12:14:49.387892+00:00",
+          "score": 0.7101,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4556,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T13:22:51.262145+00:00",
+          "score": 0.7099,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4523,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T14:09:43.686931+00:00",
+          "score": 0.7099,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4526,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T15:09:07.232578+00:00",
+          "score": 0.7097,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4501,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T16:09:39.757256+00:00",
+          "score": 0.7101,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4551,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T17:10:26.565890+00:00",
+          "score": 0.7099,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4526,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T18:12:06.802968+00:00",
+          "score": 0.7099,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4524,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T19:14:11.245061+00:00",
+          "score": 0.7101,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4551,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T20:09:54.124234+00:00",
+          "score": 0.7102,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4575,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T21:10:33.780178+00:00",
+          "score": 0.7099,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4524,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T22:09:39.862005+00:00",
+          "score": 0.7098,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.4515,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-22T23:09:31.712685+00:00",
+          "score": 0.7099,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.5613,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9889,
+            "hold_duration": 0.5464,
+            "account_size": 0.453,
+            "trade_sequencing": 0.9876,
+            "position_sizing": 0.5,
+            "activity": 0.7153,
+            "direction_bias": 1.0,
+            "position_management": 0.7762,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-23T00:34:48.375065+00:00",
+          "score": 0.7278,
+          "tier": "CONFIRMED_CANDIDATE",
+          "dimensions": {
+            "asset_preferences": 0.527,
+            "timing_profile": null,
+            "leverage_profile": 0.9187,
+            "entry_exit_style": 0.9937,
+            "hold_duration": 0.623,
+            "account_size": 0.5142,
+            "trade_sequencing": 1.0,
+            "position_sizing": 0.5,
+            "activity": 0.7682,
+            "direction_bias": 1.0,
+            "position_management": 0.8475,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-23T02:17:06.533922+00:00",
+          "score": 0.6861,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.5163,
+            "timing_profile": null,
+            "leverage_profile": 0.9076,
+            "entry_exit_style": 0.9821,
+            "hold_duration": 0.4361,
+            "account_size": 0.4807,
+            "trade_sequencing": 0.9818,
+            "position_sizing": 0.5,
+            "activity": 0.6999,
+            "direction_bias": 1.0,
+            "position_management": 0.7955,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-23T07:23:48.539110+00:00",
+          "score": 0.6541,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.4039,
+            "timing_profile": null,
+            "leverage_profile": 0.9076,
+            "entry_exit_style": 0.9937,
+            "hold_duration": 0.4293,
+            "account_size": 0.4688,
+            "trade_sequencing": 0.9156,
+            "position_sizing": 0.5,
+            "activity": 0.7295,
+            "direction_bias": 1.0,
+            "position_management": 0.7479,
+            "loss_handling": null
+          }
+        },
+        {
+          "scan_time": "2026-08-23T08:15:52.041602+00:00",
+          "score": 0.7387,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.5758,
+            "timing_profile": null,
+            "leverage_profile": 0.9076,
+            "entry_exit_style": 0.9941,
+            "hold_duration": null,
+            "account_size": 0.3809,
+            "trade_sequencing": 0.9916,
+            "position_sizing": 0.5,
+            "activity": 0.7695,
+            "direction_bias": 1.0,
+            "position_management": 0.8195,
+            "loss_handling": null
+          }
+        }
+      ],
+      "status": "ACTIVE",
+      "recent_avg_score": 0.7052
+    },
+    {
       "wallet": "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36",
       "first_seen": "2026-07-06T11:35:24.225653+00:00",
-      "last_seen": "2026-08-23T07:23:46.908877+00:00",
+      "last_seen": "2026-08-23T08:15:49.677202+00:00",
       "best_score": 0.7326,
-      "latest_score": 0.6629,
+      "latest_score": 0.663,
       "latest_tier": "WEAK_LEAD",
       "latest_evidence": {
         "tier": "WEAK_LEAD",
@@ -7409,31 +9388,12 @@
           "description": "no shared markets",
           "sample_sufficient": true,
           "bonus_applied": 0.0,
-          "score_without_bonus": 0.6629,
+          "score_without_bonus": 0.663,
           "explanations": [],
           "frequencies": {}
         }
       },
       "score_history": [
-        {
-          "scan_time": "2026-08-18T09:20:16.247469+00:00",
-          "score": 0.4308,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.0893,
-            "timing_profile": null,
-            "leverage_profile": 0.7948,
-            "entry_exit_style": 0.9973,
-            "hold_duration": 0.5977,
-            "account_size": 0.5917,
-            "trade_sequencing": 0.6052,
-            "position_sizing": 0.5,
-            "activity": 0.5856,
-            "direction_bias": 0.9994,
-            "position_management": 0.7502,
-            "loss_handling": null
-          }
-        },
         {
           "scan_time": "2026-08-18T10:15:51.138961+00:00",
           "score": 0.4453,
@@ -9314,10 +11274,29 @@
             "position_management": 0.7815,
             "loss_handling": null
           }
+        },
+        {
+          "scan_time": "2026-08-23T08:15:49.677202+00:00",
+          "score": 0.663,
+          "tier": "WEAK_LEAD",
+          "dimensions": {
+            "asset_preferences": 0.5111,
+            "timing_profile": null,
+            "leverage_profile": 0.7938,
+            "entry_exit_style": 0.9362,
+            "hold_duration": 0.4685,
+            "account_size": 0.4317,
+            "trade_sequencing": 0.9367,
+            "position_sizing": 0.5,
+            "activity": 0.6999,
+            "direction_bias": 1.0,
+            "position_management": 0.7815,
+            "loss_handling": null
+          }
         }
       ],
       "status": "ACTIVE",
-      "recent_avg_score": 0.6948
+      "recent_avg_score": 0.6861
     },
     {
       "wallet": "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
@@ -11288,1974 +13267,6 @@
       ],
       "status": "ACTIVE",
       "recent_avg_score": 0.6782
-    },
-    {
-      "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
-      "first_seen": "2026-07-27T20:12:49.458680+00:00",
-      "last_seen": "2026-08-23T07:23:48.539110+00:00",
-      "best_score": 0.7278,
-      "latest_score": 0.6541,
-      "latest_tier": "WEAK_LEAD",
-      "latest_evidence": {
-        "tier": "WEAK_LEAD",
-        "reasons": [
-          "Similar market/limit execution style",
-          "Matching long/short bias"
-        ],
-        "warnings": [],
-        "vetoes": [],
-        "asset_overlap": {
-          "overlap": [
-            "@107",
-            "BTC",
-            "ETH",
-            "PUMP",
-            "SOL"
-          ],
-          "target_only": [
-            "AAVE",
-            "ADA",
-            "ASTER",
-            "CASHCAT",
-            "DOGE",
-            "ENA",
-            "ETHFI",
-            "FARTCOIN",
-            "GRAM",
-            "LINK",
-            "MON",
-            "NEAR",
-            "ONDO",
-            "XPL",
-            "XRP",
-            "ZEC",
-            "ZRO",
-            "kPEPE",
-            "xyz:SKHX"
-          ],
-          "candidate_only": [
-            "HYPE"
-          ],
-          "overlap_count": 5,
-          "rare_overlap": [],
-          "jaccard": 0.2
-        },
-        "market_rarity": {
-          "shared_markets": [],
-          "rare_markets": [],
-          "classification": {},
-          "description": "no shared markets",
-          "sample_sufficient": true,
-          "bonus_applied": 0.0,
-          "score_without_bonus": 0.6541,
-          "explanations": [],
-          "frequencies": {}
-        }
-      },
-      "score_history": [
-        {
-          "scan_time": "2026-08-17T16:12:32.639073+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6574,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9896,
-            "hold_duration": null,
-            "account_size": 0.615,
-            "trade_sequencing": 0.4637,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8278,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-17T17:15:37.560451+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6574,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9896,
-            "hold_duration": null,
-            "account_size": 0.6145,
-            "trade_sequencing": 0.4637,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8278,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-17T18:20:16.505138+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6574,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9896,
-            "hold_duration": null,
-            "account_size": 0.6138,
-            "trade_sequencing": 0.4637,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8278,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-17T19:19:10.666571+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6563,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9782,
-            "hold_duration": null,
-            "account_size": 0.6837,
-            "trade_sequencing": 0.5181,
-            "position_sizing": 0.7071,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8568,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-17T20:13:05.495479+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6563,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9782,
-            "hold_duration": null,
-            "account_size": 0.6839,
-            "trade_sequencing": 0.5181,
-            "position_sizing": 0.7071,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8568,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T05:18:33.642645+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1915,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.8648,
-            "hold_duration": 0.5367,
-            "account_size": 0.6467,
-            "trade_sequencing": 0.5697,
-            "position_sizing": 0.7071,
-            "activity": 0.5265,
-            "direction_bias": 1.0,
-            "position_management": 0.8217,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T06:21:30.621109+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1915,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.8648,
-            "hold_duration": 0.5367,
-            "account_size": 0.6462,
-            "trade_sequencing": 0.5697,
-            "position_sizing": 0.7071,
-            "activity": 0.5265,
-            "direction_bias": 1.0,
-            "position_management": 0.8217,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T07:28:00.564002+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.2195,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9569,
-            "hold_duration": 0.5898,
-            "account_size": 0.5136,
-            "trade_sequencing": 0.5911,
-            "position_sizing": 0.5,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.8438,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T08:21:09.980757+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5999,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9682,
-            "hold_duration": null,
-            "account_size": 0.5096,
-            "trade_sequencing": 0.8451,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8463,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T09:20:20.883715+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5462,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9901,
-            "hold_duration": 0.5048,
-            "account_size": 0.588,
-            "trade_sequencing": 0.5148,
-            "position_sizing": 0.5,
-            "activity": 0.5501,
-            "direction_bias": 1.0,
-            "position_management": 0.8404,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T10:16:01.277900+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4051,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.997,
-            "hold_duration": 0.3756,
-            "account_size": 0.5655,
-            "trade_sequencing": 0.4594,
-            "position_sizing": 0.5,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.8392,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T11:14:24.419111+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4051,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.997,
-            "hold_duration": 0.3756,
-            "account_size": 0.565,
-            "trade_sequencing": 0.4594,
-            "position_sizing": 0.5,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.8392,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T12:19:49.537144+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5711,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.979,
-            "hold_duration": 0.2875,
-            "account_size": 0.5007,
-            "trade_sequencing": 0.4333,
-            "position_sizing": 0.5,
-            "activity": 0.5501,
-            "direction_bias": 1.0,
-            "position_management": 0.8021,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T13:33:46.397074+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5017,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9882,
-            "hold_duration": null,
-            "account_size": 0.4561,
-            "trade_sequencing": 0.3168,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7968,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-18T14:21:06.607719+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5017,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9882,
-            "hold_duration": null,
-            "account_size": 0.4556,
-            "trade_sequencing": 0.3168,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7968,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T02:09:53.000122+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6681,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T03:36:04.732828+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6681,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T04:24:34.942818+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.668,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T05:18:30.104461+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.668,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T06:22:16.643533+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6682,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T07:28:46.540449+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.668,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T08:22:06.660833+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6683,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T09:21:21.237233+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6679,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T10:16:14.770130+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6681,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T11:13:58.731982+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5403,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9873,
-            "hold_duration": 0.5069,
-            "account_size": 0.6684,
-            "trade_sequencing": 0.5072,
-            "position_sizing": 0.7071,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7674,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T12:19:48.221823+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.562,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T13:35:43.061594+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.5654,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T14:21:54.550836+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.5662,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T15:19:19.208661+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.5763,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T16:17:29.837170+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.5878,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T17:16:26.178087+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.56,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T18:16:12.186552+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.561,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T19:17:11.869412+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.443,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9903,
-            "hold_duration": null,
-            "account_size": 0.5738,
-            "trade_sequencing": 0.533,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7658,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T20:13:25.482566+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5339,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9126,
-            "hold_duration": 0.3974,
-            "account_size": 0.5787,
-            "trade_sequencing": 0.439,
-            "position_sizing": 0.5,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.7664,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T21:15:09.328092+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4871,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9583,
-            "hold_duration": 0.2902,
-            "account_size": 0.559,
-            "trade_sequencing": 0.4865,
-            "position_sizing": 0.5,
-            "activity": 0.5265,
-            "direction_bias": 1.0,
-            "position_management": 0.8007,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T22:12:52.000699+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4871,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9583,
-            "hold_duration": 0.2902,
-            "account_size": 0.5648,
-            "trade_sequencing": 0.4865,
-            "position_sizing": 0.5,
-            "activity": 0.5265,
-            "direction_bias": 1.0,
-            "position_management": 0.8007,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-19T23:13:11.572480+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5963,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9094,
-            "hold_duration": 0.3011,
-            "account_size": 0.6921,
-            "trade_sequencing": 0.3651,
-            "position_sizing": 0.7071,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.8421,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T00:32:04.500479+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6247,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9532,
-            "hold_duration": 0.3358,
-            "account_size": 0.7043,
-            "trade_sequencing": 0.3817,
-            "position_sizing": 0.7071,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.8309,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T02:10:12.237128+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.6247,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9532,
-            "hold_duration": 0.3358,
-            "account_size": 0.7369,
-            "trade_sequencing": 0.3817,
-            "position_sizing": 0.7071,
-            "activity": 0.537,
-            "direction_bias": 1.0,
-            "position_management": 0.8309,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T03:36:36.040689+00:00",
-          "score": 0.5998,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.625,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9994,
-            "hold_duration": null,
-            "account_size": 0.5112,
-            "trade_sequencing": 0.6605,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.7831,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T04:25:03.962463+00:00",
-          "score": 0.6069,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.6117,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9957,
-            "hold_duration": null,
-            "account_size": 0.5295,
-            "trade_sequencing": 0.7475,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8147,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T05:20:51.548569+00:00",
-          "score": 0.6056,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.599,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9964,
-            "hold_duration": null,
-            "account_size": 0.5446,
-            "trade_sequencing": 0.7612,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8105,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T06:22:59.849788+00:00",
-          "score": 0.6057,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.599,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9964,
-            "hold_duration": null,
-            "account_size": 0.5468,
-            "trade_sequencing": 0.7612,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8105,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T07:31:02.059004+00:00",
-          "score": 0.6058,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.599,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9964,
-            "hold_duration": null,
-            "account_size": 0.5476,
-            "trade_sequencing": 0.7612,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8105,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T08:22:54.878962+00:00",
-          "score": 0.605,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.599,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9964,
-            "hold_duration": null,
-            "account_size": 0.5383,
-            "trade_sequencing": 0.7612,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8105,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T09:21:50.787419+00:00",
-          "score": 0.606,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.599,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9964,
-            "hold_duration": null,
-            "account_size": 0.5497,
-            "trade_sequencing": 0.7612,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8105,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T10:17:55.521303+00:00",
-          "score": 0.6059,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.599,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9964,
-            "hold_duration": null,
-            "account_size": 0.5492,
-            "trade_sequencing": 0.7612,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8105,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T11:16:08.095685+00:00",
-          "score": 0.5658,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.6087,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9977,
-            "hold_duration": null,
-            "account_size": 0.5141,
-            "trade_sequencing": 0.4179,
-            "position_sizing": 0.5,
-            "activity": 0.6234,
-            "direction_bias": 1.0,
-            "position_management": 0.7624,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T12:22:01.765139+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.0909,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9956,
-            "hold_duration": null,
-            "account_size": 0.4907,
-            "trade_sequencing": 0.8048,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7766,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T13:37:28.597384+00:00",
-          "score": 0.4535,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.1111,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9923,
-            "hold_duration": null,
-            "account_size": 0.4838,
-            "trade_sequencing": 0.6132,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.7755,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T14:24:05.119560+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.5874,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9841,
-            "hold_duration": 0.5275,
-            "account_size": 0.5347,
-            "trade_sequencing": 0.6116,
-            "position_sizing": 0.5,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7995,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T15:22:21.159262+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.2958,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9774,
-            "hold_duration": null,
-            "account_size": 0.6187,
-            "trade_sequencing": 0.9861,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.879,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T16:19:59.808611+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.5022,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9787,
-            "hold_duration": null,
-            "account_size": 0.4982,
-            "trade_sequencing": 0.8094,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7873,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T17:17:40.607417+00:00",
-          "score": 0.5612,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.4587,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9878,
-            "hold_duration": null,
-            "account_size": 0.4825,
-            "trade_sequencing": 0.8496,
-            "position_sizing": 0.5,
-            "activity": 0.6234,
-            "direction_bias": 1.0,
-            "position_management": 0.8176,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T18:20:11.921382+00:00",
-          "score": 0.561,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.4587,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9878,
-            "hold_duration": null,
-            "account_size": 0.4806,
-            "trade_sequencing": 0.8496,
-            "position_sizing": 0.5,
-            "activity": 0.6234,
-            "direction_bias": 1.0,
-            "position_management": 0.8176,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T19:22:03.968312+00:00",
-          "score": 0.553,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.4475,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9952,
-            "hold_duration": null,
-            "account_size": 0.4703,
-            "trade_sequencing": 0.7995,
-            "position_sizing": 0.5,
-            "activity": 0.6234,
-            "direction_bias": 1.0,
-            "position_management": 0.807,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T20:15:43.108059+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.4534,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9954,
-            "hold_duration": null,
-            "account_size": 0.5237,
-            "trade_sequencing": 0.8734,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.7569,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T21:16:36.078267+00:00",
-          "score": 0.5493,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.4605,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9932,
-            "hold_duration": null,
-            "account_size": 0.486,
-            "trade_sequencing": 0.7294,
-            "position_sizing": 0.5,
-            "activity": 0.6234,
-            "direction_bias": 1.0,
-            "position_management": 0.7749,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T22:14:49.200600+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.5997,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9673,
-            "hold_duration": null,
-            "account_size": 0.5605,
-            "trade_sequencing": 0.9096,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8053,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-20T23:14:38.252373+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.2572,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9743,
-            "hold_duration": null,
-            "account_size": 0.5803,
-            "trade_sequencing": 0.9998,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8266,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T00:34:04.671339+00:00",
-          "score": 0.45,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.2004,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9745,
-            "hold_duration": 0.4486,
-            "account_size": 0.5522,
-            "trade_sequencing": 0.5505,
-            "position_sizing": 0.5,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.8448,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T04:27:01.567798+00:00",
-          "score": 0.5996,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6228,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9985,
-            "hold_duration": null,
-            "account_size": 0.4861,
-            "trade_sequencing": 0.6739,
-            "position_sizing": 0.5,
-            "activity": 0.6795,
-            "direction_bias": 1.0,
-            "position_management": 0.8012,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T05:22:05.433363+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4878,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9931,
-            "hold_duration": 0.4671,
-            "account_size": 0.5293,
-            "trade_sequencing": 0.8506,
-            "position_sizing": 0.5,
-            "activity": 0.567,
-            "direction_bias": 1.0,
-            "position_management": 0.7738,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T06:24:12.039824+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4777,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9475,
-            "hold_duration": null,
-            "account_size": 0.4919,
-            "trade_sequencing": 0.9407,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.844,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T12:21:36.450401+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4798,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9076,
-            "hold_duration": null,
-            "account_size": 0.4836,
-            "trade_sequencing": 0.9402,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8468,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T13:36:29.214559+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.3775,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9893,
-            "hold_duration": null,
-            "account_size": 0.5199,
-            "trade_sequencing": 0.9939,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8506,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T15:21:56.664381+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.4714,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9931,
-            "hold_duration": null,
-            "account_size": 0.4421,
-            "trade_sequencing": 0.9157,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.848,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T16:18:22.614332+00:00",
-          "score": 0.5908,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.6111,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9994,
-            "hold_duration": null,
-            "account_size": 0.4398,
-            "trade_sequencing": 0.7721,
-            "position_sizing": 0.5,
-            "activity": 0.6234,
-            "direction_bias": 1.0,
-            "position_management": 0.7812,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T17:18:03.430467+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.3458,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9912,
-            "hold_duration": null,
-            "account_size": 0.4625,
-            "trade_sequencing": 0.9987,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8409,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T18:19:55.602345+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1441,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9952,
-            "hold_duration": null,
-            "account_size": 0.4673,
-            "trade_sequencing": 1.0,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8341,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T19:18:23.503166+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1441,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9952,
-            "hold_duration": null,
-            "account_size": 0.4675,
-            "trade_sequencing": 1.0,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8341,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T20:12:26.267515+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1441,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9952,
-            "hold_duration": null,
-            "account_size": 0.4697,
-            "trade_sequencing": 1.0,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8341,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T21:12:35.778469+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1441,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9952,
-            "hold_duration": null,
-            "account_size": 0.4703,
-            "trade_sequencing": 1.0,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8341,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T22:11:53.368624+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.1441,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9952,
-            "hold_duration": null,
-            "account_size": 0.4847,
-            "trade_sequencing": 1.0,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8341,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-21T23:13:05.036272+00:00",
-          "score": 0.45,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.5968,
-            "timing_profile": null,
-            "leverage_profile": 0.9064,
-            "entry_exit_style": 0.9966,
-            "hold_duration": null,
-            "account_size": 0.4369,
-            "trade_sequencing": 0.9838,
-            "position_sizing": 0.5,
-            "activity": 0.5899,
-            "direction_bias": 1.0,
-            "position_management": 0.8592,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T02:08:04.925451+00:00",
-          "score": 0.6824,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.3973,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9841,
-            "hold_duration": 0.6787,
-            "account_size": 0.4558,
-            "trade_sequencing": 0.8665,
-            "position_sizing": 0.5,
-            "activity": 0.7682,
-            "direction_bias": 1.0,
-            "position_management": 0.7702,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T03:32:43.867033+00:00",
-          "score": 0.6882,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.3303,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.971,
-            "hold_duration": null,
-            "account_size": 0.5299,
-            "trade_sequencing": 0.9951,
-            "position_sizing": 0.5,
-            "activity": 0.8085,
-            "direction_bias": 1.0,
-            "position_management": 0.7994,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T04:21:10.364178+00:00",
-          "score": 0.7255,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.551,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9814,
-            "hold_duration": 0.6518,
-            "account_size": 0.4559,
-            "trade_sequencing": 0.9968,
-            "position_sizing": 0.5,
-            "activity": 0.7384,
-            "direction_bias": 1.0,
-            "position_management": 0.8218,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T05:16:20.157305+00:00",
-          "score": 0.6939,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.4872,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9935,
-            "hold_duration": null,
-            "account_size": 0.4735,
-            "trade_sequencing": 0.695,
-            "position_sizing": 0.5,
-            "activity": 0.8085,
-            "direction_bias": 1.0,
-            "position_management": 0.6764,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T06:19:06.706383+00:00",
-          "score": 0.7045,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.3603,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9989,
-            "hold_duration": null,
-            "account_size": 0.4703,
-            "trade_sequencing": 0.9984,
-            "position_sizing": 0.5,
-            "activity": 0.8676,
-            "direction_bias": 1.0,
-            "position_management": 0.8155,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T07:22:06.324845+00:00",
-          "score": 0.6722,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.2366,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9999,
-            "hold_duration": null,
-            "account_size": 0.4708,
-            "trade_sequencing": 0.9986,
-            "position_sizing": 0.5,
-            "activity": 0.8676,
-            "direction_bias": 1.0,
-            "position_management": 0.8274,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T08:15:32.143750+00:00",
-          "score": 0.6664,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.3038,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9974,
-            "hold_duration": 0.6611,
-            "account_size": 0.4788,
-            "trade_sequencing": 0.9972,
-            "position_sizing": 0.5,
-            "activity": 0.7384,
-            "direction_bias": 1.0,
-            "position_management": 0.7735,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T09:16:03.126108+00:00",
-          "score": 0.5994,
-          "tier": "WATCH_CLOSELY",
-          "dimensions": {
-            "asset_preferences": 0.5429,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9781,
-            "hold_duration": null,
-            "account_size": 0.4352,
-            "trade_sequencing": 0.6849,
-            "position_sizing": 0.5,
-            "activity": 0.8896,
-            "direction_bias": 1.0,
-            "position_management": 0.7229,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T10:11:00.234350+00:00",
-          "score": 0.7101,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4559,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T11:10:02.792726+00:00",
-          "score": 0.71,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.455,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T12:14:49.387892+00:00",
-          "score": 0.7101,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4556,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T13:22:51.262145+00:00",
-          "score": 0.7099,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4523,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T14:09:43.686931+00:00",
-          "score": 0.7099,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4526,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T15:09:07.232578+00:00",
-          "score": 0.7097,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4501,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T16:09:39.757256+00:00",
-          "score": 0.7101,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4551,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T17:10:26.565890+00:00",
-          "score": 0.7099,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4526,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T18:12:06.802968+00:00",
-          "score": 0.7099,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4524,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T19:14:11.245061+00:00",
-          "score": 0.7101,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4551,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T20:09:54.124234+00:00",
-          "score": 0.7102,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4575,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T21:10:33.780178+00:00",
-          "score": 0.7099,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4524,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T22:09:39.862005+00:00",
-          "score": 0.7098,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.4515,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-22T23:09:31.712685+00:00",
-          "score": 0.7099,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.5613,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9889,
-            "hold_duration": 0.5464,
-            "account_size": 0.453,
-            "trade_sequencing": 0.9876,
-            "position_sizing": 0.5,
-            "activity": 0.7153,
-            "direction_bias": 1.0,
-            "position_management": 0.7762,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-23T00:34:48.375065+00:00",
-          "score": 0.7278,
-          "tier": "CONFIRMED_CANDIDATE",
-          "dimensions": {
-            "asset_preferences": 0.527,
-            "timing_profile": null,
-            "leverage_profile": 0.9187,
-            "entry_exit_style": 0.9937,
-            "hold_duration": 0.623,
-            "account_size": 0.5142,
-            "trade_sequencing": 1.0,
-            "position_sizing": 0.5,
-            "activity": 0.7682,
-            "direction_bias": 1.0,
-            "position_management": 0.8475,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-23T02:17:06.533922+00:00",
-          "score": 0.6861,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.5163,
-            "timing_profile": null,
-            "leverage_profile": 0.9076,
-            "entry_exit_style": 0.9821,
-            "hold_duration": 0.4361,
-            "account_size": 0.4807,
-            "trade_sequencing": 0.9818,
-            "position_sizing": 0.5,
-            "activity": 0.6999,
-            "direction_bias": 1.0,
-            "position_management": 0.7955,
-            "loss_handling": null
-          }
-        },
-        {
-          "scan_time": "2026-08-23T07:23:48.539110+00:00",
-          "score": 0.6541,
-          "tier": "WEAK_LEAD",
-          "dimensions": {
-            "asset_preferences": 0.4039,
-            "timing_profile": null,
-            "leverage_profile": 0.9076,
-            "entry_exit_style": 0.9937,
-            "hold_duration": 0.4293,
-            "account_size": 0.4688,
-            "trade_sequencing": 0.9156,
-            "position_sizing": 0.5,
-            "activity": 0.7295,
-            "direction_bias": 1.0,
-            "position_management": 0.7479,
-            "loss_handling": null
-          }
-        }
-      ],
-      "status": "ACTIVE",
-      "recent_avg_score": 0.7011
     },
     {
       "wallet": "0xa1830e8d9f019feb448478a171bb37cc6c4c0482",
@@ -66755,7 +66766,7 @@
     {
       "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
       "first_seen": "2026-07-27T20:07:21.466157+00:00",
-      "last_seen": "2026-08-23T07:24:01.294112+00:00",
+      "last_seen": "2026-08-23T08:16:05.262444+00:00",
       "best_score": 0.6197,
       "latest_score": 0.45,
       "latest_tier": "BACKGROUND",
@@ -66766,7 +66777,7 @@
         ],
         "warnings": [],
         "vetoes": [
-          "Decision frequency 6x apart (2.30 vs 14.00 position episodes/day)"
+          "Decision frequency 6x apart (2.30 vs 13.00 position episodes/day)"
         ],
         "asset_overlap": {
           "overlap": [
@@ -66798,10 +66809,9 @@
             "xyz:SKHX"
           ],
           "candidate_only": [
-            "LIT",
             "XMR",
             "xyz:BRENTOIL",
-            "xyz:CL",
+            "xyz:GOLD",
             "xyz:GOOGL",
             "xyz:MU",
             "xyz:SKHY",
@@ -66810,7 +66820,7 @@
           ],
           "overlap_count": 5,
           "rare_overlap": [],
-          "jaccard": 0.1515
+          "jaccard": 0.1562
         },
         "market_rarity": {
           "shared_markets": [],
@@ -66825,25 +66835,6 @@
         }
       },
       "score_history": [
-        {
-          "scan_time": "2026-08-17T13:31:04.933508+00:00",
-          "score": 0.4435,
-          "tier": "BACKGROUND",
-          "dimensions": {
-            "asset_preferences": 0.452,
-            "timing_profile": null,
-            "leverage_profile": 0.8588,
-            "entry_exit_style": 0.0003,
-            "hold_duration": 0.5295,
-            "account_size": 0.7688,
-            "trade_sequencing": 0.7587,
-            "position_sizing": 0.7071,
-            "activity": 0.4891,
-            "direction_bias": 0.5997,
-            "position_management": 0.7492,
-            "loss_handling": null
-          }
-        },
         {
           "scan_time": "2026-08-17T14:15:45.520363+00:00",
           "score": 0.45,
@@ -68724,10 +68715,29 @@
             "position_management": 0.7938,
             "loss_handling": null
           }
+        },
+        {
+          "scan_time": "2026-08-23T08:16:05.262444+00:00",
+          "score": 0.45,
+          "tier": "BACKGROUND",
+          "dimensions": {
+            "asset_preferences": 0.4855,
+            "timing_profile": null,
+            "leverage_profile": 0.86,
+            "entry_exit_style": 0.0055,
+            "hold_duration": 0.4948,
+            "account_size": 0.4728,
+            "trade_sequencing": 0.9883,
+            "position_sizing": 0.5,
+            "activity": 0.6007,
+            "direction_bias": 0.9751,
+            "position_management": 0.7881,
+            "loss_handling": null
+          }
         }
       ],
       "status": "COOLING",
-      "recent_avg_score": 0.5046
+      "recent_avg_score": 0.4803
     },
     {
       "wallet": "0x93733da475d3cdcdf309fc72a91bdf36ac7e0e94",
