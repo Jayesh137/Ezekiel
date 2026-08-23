@@ -1,27 +1,29 @@
 {
   "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
   "first_seen": "2026-07-27T20:12:49.458680+00:00",
-  "last_seen": "2026-08-23T20:09:13.103424+00:00",
+  "last_seen": "2026-08-23T23:10:05.195509+00:00",
   "best_score": 0.7387,
-  "latest_score": 0.6836,
+  "latest_score": 0.7075,
   "latest_tier": "WEAK_LEAD",
   "latest_evidence": {
     "tier": "WEAK_LEAD",
     "reasons": [
       "Similar market/limit execution style",
+      "Matching trade frequency and cadence",
       "Matching long/short bias"
     ],
-    "warnings": [],
+    "warnings": [
+      "Too few position episodes to compare holding style"
+    ],
     "vetoes": [],
     "asset_overlap": {
       "overlap": [
+        "@107",
         "BTC",
-        "PUMP",
         "SOL",
         "XRP"
       ],
       "target_only": [
-        "@107",
         "AAVE",
         "ADA",
         "ASTER",
@@ -36,6 +38,7 @@
         "MON",
         "NEAR",
         "ONDO",
+        "PUMP",
         "XPL",
         "ZEC",
         "ZRO",
@@ -43,7 +46,7 @@
         "xyz:SKHX"
       ],
       "candidate_only": [
-        "xyz:GOLD"
+        "HYPE"
       ],
       "overlap_count": 4,
       "rare_overlap": [],
@@ -56,31 +59,12 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.6836,
+      "score_without_bonus": 0.7075,
       "explanations": [],
       "frequencies": {}
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-18T13:33:46.397074+00:00",
-      "score": 0.45,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.5017,
-        "timing_profile": null,
-        "leverage_profile": 0.9064,
-        "entry_exit_style": 0.9882,
-        "hold_duration": null,
-        "account_size": 0.4561,
-        "trade_sequencing": 0.3168,
-        "position_sizing": 0.5,
-        "activity": 0.5899,
-        "direction_bias": 1.0,
-        "position_management": 0.7968,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-18T14:21:06.607719+00:00",
       "score": 0.45,
@@ -1961,8 +1945,27 @@
         "position_management": 0.7596,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-08-23T23:10:05.195509+00:00",
+      "score": 0.7075,
+      "tier": "WEAK_LEAD",
+      "dimensions": {
+        "asset_preferences": 0.5271,
+        "timing_profile": null,
+        "leverage_profile": 0.848,
+        "entry_exit_style": 0.9822,
+        "hold_duration": null,
+        "account_size": 0.4009,
+        "trade_sequencing": 0.9633,
+        "position_sizing": 0.5,
+        "activity": 0.7695,
+        "direction_bias": 1.0,
+        "position_management": 0.7183,
+        "loss_handling": null
+      }
     }
   ],
   "status": "ACTIVE",
-  "recent_avg_score": 0.7
+  "recent_avg_score": 0.7009
 }
