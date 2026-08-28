@@ -14,6 +14,12 @@ def test_enabled_chains_falls_back_to_defaults_when_config_is_silent():
     assert [c["name"] for c in got] == [c["name"] for c in chains.DEFAULT_CHAINS]
 
 
+def test_enabled_chains_with_explicit_empty_list_returns_empty():
+    """An explicit empty chains list disables collection; this is distinct from omitting the key."""
+    got = chains.enabled_chains({"chains": []})
+    assert got == []
+
+
 def test_enabled_chains_filters_disabled_and_sorts_by_priority():
     cfg = {"chains": [
         {"name": "base", "chain_id": 8453, "native": "ETH", "enabled": True, "priority": 9},

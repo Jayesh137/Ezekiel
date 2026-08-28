@@ -25,21 +25,31 @@ def _validated(entry: dict) -> dict:
     return entry
 
 
+def _validated_chain_entries(config: dict) -> list[dict]:
+    """Get chain entries from config, validated and falling back to defaults if omitted.
+
+    Distinguishes between omitted key (returns defaults) and explicit empty list
+    (returns empty list). All entries are validated upfront.
+    """
+    entries = DEFAULT_CHAINS if "chains" not in config else config["chains"]
+    return [_validated(e) for e in entries]
+
+
 def enabled_chains(config: dict) -> list[dict]:
     """Configured chains that are switched on, strongest priority first.
 
     A config written before this key existed simply omits it, so the defaults
     apply and Arbitrum keeps working exactly as before.
     """
-    entries = config.get("chains") or DEFAULT_CHAINS
-    kept = [_validated(e) for e in entries]
+    kept = _validated_chain_entries(config)
     return sorted((e for e in kept if e["enabled"]), key=lambda e: e["priority"])
 
 
 def chain_by_name(name: str, config: dict) -> dict:
     """The chain entry for `name`, enabled or not. Raises KeyError if unknown."""
     wanted = (name or "").lower()
-    for entry in (config.get("chains") or DEFAULT_CHAINS):
+    entries = _validated_chain_entries(config)
+    for entry in entries:
         if entry["name"].lower() == wanted:
-            return _validated(entry)
+            return entry
     raise KeyError(f"unknown chain: {name!r}")
