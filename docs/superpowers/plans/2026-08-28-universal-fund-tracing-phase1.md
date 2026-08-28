@@ -603,7 +603,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `walk_blocks`, `WalkResult`, `CallBudget`, `BudgetExhausted`, `src.utils.etherscan_get`
-- Produces: `ACTIONS: dict[str, str]`, `fetch_kind(address, chain, kind, start_block, budget, *, page_size=1000, max_pages=50) -> tuple[WalkResult, str | None]` (rows, error), `probe_activity(address, chain, budget) -> bool`, `fetch_code(address, chain, budget) -> str | None`. `kind` is one of `"erc20" | "native" | "internal"`.
+- Produces: `ACTIONS: dict[str, str]`, `fetch_kind(address, chain, kind, start_block, budget, *, page_size=1000, max_pages=50) -> tuple[WalkResult, str | None]` (rows, error), `probe_activity(address, chain, budget) -> tuple[bool, str | None]` (active, error), `fetch_code(address, chain, budget) -> str | None`. `kind` is one of `"erc20" | "native" | "internal"`.
+
+> **Every reader returns (value, error).** A probe that returns a bare `False` cannot distinguish "this address never transacted here" from "we could not read this chain", and a caller that treats the first meaning as the second marks a chain empty when the system is simply blind to it. That is the exact silent all-clear this phase exists to prevent, so the error channel is part of the signature, not an optional extra.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -688,7 +690,7 @@ def test_probe_activity_costs_one_call_and_answers_yes_or_no(monkeypatch):
 
     monkeypatch.setattr(client, "etherscan_get", fake_get)
     b = budget()
-    assert client.probe_activity("0xabc", ARB, b) is True
+    assert client.probe_activity("0xabc", ARB, b) == (True, None)
     assert b.calls_used == 1
     assert calls[0]["offset"] == 1
 
@@ -696,13 +698,42 @@ def test_probe_activity_costs_one_call_and_answers_yes_or_no(monkeypatch):
 def test_probe_activity_is_false_when_the_address_never_transacted(monkeypatch):
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
         "status": "0", "message": "No transactions found", "result": []})
-    assert client.probe_activity("0xabc", ARB, budget()) is False
+    assert client.probe_activity("0xabc", ARB, budget()) == (False, None)
+
+
+def test_a_failed_probe_reports_an_error_and_is_not_merely_inactive(monkeypatch):
+    """The caller skips chains a probe calls inactive. If a rate-limited probe
+    returned a bare False, the sweep would record 'nothing here' for a chain it
+    simply could not read."""
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "0", "message": "Max rate limit reached", "result": []})
+    active, error = client.probe_activity("0xabc", ARB, budget())
+    assert active is False
+    assert error == "Max rate limit reached"
+
+
+def test_a_probe_with_no_budget_reports_exhaustion_rather_than_inactivity(monkeypatch):
+    monkeypatch.setattr(client, "etherscan_get",
+                        lambda p, chain_id=None: {"status": "1", "result": []})
+    b = CallBudget(max_calls=0, seconds=1000, clock=lambda: 0.0)
+    active, error = client.probe_activity("0xabc", ARB, b)
+    assert active is False
+    assert error == "budget_exhausted:call_budget"
 
 
 def test_fetch_code_returns_the_bytecode_string(monkeypatch):
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
         "jsonrpc": "2.0", "result": "0x60806040"})
     assert client.fetch_code("0xabc", ARB, budget()) == "0x60806040"
+
+
+def test_fetch_code_rejects_an_error_string_in_the_result_position(monkeypatch):
+    """Etherscan puts bare error strings where the payload belongs. Returned as
+    bytecode, one would mark a real wallet a contract — and a contract is never
+    graded a person."""
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "0", "message": "NOTOK", "result": "Max rate limit reached"})
+    assert client.fetch_code("0xabc", ARB, budget()) is None
 
 
 def test_fetch_code_returns_none_when_the_budget_is_gone(monkeypatch):
@@ -790,14 +821,13 @@ not read". Those must never serialise the same way: one is knowledge, the other
 is blindness.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from src.chain.budget import BudgetExhausted, CallBudget
 from src.chain.pagination import WalkResult, walk_blocks
 from src.utils import etherscan_get
+
+# No sys.path insert here. `src/*.py` modules carry one because they run as
+# scripts; `src/chain/*.py` never do — reaching this module's body at all means
+# `src.chain` already resolved.
 
 ACTIONS = {
     "erc20": "tokentx",
@@ -863,17 +893,22 @@ def fetch_kind(address: str, chain: dict, kind: str, start_block: int,
     return result, error
 
 
-def probe_activity(address: str, chain: dict, budget: CallBudget) -> bool:
+def probe_activity(address: str, chain: dict, budget: CallBudget
+                   ) -> tuple[bool, str | None]:
     """Has this address ever transacted on this chain? One call.
 
     Sweeping every frontier wallet across every chain costs six full sweeps per
     wallet; this costs one request and skips the chains that would return
     nothing.
+
+    Returns (active, error). A caller must treat a non-None error as "we could
+    not tell", never as "inactive": a failed probe that reads as an empty chain
+    is the silent all-clear this phase exists to prevent.
     """
     try:
         budget.spend()
-    except BudgetExhausted:
-        return False
+    except BudgetExhausted as exc:
+        return False, f"budget_exhausted:{exc}"
     payload = etherscan_get({
         "module": "account",
         "action": "txlist",
@@ -884,8 +919,8 @@ def probe_activity(address: str, chain: dict, budget: CallBudget) -> bool:
         "offset": 1,
         "sort": "asc",
     }, chain_id=chain["chain_id"])
-    rows, _ = _rows_or_error(payload)
-    return bool(rows)
+    rows, error = _rows_or_error(payload)
+    return bool(rows), error
 
 
 def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
@@ -905,7 +940,12 @@ def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
         "tag": "latest",
     }, chain_id=chain["chain_id"])
     code = payload.get("result")
-    return code if isinstance(code, str) else None
+    # Etherscan puts a bare error string in `result` on rate-limit and
+    # invalid-key responses across every module, so an unguarded isinstance
+    # check returns "Max rate limit reached" as though it were bytecode — which
+    # this function's own contract would then read as "contract, never a
+    # person", misclassifying a real wallet because of a transient API error.
+    return code if isinstance(code, str) and code.startswith("0x") else None
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**
@@ -2052,7 +2092,8 @@ def test_a_non_cluster_wallet_is_probed_before_being_swept(tmp_path, monkeypatch
     monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
 
     swept = []
-    monkeypatch.setattr(collect, "probe_activity", lambda a, c, b: c["name"] == "arbitrum")
+    monkeypatch.setattr(collect, "probe_activity",
+                        lambda a, c, b: (c["name"] == "arbitrum", None))
 
     def fake_fetch_kind(address, chain, kind, start, b, **kw):
         swept.append(chain["name"])
@@ -2065,6 +2106,25 @@ def test_a_non_cluster_wallet_is_probed_before_being_swept(tmp_path, monkeypatch
     assert set(swept) == {"arbitrum"}
     assert result["chains"]["base"]["probed_inactive"] is True
     assert result["chains"]["base"]["records"] == 0
+    assert result["degraded_sources"] == []
+
+
+def test_a_failed_probe_degrades_the_chain_rather_than_calling_it_inactive(
+        tmp_path, monkeypatch):
+    """A probe that could not read must never be recorded as an empty chain."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    monkeypatch.setattr(collect, "probe_activity",
+                        lambda a, c, b: (False, "Max rate limit reached"))
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda *a, **k: pytest.fail("must not sweep after a failed probe"))
+
+    result = collect.sweep_wallet("0xfrontier", [BASE], budget(), cluster=False)
+
+    assert result["chains"]["base"]["error"] == "Max rate limit reached"
+    assert result["chains"]["base"]["probed_inactive"] is False
+    assert result["degraded_sources"] == ["base"]
 
 
 def test_a_cluster_wallet_is_never_probed(tmp_path, monkeypatch):
@@ -2199,11 +2259,8 @@ Two rules this module exists to enforce:
 
 import json
 import os
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.chain import spam as spam_mod
 from src.chain.assets import decimals_of, value_usd
@@ -2343,8 +2400,15 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
 
         if not cluster:
             before = budget.calls_used
-            active = probe_activity(addr, chain, budget)
+            active, probe_error = probe_activity(addr, chain, budget)
             chain_result["calls"] += budget.calls_used - before
+            if probe_error:
+                # Could not read the chain. Recording this as "inactive" would
+                # claim the wallet has nothing here on the strength of a failed
+                # request — blindness dressed as knowledge.
+                chain_result["error"] = probe_error
+                result["degraded_sources"].append(name)
+                continue
             if not active:
                 chain_result["probed_inactive"] = True
                 continue
