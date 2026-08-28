@@ -76,7 +76,9 @@ def test_probe_activity_costs_one_call_and_answers_yes_or_no(monkeypatch):
 
     monkeypatch.setattr(client, "etherscan_get", fake_get)
     b = budget()
-    assert client.probe_activity("0xabc", ARB, b) is True
+    active, error = client.probe_activity("0xabc", ARB, b)
+    assert active is True
+    assert error is None
     assert b.calls_used == 1
     assert calls[0]["offset"] == 1
 
@@ -84,7 +86,26 @@ def test_probe_activity_costs_one_call_and_answers_yes_or_no(monkeypatch):
 def test_probe_activity_is_false_when_the_address_never_transacted(monkeypatch):
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
         "status": "0", "message": "No transactions found", "result": []})
-    assert client.probe_activity("0xabc", ARB, budget()) is False
+    active, error = client.probe_activity("0xabc", ARB, budget())
+    assert active is False
+    assert error is None
+
+
+def test_probe_activity_reports_a_read_error_instead_of_looking_inactive(monkeypatch):
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "0", "message": "Max rate limit reached", "result": []})
+    active, error = client.probe_activity("0xabc", ARB, budget())
+    assert active is False
+    assert error == "Max rate limit reached"
+
+
+def test_probe_activity_reports_budget_exhaustion_as_an_error(monkeypatch):
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "1", "result": [{"blockNumber": "1", "hash": "a"}]})
+    b = CallBudget(max_calls=0, seconds=1000, clock=lambda: 0.0)
+    active, error = client.probe_activity("0xabc", ARB, b)
+    assert active is False
+    assert error == "budget_exhausted:call_budget"
 
 
 def test_fetch_code_returns_the_bytecode_string(monkeypatch):
@@ -97,6 +118,12 @@ def test_fetch_code_returns_none_when_the_budget_is_gone(monkeypatch):
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {"result": "0x"})
     b = CallBudget(max_calls=0, seconds=1000, clock=lambda: 0.0)
     assert client.fetch_code("0xabc", ARB, b) is None
+
+
+def test_fetch_code_treats_a_non_hex_error_string_as_unreadable(monkeypatch):
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "jsonrpc": "2.0", "result": "Max rate limit reached"})
+    assert client.fetch_code("0xabc", ARB, budget()) is None
 
 
 def test_etherscan_get_defaults_to_arbitrum_and_honours_an_override(monkeypatch):

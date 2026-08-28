@@ -11,11 +11,6 @@ not read". Those must never serialise the same way: one is knowledge, the other
 is blindness.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from src.chain.budget import BudgetExhausted, CallBudget
 from src.chain.pagination import WalkResult, walk_blocks
 from src.utils import etherscan_get
@@ -84,17 +79,17 @@ def fetch_kind(address: str, chain: dict, kind: str, start_block: int,
     return result, error
 
 
-def probe_activity(address: str, chain: dict, budget: CallBudget) -> bool:
+def probe_activity(address: str, chain: dict, budget: CallBudget) -> tuple[bool, str | None]:
     """Has this address ever transacted on this chain? One call.
 
-    Sweeping every frontier wallet across every chain costs six full sweeps per
-    wallet; this costs one request and skips the chains that would return
-    nothing.
+    Returns (active, error). A caller must treat a non-None error as "we could
+    not tell", never as "inactive" — a failed probe that reads as an empty chain
+    is the silent all-clear this whole phase exists to prevent.
     """
     try:
         budget.spend()
-    except BudgetExhausted:
-        return False
+    except BudgetExhausted as exc:
+        return False, f"budget_exhausted:{exc}"
     payload = etherscan_get({
         "module": "account",
         "action": "txlist",
@@ -105,8 +100,8 @@ def probe_activity(address: str, chain: dict, budget: CallBudget) -> bool:
         "offset": 1,
         "sort": "asc",
     }, chain_id=chain["chain_id"])
-    rows, _ = _rows_or_error(payload)
-    return bool(rows)
+    rows, err = _rows_or_error(payload)
+    return bool(rows), err
 
 
 def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
@@ -126,4 +121,4 @@ def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
         "tag": "latest",
     }, chain_id=chain["chain_id"])
     code = payload.get("result")
-    return code if isinstance(code, str) else None
+    return code if isinstance(code, str) and code.startswith("0x") else None
