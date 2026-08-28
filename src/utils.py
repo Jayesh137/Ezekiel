@@ -52,12 +52,18 @@ def hl_post(request_body: dict, retries: int = 3) -> dict | list:
 
 # --- Etherscan V2 API ---
 
-def etherscan_get(params: dict) -> dict:
-    """GET from Etherscan V2 API for Arbitrum."""
+def etherscan_get(params: dict, chain_id: int | None = None) -> dict:
+    """GET from the Etherscan V2 API.
+
+    V2 serves every supported chain from one API key by varying `chainid`, so
+    `chain_id` is the only thing that changes between chains. It defaults to the
+    configured Arbitrum id, which keeps every pre-existing call site behaving
+    exactly as it did when the id was hardcoded.
+    """
     config = load_config()
     api_key = os.environ.get("ETHERSCAN_API_KEY", "")
     base_params = {
-        "chainid": config["arbitrum_chain_id"],
+        "chainid": chain_id if chain_id is not None else config["arbitrum_chain_id"],
         "apikey": api_key,
     }
     base_params.update(params)
