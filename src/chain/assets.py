@@ -86,9 +86,10 @@ class PriceCache:
         if symbol not in self._loaded:
             path = self._path(symbol)
             try:
-                self._loaded[symbol] = json.loads(path.read_text())
+                loaded = json.loads(path.read_text())
             except (OSError, ValueError):
-                self._loaded[symbol] = {}
+                loaded = {}
+            self._loaded[symbol] = loaded if isinstance(loaded, dict) else {}
         return self._loaded[symbol]
 
     def get(self, symbol: str, date_str: str) -> float | None:

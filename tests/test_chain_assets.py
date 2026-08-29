@@ -75,3 +75,46 @@ def test_price_cache_records_a_miss_so_it_is_not_retried_every_run(tmp_path):
     assert cache.get("WETH", "2026-06-16") is None
     assert cache.get("WETH", "2026-06-16") is None
     assert len(calls) == 1
+
+
+def test_price_cache_handles_malformed_json_shapes(tmp_path):
+    """Cache files containing valid JSON that is not an object must not raise.
+    Truncated or half-written files left by killed CI jobs commonly have this.
+    """
+    calls = []
+
+    def fetch(symbol, date):
+        calls.append((symbol, date))
+        return 3000.0
+
+    # Write a cache file containing null (valid JSON, not a dict)
+    (tmp_path / "ETH.json").write_text("null")
+    cache = assets.PriceCache(tmp_path, fetch=fetch)
+    assert cache.get("ETH", "2026-06-16") == 3000.0
+    assert calls == [("ETH", "2026-06-16")]
+
+    # Write a cache file containing an array (valid JSON, not a dict)
+    calls.clear()
+    (tmp_path / "BTC.json").write_text("[]")
+    cache = assets.PriceCache(tmp_path, fetch=fetch)
+    assert cache.get("BTC", "2026-06-16") == 3000.0
+    assert calls == [("BTC", "2026-06-16")]
+
+
+def test_price_cache_persists_misses_across_reloads(tmp_path):
+    """A cached miss should be recorded to disk and not re-fetched on reload."""
+    calls = []
+
+    def fetch(symbol, date):
+        calls.append((symbol, date))
+        return None
+
+    cache = assets.PriceCache(tmp_path, fetch=fetch)
+    assert cache.get("WETH", "2026-06-16") is None
+    assert calls == [("WETH", "2026-06-16")]
+
+    # Reload from disk
+    calls.clear()
+    reloaded = assets.PriceCache(tmp_path, fetch=fetch)
+    assert reloaded.get("WETH", "2026-06-16") is None
+    assert calls == []  # No fetch call for cached miss
