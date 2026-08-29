@@ -1372,11 +1372,6 @@ self-wallet or the Hyperliquid bridge.
 Pure — no IO, no config reads.
 """
 
-# Volume assigned to an address the caller already knows is genuine — the
-# cluster's own wallets. Unbeatable, so a forgery of one is always caught even
-# on a run where that wallet's own transfers are not in view. Never serialised.
-ANCHOR_VOLUME = float("inf")
-
 
 def counterparty_volume(records: list[dict], wallet: str) -> dict[str, float]:
     """Total priced USD moved with `wallet`, per counterparty address.
@@ -1999,7 +1994,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: everything from Tasks 1–7, plus `src.utils.append_records`, `save_latest`, `DATA_DIR`
-- Produces: `normalise_row(row, chain, kind, price_lookup) -> dict | None`, `read_cursors() -> dict`, `write_cursors(cursors) -> None`, `records_for(wallet, *, include_spam=False) -> list[dict]`, `sweep_wallet(address, chains, budget, *, cluster=False, price_lookup=None, real_counterparties=None) -> dict`, `sweep_health(results) -> dict`, `TRANSFERS_DIR`, `SPAM_DIR`, `CURSOR_PATH`.
+- Produces: `normalise_row(row, chain, kind, price_lookup) -> dict | None`, `read_cursors() -> dict`, `write_cursors(cursors) -> None`, `records_for(wallet, *, include_spam=False) -> list[dict]`, `sweep_wallet(address, chains, budget, *, cluster=False, price_lookup=None) -> dict`, `sweep_health(results) -> dict`, `TRANSFERS_DIR`, `SPAM_DIR`, `CURSOR_PATH`.
 
 > **`records_for` is the single reader.** Tasks 9, 10 and 11 all need "every stored record touching this wallet". Defining it three times would guarantee three different spam-filtering rules. It lives here; everything else imports it.
 
@@ -2416,7 +2411,7 @@ def _blank_chain_result() -> dict:
 
 
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
-                 price_lookup=None, real_counterparties=None,
+                 price_lookup=None,
                  dust_usd: float = 1.0, page_size: int = 1000,
                  max_pages: int = 50) -> dict:
     """Collect every transfer for one wallet across `chains`.
@@ -2488,12 +2483,11 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 chain_result["cursor"] = max(chain_result["cursor"], walk.last_block)
 
         # Volume, not membership: the lookalike rule needs to know which side of
-        # a matched pair moved more money. `real_counterparties` from the caller
-        # seeds addresses already known to be genuine (the cluster), entered at
-        # a magnitude no forgery can outbid.
+        # a matched pair moved more money. The genuine anchors earn their
+        # standing from the records themselves — on the live data the
+        # self-wallet and the bridge carry millions, which is exactly why the
+        # forgeries of them are detectable.
         volume = spam_mod.counterparty_volume(collected, addr)
-        for known in (real_counterparties or ()):
-            volume[(known or "").lower()] = spam_mod.ANCHOR_VOLUME
 
         clean, quarantined = [], []
         for rec in collected:
