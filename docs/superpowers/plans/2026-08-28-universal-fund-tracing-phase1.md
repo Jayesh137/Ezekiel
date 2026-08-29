@@ -984,8 +984,8 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Test: `tests/test_chain_assets.py`
 
 **Interfaces:**
-- Consumes: `src.utils.DATA_DIR`
-- Produces: `STABLES: set[str]`, `MAJORS: dict[str, str]`, `decimals_of(row, kind) -> int`, `value_usd(symbol, amount, date_str, price_lookup) -> tuple[float | None, str]`, `cached_price(symbol, date_str) -> float | None`, `PriceCache` class with `get(symbol, date_str) -> float | None`.
+- Consumes: nothing from this repo — `json` and `pathlib` only. The cache directory arrives as a constructor argument, so the module never reaches for `DATA_DIR` and stays testable against `tmp_path`.
+- Produces: `STABLES: set[str]`, `MAJORS: dict[str, str]`, `decimals_of(row, kind) -> int`, `value_usd(symbol, amount, date_str, price_lookup) -> tuple[float | None, str]`, `PriceCache(directory, fetch=None)` with `get(symbol, date_str) -> float | None`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1511,7 +1511,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Test: `tests/test_chain_labels.py`
 
 **Interfaces:**
-- Consumes: `src.chain.client.fetch_code`, `src.utils.DATA_DIR`
+- Consumes: `src.chain.client.fetch_code` (injected as `CodeCache`'s `fetcher`, not imported by `labels.py`). Paths arrive as arguments — the module never reaches for `DATA_DIR`.
 - Produces: `SERVICE_CATEGORIES: set[str]`, `load_registry(path) -> dict[str, dict]`, `classify_address(addr, registry, *, has_code=None, fan_reason=None, inferred=None) -> dict`, `infer_deposit_addresses(records, cex_hot, *, forward_ratio=0.95, window_hours=24) -> dict[str, dict]`, `service_addresses(registry, inferred=None) -> set[str]`, `CodeCache(path, fetcher)` with `has_code(address, chain) -> bool | None`.
 
 A classification result is `{"category": str | None, "entity": str | None, "source": str | None, "is_service": bool}`.
