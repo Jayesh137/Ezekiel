@@ -74,12 +74,14 @@ def is_lookalike(addr: str, volume, *, prefix: int = 4, suffix: int = 4,
 
 def derive_real_counterparties(records: list[dict], wallet: str,
                                dust_usd: float = 1.0) -> set[str]:
-    """Addresses that moved real money with `wallet`.
+    """Addresses that moved priced value >= dust_usd with `wallet`.
 
     Deliberately runs before spam classification, on valued records: the
-    lookalike rule is defined against addresses that moved real money, so
-    valuation has to happen first. There is no circularity — a forgery sends
-    zero value, so it can never qualify as real.
+    lookalike rule needs anchors that cleared the dust bar. This returns
+    addresses >= dust_usd, which is a weaker statement than "genuine" — a
+    forgery can pay >= dust_usd and land here. The forgery/original distinction
+    is made by volume ordering in is_lookalike, which checks that the anchor
+    has moved strictly more value than the candidate.
     """
     vol = counterparty_volume(records, wallet)
     return {a for a, v in vol.items() if v >= dust_usd}

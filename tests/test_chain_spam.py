@@ -30,7 +30,7 @@ def test_counterparty_volume_sums_priced_usd():
 
 def test_every_live_poisoning_address_is_caught_by_the_four_four_rule():
     """All 8 fixture addresses classify as lookalikes when genuine anchors
-    have realistic volume."""
+    have realistic volume. Tests the pattern matcher directly."""
     wallet = "0xtarget"
     genuine_records = [
         record(wallet, SELF_WALLET, usd=13_000_000.0),
@@ -39,11 +39,30 @@ def test_every_live_poisoning_address_is_caught_by_the_four_four_rule():
     vol = spam.counterparty_volume(genuine_records, wallet)
     entries = json.loads(FIXTURE.read_text())
     for entry in entries:
-        # Each fixture address should classify as lookalike when the real
-        # address has much higher volume.
         is_fake_of = spam.is_lookalike(entry["address"], vol)
         assert is_fake_of in {SELF_WALLET.lower(), HL_BRIDGE.lower()}, (
             f"{entry['address']} should be lookalike of genuine address"
+        )
+
+
+def test_fixture_forgeries_classified_as_lookalike_through_classifier():
+    """All 8 live observed forgeries classify as lookalike through
+    classify_spam, not just the pattern matcher. This verifies the
+    integration and catches regressions in classify_spam's logic."""
+    wallet = "0xtarget"
+    genuine_records = [
+        record(wallet, SELF_WALLET, usd=13_000_000.0),
+        record(wallet, HL_BRIDGE, usd=5_000_000.0),
+    ]
+    vol = spam.counterparty_volume(genuine_records, wallet)
+    entries = json.loads(FIXTURE.read_text())
+    for entry in entries:
+        # Each fixture address, sent to the wallet, should classify as
+        # lookalike through the full classifier pipeline.
+        r = record("0xspammer", entry["address"], usd=0.1)
+        reason = spam.classify_spam(r, vol)
+        assert reason == "lookalike", (
+            f"{entry['address']} should classify as lookalike, got {reason}"
         )
 
 
