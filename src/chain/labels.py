@@ -100,7 +100,12 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
     received: dict[str, float] = {}
     first_in: dict[str, int] = {}
     sent_to: dict[str, dict[str, float]] = {}
-    first_out_to_hot: dict[str, tuple[int, str]] = {}
+    # The single largest send to any hot wallet, per address — not the
+    # earliest. An incidental small send ahead of the real transfer (a test
+    # send, dust, a stray approval-adjacent transfer) must not be mistaken for
+    # the forward that actually carries the value: anchoring the "quickly"
+    # window to it would let a bulk forward days later pass as immediate.
+    primary_out_to_hot: dict[str, tuple[float, int, str]] = {}
 
     for rec in records:
         usd = rec.get("amount_usd")
@@ -115,12 +120,14 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
             received[dst] = received.get(dst, 0.0) + usd
             if dst not in first_in or ts < first_in[dst]:
                 first_in[dst] = ts
-        if src:
+        if src and dst:
             sent_to.setdefault(src, {})
             sent_to[src][dst] = sent_to[src].get(dst, 0.0) + usd
-            if dst in hot and (src not in first_out_to_hot
-                               or ts < first_out_to_hot[src][0]):
-                first_out_to_hot[src] = (ts, dst)
+            if dst in hot:
+                current = primary_out_to_hot.get(src)
+                if (current is None or usd > current[0]
+                        or (usd == current[0] and ts < current[1])):
+                    primary_out_to_hot[src] = (usd, ts, dst)
 
     out: dict[str, dict] = {}
     for addr, total_in in received.items():
@@ -130,12 +137,16 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
         to_hot = sum(v for d, v in destinations.items() if d in hot)
         if to_hot / total_in < forward_ratio:
             continue
-        other = max((v for d, v in destinations.items() if d not in hot), default=0.0)
-        if other / total_in > MATERIAL_DESTINATION_RATIO:
+        # The full total sent elsewhere, not just the largest single sibling —
+        # ten destinations under the bar individually can still add up to real
+        # activity that a deposit address would never have.
+        other_total = sum(v for d, v in destinations.items() if d not in hot)
+        if other_total / total_in > MATERIAL_DESTINATION_RATIO:
             continue
-        out_ts, hot_addr = first_out_to_hot.get(addr, (None, None))
-        if out_ts is None:
+        primary = primary_out_to_hot.get(addr)
+        if primary is None:
             continue
+        _, out_ts, hot_addr = primary
         elapsed_hours = (out_ts - first_in.get(addr, out_ts)) / 3600.0
         if elapsed_hours < 0 or elapsed_hours > window_hours:
             continue

@@ -115,6 +115,48 @@ def test_a_wallet_with_other_material_destinations_is_not_a_deposit_address():
     assert labels.infer_deposit_addresses(records, {BINANCE}) == {}
 
 
+def test_material_destinations_fanned_across_many_small_transfers_are_not_a_deposit_address():
+    """No single sibling destination clears the 5% bar on its own, but ten of
+    them together move 49% of everything received. The guard has to look at
+    the total sent elsewhere, not just the largest single destination."""
+    hour = 3600
+    records = [
+        {"src": "0xcluster", "dst": "0xmaybe", "amount_usd": 1_000_000.0, "ts": 0},
+        {"src": "0xmaybe", "dst": BINANCE, "amount_usd": 950_000.0, "ts": hour},
+    ] + [
+        {"src": "0xmaybe", "dst": f"0xother{i}", "amount_usd": 49_000.0, "ts": hour}
+        for i in range(10)
+    ]
+    assert labels.infer_deposit_addresses(records, {BINANCE}) == {}
+
+
+def test_an_incidental_small_send_to_a_hot_wallet_does_not_anchor_the_forwarding_window():
+    """An early $1 test-send to the hot wallet must not make a bulk forward
+    100 hours later look like it happened "quickly"."""
+    hour = 3600
+    records = [
+        {"src": "0xcluster", "dst": "0xmaybe", "amount_usd": 1_000_000.0, "ts": 0},
+        {"src": "0xmaybe", "dst": BINANCE, "amount_usd": 1.0, "ts": hour},
+        {"src": "0xmaybe", "dst": BINANCE, "amount_usd": 999_000.0, "ts": 100 * hour},
+    ]
+    assert labels.infer_deposit_addresses(records, {BINANCE}) == {}
+
+
+def test_a_fast_bulk_forward_is_inferred_using_its_own_timing_not_an_incidental_earlier_send():
+    """The real forward is still caught, and the reported timing belongs to
+    the transfer that actually carried the value, not the earliest one."""
+    hour = 3600
+    records = [
+        {"src": "0xcluster", "dst": "0xmaybe", "amount_usd": 1_000_000.0, "ts": 0},
+        {"src": "0xmaybe", "dst": BINANCE, "amount_usd": 1.0, "ts": hour},
+        {"src": "0xmaybe", "dst": BINANCE, "amount_usd": 999_000.0, "ts": 2 * hour},
+    ]
+    got = labels.infer_deposit_addresses(records, {BINANCE})
+    assert "0xmaybe" in got
+    assert got["0xmaybe"]["forwarded_to"] == BINANCE
+    assert got["0xmaybe"]["hours_to_forward"] == 2.0
+
+
 def test_service_addresses_unions_curated_and_inferred():
     inferred = {"0xdeposit": {"category": "cex_deposit", "entity": "Binance (inferred)"}}
     got = labels.service_addresses(registry(), inferred)
