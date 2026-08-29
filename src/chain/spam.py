@@ -18,23 +18,56 @@ Pure — no IO, no config reads.
 """
 
 
-def is_lookalike(addr: str, real_addrs, *, prefix: int = 4,
-                 suffix: int = 4) -> str | None:
+def counterparty_volume(records: list[dict], wallet: str) -> dict[str, float]:
+    """Total priced USD moved with `wallet`, per counterparty address.
+
+    Replaces the flat "is this address real?" set. Magnitude is what
+    distinguishes a forgery from the address it forges: the attack only makes
+    sense against a counterparty richer than the attacker's own address, so
+    comparing volumes tells the two apart where a membership test cannot.
+    """
+    w = (wallet or "").lower()
+    volume: dict[str, float] = {}
+    for rec in records:
+        usd = rec.get("amount_usd")
+        # Skip unpriced records — they are not evidence of value.
+        if usd is None:
+            continue
+        src, dst = (rec.get("src") or "").lower(), (rec.get("dst") or "").lower()
+        # Identify the counterparty: the side that is not the wallet.
+        counterparty = dst if src == w else src
+        if counterparty and counterparty != w:
+            volume[counterparty] = volume.get(counterparty, 0.0) + float(usd)
+    return volume
+
+
+def is_lookalike(addr: str, volume, *, prefix: int = 4, suffix: int = 4,
+                 dust_usd: float = 1.0) -> str | None:
     """The real address this one is forging, or None.
 
     Returned rather than a bool because *which* address is being mimicked is
     itself intelligence: forgers target addresses that received large sums, so
     the mimic list points at the counterparties that matter.
+
+    An address A is a forgery of R only if R has moved strictly more value
+    with the wallet than A has. This ordering distinguishes a forgery from
+    the address it forges: forgers attack addresses richer than themselves.
     """
     a = (addr or "").lower()
     if not a.startswith("0x") or len(a) != 42:
         return None
+    a_volume = volume.get(a, 0.0)
     head, tail = a[2:2 + prefix], a[-suffix:]
-    for real in real_addrs:
+    for real in volume:
         r = (real or "").lower()
         if r == a or len(r) != 42:
             continue
-        if r[2:2 + prefix] == head and r[-suffix:] == tail:
+        r_volume = volume.get(r, 0.0)
+        # Anchors must have moved real value to be worth forging.
+        if r_volume < dust_usd:
+            continue
+        # Match only if the real address moved strictly more than the candidate.
+        if r_volume > a_volume and r[2:2 + prefix] == head and r[-suffix:] == tail:
             return r
     return None
 
@@ -48,20 +81,11 @@ def derive_real_counterparties(records: list[dict], wallet: str,
     valuation has to happen first. There is no circularity — a forgery sends
     zero value, so it can never qualify as real.
     """
-    w = (wallet or "").lower()
-    real: set[str] = set()
-    for rec in records:
-        usd = rec.get("amount_usd")
-        if usd is None or usd < dust_usd:
-            continue
-        src, dst = (rec.get("src") or "").lower(), (rec.get("dst") or "").lower()
-        other = dst if src == w else src
-        if other and other != w:
-            real.add(other)
-    return real
+    vol = counterparty_volume(records, wallet)
+    return {a for a, v in vol.items() if v >= dust_usd}
 
 
-def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
+def classify_spam(record: dict, volume, *, dust_usd: float = 1.0,
                   prefix: int = 4, suffix: int = 4) -> str | None:
     """Why this record is noise, or None if it is real money.
 
@@ -69,18 +93,10 @@ def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
     a forgery is almost always sub-dust, and reporting it as "dust" would throw
     away the mimic relationship that makes it worth recording.
     """
-    # Normalize real_counterparties to lowercase for case-insensitive comparison.
-    real_lower: set[str] = {(r or "").lower() for r in real_counterparties}
     for side in ((record.get("src") or ""), (record.get("dst") or "")):
         s = side.lower()
-        # An address that has moved real money is not a forgery of anything.
-        # Without this, a $1 transfer from a vanity clone of a genuine
-        # counterparty puts the clone in `real_counterparties`, and the GENUINE
-        # address then matches it and gets quarantined — erasing the real
-        # relationship from the graph at a $1 attack cost.
-        if s in real_lower:
-            continue
-        if is_lookalike(s, real_counterparties, prefix=prefix, suffix=suffix):
+        if is_lookalike(s, volume, prefix=prefix, suffix=suffix,
+                        dust_usd=dust_usd):
             return "lookalike"
 
     amount = record.get("amount")
@@ -95,7 +111,7 @@ def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
     return None
 
 
-def rollup(records: list[dict], wallet: str = "") -> list[dict]:
+def rollup(records: list[dict], wallet: str) -> list[dict]:
     """Aggregate quarantined records to one entry per address.
 
     Stored instead of the records themselves: 1,842 junk rows must not live in

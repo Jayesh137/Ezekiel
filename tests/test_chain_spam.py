@@ -13,20 +13,48 @@ def record(src, dst, usd=100.0, basis="stable_par", amount=100.0):
             "value_basis": basis, "asset": "USDC"}
 
 
+def test_counterparty_volume_sums_priced_usd():
+    """counterparty_volume aggregates priced transfers by counterparty."""
+    wallet = "0xtarget"
+    records = [
+        record(wallet, "0xA", usd=100.0),
+        record("0xA", wallet, usd=50.0),
+        record(wallet, "0xB", usd=1000.0),
+        record(wallet, "0xC", usd=None),  # unpriced, not counted
+    ]
+    vol = spam.counterparty_volume(records, wallet)
+    assert vol.get("0xa") == 150.0
+    assert vol.get("0xb") == 1000.0
+    assert "0xc" not in vol
+
+
 def test_every_live_poisoning_address_is_caught_by_the_four_four_rule():
-    real = {SELF_WALLET, HL_BRIDGE}
+    """All 8 fixture addresses classify as lookalikes when genuine anchors
+    have realistic volume."""
+    wallet = "0xtarget"
+    genuine_records = [
+        record(wallet, SELF_WALLET, usd=13_000_000.0),
+        record(wallet, HL_BRIDGE, usd=5_000_000.0),
+    ]
+    vol = spam.counterparty_volume(genuine_records, wallet)
     entries = json.loads(FIXTURE.read_text())
     for entry in entries:
-        assert spam.is_lookalike(entry["address"], real) in real, entry["address"]
+        # Each fixture address should classify as lookalike when the real
+        # address has much higher volume.
+        is_fake_of = spam.is_lookalike(entry["address"], vol)
+        assert is_fake_of in {SELF_WALLET.lower(), HL_BRIDGE.lower()}, (
+            f"{entry['address']} should be lookalike of genuine address"
+        )
 
 
 def test_a_genuine_counterparty_is_not_a_lookalike():
-    real = {SELF_WALLET, HL_BRIDGE}
-    assert spam.is_lookalike("0xa95d9c1f655341597c94393fddc30cf3c08e4fce", real) is None
+    vol = {SELF_WALLET.lower(): 1000.0, HL_BRIDGE.lower(): 500.0}
+    assert spam.is_lookalike("0xa95d9c1f655341597c94393fddc30cf3c08e4fce", vol) is None
 
 
 def test_an_address_is_never_a_lookalike_of_itself():
-    assert spam.is_lookalike(SELF_WALLET, {SELF_WALLET}) is None
+    vol = {SELF_WALLET.lower(): 100.0}
+    assert spam.is_lookalike(SELF_WALLET, vol) is None
 
 
 def test_real_counterparties_need_a_priced_non_dust_transfer():
@@ -43,43 +71,98 @@ def test_real_counterparties_need_a_priced_non_dust_transfer():
 def test_lookalike_is_evaluated_before_dust():
     """Which address is being mimicked is intelligence: attackers mimic
     addresses that received large sums."""
-    real = {SELF_WALLET}
+    wallet = "0xtarget"
     poison = "0x1419b0d742da87d053373018740e7c3a41402d5f"
-    reason = spam.classify_spam(record("0xtarget", poison, usd=0.0, amount=0.0), real)
+    # poison is a forgery of SELF_WALLET, which has moved $13M.
+    vol = {SELF_WALLET.lower(): 13_000_000.0}
+    reason = spam.classify_spam(record(wallet, poison, usd=0.0, amount=0.0), vol)
     assert reason == "lookalike"
 
 
 def test_zero_value_transfer_is_quarantined():
-    reason = spam.classify_spam(record("0xtarget", "0xsomebody", usd=0.0, amount=0.0), set())
+    reason = spam.classify_spam(record("0xtarget", "0xsomebody", usd=0.0,
+                                       amount=0.0), {})
     assert reason == "zero_value"
 
 
 def test_sub_dust_transfer_is_quarantined():
-    reason = spam.classify_spam(record("0xtarget", "0xsomebody", usd=0.4), set())
+    reason = spam.classify_spam(record("0xtarget", "0xsomebody", usd=0.4), {})
     assert reason == "dust"
 
 
 def test_unpriced_token_is_quarantined():
     r = record("0xtarget", "0xsomebody", usd=None, basis="unpriced", amount=1e9)
     r["asset"] = "SCAMAIRDROP"
-    assert spam.classify_spam(r, set()) == "unpriced_token"
+    assert spam.classify_spam(r, {}) == "unpriced_token"
 
 
 def test_a_real_transfer_is_not_spam():
-    assert spam.classify_spam(record("0xtarget", "0xbig", usd=13_000_000.0), set()) is None
+    assert spam.classify_spam(record("0xtarget", "0xbig", usd=13_000_000.0), {}) is None
+
+
+def test_genuine_counterparty_not_flagged_when_low_volume_forgery_exists():
+    """A genuine high-volume counterparty is NOT flagged as lookalike when
+    a low-volume forgery of it exists in the volume dict."""
+    wallet = "0xtarget"
+    genuine = SELF_WALLET.lower()
+    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    # Genuine moved $13M, forgery moved $1.
+    vol = {genuine: 13_000_000.0, forgery: 1.0}
+    # Classifying a genuine transfer to the genuine address.
+    r = record(wallet, SELF_WALLET, usd=100.0)
+    reason = spam.classify_spam(r, vol)
+    assert reason is None
+
+
+def test_forgery_still_flagged_when_genuine_has_more_volume():
+    """A low-volume forgery IS still flagged as lookalike when the genuine
+    address it copies has higher volume. This is the core case the
+    volume ordering enables."""
+    wallet = "0xtarget"
+    genuine = SELF_WALLET.lower()
+    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    # Genuine moved $13M, forgery moved $1.
+    vol = {genuine: 13_000_000.0, forgery: 1.0}
+    # Classifying a record FROM the forgery.
+    r = record(forgery, wallet, usd=0.5)
+    reason = spam.classify_spam(r, vol)
+    assert reason == "lookalike"
+
+
+def test_anchor_below_dust_usd_cannot_cause_match():
+    """An anchor address with volume < dust_usd cannot match, even if the
+    4+4 pattern matches."""
+    genuine = SELF_WALLET.lower()
+    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    # Genuine moved only $0.5 (below dust_usd=1.0).
+    vol = {genuine: 0.5, forgery: 0.1}
+    result = spam.is_lookalike(forgery, vol, dust_usd=1.0)
+    assert result is None
+
+
+def test_equal_volumes_flag_neither_side():
+    """When two addresses have equal volume, neither is a lookalike of the
+    other (strictly greater, not >=)."""
+    address_a = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    address_b = "0x1419e75330c71ce463102e6a1eb62fe80b412d5f"
+    # Both have same volume.
+    vol = {address_a: 100.0, address_b: 100.0}
+    assert spam.is_lookalike(address_a, vol) is None
+    assert spam.is_lookalike(address_b, vol) is None
 
 
 def test_rollup_aggregates_by_address_and_keeps_the_mimic_target():
+    wallet = "0xtarget"
     records = [
-        {"src": "0xtarget", "dst": "0xpoison", "spam": True, "spam_reason": "lookalike",
+        {"src": wallet, "dst": "0xpoison", "spam": True, "spam_reason": "lookalike",
          "mimics": SELF_WALLET, "forged": "0xpoison", "ts": 100,
          "asset": "USDC", "token_address": "0xaf88"},
-        {"src": "0xpoison", "dst": "0xtarget", "spam": True, "spam_reason": "lookalike",
+        {"src": "0xpoison", "dst": wallet, "spam": True, "spam_reason": "lookalike",
          "mimics": SELF_WALLET, "forged": "0xpoison", "ts": 300,
          "asset": "USDC", "token_address": "0xaf88"},
-        {"src": "0xtarget", "dst": "0xok", "spam": False, "spam_reason": None, "ts": 200},
+        {"src": wallet, "dst": "0xok", "spam": False, "spam_reason": None, "ts": 200},
     ]
-    rolled = spam.rollup(records)
+    rolled = spam.rollup(records, wallet=wallet)
     assert len(rolled) == 1
     entry = rolled[0]
     assert entry["address"] == "0xpoison"
@@ -90,59 +173,42 @@ def test_rollup_aggregates_by_address_and_keeps_the_mimic_target():
 
 
 def test_rollup_keeps_the_token_of_an_unpriced_entry_so_it_can_be_registered():
-    records = [{"src": "0xtarget", "dst": "0xnew", "spam": True,
+    wallet = "0xtarget"
+    records = [{"src": wallet, "dst": "0xnew", "spam": True,
                 "spam_reason": "unpriced_token", "ts": 5,
                 "asset": "REALTOKEN", "token_address": "0xdeadbeef"}]
-    entry = spam.rollup(records)[0]
+    entry = spam.rollup(records, wallet=wallet)[0]
     assert entry["asset"] == "REALTOKEN"
     assert entry["token_address"] == "0xdeadbeef"
+    assert entry["address"] == "0xnew"
 
 
-def test_genuine_counterparty_not_classified_as_lookalike_when_forgery_in_real():
-    """A genuine counterparty is NOT classified as a lookalike just because
-    a forgery of it sits in real_counterparties. This prevents a $1 transfer
-    from a vanity clone of a genuine counterparty from quarantining the genuine
-    relationship."""
-    genuine = SELF_WALLET
-    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
-    # Both genuine and forgery are in the real set.
-    real = {genuine, forgery}
-    # A genuine transfer between wallet and genuine counterparty.
-    # Even though the forgery is in real, this should not be classified as
-    # lookalike.
+def test_rollup_outgoing_spam_rolls_up_under_spammer():
+    """Outgoing spam (src=wallet, dst=spammer) rolls up under the spammer."""
     wallet = "0xtarget"
-    r = record(wallet, genuine, usd=100.0)
-    reason = spam.classify_spam(r, real)
-    assert reason is None
+    spammer = "0xspammer"
+    records = [
+        {"src": wallet, "dst": spammer, "spam": True,
+         "spam_reason": "dust", "ts": 100, "asset": "USDC"},
+    ]
+    rolled = spam.rollup(records, wallet=wallet)
+    assert len(rolled) == 1
+    assert rolled[0]["address"] == spammer
 
 
-def test_existing_eleven_forgery_detection_still_holds():
-    """The existing fixture validation continues to hold even with the
-    genuine-counterparty exemption in place."""
-    real = {SELF_WALLET, HL_BRIDGE}
-    entries = json.loads(FIXTURE.read_text())
-    for entry in entries:
-        assert spam.is_lookalike(entry["address"], real) in real
-
-
-def test_rollup_incoming_dust_rolls_up_under_spammer_not_wallet():
-    """Incoming dust (wallet is dst) must roll up under the spammer's address,
-    not the wallet's. Without wallet context, spam arriving at the wallet would
-    collapse all spammers into one entry labelled with the victim's own address."""
+def test_rollup_incoming_dust_rolls_up_under_spammer():
+    """Incoming dust (src=spammer, dst=wallet) rolls up under the spammer."""
     wallet = "0xtarget"
     spammer1 = "0xspammer1"
     spammer2 = "0xspammer2"
     records = [
-        # Two dust transfers from different spammers to wallet
         {"src": spammer1, "dst": wallet, "spam": True,
          "spam_reason": "dust", "ts": 100, "asset": "USDC"},
         {"src": spammer2, "dst": wallet, "spam": True,
          "spam_reason": "dust", "ts": 200, "asset": "USDC"},
     ]
     rolled = spam.rollup(records, wallet=wallet)
-    # Should have two entries, one per spammer (not one entry under wallet)
     assert len(rolled) == 2
     addresses = {entry["address"] for entry in rolled}
-    assert spammer1.lower() in addresses
-    assert spammer2.lower() in addresses
-    assert wallet.lower() not in addresses
+    assert spammer1 in addresses
+    assert spammer2 in addresses
