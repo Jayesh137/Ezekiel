@@ -1422,8 +1422,19 @@ def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
     a forgery is almost always sub-dust, and reporting it as "dust" would throw
     away the mimic relationship that makes it worth recording.
     """
+    real = {(a or "").lower() for a in real_counterparties}
     for side in ((record.get("src") or ""), (record.get("dst") or "")):
-        if is_lookalike(side, real_counterparties, prefix=prefix, suffix=suffix):
+        s = side.lower()
+        # An address that has itself moved real money is not a forgery of
+        # anything. Without this guard the rule is reflexive and turns against
+        # us: a vanity clone of a genuine counterparty that sends the wallet
+        # $1 joins `real`, and the GENUINE address then matches the clone and
+        # gets quarantined — erasing a real relationship from the graph for a
+        # $1 attack cost, or by accident when a poisoner pings $1.50 instead
+        # of zero. Losing a $1 edge is vastly better than losing a $13M one.
+        if s in real:
+            continue
+        if is_lookalike(s, real, prefix=prefix, suffix=suffix):
             return "lookalike"
 
     amount = record.get("amount")
@@ -1438,7 +1449,7 @@ def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
     return None
 
 
-def rollup(records: list[dict]) -> list[dict]:
+def rollup(records: list[dict], wallet: str = "") -> list[dict]:
     """Aggregate quarantined records to one entry per address.
 
     Stored instead of the records themselves: 1,842 junk rows must not live in
@@ -1446,6 +1457,7 @@ def rollup(records: list[dict]) -> list[dict]:
     legitimate token the registry does not yet know is visible and can be added
     to assets.py, rather than silently discarded on every future run.
     """
+    w = (wallet or "").lower()
     by_addr: dict[str, dict] = {}
     for rec in records:
         if not rec.get("spam"):
@@ -1454,7 +1466,17 @@ def rollup(records: list[dict]) -> list[dict]:
         # Re-deriving it here from `mimics` cannot work: a poisoning transfer
         # arrives in both directions, so "the side that is not the mimicked
         # address" is the target's own wallet half the time.
-        addr = (rec.get("forged") or rec.get("dst") or "").lower()
+        #
+        # For the non-lookalike reasons there is no `forged`, and an
+        # unconditional `dst` fallback is wrong for the same directional
+        # reason: poisoning is overwhelmingly INCOMING, so the wallet is `dst`
+        # and every distinct spammer would collapse into one entry keyed by the
+        # victim's own address — destroying the per-address breakdown this
+        # function exists to produce.
+        src = (rec.get("src") or "").lower()
+        dst = (rec.get("dst") or "").lower()
+        counterparty = dst if src == w else src
+        addr = (rec.get("forged") or counterparty or dst or "").lower()
         mimics = rec.get("mimics")
         if not addr:
             continue
@@ -2458,7 +2480,7 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         if clean:
             append_records(str(Path(TRANSFERS_DIR) / name), clean, key_field="id")
         if quarantined:
-            _merge_spam_rollup(spam_mod.rollup(quarantined))
+            _merge_spam_rollup(spam_mod.rollup(quarantined, addr))
 
         chain_result["records"] = len(clean)
         chain_result["spam"] = len(quarantined)
