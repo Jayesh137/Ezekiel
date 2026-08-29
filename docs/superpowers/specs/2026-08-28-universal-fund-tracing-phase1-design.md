@@ -248,11 +248,25 @@ match the 4+4 rule, including all 510 records of the single largest campaign.
 3. **Fan-degree** — the existing `detect_services` heuristic, retained as the
    fallback for unlabelled hubs.
 4. **Inferred CEX deposit address** — an address that receives from a cluster
-   wallet and forwards **≥ 95% of the received value** to a known CEX hot wallet
-   **within 24 hours**, with the hot wallet as its only material destination.
-   Never publicly labelled, and the highest-value identity artifact on chain: a
-   deposit address belongs to exactly one exchange account. Phase 1 labels it;
-   Phase 2 re-links on it.
+   wallet and forwards **≥ 95% of the received value** to a known CEX hot wallet,
+   where everything sent elsewhere **sums** to ≤ 5% of what it received, and the
+   hot-wallet transfer **carrying the largest amount** lands **within 24 hours**
+   of the first receipt. Never publicly labelled, and the highest-value identity
+   artifact on chain: a deposit address belongs to exactly one exchange account.
+   Phase 1 labels it; Phase 2 re-links on it.
+
+   Both qualifiers are load-bearing and were added after each was shown to admit
+   a false positive. Capping the *largest* other destination rather than their
+   sum lets the same value fan across ten addresses at 4.9% each, so a wallet
+   with half its activity elsewhere still qualifies. Anchoring the window on the
+   *earliest* hot-wallet send lets a trivial test-send — ordinary behaviour
+   before committing a large transfer — satisfy "quickly" on behalf of a bulk
+   forward days later.
+
+   The rule fails toward traversing, on purpose. A false negative wastes some
+   expansion budget on an address we could have skipped. A false positive marks
+   a real wallet a service, and services are never traversed — so the fund trail
+   stops dead at the one address we most needed to follow, silently.
 
 ### Hard rules
 

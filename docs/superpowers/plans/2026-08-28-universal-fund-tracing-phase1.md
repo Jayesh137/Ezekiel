@@ -1871,7 +1871,11 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
     received: dict[str, float] = {}
     first_in: dict[str, int] = {}
     sent_to: dict[str, dict[str, float]] = {}
-    first_out_to_hot: dict[str, tuple[int, str]] = {}
+    # The LARGEST send to a hot wallet, not the earliest: (amount, ts, hot).
+    # Anchoring the window on the earliest lets a trivial test-send — ordinary
+    # behaviour before committing a large transfer — satisfy "quickly" on behalf
+    # of a bulk forward that happened days later.
+    primary_out: dict[str, tuple[float, int, str]] = {}
 
     for rec in records:
         usd = rec.get("amount_usd")
@@ -1886,12 +1890,14 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
             received[dst] = received.get(dst, 0.0) + usd
             if dst not in first_in or ts < first_in[dst]:
                 first_in[dst] = ts
-        if src:
+        if src and dst:
             sent_to.setdefault(src, {})
             sent_to[src][dst] = sent_to[src].get(dst, 0.0) + usd
-            if dst in hot and (src not in first_out_to_hot
-                               or ts < first_out_to_hot[src][0]):
-                first_out_to_hot[src] = (ts, dst)
+            if dst in hot:
+                best = primary_out.get(src)
+                # Strictly greater, so an exact tie keeps the earlier send.
+                if best is None or usd > best[0]:
+                    primary_out[src] = (usd, ts, dst)
 
     out: dict[str, dict] = {}
     for addr, total_in in received.items():
@@ -1901,13 +1907,25 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
         to_hot = sum(v for d, v in destinations.items() if d in hot)
         if to_hot / total_in < forward_ratio:
             continue
-        other = max((v for d, v in destinations.items() if d not in hot), default=0.0)
-        if other / total_in > MATERIAL_DESTINATION_RATIO:
+        # Summed, not maxed. A max only rejects one large sibling destination,
+        # so the same value fanned across ten addresses at 4.9% each slips
+        # under the threshold and a wallet with half its activity elsewhere
+        # still reads as a deposit address.
+        other_total = sum(v for d, v in destinations.items() if d not in hot)
+        if other_total / total_in > MATERIAL_DESTINATION_RATIO:
             continue
-        out_ts, hot_addr = first_out_to_hot.get(addr, (None, None))
-        if out_ts is None:
+        best = primary_out.get(addr)
+        if best is None:
             continue
+        _, out_ts, hot_addr = best
         elapsed_hours = (out_ts - first_in.get(addr, out_ts)) / 3600.0
+        # Measured to the transfer that actually carries the value. A long-lived
+        # address whose bulk forward is far from its first receipt now falls
+        # outside the window and is left unlabelled — deliberately. A false
+        # negative costs some wasted expansion budget; a false positive marks a
+        # real wallet a service, and services are never traversed, so the trail
+        # stops dead at the one address we most needed to follow. The two are
+        # not symmetric, so the rule fails toward traversing.
         if elapsed_hours < 0 or elapsed_hours > window_hours:
             continue
         out[addr] = {
