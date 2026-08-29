@@ -69,8 +69,18 @@ def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
     a forgery is almost always sub-dust, and reporting it as "dust" would throw
     away the mimic relationship that makes it worth recording.
     """
+    # Normalize real_counterparties to lowercase for case-insensitive comparison.
+    real_lower: set[str] = {(r or "").lower() for r in real_counterparties}
     for side in ((record.get("src") or ""), (record.get("dst") or "")):
-        if is_lookalike(side, real_counterparties, prefix=prefix, suffix=suffix):
+        s = side.lower()
+        # An address that has moved real money is not a forgery of anything.
+        # Without this, a $1 transfer from a vanity clone of a genuine
+        # counterparty puts the clone in `real_counterparties`, and the GENUINE
+        # address then matches it and gets quarantined — erasing the real
+        # relationship from the graph at a $1 attack cost.
+        if s in real_lower:
+            continue
+        if is_lookalike(s, real_counterparties, prefix=prefix, suffix=suffix):
             return "lookalike"
 
     amount = record.get("amount")
@@ -85,7 +95,7 @@ def classify_spam(record: dict, real_counterparties, *, dust_usd: float = 1.0,
     return None
 
 
-def rollup(records: list[dict]) -> list[dict]:
+def rollup(records: list[dict], wallet: str = "") -> list[dict]:
     """Aggregate quarantined records to one entry per address.
 
     Stored instead of the records themselves: 1,842 junk rows must not live in
@@ -93,6 +103,7 @@ def rollup(records: list[dict]) -> list[dict]:
     legitimate token the registry does not yet know is visible and can be added
     to assets.py, rather than silently discarded on every future run.
     """
+    w = (wallet or "").lower()
     by_addr: dict[str, dict] = {}
     for rec in records:
         if not rec.get("spam"):
@@ -101,7 +112,10 @@ def rollup(records: list[dict]) -> list[dict]:
         # Re-deriving it here from `mimics` cannot work: a poisoning transfer
         # arrives in both directions, so "the side that is not the mimicked
         # address" is the target's own wallet half the time.
-        addr = (rec.get("forged") or rec.get("dst") or "").lower()
+        src = (rec.get("src") or "").lower()
+        dst = (rec.get("dst") or "").lower()
+        counterparty = dst if src == w else src
+        addr = (rec.get("forged") or counterparty or dst or "").lower()
         mimics = rec.get("mimics")
         if not addr:
             continue

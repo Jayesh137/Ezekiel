@@ -96,3 +96,53 @@ def test_rollup_keeps_the_token_of_an_unpriced_entry_so_it_can_be_registered():
     entry = spam.rollup(records)[0]
     assert entry["asset"] == "REALTOKEN"
     assert entry["token_address"] == "0xdeadbeef"
+
+
+def test_genuine_counterparty_not_classified_as_lookalike_when_forgery_in_real():
+    """A genuine counterparty is NOT classified as a lookalike just because
+    a forgery of it sits in real_counterparties. This prevents a $1 transfer
+    from a vanity clone of a genuine counterparty from quarantining the genuine
+    relationship."""
+    genuine = SELF_WALLET
+    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    # Both genuine and forgery are in the real set.
+    real = {genuine, forgery}
+    # A genuine transfer between wallet and genuine counterparty.
+    # Even though the forgery is in real, this should not be classified as
+    # lookalike.
+    wallet = "0xtarget"
+    r = record(wallet, genuine, usd=100.0)
+    reason = spam.classify_spam(r, real)
+    assert reason is None
+
+
+def test_existing_eleven_forgery_detection_still_holds():
+    """The existing fixture validation continues to hold even with the
+    genuine-counterparty exemption in place."""
+    real = {SELF_WALLET, HL_BRIDGE}
+    entries = json.loads(FIXTURE.read_text())
+    for entry in entries:
+        assert spam.is_lookalike(entry["address"], real) in real
+
+
+def test_rollup_incoming_dust_rolls_up_under_spammer_not_wallet():
+    """Incoming dust (wallet is dst) must roll up under the spammer's address,
+    not the wallet's. Without wallet context, spam arriving at the wallet would
+    collapse all spammers into one entry labelled with the victim's own address."""
+    wallet = "0xtarget"
+    spammer1 = "0xspammer1"
+    spammer2 = "0xspammer2"
+    records = [
+        # Two dust transfers from different spammers to wallet
+        {"src": spammer1, "dst": wallet, "spam": True,
+         "spam_reason": "dust", "ts": 100, "asset": "USDC"},
+        {"src": spammer2, "dst": wallet, "spam": True,
+         "spam_reason": "dust", "ts": 200, "asset": "USDC"},
+    ]
+    rolled = spam.rollup(records, wallet=wallet)
+    # Should have two entries, one per spammer (not one entry under wallet)
+    assert len(rolled) == 2
+    addresses = {entry["address"] for entry in rolled}
+    assert spammer1.lower() in addresses
+    assert spammer2.lower() in addresses
+    assert wallet.lower() not in addresses
