@@ -191,23 +191,32 @@ Etherscan V2 and needs its own reader. Deferred to Phase 2.
 ## 6. Spam quarantine
 
 `src/chain/spam.py` exposes one pure function,
-`classify_spam(record, real_counterparties) -> str | None`:
+`classify_spam(record, volume) -> str | None`:
 
 | Reason | Rule |
 |---|---|
-| `lookalike` | address shares its **first 4 and last 4** hex characters with a real counterparty or the target |
+| `lookalike` | address shares its **first 4 and last 4** hex characters with a counterparty that has moved strictly more value |
 | `zero_value` | zero-amount transfer — moves no money, exists only to appear in history |
 | `dust` | `amount_usd < dust_usd` (existing config, 1.0) |
 | `unpriced_token` | ERC-20 outside the valued-asset registry |
 
-`real_counterparties` is derived in a first pass, before classification: every
-address that has exchanged at least one **priced, non-zero, ≥ `dust_usd`**
-transfer with the wallet. Valuation therefore runs before spam classification,
-not after — the order matters, because the lookalike rule is defined against
-addresses that moved real money.
+`volume` is derived in a first pass, before classification: total priced USD
+moved with the wallet, per counterparty address. Valuation therefore runs before
+spam classification, not after — the order matters, because the lookalike rule is
+defined against value.
 
 ### Hard rules
 
+- **A forgery is the poorer side.** An address is a forgery of another only when
+  the other has moved *strictly more* value with the wallet, and only when that
+  anchor itself clears `dust_usd`. This is not a refinement — a symmetric
+  membership test is actively dangerous, because the 4+4 match is symmetric while
+  the attack is not. Under a membership test a $1 clone of the $13M counterparty
+  makes the **genuine** address match the clone, quarantining a real relationship
+  out of the graph for a dollar; patching that with a blanket "real addresses are
+  exempt" rule instead whitewashes the clone. Only magnitude separates them, and
+  it does so in both directions at once: nobody forges an address poorer than
+  their own.
 - The **lookalike check runs before dust filtering**. Which address is being
   mimicked is itself intelligence: attackers mimic addresses that received large
   sums, so the mimic list points at the wallets that matter.
