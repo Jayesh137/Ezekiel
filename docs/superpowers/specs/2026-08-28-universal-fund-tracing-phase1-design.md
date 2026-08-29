@@ -198,7 +198,7 @@ Etherscan V2 and needs its own reader. Deferred to Phase 2.
 | `lookalike` | address shares its **first 4 and last 4** hex characters with a counterparty that has moved strictly more value |
 | `zero_value` | zero-amount transfer — moves no money, exists only to appear in history |
 | `dust` | `amount_usd < dust_usd` (existing config, 1.0) |
-| `unpriced_token` | ERC-20 outside the valued-asset registry |
+| `unpriced_token` | ERC-20 outside the valued-asset registry. **Never** a known major whose price merely failed — that carries `value_basis: price_unavailable` and is retained. |
 
 `volume` is derived in a first pass, before classification: total priced USD
 moved with the wallet, per counterparty address. Valuation therefore runs before
@@ -287,7 +287,17 @@ match the 4+4 rule, including all 510 records of the single largest campaign.
 |---|---|
 | Stablecoins (USDC, USDC.e, USDT, DAI, USDe) | `$1` par → `stable_par` |
 | Majors (ETH/WETH, WBTC, ARB) | daily close, cached per `(symbol, date)` → `daily_close` |
+| Majors whose price could not be fetched | `amount_usd: null` → `price_unavailable` |
 | Anything else | `amount_usd: null` → `unpriced` |
+
+**`price_unavailable` and `unpriced` are different facts and must not share a
+basis.** One says "we know this asset is valuable and could not price it today";
+the other says "we have never heard of this token". Collapsing them lets the spam
+classifier quarantine a real ETH transfer on the strength of a price outage — and
+quarantined records never reach the substrate at all, so once the cursor has
+advanced past them the loss is permanent and invisible. A `price_unavailable`
+record is retained, counted in the sweep's `unpriced` health field, and can be
+re-priced later from what was stored.
 
 ### Hard rules
 

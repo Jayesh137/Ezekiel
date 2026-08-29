@@ -1143,7 +1143,10 @@ def value_usd(symbol: str, amount: float, date_str: str,
     if sym in MAJORS:
         price = price_lookup(sym, date_str)
         if price is None:
-            return None, "unpriced"
+            # Distinct from "unpriced". A known major we could not price is not
+            # an unknown token, and conflating them lets the spam classifier
+            # quarantine a real ETH transfer on the strength of a price outage.
+            return None, "price_unavailable"
         return round(float(amount) * float(price), 2), "daily_close"
     return None, "unpriced"
 
@@ -1461,6 +1464,13 @@ def classify_spam(record: dict, volume: dict, *, dust_usd: float = 1.0,
     amount = record.get("amount")
     if amount is not None and float(amount) == 0.0:
         return "zero_value"
+
+    if record.get("value_basis") == "price_unavailable":
+        # A known major we could not price is not noise. Quarantining it would
+        # discard a potentially large real transfer on the strength of a price
+        # outage — and quarantined records never reach the substrate at all, so
+        # once the cursor has advanced past them the loss is permanent.
+        return None
 
     usd = record.get("amount_usd")
     if usd is None:
@@ -2424,8 +2434,9 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
 
 
 def _blank_chain_result() -> dict:
-    return {"records": 0, "spam": 0, "calls": 0, "cursor": 0, "gaps": [],
-            "truncated": False, "error": None, "probed_inactive": False}
+    return {"records": 0, "spam": 0, "spam_by_reason": {}, "unpriced": 0,
+            "calls": 0, "cursor": 0, "gaps": [], "truncated": False,
+            "error": None, "probed_inactive": False}
 
 
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
@@ -2515,6 +2526,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 continue
             rec["spam"] = True
             rec["spam_reason"] = reason
+            chain_result["spam_by_reason"][reason] = (
+                chain_result["spam_by_reason"].get(reason, 0) + 1)
             if reason == "lookalike":
                 for side in (rec["src"], rec["dst"]):
                     mimicked = spam_mod.is_lookalike(side, volume,
@@ -2532,10 +2545,18 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
 
         chain_result["records"] = len(clean)
         chain_result["spam"] = len(quarantined)
+        chain_result["unpriced"] = sum(
+            1 for r in clean if r.get("value_basis") == "price_unavailable")
         if chain_result["error"]:
             result["degraded_sources"].append(name)
 
-    write_cursors(cursors)
+        # Flushed per chain, not once at the end. append_records dedups by id
+        # and is safe to repeat, but _merge_spam_rollup merges by straight
+        # addition — so a crash in a later chain would make the next run
+        # re-fetch this chain's already-processed range and add its counts on
+        # top of the persisted entry, inflating them without bound.
+        write_cursors(cursors)
+
     return result
 
 
@@ -2568,7 +2589,8 @@ def _merge_spam_rollup(entries: list[dict]) -> None:
 
 def sweep_health(results: list[dict]) -> dict:
     """One summary across every wallet swept this run."""
-    records = spam = calls = gaps = 0
+    records = spam = calls = gaps = unpriced = 0
+    by_reason: dict[str, int] = {}
     degraded: list[str] = []
     for res in results:
         for name, chain_result in res["chains"].items():
@@ -2576,6 +2598,9 @@ def sweep_health(results: list[dict]) -> dict:
             spam += chain_result["spam"]
             calls += chain_result["calls"]
             gaps += len(chain_result["gaps"])
+            unpriced += chain_result.get("unpriced", 0)
+            for reason, n in (chain_result.get("spam_by_reason") or {}).items():
+                by_reason[reason] = by_reason.get(reason, 0) + n
             if chain_result["error"] and name not in degraded:
                 degraded.append(name)
     return {
@@ -2583,6 +2608,12 @@ def sweep_health(results: list[dict]) -> dict:
         "wallets": len(results),
         "records": records,
         "spam_suppressed": spam,
+        # Broken out by reason so a price outage or a poisoning campaign is
+        # legible at a glance instead of being one flat number.
+        "spam_by_reason": by_reason,
+        # Records kept, but whose known asset could not be priced this run.
+        # A non-zero value here means the graph is missing real transfers.
+        "unpriced": unpriced,
         "calls": calls,
         "possible_gaps": gaps,
         "degraded_sources": sorted(degraded),
