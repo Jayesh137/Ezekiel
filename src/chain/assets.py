@@ -54,7 +54,14 @@ def value_usd(symbol: str, amount: float, date_str: str,
               price_lookup) -> tuple[float | None, str]:
     """USD value of `amount` of `symbol` on `date_str`, and the basis used.
 
-    Returns (None, "unpriced") for anything we cannot value — never (0.0, ...).
+    Returns (None, "unpriced") for a token we do not price at all, and
+    (None, "price_unavailable") for a known major whose price_lookup came back
+    empty — never (0.0, ...) for either. The two must stay distinguishable: an
+    unknown token is noise by design, but a major we simply could not price
+    today (a price-source outage) is real money. Collapsing both into the same
+    "unpriced" basis is what let a downstream spam filter quarantine a live
+    ETH transfer on the strength of a price-source hiccup — the classifier
+    could not tell "worthless" from "worth unknown right now."
     """
     sym = (symbol or "").strip().upper()
     if sym in STABLES:
@@ -62,7 +69,7 @@ def value_usd(symbol: str, amount: float, date_str: str,
     if sym in MAJORS:
         price = price_lookup(sym, date_str)
         if price is None:
-            return None, "unpriced"
+            return None, "price_unavailable"
         return round(float(amount) * float(price), 2), "daily_close"
     return None, "unpriced"
 

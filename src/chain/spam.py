@@ -105,6 +105,13 @@ def classify_spam(record: dict, volume, *, dust_usd: float = 1.0,
     if amount is not None and float(amount) == 0.0:
         return "zero_value"
 
+    if record.get("value_basis") == "price_unavailable":
+        # A known major we could not price is not noise. Quarantining it would
+        # discard a potentially large real transfer on the strength of a price
+        # outage — and quarantined records never reach the substrate at all,
+        # so the loss is permanent once the cursor has advanced past them.
+        return None
+
     usd = record.get("amount_usd")
     if usd is None:
         return "unpriced_token"

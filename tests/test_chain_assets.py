@@ -24,12 +24,15 @@ def test_majors_use_the_daily_close():
     assert basis == "daily_close"
 
 
-def test_a_missing_price_yields_none_and_never_zero():
+def test_a_majors_missing_price_yields_price_unavailable_never_zero():
     """A $2M ETH transfer booked as 0.0 drops below every threshold in the
-    system and the migration walks past unnoticed."""
+    system and the migration walks past unnoticed. A known major with no price
+    today must stay distinguishable from an unknown token: it is real money a
+    price-source outage temporarily could not value, not noise, and downstream
+    consumers need the distinct basis to avoid quarantining it as such."""
     amount, basis = assets.value_usd("WETH", 1000.0, "2026-06-16", lambda s, d: None)
     assert amount is None
-    assert basis == "unpriced"
+    assert basis == "price_unavailable"
     assert amount != 0.0        # the distinction this whole rule exists for
 
 
@@ -37,6 +40,7 @@ def test_an_unknown_token_is_unpriced_not_valued():
     amount, basis = assets.value_usd("SCAMAIRDROP", 1e9, "2026-06-16", lambda s, d: 1.0)
     assert amount is None
     assert basis == "unpriced"
+    assert amount != 0.0
 
 
 def test_decimals_come_from_the_row_for_erc20_and_are_18_for_native():

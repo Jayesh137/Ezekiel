@@ -254,6 +254,91 @@ def test_sweep_is_skipped_without_an_api_key(tmp_path, monkeypatch):
     assert b.calls_used == 0
 
 
+def test_a_price_unavailable_major_reaches_transfers_dir_not_the_spam_rollup(
+        tmp_path, monkeypatch):
+    """A known major (ETH) the price source could not price today must survive
+    as a real, readable record -- not vanish into an address-keyed spam count.
+    price_lookup returning None here is exactly sweep_wallet's own default
+    behaviour when no price_lookup is supplied, which is how Tasks 11/12 call
+    it in production."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+
+    def native_row(h="0xeth"):
+        return {"blockNumber": "50", "timeStamp": "1781000000", "hash": h,
+                "from": "0xtarget", "to": "0xdest", "value": "2000000000000000000"}
+
+    def fake_fetch_kind(address, chain, kind, start, b, **kw):
+        if kind != "native":
+            return WalkResult([], start, 1, False, []), None
+        return WalkResult([native_row()], 50, 1, False, []), None
+
+    monkeypatch.setattr(collect, "fetch_kind", fake_fetch_kind)
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True,
+                                  price_lookup=lambda s, d: None)
+
+    chain = result["chains"]["arbitrum"]
+    assert chain["records"] == 1
+    assert chain["spam"] == 0
+    assert chain["unpriced"] == 1
+
+    got = collect.records_for("0xtarget")
+    assert len(got) == 1
+    assert got[0]["asset"] == "ETH"
+    assert got[0]["amount_usd"] is None
+    assert got[0]["value_basis"] == "price_unavailable"
+
+
+def test_a_finished_chains_cursor_is_durable_before_the_next_chain_is_swept(
+        tmp_path, monkeypatch):
+    """write_cursors must flush after each chain, not once at the very end --
+    otherwise a process killed mid-sweep (the 10-minute CI timeout budget.py
+    is built around) loses cursor progress for chains that had already
+    finished and already written their records, and the spam rollup's
+    straight-addition merge would inflate suppressed counts on every retry
+    of a range that was already accounted for."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+
+    seen = {}
+
+    def fake_fetch_kind(address, chain, kind, start, b, **kw):
+        if chain["name"] == "base" and kind == "erc20":
+            # By the time base's erc20 kind is being fetched, arbitrum must
+            # already be durable on disk -- read straight from CURSOR_PATH,
+            # not from any in-memory state, to prove it.
+            seen.update(collect.read_cursors())
+        if kind != "erc20":
+            return WalkResult([], start, 1, False, []), None
+        return WalkResult([], 100, 1, False, []), None
+
+    monkeypatch.setattr(collect, "fetch_kind", fake_fetch_kind)
+
+    collect.sweep_wallet("0xtarget", [ARB, BASE], budget(), cluster=True)
+
+    assert seen.get("arbitrum:0xtarget:erc20") == 100
+
+
+def test_multiple_failed_kinds_are_all_recorded_not_just_the_last(tmp_path, monkeypatch):
+    """chain_result["error"] is overwritten per kind, so if erc20 and native
+    both fail only the later message would survive there -- errors_by_kind
+    keeps every kind's own message instead of losing all but the last."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []),
+                                                     f"{k} failed"))
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+
+    assert result["chains"]["arbitrum"]["errors_by_kind"] == {
+        "erc20": "erc20 failed", "native": "native failed", "internal": "internal failed"}
+
+
 def test_sweep_health_summarises_across_wallets():
     results = [
         {"address": "0xa", "chains": {"arbitrum": {"records": 3, "spam": 5, "calls": 2,
@@ -272,3 +357,24 @@ def test_sweep_health_summarises_across_wallets():
     assert health["degraded_sources"] == ["arbitrum"]
     assert health["possible_gaps"] == 1
     assert health["wallets"] == 2
+
+
+def test_sweep_health_reports_unpriced_and_spam_by_reason():
+    """A run where the price source is down must say so in the health output
+    -- as a distinct `unpriced` total -- rather than only showing up as an
+    unexplained spike in the flat `spam_suppressed` count."""
+    results = [
+        {"address": "0xa", "chains": {"arbitrum": {
+            "records": 2, "spam": 3, "calls": 2, "cursor": 10, "gaps": [],
+            "truncated": False, "error": None, "probed_inactive": False,
+            "unpriced": 1, "spam_by_reason": {"dust": 2, "lookalike": 1}}},
+         "degraded_sources": []},
+        {"address": "0xb", "chains": {"arbitrum": {
+            "records": 1, "spam": 1, "calls": 1, "cursor": 12, "gaps": [],
+            "truncated": False, "error": None, "probed_inactive": False,
+            "unpriced": 2, "spam_by_reason": {"dust": 1}}},
+         "degraded_sources": []},
+    ]
+    health = collect.sweep_health(results)
+    assert health["unpriced"] == 3
+    assert health["spam_by_reason"] == {"dust": 3, "lookalike": 1}

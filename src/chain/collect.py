@@ -118,7 +118,8 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
 
 def _blank_chain_result() -> dict:
     return {"records": 0, "spam": 0, "calls": 0, "cursor": 0, "gaps": [],
-            "truncated": False, "error": None, "probed_inactive": False}
+            "truncated": False, "error": None, "probed_inactive": False,
+            "unpriced": 0, "spam_by_reason": {}, "errors_by_kind": {}}
 
 
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
@@ -183,6 +184,7 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             chain_result["truncated"] = chain_result["truncated"] or walk.truncated
             if error:
                 chain_result["error"] = error
+                chain_result["errors_by_kind"][kind] = error
 
             for row in walk.rows:
                 rec = normalise_row(row, chain, kind, price_lookup)
@@ -208,6 +210,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 continue
             rec["spam"] = True
             rec["spam_reason"] = reason
+            chain_result["spam_by_reason"][reason] = (
+                chain_result["spam_by_reason"].get(reason, 0) + 1)
             if reason == "lookalike":
                 for side in (rec["src"], rec["dst"]):
                     mimicked = spam_mod.is_lookalike(side, volume,
@@ -225,10 +229,22 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
 
         chain_result["records"] = len(clean)
         chain_result["spam"] = len(quarantined)
+        chain_result["unpriced"] = sum(
+            1 for rec in clean if rec.get("value_basis") == "price_unavailable")
         if chain_result["error"]:
             result["degraded_sources"].append(name)
 
-    write_cursors(cursors)
+        # Flushed per chain, immediately after that chain's own writes, rather
+        # than once at the end: a run killed mid-sweep (the 10-minute CI
+        # timeout budget.py is built around) would otherwise lose cursor
+        # progress for chains that had already finished and already written
+        # their records. On retry those chains would be re-fetched from
+        # scratch, and _merge_spam_rollup's straight-addition merge has no
+        # id-based dedup like append_records does — a retried range would
+        # inflate `count`/`suppressed_total` by re-adding on top of what was
+        # already persisted, unbounded and self-reinforcing.
+        write_cursors(cursors)
+
     return result
 
 
@@ -261,14 +277,18 @@ def _merge_spam_rollup(entries: list[dict]) -> None:
 
 def sweep_health(results: list[dict]) -> dict:
     """One summary across every wallet swept this run."""
-    records = spam = calls = gaps = 0
+    records = spam = calls = gaps = unpriced = 0
     degraded: list[str] = []
+    spam_by_reason: dict[str, int] = {}
     for res in results:
         for name, chain_result in res["chains"].items():
             records += chain_result["records"]
             spam += chain_result["spam"]
             calls += chain_result["calls"]
             gaps += len(chain_result["gaps"])
+            unpriced += chain_result.get("unpriced", 0)
+            for reason, count in chain_result.get("spam_by_reason", {}).items():
+                spam_by_reason[reason] = spam_by_reason.get(reason, 0) + count
             if chain_result["error"] and name not in degraded:
                 degraded.append(name)
     return {
@@ -276,6 +296,8 @@ def sweep_health(results: list[dict]) -> dict:
         "wallets": len(results),
         "records": records,
         "spam_suppressed": spam,
+        "unpriced": unpriced,
+        "spam_by_reason": spam_by_reason,
         "calls": calls,
         "possible_gaps": gaps,
         "degraded_sources": sorted(degraded),

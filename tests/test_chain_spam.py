@@ -115,6 +115,18 @@ def test_unpriced_token_is_quarantined():
     assert spam.classify_spam(r, {}) == "unpriced_token"
 
 
+def test_a_price_unavailable_major_is_not_spam():
+    """A known major (ETH, WBTC, ...) the price source could not price today
+    is real money, not noise. Quarantining it on the strength of a price
+    outage would discard it permanently: quarantined records never reach
+    TRANSFERS_DIR, only an address-keyed count survives, and the cursor
+    advances past the range regardless -- there is no second chance once the
+    price source recovers."""
+    r = record("0xtarget", "0xbig", usd=None, basis="price_unavailable", amount=2.5)
+    r["asset"] = "ETH"
+    assert spam.classify_spam(r, {}) is None
+
+
 def test_a_real_transfer_is_not_spam():
     assert spam.classify_spam(record("0xtarget", "0xbig", usd=13_000_000.0), {}) is None
 
