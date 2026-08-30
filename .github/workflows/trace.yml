@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+    inputs:
+      investigate_wallet:
+        description: 'Sweep this address across all chains before tracing'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -23,6 +28,11 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       - run: pip install -r requirements.txt
+      - name: Investigate a specific wallet
+        if: inputs.investigate_wallet != ''
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: python scripts/backfill_transfers.py --wallet "${{ inputs.investigate_wallet }}"
       - run: python src/tracer.py
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}

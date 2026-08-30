@@ -263,11 +263,71 @@ src/            backend — see the module table above
   thresholds.py   single source of truth for thresholds/tiers/disposition
   transfer_graph.py  normalised transfer graph + linked-wallet grading
   heartbeat.py    alerts when collection itself stalls
+  chain/          multi-chain collection substrate (client, spam, labels, assets)
 dashboard/      SvelteKit 5 static SPA, deployed to GitHub Pages
 data/           collected JSON — also the dashboard's API
 profile/        computed fingerprint, recent fingerprint, backtest report
 scripts/        compact_data.py, dedupe_fills_by_tid.py
 docs/           architecture.md (see caveat below), plans, specs
+```
+
+## Transfer substrate
+
+`src/chain/` collects transfers and writes `data/transfers/{chain}/YYYY-MM-DD.json`.
+Everything downstream — the transfer graph, the tracer, linkage — reads it rather
+than calling Etherscan directly.
+
+What it does that the previous single-endpoint collection did not:
+
+- **Six chains, not one.** Etherscan V2 serves Arbitrum, Ethereum, Base, Optimism,
+  Polygon and BSC from the same API key by varying `chainid`. Configure in
+  `config.json` under `chains`.
+- **Three record kinds, not one.** `tokentx`, `txlist` and `txlistinternal`.
+  Internal transactions matter most: a contract-mediated transfer, which is what
+  every bridge emits, appears in neither of the others.
+- **Block-range pagination.** The old collection asked for `page=1, offset=1000,
+  sort=desc` exactly once, so `data/l1_transactions/` capped at 1000 records
+  forever. The walker steps forward by block with no ceiling.
+- **Poisoning quarantine.** 905 of those 1000 records moved under a dollar, and a
+  single forgery of the known self-wallet accounted for 510. Forged addresses are
+  matched on their first and last 4 hex characters and rolled up into
+  `data/transfers_spam/latest.json` instead of entering the graph.
+
+  The rule is **value-ordered**, not a membership test: an address is a forgery of
+  another only when the other has moved strictly more value with the wallet.
+  Nobody forges an address poorer than their own. A symmetric test gets this wrong
+  in both directions — it lets a $1 clone of a large counterparty quarantine the
+  genuine address, and a blanket exemption to prevent that whitewashes the clone.
+- **Entity labels.** `data/labels/entities.json` names exchanges, bridges and
+  routers; bytecode is checked once per address and cached. A contract can never
+  be graded a personal wallet.
+
+  **"Service" is purpose-relative.** The graph asks "may I walk into this
+  address?" and a CEX *deposit* address answers no. Linkage asks "does shared use
+  imply common ownership?" and the same address is the strongest possible yes —
+  it belongs to one exchange account. `service_addresses()` therefore takes the
+  categories to apply; linkage passes `SERVICE_CATEGORIES` minus the two deposit
+  categories.
+- **Prices that fail are not zero, and not spam.** A known asset the system could
+  not price this run is stored with `value_basis: "price_unavailable"` and
+  counted in `data/transfers/latest.json`'s `unpriced` field. It is retained, not
+  quarantined: booking it as `0.0` would drop a potentially large transfer below
+  every threshold silently, and quarantining it would keep it out of the
+  substrate entirely. Only a genuinely unknown token is quarantined.
+- **Alerts name the asset and the chain.** Collection used to be USDC-on-Arbitrum
+  by construction, so both were safe to hardcode. Neither is now, and the amount
+  is rendered as a dollar figure (`$X of ETH on base`) rather than a bare number
+  beside a symbol, which would read as a token quantity.
+
+**Blindness is reported, never inferred.** `data/transfers/latest.json` carries
+`degraded_sources`; a chain that could not be read is recorded there, and an empty
+sweep never serialises the same way as a failed one.
+
+To investigate one address on demand, run the **Trace Fund Flows** workflow with
+the `investigate_wallet` input, or locally:
+
+```powershell
+python scripts/backfill_transfers.py --wallet 0xa95d9c1f655341597c94393fddc30cf3c08e4fce
 ```
 
 ## Known rough edges

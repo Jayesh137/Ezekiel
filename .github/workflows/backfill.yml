@@ -22,6 +22,10 @@ jobs:
           cache: 'pip'
       - run: pip install -r requirements.txt
       - run: python src/backfill.py
+      - name: Backfill multi-chain transfer history
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: python scripts/backfill_transfers.py
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
