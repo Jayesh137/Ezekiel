@@ -36,6 +36,26 @@ def addr(seed: str) -> str:
     return "0x" + (seed * 40)[:40]
 
 
+def as_substrate_record(row, chain="arbitrum"):
+    """A raw Etherscan row (this file's `l1()` shape) as src/chain/collect.py
+    now produces it — expand_frontier reads records_for(), not raw rows."""
+    usd = int(row.get("value", 0) or 0) / 1e6
+    ts = int(row.get("timeStamp", 0) or 0)
+    return {
+        "id": f"{chain}:{row.get('hash', '')}:erc20:0",
+        "chain": chain, "chain_id": 42161,
+        "block": int(row.get("blockNumber", 0) or 0),
+        "ts": ts, "timestamp": None,
+        "tx_hash": row.get("hash", ""),
+        "src": (row.get("from") or "").lower(),
+        "dst": (row.get("to") or "").lower(),
+        "kind": "erc20", "asset": row.get("tokenSymbol") or "USDC",
+        "token_address": None,
+        "amount": usd, "amount_usd": usd, "value_basis": "stable_par",
+        "spam": False, "spam_reason": None,
+    }
+
+
 LOW_ALPHA = addr("0")     # sorts FIRST alphabetically
 HIGH_ALPHA = addr("f")    # sorts LAST alphabetically
 
@@ -259,8 +279,10 @@ def test_persisted_frontier_resumes_on_the_following_run(monkeypatch):
     a, b, c = addr("a"), addr("b"), addr("c")
     pages = {a: [l1(a, b, 950_000, 4, "0xab")], b: [l1(b, c, 900_000, 3, "0xbc")],
              c: []}
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda w, start_block=0: list(pages.get(w.lower(), [])))
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr(
+        "src.chain.collect.records_for",
+        lambda w, **kw: [as_substrate_record(r) for r in pages.get(w.lower(), [])])
     seed = edges(l1(T, a, 1_000_000, 5, "0xta"))
     tight = {**tg.DEFAULTS, "max_expansions": 1}
 

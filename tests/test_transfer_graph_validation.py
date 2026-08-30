@@ -34,17 +34,39 @@ def l1():
     return json.loads(FIXTURE.read_text())
 
 
+def as_substrate_record(row, chain="arbitrum"):
+    """A raw Etherscan row (this file's fixture shape) as src/chain/collect.py
+    now produces it — expand_frontier reads records_for(), not raw rows."""
+    usd = int(row.get("value", 0) or 0) / 1e6
+    ts = int(row.get("timeStamp", 0) or 0)
+    return {
+        "id": f"{chain}:{row.get('hash', '')}:erc20:0",
+        "chain": chain, "chain_id": 42161,
+        "block": int(row.get("blockNumber", 0) or 0),
+        "ts": ts, "timestamp": None,
+        "tx_hash": row.get("hash", ""),
+        "src": (row.get("from") or "").lower(),
+        "dst": (row.get("to") or "").lower(),
+        "kind": "erc20", "asset": row.get("tokenSymbol") or "USDC",
+        "token_address": None,
+        "amount": usd, "amount_usd": usd, "value_basis": "stable_par",
+        "spam": False, "spam_reason": None,
+    }
+
+
 @pytest.fixture
 def fake_etherscan(monkeypatch, l1):
     """Serve recorded Etherscan responses so the L1 path runs without a key."""
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     calls = []
 
-    def _get_usdc_transfers(address, start_block=0):
-        calls.append(address.lower())
-        return l1["responses"].get(address.lower(), {}).get("result", [])
+    def _records_for(wallet, **kw):
+        calls.append(wallet.lower())
+        rows = l1["responses"].get(wallet.lower(), {}).get("result", [])
+        return [as_substrate_record(r) for r in rows]
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", _get_usdc_transfers)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *a, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", _records_for)
     return calls
 
 
@@ -97,10 +119,10 @@ def test_expansion_failure_keeps_partial_results(monkeypatch, l1):
     target = l1["target"]
     seed = [normalise_l1_transfer(tx) for tx in l1["responses"][target]["result"]]
 
-    def boom(address, start_block=0):
+    def boom(wallet, *args, **kw):
         raise OSError("etherscan unreachable")
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", boom)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", boom)
     edges, diag = expand_frontier(seed, target, tg.DEFAULTS)
     assert diag["status"] == "failed"
     assert diag["error"]

@@ -34,6 +34,26 @@ def edges(*rows):
     return [normalise_l1_transfer(r) for r in rows]
 
 
+def as_substrate_record(row, chain="arbitrum"):
+    """A raw Etherscan row (this file's `l1()` shape) as src/chain/collect.py
+    now produces it — expand_frontier reads records_for(), not raw rows."""
+    usd = int(row.get("value", 0) or 0) / 1e6
+    ts = int(row.get("timeStamp", 0) or 0)
+    return {
+        "id": f"{chain}:{row.get('hash', '')}:erc20:0",
+        "chain": chain, "chain_id": 42161,
+        "block": int(row.get("blockNumber", 0) or 0),
+        "ts": ts, "timestamp": None,
+        "tx_hash": row.get("hash", ""),
+        "src": (row.get("from") or "").lower(),
+        "dst": (row.get("to") or "").lower(),
+        "kind": "erc20", "asset": row.get("tokenSymbol") or "USDC",
+        "token_address": None,
+        "amount": usd, "amount_usd": usd, "value_basis": "stable_par",
+        "spam": False, "spam_reason": None,
+    }
+
+
 def node(graph, addr):
     return next((n for n in graph["nodes"] if n["wallet"] == addr.lower()), None)
 
@@ -244,14 +264,17 @@ def test_failed_lookup_preserves_partial_edges_and_resume_queue(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
     calls = {"n": 0}
+    collected = {}
 
-    def flaky(address, start_block=0):
+    def flaky_sweep(wallet, *args, **kw):
         calls["n"] += 1
         if calls["n"] > 1:
             raise OSError("etherscan unreachable")
-        return [l1(A, C, 980_000, 4, "0x3")]
+        collected[wallet.lower()] = [as_substrate_record(l1(A, C, 980_000, 4, "0x3"))]
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", flaky)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", flaky_sweep)
+    monkeypatch.setattr("src.chain.collect.records_for",
+                        lambda wallet, **kw: collected.get(wallet.lower(), []))
     out, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     # One address failing must not abandon the walk: the successful lookup is
     # kept and the failed ones are re-queued rather than recorded as finished.
@@ -269,10 +292,10 @@ def test_total_lookup_outage_is_reported_as_failed(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
 
-    def dead(address, start_block=0):
+    def dead(wallet, *args, **kw):
         raise OSError("etherscan unreachable")
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", dead)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", dead)
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert diag["status"] == "failed", "a total outage is not a partial result"
     assert diag["error"]
@@ -281,7 +304,8 @@ def test_total_lookup_outage_is_reported_as_failed(monkeypatch):
 
 def test_resume_queue_is_consumed_on_the_next_run(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *args, **kw: [])
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS,
                                  resume=[{"wallet": E, "depth": 2}], now_ts=NOW)
@@ -290,7 +314,8 @@ def test_resume_queue_is_consumed_on_the_next_run(monkeypatch):
 
 def test_expansion_records_why_each_frontier_was_handled(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *args, **kw: [])
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, CEX, 9_000_000, 5, "0x2"))
     _, diag = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 1},
                                  now_ts=NOW)
@@ -301,7 +326,8 @@ def test_expansion_records_why_each_frontier_was_handled(monkeypatch):
 
 def test_budget_limits_are_respected(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *args, **kw: [])
     seed = edges(*[l1(T, f"0x{i:040x}", 500_000, 5, f"0x{i}") for i in range(20)])
     _, diag = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 3},
                                  now_ts=NOW)

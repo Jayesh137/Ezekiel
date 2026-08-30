@@ -43,11 +43,40 @@ def chain_to(graph, addr):
     return max(hits, key=lambda c: c["hop_count"]) if hits else None
 
 
+def as_substrate_record(row, chain="arbitrum"):
+    """A raw Etherscan row (this file's `l1()` shape) as src/chain/collect.py
+    now produces it — expand_frontier reads records_for(), not raw rows."""
+    usd = int(row.get("value", 0) or 0) / 1e6
+    ts = int(row.get("timeStamp", 0) or 0)
+    return {
+        "id": f"{chain}:{row.get('hash', '')}:erc20:0",
+        "chain": chain, "chain_id": 42161,
+        "block": int(row.get("blockNumber", 0) or 0),
+        "ts": ts, "timestamp": None,
+        "tx_hash": row.get("hash", ""),
+        "src": (row.get("from") or "").lower(),
+        "dst": (row.get("to") or "").lower(),
+        "kind": "erc20", "asset": row.get("tokenSymbol") or "USDC",
+        "token_address": None,
+        "amount": usd, "amount_usd": usd, "value_basis": "stable_par",
+        "spam": False, "spam_reason": None,
+    }
+
+
 def api(pages):
-    """A fake Etherscan whose responses are keyed by address."""
-    def _get(address, start_block=0):
-        return list(pages.get(address.lower(), []))
-    return _get
+    """A fake substrate reader whose responses are keyed by address. Patches
+    both halves of the seam: sweep_wallet is a no-op (it exists only to
+    populate the substrate; in a test the substrate is whatever records_for
+    returns) and records_for serves the per-wallet pages as substrate records."""
+    def _records_for(wallet, **kw):
+        return [as_substrate_record(r) for r in pages.get(wallet.lower(), [])]
+    return _records_for
+
+
+def patch_api(monkeypatch, pages):
+    """Install `api(pages)` as the frontier's fetch seam."""
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *a, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", api(pages))
 
 
 # --- 1. cyclic flow ---------------------------------------------------------
@@ -139,7 +168,7 @@ CHAIN_PAGES = {
 
 def test_four_hops_are_genuinely_walked(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api(CHAIN_PAGES))
+    patch_api(monkeypatch, CHAIN_PAGES)
     seed = edges(l1(T, A, 1_000_000, 10, "0xta"))
     out, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert diag["deepest_expanded"] >= 3
@@ -155,7 +184,7 @@ def test_frontier_resumes_across_two_separate_process_runs(monkeypatch):
     """Run 1 is capped at one lookup. Run 2 gets only run 1's persisted queue
     and must continue from there rather than restarting."""
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api(CHAIN_PAGES))
+    patch_api(monkeypatch, CHAIN_PAGES)
     seed = edges(l1(T, A, 1_000_000, 10, "0xta"))
     tight = {**tg.DEFAULTS, "max_expansions": 1}
 
@@ -186,14 +215,17 @@ def test_interrupted_run_resumes_without_losing_or_repeating_work(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     seed = edges(l1(T, A, 1_000_000, 10, "0xta"), l1(T, B, 900_000, 10, "0xtb"))
     state = {"dead": True}
+    collected = {}
 
-    def flaky(address, start_block=0):
-        a = address.lower()
+    def flaky_sweep(wallet, *args, **kw):
+        a = wallet.lower()
         if a == B.lower() and state["dead"]:
             raise OSError("connection reset mid-run")
-        return list(CHAIN_PAGES.get(a, []))
+        collected[a] = [as_substrate_record(r) for r in CHAIN_PAGES.get(a, [])]
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", flaky)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", flaky_sweep)
+    monkeypatch.setattr("src.chain.collect.records_for",
+                        lambda wallet, **kw: collected.get(wallet.lower(), []))
     e1, d1 = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert d1["status"] == "partial"
     assert A.lower() in d1["expanded_ledger"]
@@ -210,7 +242,7 @@ def test_interrupted_run_resumes_without_losing_or_repeating_work(monkeypatch):
 
 def test_repeated_runs_over_static_data_stop_spending_budget(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api(CHAIN_PAGES))
+    patch_api(monkeypatch, CHAIN_PAGES)
     seed = edges(l1(T, A, 1_000_000, 10, "0xta"))
     e, d = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert d["status"] == "ok"
@@ -223,7 +255,7 @@ def test_repeated_runs_over_static_data_stop_spending_budget(monkeypatch):
 
 def test_fully_explored_is_only_claimed_when_no_eligible_frontier_remains(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api(CHAIN_PAGES))
+    patch_api(monkeypatch, CHAIN_PAGES)
     seed = edges(l1(T, A, 1_000_000, 10, "0xta"))
     _, capped = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 1},
                                    now_ts=NOW)
@@ -246,11 +278,11 @@ def test_high_fan_degree_service_is_not_expanded_and_does_not_explode_frontier(m
 
     called = []
 
-    def spy(address, start_block=0):
-        called.append(address.lower())
-        return []
+    def spy(wallet, *args, **kw):
+        called.append(wallet.lower())
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", spy)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", spy)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *a, **kw: [])
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert HUB.lower() not in called, "a service hub must never be expanded"
     suppressed = [d for d in diag["decisions"] if d["action"] == "suppressed"]
@@ -262,8 +294,9 @@ def test_configured_service_addresses_are_suppressed_during_expansion(monkeypatc
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     seed = edges(l1(T, HUB, 1_000_000, 10, "0xth"))
     called = []
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda a, start_block=0: called.append(a.lower()) or [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet",
+                        lambda wallet, *a, **kw: called.append(wallet.lower()))
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *a, **kw: [])
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW,
                                  known_services={HUB.upper()})
     assert HUB.lower() not in called
@@ -278,8 +311,9 @@ def test_dust_recipients_never_consume_the_lookup_budget(monkeypatch):
     rows = [l1(T, A, 1_000_000, 10, "0xreal")]
     rows += [l1(T, p, 0.01, 9, f"0xdust{i}") for i, p in enumerate(poison)]
     called = []
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda a, start_block=0: called.append(a.lower()) or [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet",
+                        lambda wallet, *a, **kw: called.append(wallet.lower()))
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *a, **kw: [])
     _, diag = tg.expand_frontier(edges(*rows), T, tg.DEFAULTS, now_ts=NOW)
     assert called == [A.lower()], f"budget leaked to dust: {called}"
     assert diag["lookups"] == 1
@@ -287,9 +321,9 @@ def test_dust_recipients_never_consume_the_lookup_budget(monkeypatch):
 
 def test_dust_discovered_mid_walk_is_not_queued(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api({
+    patch_api(monkeypatch, {
         A: [l1(A, B, 0.02, 8, "0xdust"), l1(A, C, 900_000, 8, "0xreal")],
-    }))
+    })
     _, diag = tg.expand_frontier(edges(l1(T, A, 1_000_000, 10, "0xta")), T,
                                  {**tg.DEFAULTS, "max_expansions": 1}, now_ts=NOW)
     queued = {q["wallet"] for q in diag["frontier_queue"]}
@@ -459,7 +493,7 @@ def test_out_of_order_timestamps_do_not_break_path_assembly():
 def test_partial_pagination_yields_a_shorter_path_not_a_wrong_one(monkeypatch):
     """Etherscan caps a busy address at N rows; the onward hop is simply absent."""
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api({A: [], B: []}))
+    patch_api(monkeypatch, {A: [], B: []})
     out, diag = tg.expand_frontier(edges(l1(T, A, 1_000_000, 10, "0xta")), T,
                                    tg.DEFAULTS, now_ts=NOW)
     g = build_graph(out, T, expansion=diag)
@@ -895,7 +929,7 @@ def test_expansion_never_writes_into_the_working_tree(monkeypatch, tmp_path):
     before = {p.name: p.read_bytes() for p in state.glob("*")} if state.exists() else {}
 
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api(CHAIN_PAGES))
+    patch_api(monkeypatch, CHAIN_PAGES)
     tg.expand_frontier(edges(l1(T, A, 1_000_000, 10, "0xta")), T, tg.DEFAULTS,
                        now_ts=NOW)
 
@@ -910,8 +944,9 @@ def test_branching_limit_caps_wallets_expanded_per_level(monkeypatch):
     fan = ["0x" + f"{i:040x}" for i in range(20)]
     seed = edges(*[l1(T, w, 500_000, 10, f"0x{i}") for i, w in enumerate(fan)])
     called = []
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda a, start_block=0: called.append(a.lower()) or [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet",
+                        lambda wallet, *a, **kw: called.append(wallet.lower()))
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *a, **kw: [])
     budget = {**tg.DEFAULTS, "max_branching": 3, "max_expansions": 99}
     _, diag = tg.expand_frontier(seed, T, budget, now_ts=NOW)
     assert len(called) == 3, f"branching limit ignored: {len(called)} lookups"
@@ -922,8 +957,8 @@ def test_time_budget_stops_the_walk_and_queues_the_remainder(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     fan = ["0x" + f"{i:040x}" for i in range(8)]
     seed = edges(*[l1(T, w, 500_000, 10, f"0x{i}") for i, w in enumerate(fan)])
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *a, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *a, **kw: [])
     # A budget already in the past: the deadline is breached immediately.
     _, diag = tg.expand_frontier(seed, T,
                                  {**tg.DEFAULTS, "time_budget_seconds": -1},
@@ -936,7 +971,7 @@ def test_time_budget_stops_the_walk_and_queues_the_remainder(monkeypatch):
 
 def test_depth_limit_is_never_exceeded(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api(CHAIN_PAGES))
+    patch_api(monkeypatch, CHAIN_PAGES)
     _, diag = tg.expand_frontier(edges(l1(T, A, 1_000_000, 10, "0xta")), T,
                                  {**tg.DEFAULTS, "max_depth": 2}, now_ts=NOW)
     assert diag["deepest_expanded"] <= 2
@@ -948,8 +983,8 @@ def test_frontier_queue_truncation_is_reported_not_hidden(monkeypatch):
     n = tg.MAX_FRONTIER_QUEUE + 25
     fan = ["0x" + f"{i:040x}" for i in range(n)]
     seed = edges(*[l1(T, w, 500_000, 10, f"0x{i}") for i, w in enumerate(fan)])
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *a, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *a, **kw: [])
     _, diag = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 0},
                                  now_ts=NOW)
     assert len(diag["frontier_queue"]) == tg.MAX_FRONTIER_QUEUE
@@ -960,10 +995,10 @@ def test_frontier_queue_truncation_is_reported_not_hidden(monkeypatch):
 def test_one_wallet_reachable_at_two_depths_counts_once(monkeypatch):
     """Diamond: T->A->C and T->B->C. C is one unit of remaining work, not two."""
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", api({
+    patch_api(monkeypatch, {
         A: [l1(A, C, 400_000, 8, "0xac")],
         B: [l1(B, C, 400_000, 8, "0xbc")],
-    }))
+    })
     seed = edges(l1(T, A, 500_000, 10, "0xta"), l1(T, B, 500_000, 10, "0xtb"),
                  l1(T, C, 600_000, 10, "0xtc"))
     _, diag = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 2},
