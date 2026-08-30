@@ -2909,7 +2909,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/linkage.py:105-125` (`get_outbound_usdc_addresses`) and `src/linkage.py:128-147` (`target_l1_profile`)
-- Test: `tests/test_wallet_links.py` (extend the existing module)
+- Test: `tests/test_migration_signals.py`, in its existing `# --- linkage ---` section. That file already imports `linkage` and covers `compute_linkage`, so it is the established home. **Not** `tests/test_wallet_links.py` — despite the name, that module is about Hypurrscan URL construction and imports `src.links`, an unrelated concern.
 
 **Interfaces:**
 - Consumes: `src.utils.load_all_records`, `src.chain.chains.enabled_chains`
@@ -2991,10 +2991,23 @@ def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
     costs no calls at all.
     """
     from src.chain.collect import records_for
+    from src.chain.labels import load_registry, service_addresses
 
     config = config or load_config()
-    bridge = config["hl_bridge_contract"].lower()
     wl = (wallet or "").lower()
+
+    # A shared destination is evidence only when it could be a private deposit
+    # address. Routers, wrapper contracts and exchange HOT wallets receive from
+    # millions of unrelated people, so an overlap there is coincidence — and
+    # this result feeds a bonus the module calls "cryptographic certainty" and
+    # fires a standalone alert, so a coincidence reaches the user as a
+    # confident ownership claim. Widening from one chain and one asset to six
+    # chains, every asset and three record kinds is exactly what makes that
+    # collision likely enough to defend against.
+    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
+    excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
+    excluded.add(config["hl_bridge_contract"].lower())
+    excluded.add(wl)
 
     out = set()
     for rec in records_for(wl):
@@ -3004,7 +3017,7 @@ def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
         if usd is None or float(usd) <= 0:
             continue
         dst = (rec.get("dst") or "").lower()
-        if dst and dst != bridge and dst != wl:
+        if dst and dst not in excluded:
             out.add(dst)
     return out
 
