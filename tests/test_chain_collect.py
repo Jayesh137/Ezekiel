@@ -466,3 +466,54 @@ def test_sweep_health_reports_unpriced_and_spam_by_reason():
     health = collect.sweep_health(results)
     assert health["unpriced"] == 3
     assert health["spam_by_reason"] == {"dust": 3, "lookalike": 1}
+
+
+# --- the blindness record must survive two writers -----------------------------
+
+def test_merge_keeps_the_other_jobs_per_wallet_detail(tmp_path, monkeypatch):
+    """Two jobs write data/transfers/latest.json: the trace job sweeps the
+    target every 30 minutes, the backfill sweeps the whole cluster on demand.
+    Either writing it blind erases the other's record of which chains it could
+    not read, and this file is the only place blindness is reported."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+
+    backfill = {"address": "0xself", "status": "ok", "degraded_sources": ["bsc"],
+                "chains": {"bsc": {"records": 0, "spam": 0, "calls": 1, "cursor": 0,
+                                   "gaps": [], "truncated": False, "error": "boom",
+                                   "probed_inactive": False}}}
+    collect.save_sweep_health([backfill])
+
+    tracer_run = {"address": "0xtarget", "status": "ok", "degraded_sources": [],
+                  "chains": {"arbitrum": {"records": 4, "spam": 1, "calls": 2,
+                                          "cursor": 9, "gaps": [], "truncated": False,
+                                          "error": None, "probed_inactive": False}}}
+    health = collect.save_sweep_health([tracer_run])
+
+    assert {r["address"] for r in health["per_wallet"]} == {"0xtarget", "0xself"}
+    assert health["carried_over_wallets"] == ["0xself"]
+    # Totals and degradation describe THIS run: an outage the other job saw
+    # last week must not still be reported as live.
+    assert health["records"] == 4
+    assert health["degraded_sources"] == []
+
+    on_disk = json.loads((tmp_path / "transfers" / "latest.json").read_text())
+    assert on_disk == health
+
+
+def test_a_re_sweep_of_the_same_wallet_replaces_rather_than_duplicates(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    stale = {"address": "0xtarget", "status": "ok", "degraded_sources": ["base"],
+             "chains": {"base": {"records": 0, "spam": 0, "calls": 1, "cursor": 0,
+                                 "gaps": [], "truncated": False, "error": "boom",
+                                 "probed_inactive": False}}}
+    collect.save_sweep_health([stale])
+
+    fresh = {"address": "0xtarget", "status": "ok", "degraded_sources": [],
+             "chains": {"base": {"records": 3, "spam": 0, "calls": 1, "cursor": 5,
+                                 "gaps": [], "truncated": False, "error": None,
+                                 "probed_inactive": False}}}
+    health = collect.save_sweep_health([fresh])
+
+    assert len(health["per_wallet"]) == 1
+    assert health["degraded_sources"] == []
+    assert "carried_over_wallets" not in health

@@ -452,3 +452,47 @@ def test_an_unreadable_substrate_never_erases_the_marker(tmp_path, monkeypatch):
     tracer.mark_traced("0xtarget", ["a", "b"])
     tracer.mark_traced("0xtarget", [], known_ids=set())
     assert _traced(tmp_path) == {"a", "b"}
+
+
+# --- the scheduled path must write the blindness record ------------------------
+
+def test_the_tracer_writes_sweep_health_so_an_outage_is_visible(tmp_path, monkeypatch):
+    """data/transfers/latest.json is spec section 10's degradation record and
+    the README's "blindness is reported, never inferred". It was produced by
+    the manually-dispatched backfill script alone, so on the scheduled path a
+    chain outage produced no record anywhere."""
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: {
+        "address": "0xtarget", "status": "ok", "degraded_sources": ["bsc"],
+        "chains": {"bsc": {"records": 0, "spam": 0, "calls": 1, "cursor": 0,
+                           "gaps": [], "truncated": False,
+                           "error": "Max rate limit reached",
+                           "probed_inactive": False}}})
+
+    tracer.trace_outbound_transfers("0xtarget")
+
+    health = json.loads((tmp_path / "transfers" / "latest.json").read_text())
+    assert health["degraded_sources"] == ["bsc"]
+    assert health["per_wallet"][0]["address"] == "0xtarget"
+
+
+def test_a_skipped_sweep_is_recorded_rather_than_reading_as_a_quiet_run(
+        tmp_path, monkeypatch):
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: {
+        "address": "0xtarget", "status": "skipped_no_api_key",
+        "degraded_sources": ["arbitrum"],
+        "chains": {"arbitrum": {"records": 0, "spam": 0, "calls": 0, "cursor": 0,
+                                "gaps": [], "truncated": False,
+                                "error": "skipped_no_api_key",
+                                "probed_inactive": False}}})
+
+    assert tracer.trace_outbound_transfers("0xtarget") == []
+    health = json.loads((tmp_path / "transfers" / "latest.json").read_text())
+    assert health["degraded_sources"] == ["arbitrum"]

@@ -306,3 +306,48 @@ def sweep_health(results: list[dict]) -> dict:
         "degraded_sources": sorted(degraded),
         "per_wallet": results,
     }
+
+
+def read_sweep_health(directory: str | None = None) -> dict:
+    path = Path(directory or TRANSFERS_DIR) / "latest.json"
+    try:
+        doc = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def merge_sweep_health(previous: dict | None, results: list[dict]) -> dict:
+    """This run's health, keeping per-wallet detail for wallets it did not sweep.
+
+    Two jobs write this file: the trace job sweeps the target every 30 minutes,
+    the backfill sweeps the whole cluster on demand. Either writing it blind
+    erases the other's record of which chains it could not read — and this file
+    is the only place blindness is reported at all.
+
+    Totals and `degraded_sources` describe THIS run only, deliberately. A chain
+    the other job could not read last week is not evidence about this run, and
+    folding it in would leave an outage showing long after it ended — the
+    mirror image of the failure this file exists to prevent.
+    """
+    health = sweep_health(results)
+    swept = {res.get("address") for res in results}
+    carried = [res for res in (previous or {}).get("per_wallet") or []
+               if res.get("address") not in swept]
+    if carried:
+        health["per_wallet"] = health["per_wallet"] + carried
+        health["carried_over_wallets"] = sorted(
+            {a for res in carried if (a := res.get("address"))})
+    return health
+
+
+def save_sweep_health(results: list[dict], directory: str | None = None) -> dict:
+    """Write the run's health to `latest.json` without clobbering the other job.
+
+    `directory` defaults to this module's TRANSFERS_DIR, resolved at call time
+    so tests that repoint it are honoured.
+    """
+    target = str(directory or TRANSFERS_DIR)
+    health = merge_sweep_health(read_sweep_health(target), results)
+    save_latest(target, health)
+    return health

@@ -13,7 +13,7 @@ from src import thresholds as th
 from src.alerts import alert_combined_match, alert_fund_movement, alert_new_wallet_found
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
-from src.chain.collect import records_for, sweep_wallet
+from src.chain.collect import records_for, save_sweep_health, sweep_wallet
 from src.utils import (
     DATA_DIR,
     append_records,
@@ -255,7 +255,15 @@ def trace_outbound_transfers(wallet: str) -> list[dict]:
         max_calls=(config.get("collection") or {}).get("max_calls_per_run", 2500),
         seconds=(config.get("collection") or {}).get("time_budget_seconds", 420),
     )
-    sweep_wallet(wallet, enabled_chains(config), budget, cluster=True)
+    result = sweep_wallet(wallet, enabled_chains(config), budget, cluster=True)
+    # data/transfers/latest.json is the only place a chain outage is reported —
+    # spec section 4's storage record, section 10's degradation record, and the
+    # README's "blindness is reported, never inferred". It was written by the
+    # manually-dispatched backfill script alone, so on the scheduled path (this
+    # function, every 30 minutes) a chain going dark produced no record
+    # anywhere. A promise kept only by a human-triggered job is not kept.
+    if isinstance(result, dict):
+        save_sweep_health([result])
 
     wl = (wallet or "").lower()
     rows = (_as_etherscan_row(r) for r in records_for(wl)

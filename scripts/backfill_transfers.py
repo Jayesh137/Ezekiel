@@ -27,11 +27,11 @@ from src.chain.chains import enabled_chains
 from src.chain.collect import (
     TRANSFERS_DIR,
     read_cursors,
-    sweep_health,
+    save_sweep_health,
     sweep_wallet,
     write_cursors,
 )
-from src.utils import load_config, save_latest
+from src.utils import load_config
 
 
 def cluster_wallets(config: dict) -> list[str]:
@@ -92,8 +92,11 @@ def main(argv=None) -> int:
         results.append(sweep_wallet(wallet, enabled_chains(config), budget,
                                     cluster=True))
 
-    health = sweep_health(results)
-    save_latest(str(TRANSFERS_DIR), health)
+    # Merging rather than clobbering: the trace job writes this same file every
+    # 30 minutes for the target alone, and a --wallet run here sweeps something
+    # else entirely. Whichever wrote last must not erase the other's record of
+    # which chains it could not read.
+    health = save_sweep_health(results, str(TRANSFERS_DIR))
     print(f"[backfill] {health['records']} record(s), "
           f"{health['spam_suppressed']} suppressed as spam, "
           f"{health['calls']} API call(s)")
