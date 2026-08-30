@@ -11,6 +11,8 @@ not read". Those must never serialise the same way: one is knowledge, the other
 is blindness.
 """
 
+import os
+
 from src.chain.budget import BudgetExhausted, CallBudget
 from src.chain.pagination import WalkResult, walk_blocks
 from src.utils import etherscan_get
@@ -110,6 +112,14 @@ def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
     "0x" means an externally owned account. Anything longer is a contract, and a
     contract is never a person.
     """
+    # Every other live-lookup path in the codebase checks this before firing a
+    # request (src/linkage.py, src/chain/collect.py, src/transfer_graph.py) —
+    # without a key every call returns "Invalid API Key", which would spend up
+    # to CODE_LOOKUP_SECONDS doing nothing rather than skipping cleanly. A
+    # failed lookup already resolves safely (has_code's `is True` guard), but
+    # firing doomed requests still breaks convention.
+    if not os.environ.get("ETHERSCAN_API_KEY"):
+        return None
     try:
         budget.spend()
     except BudgetExhausted:

@@ -1811,7 +1811,7 @@ def _read_previous_graph() -> dict:
 # the steady-state cost is zero.
 #
 # The wall-clock ceiling is deliberately small. The trace workflow's job
-# timeout is 600s and every budget inside it adds up: collection 180 +
+# timeout is 600s and every budget inside it adds up: collection 150 +
 # TRACE_BUDGET_SECONDS 240 + expansion 150 + this. At etherscan_get's 0.25s
 # rate-limit sleep, 25 calls cost ~7s of sleeping, so 20s absorbs slow
 # responses without meaningfully moving that total.

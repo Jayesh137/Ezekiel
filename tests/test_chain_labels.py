@@ -360,11 +360,18 @@ def test_labelling_a_graph_without_enabled_chains_is_a_no_op():
 
 
 def test_labelling_never_reaches_the_network_without_a_key(monkeypatch):
-    """The real cache path, with fetch_code stubbed to prove the wiring: a
-    budget-exhausted or keyless lookup degrades to unknown, not to codeless."""
+    """fetch_code's real body, unstubbed: a keyless lookup must degrade to
+    unknown (None) without ever calling the API, not just resolve safely if it
+    somehow did.
+
+    Previously this monkeypatched fetch_code directly, so label_contracts'
+    local `from src.chain.client import fetch_code` bound to the stub and the
+    etherscan_get-must-not-be-called assertion below was unreachable dead
+    code — the test passed regardless of whether fetch_code itself checked
+    for a key."""
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
     monkeypatch.setattr("src.chain.client.etherscan_get",
                         lambda *a, **k: pytest.fail("must not call the API"))
-    monkeypatch.setattr("src.chain.client.fetch_code", lambda a, c, b: None)
     known = set()
     tg.label_contracts([_edge(CONTRACT)], known, CONFIG, 1.0)
     assert known == set()

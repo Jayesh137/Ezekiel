@@ -1,4 +1,6 @@
 # tests/test_chain_client.py
+import pytest
+
 from src.chain import client
 from src.chain.budget import CallBudget
 
@@ -109,20 +111,33 @@ def test_probe_activity_reports_budget_exhaustion_as_an_error(monkeypatch):
 
 
 def test_fetch_code_returns_the_bytecode_string(monkeypatch):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key")
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
         "jsonrpc": "2.0", "result": "0x60806040"})
     assert client.fetch_code("0xabc", ARB, budget()) == "0x60806040"
 
 
 def test_fetch_code_returns_none_when_the_budget_is_gone(monkeypatch):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key")
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {"result": "0x"})
     b = CallBudget(max_calls=0, seconds=1000, clock=lambda: 0.0)
     assert client.fetch_code("0xabc", ARB, b) is None
 
 
 def test_fetch_code_treats_a_non_hex_error_string_as_unreadable(monkeypatch):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key")
     monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
         "jsonrpc": "2.0", "result": "Max rate limit reached"})
+    assert client.fetch_code("0xabc", ARB, budget()) is None
+
+
+def test_fetch_code_returns_none_without_an_api_key_and_never_calls_the_network(monkeypatch):
+    """Every sibling live-lookup path (src/linkage.py, src/chain/collect.py,
+    src/transfer_graph.py) skips cleanly without a key instead of firing a
+    doomed request; fetch_code must too."""
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
+    monkeypatch.setattr(client, "etherscan_get",
+                        lambda *a, **k: pytest.fail("must not call the API without a key"))
     assert client.fetch_code("0xabc", ARB, budget()) is None
 
 
