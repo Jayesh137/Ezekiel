@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.chain.collect import records_for
 from src.utils import (
     DATA_DIR,
     etherscan_get,
@@ -128,7 +129,19 @@ def find_correlations(exits: list[dict], entries: list[dict],
 
 
 def collect_target_exits(target: str, min_amount: float) -> list[dict]:
-    """Target 'exits': HL withdrawals (ledger) + outbound L1 USDC transfers."""
+    """Target 'exits': HL withdrawals (ledger) + outbound transfers from the substrate.
+
+    The L1 side used to read data/l1_transactions, the single-page Arbitrum-USDC
+    table src/tracer.py wrote. Nothing writes that table any more — the tracer was
+    pointed at the substrate — so this reads records_for(target) instead, the same
+    store every other consumer now reads. That also means the value is already
+    computed once, correctly, for every asset on every collected chain: re-deriving
+    USDC's `value / 1e6` here would be wrong for anything that isn't USDC, so
+    `amount_usd` is taken as-is. A `price_unavailable` record (`amount_usd is None`,
+    a known asset like ETH we could not price this run) is skipped outright rather
+    than treated as a $0 exit: amount-matching is the entire basis of correlation,
+    and an exit of unknown size cannot be matched, correctly, to anything.
+    """
     exits = []
 
     for entry in load_all_records(str(DATA_DIR / "ledger")):
@@ -148,19 +161,19 @@ def collect_target_exits(target: str, min_amount: float) -> list[dict]:
             })
 
     target = target.lower()
-    for t in load_all_records(str(DATA_DIR / "l1_transactions")):
-        if (t.get("from", "") or "").lower() != target:
+    for rec in records_for(target):
+        if (rec.get("src") or "").lower() != target:
             continue
-        try:
-            amt = int(t.get("value", 0)) / 1e6  # USDC 6 decimals
-        except (TypeError, ValueError):
+        usd = rec.get("amount_usd")
+        if usd is None:
             continue
+        amt = float(usd)
         if amt >= min_amount:
             exits.append({
                 "amount": amt,
-                "ts": int(t.get("timeStamp", 0)),
+                "ts": int(rec.get("ts", 0) or 0),
                 "source": "l1_outbound",
-                "ref": t.get("hash", ""),
+                "ref": rec.get("tx_hash", ""),
             })
     return exits
 

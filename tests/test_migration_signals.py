@@ -62,6 +62,98 @@ def test_correlation_ignores_below_min_amount():
     assert out == []
 
 
+# collect_target_exits: the L1 side now reads the substrate (records_for),
+# not the frozen pre-substrate data/l1_transactions table — nothing writes
+# that table any more since src/tracer.py was pointed at the substrate.
+
+def test_collect_target_exits_includes_outbound_substrate_transfer_above_min(
+        tmp_path, monkeypatch):
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": T, "dst": "0xcex",
+         "tx_hash": "0xexit", "ts": 1000, "amount_usd": 250_000.0,
+         "value_basis": "stable_par", "spam": False},
+    ]))
+
+    exits = correlator.collect_target_exits(T, min_amount=100_000)
+    assert exits == [
+        {"amount": 250_000.0, "ts": 1000, "source": "l1_outbound", "ref": "0xexit"},
+    ]
+
+
+def test_collect_target_exits_excludes_inbound_substrate_transfer(tmp_path, monkeypatch):
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xfunder", "dst": T,
+         "tx_hash": "0xin", "ts": 1000, "amount_usd": 250_000.0,
+         "value_basis": "stable_par", "spam": False},
+    ]))
+
+    assert correlator.collect_target_exits(T, min_amount=100_000) == []
+
+
+def test_collect_target_exits_skips_price_unavailable_rather_than_treating_as_zero(
+        tmp_path, monkeypatch):
+    """amount_usd is None when value_basis is price_unavailable — a known asset
+    (e.g. ETH) whose price we could not fetch this run. Amount-matching is the
+    entire basis of correlation, so an exit of unknown size must be excluded
+    outright: it must not raise (None reaching a numeric comparison), and it
+    must not silently become a $0 exit either, which — for a min_amount of
+    exactly 0 — `find_correlations` would not reject the way it rejects every
+    other below-minimum exit."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": T, "dst": "0xcex",
+         "tx_hash": "0xunpriced", "ts": 1000, "amount_usd": None, "asset": "ETH",
+         "value_basis": "price_unavailable", "spam": False},
+    ]))
+
+    assert correlator.collect_target_exits(T, min_amount=0) == []
+
+
+def test_collect_target_exits_still_includes_hl_withdrawals(tmp_path, monkeypatch):
+    """The ledger branch above the substrate rewrite must be unaffected."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    ledger_dir = tmp_path / "ledger"
+    ledger_dir.mkdir()
+    (ledger_dir / "2026-08-28.json").write_text(json.dumps([
+        {"delta": {"type": "withdraw", "usdc": "300000"}, "time": 1_700_000_000_000,
+         "hash": "0xwithdraw"},
+    ]))
+
+    exits = correlator.collect_target_exits(T, min_amount=100_000)
+    assert exits == [
+        {"amount": 300_000.0, "ts": 1_700_000_000, "source": "hl_withdraw",
+         "ref": "0xwithdraw"},
+    ]
+
+
 # --- linkage ------------------------------------------------------------------
 
 def test_linkage_direct_funding_by_target():
