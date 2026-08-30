@@ -1809,7 +1809,14 @@ def _read_previous_graph() -> dict:
 # be hundreds of calls inside a job that already spends its budget on
 # expansion. Capped per run; the cache drains the backlog over a few runs and
 # the steady-state cost is zero.
-MAX_CODE_LOOKUPS_PER_RUN = 40
+#
+# The wall-clock ceiling is deliberately small. The trace workflow's job
+# timeout is 600s and every budget inside it adds up: collection 180 +
+# TRACE_BUDGET_SECONDS 240 + expansion 150 + this. At etherscan_get's 0.25s
+# rate-limit sleep, 25 calls cost ~7s of sleeping, so 20s absorbs slow
+# responses without meaningfully moving that total.
+MAX_CODE_LOOKUPS_PER_RUN = 25
+CODE_LOOKUP_SECONDS = 20
 
 
 def label_contracts(edges: list[dict], known_services: set, config: dict,
@@ -1859,7 +1866,8 @@ def label_contracts(edges: list[dict], known_services: set, config: dict,
     if not best:
         return {}
 
-    budget = CallBudget(max_calls=MAX_CODE_LOOKUPS_PER_RUN, seconds=120)
+    budget = CallBudget(max_calls=MAX_CODE_LOOKUPS_PER_RUN,
+                        seconds=CODE_LOOKUP_SECONDS)
     if cache is None:
         cache = CodeCache(DATA_DIR / "labels" / "code_cache.json",
                           lambda addr, chain: fetch_code(addr, chain, budget))

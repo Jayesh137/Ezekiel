@@ -31,9 +31,16 @@ MAX_DESTINATIONS = 50
 # real record carries `chain`; this only matters for hand-built test fixtures.
 CHAIN_DEFAULT = "arbitrum"
 
-# Wall-clock budget for the tracing loop. The CI job has a 5-minute hard
-# timeout; stop tracing new destinations after this so partial findings still
-# get saved and committed instead of the job being cancelled.
+# Wall-clock budget for the tracing loop. Stop tracing new destinations after
+# this so partial findings still get saved and committed instead of the job
+# being cancelled.
+#
+# This is only one of the budgets inside the trace workflow's 600s job timeout.
+# It runs AFTER trace_outbound_transfers' own sweep, which is bounded by
+# config.collection.time_budget_seconds, and the job then runs the graph. The
+# full arithmetic is written out in .github/workflows/trace.yml; raising either
+# number without re-checking it there risks a cancelled job, which never
+# reaches "Commit and push" and so discards the cursors the run advanced.
 TRACE_BUDGET_SECONDS = 240
 
 # Run-scoped cache of Etherscan transfer lookups, keyed by (address, start_block).

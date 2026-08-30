@@ -20,6 +20,20 @@ concurrency:
 jobs:
   trace:
     runs-on: ubuntu-latest
+    # 600s, and every budget inside this job has to fit within it. A job that
+    # is CANCELLED never reaches "Commit and push", so the cursors written to
+    # the runner's working tree are discarded and the next run starts from
+    # block 0 again — the same livelock --reset was fixed for, reached through
+    # job cancellation instead.
+    #
+    #   config.collection.time_budget_seconds  150   cluster sweep (tracer)
+    #   tracer.TRACE_BUDGET_SECONDS            240   destination tracing loop
+    #   correlator.run_correlation               1   one Etherscan call
+    #   config.transfer_graph.time_budget_...  150   frontier expansion
+    #   transfer_graph.CODE_LOOKUP_SECONDS      20   bytecode labelling
+    #                                          ---
+    #                                          561   leaving ~39s for checkout,
+    #                                                pip (cached) and the push
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

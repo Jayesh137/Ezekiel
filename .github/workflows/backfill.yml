@@ -19,6 +19,10 @@ concurrency:
 jobs:
   backfill:
     runs-on: ubuntu-latest
+    # 3600s against config.backfill.time_budget_seconds = 2700, leaving 15
+    # minutes for checkout, pip, the pre-existing `python src/backfill.py`
+    # step and the commit/push. A cancelled job never commits, so the cursor
+    # progress this run made is lost and --reset's livelock returns.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
