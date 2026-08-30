@@ -338,6 +338,28 @@ the `investigate_wallet` input, or locally:
 python scripts/backfill_transfers.py --wallet 0xa95d9c1f655341597c94393fddc30cf3c08e4fce
 ```
 
+To recover the **full history** of the target and its known self-wallets — the
+records the old 1000-row window evicted, which is everything before 2025-11-30 —
+run the **Historical Backfill** workflow with `full_reset` ticked, or locally:
+
+```powershell
+python scripts/backfill_transfers.py --reset
+```
+
+`--reset` drops the stored cursors for those wallets so every chain is re-read
+from block 0. Run it **once**. Every run after it must omit the flag:
+
+```powershell
+python scripts/backfill_transfers.py
+```
+
+The job's budget is finite, so a full read can stop partway. It says so — it
+prints `TRUNCATED: budget ran out before finishing [...]` and names the chains,
+and `data/transfers/latest.json` carries the same detail. Re-run *without*
+`--reset` to continue from where it stopped. Re-running *with* it would wipe
+that progress and start from block 0 again, and the sweep could loop forever
+without ever finishing.
+
 ## Known rough edges
 
 - `docs/architecture.md` predates several changes and still describes Svelte
