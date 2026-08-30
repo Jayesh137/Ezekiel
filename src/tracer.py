@@ -10,20 +10,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import thresholds as th
 from src.alerts import alert_combined_match, alert_fund_movement, alert_new_wallet_found
+from src.chain.budget import CallBudget
+from src.chain.chains import enabled_chains
+from src.chain.collect import records_for, sweep_wallet
 from src.utils import (
     DATA_DIR,
     append_records,
     candidate_current_score,
     etherscan_get,
     load_config,
-    read_cursor,
     save_latest,
-    write_cursor,
 )
 
 # Max unique destinations to trace per run — a safety net so a wallet spammed
 # with transfers to many addresses can never blow the job timeout.
 MAX_DESTINATIONS = 50
+
+# Fallback chain label for a substrate record that somehow lacks one. Every
+# real record carries `chain`; this only matters for hand-built test fixtures.
+CHAIN_DEFAULT = "arbitrum"
 
 # Wall-clock budget for the tracing loop. The CI job has a 5-minute hard
 # timeout; stop tracing new destinations after this so partial findings still
@@ -76,6 +81,42 @@ def get_usdc_transfers(address: str, start_block: int = 0) -> list[dict]:
         return []
 
 
+def _as_etherscan_row(rec: dict) -> dict | None:
+    """A substrate record in the row shape the finding builders already read.
+
+    unique_destinations and build_finding index `to`, `value` and `hash`, and
+    value is expected in 6-decimal USDC units. Converting here keeps the whole
+    downstream alert path — which the dashboard and the combined-alert route
+    depend on — byte-identical.
+
+    Returns None for a record whose `amount_usd` is None. That only happens
+    for `value_basis == "price_unavailable"`: a known major asset (e.g. ETH)
+    that could not be priced this run. spam.classify_spam deliberately leaves
+    that record un-quarantined rather than lose "a potentially large real
+    transfer on the strength of a price outage" (its own words). Collapsing
+    the missing price to 0 here would undo that protection one layer up: the
+    record would carry value "0", unique_destinations' dust filter would drop
+    it, and a real transfer would go unlooked-at — exactly the "zero is
+    invisible" failure src/chain/assets.py's value_usd docstring warns about.
+    Returning None instead excludes it from this run's trace without
+    fabricating a dollar figure nobody has; the record stays on disk,
+    unquarantined, for a future run to re-price.
+    """
+    usd = rec.get("amount_usd")
+    if usd is None:
+        return None
+    return {
+        "to": rec.get("dst", ""),
+        "from": rec.get("src", ""),
+        "value": str(int(round(float(usd) * 1e6))),
+        "hash": rec.get("tx_hash", ""),
+        "blockNumber": str(rec.get("block", 0)),
+        "timeStamp": str(rec.get("ts", 0)),
+        "tokenSymbol": rec.get("asset", ""),
+        "chain": rec.get("chain", CHAIN_DEFAULT),
+    }
+
+
 def get_normal_transactions(address: str, start_block: int = 0) -> list[dict]:
     """Get all normal transactions for an address on Arbitrum."""
     result = etherscan_get({
@@ -107,25 +148,23 @@ def check_if_hl_deposit(address: str) -> bool:
 
 
 def trace_outbound_transfers(wallet: str) -> list[dict]:
-    """Find USDC transfers OUT from the tracked wallet. Returns new transfers."""
-    last_block = read_cursor("last_l1_block")
-    transfers = get_usdc_transfers(wallet, start_block=last_block)
+    """Find transfers OUT from the tracked wallet, on every collected chain.
 
-    if not transfers:
-        return []
+    Collection is delegated to the substrate, which paginates properly and
+    quarantines poisoning; this function is now only about selecting the
+    outbound side of it.
+    """
+    config = load_config()
+    budget = CallBudget(
+        max_calls=(config.get("collection") or {}).get("max_calls_per_run", 2500),
+        seconds=(config.get("collection") or {}).get("time_budget_seconds", 420),
+    )
+    sweep_wallet(wallet, enabled_chains(config), budget, cluster=True)
 
-    outbound = [
-        t for t in transfers
-        if t.get("from", "").lower() == wallet.lower()
-    ]
-
-    append_records(str(DATA_DIR / "l1_transactions"), transfers, key_field="hash")
-
-    if transfers:
-        max_block = max(int(t.get("blockNumber", 0)) for t in transfers)
-        write_cursor("last_l1_block", max_block)
-
-    return outbound
+    wl = (wallet or "").lower()
+    rows = (_as_etherscan_row(r) for r in records_for(wl)
+            if (r.get("src") or "").lower() == wl)
+    return [row for row in rows if row is not None]
 
 
 def save_fund_flow_findings(findings: list[dict]) -> None:
