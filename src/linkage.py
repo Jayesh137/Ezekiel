@@ -22,7 +22,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.chain.labels import SERVICE_CATEGORIES
 from src.utils import DATA_DIR, etherscan_get, load_config
+
+# Categories that make a shared destination meaningless. Deliberately omits the
+# two deposit categories: a CEX deposit address belongs to exactly one exchange
+# account, so two wallets sharing one is the strongest ownership evidence there
+# is — the very thing this signal looks for. Those are infrastructure for graph
+# traversal and evidence here; one category set cannot serve both.
+LINKAGE_EXCLUDED_CATEGORIES = SERVICE_CATEGORIES - {"cex_deposit", "cex_deposit_sweep"}
 
 
 def compute_linkage(candidate: str, candidate_first_funder: str | None,
@@ -130,7 +138,8 @@ def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
     config = config or load_config()
     wl = (wallet or "").lower()
 
-    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
+    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"),
+                                 categories=LINKAGE_EXCLUDED_CATEGORIES)
     excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
     excluded.add(config["hl_bridge_contract"].lower())
     excluded.add(wl)

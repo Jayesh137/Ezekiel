@@ -160,12 +160,23 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
     return out
 
 
-def service_addresses(registry: dict[str, dict],
-                      inferred: dict | None = None) -> set[str]:
-    """Every address the graph must treat as infrastructure."""
-    out = {a for a, e in registry.items()
-           if e.get("category") in SERVICE_CATEGORIES}
-    out |= {a.lower() for a in (inferred or {})}
+def service_addresses(registry: dict[str, dict], inferred: dict | None = None,
+                      categories: set[str] | None = None) -> set[str]:
+    """Addresses to treat as infrastructure, for a given purpose.
+
+    `categories` defaults to all of SERVICE_CATEGORIES, which is right for
+    traversal control. A caller asking a different question passes a narrower
+    set — linkage does, because a cex_deposit address is evidence there, not
+    infrastructure.
+
+    `inferred` entries are all cex_deposit, so they are folded in only when the
+    caller actually wants that category. Otherwise a future task wiring
+    `inferred` through would quietly reintroduce the inversion.
+    """
+    wanted = SERVICE_CATEGORIES if categories is None else categories
+    out = {a for a, e in registry.items() if e.get("category") in wanted}
+    if "cex_deposit" in wanted:
+        out |= {a.lower() for a in (inferred or {})}
     return out
 
 

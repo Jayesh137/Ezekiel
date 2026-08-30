@@ -176,6 +176,39 @@ def test_outbound_addresses_exclude_labelled_infrastructure(tmp_path, monkeypatc
     assert linkage.get_outbound_addresses("0xtarget") == {"0xreal"}
 
 
+def test_outbound_addresses_do_not_exclude_cex_deposit_labels(tmp_path, monkeypatch):
+    """Regression guard: a curated cex_deposit (or cex_deposit_sweep) label must
+    NOT be excluded here. service_addresses() was built to answer "may the
+    graph walk into this address?", where a deposit address correctly answers
+    no. Linkage asks a different question — "does shared use of this address
+    imply common ownership?" — and for that question a deposit address is the
+    strongest possible yes: it belongs to exactly one exchange account. That is
+    the entire signal this function exists to find; excluding it would invert
+    it silently the day someone curates a confirmed deposit address."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+
+    labels_dir = tmp_path / "labels"
+    labels_dir.mkdir()
+    (labels_dir / "entities.json").write_text(json.dumps({"entities": [
+        {"address": "0xcexdeposit", "chain": "arbitrum", "entity": "Binance deposit",
+         "category": "cex_deposit", "source": "curated", "added": "2026-08-28"},
+    ]}))
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": "0xcexdeposit",
+         "amount_usd": 900.0, "ts": 1, "spam": False},
+    ]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xcexdeposit"}
+
+
 def test_outbound_addresses_exclude_configured_service_addresses(tmp_path, monkeypatch):
     """`known_service_addresses` in config.json is the other place infrastructure
     can be named, alongside the curated label registry."""

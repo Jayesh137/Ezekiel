@@ -163,6 +163,47 @@ def test_service_addresses_unions_curated_and_inferred():
     assert BINANCE in got and BRIDGE in got and "0xdeposit" in got
 
 
+def test_service_addresses_categories_narrows_and_gates_inferred():
+    """A caller asking a different question than transfer_graph's ("may I walk
+    into this address?") passes a narrower category set. Linkage asks "does
+    shared use imply common ownership?", for which a cex_deposit address is
+    the strongest possible yes — so it must survive a category filter that
+    omits cex_deposit, while a real service category is still caught.
+
+    `inferred` entries are always cex_deposit, so they must be gated by the
+    same filter — otherwise a caller that deliberately excluded that category
+    would have it silently reintroduced through the back door.
+    """
+    deposit_registry = labels.load_registry_data({"entities": [
+        {"address": "0xcexdeposit", "chain": "arbitrum", "entity": "Binance deposit",
+         "category": "cex_deposit", "source": "curated", "added": "2026-08-28"},
+        {"address": BINANCE, "chain": "ethereum", "entity": "Binance 8",
+         "category": "cex_hot", "source": "public label", "added": "2026-08-28"},
+    ]})
+    narrow = labels.SERVICE_CATEGORIES - {"cex_deposit", "cex_deposit_sweep"}
+
+    got = labels.service_addresses(deposit_registry, categories=narrow)
+    assert BINANCE in got, "a real infrastructure category must still be caught"
+    assert "0xcexdeposit" not in got, "a deposit address must not be treated as infrastructure"
+
+    inferred = {"0xinferred": {"category": "cex_deposit"}}
+    got_with_inferred = labels.service_addresses(deposit_registry, inferred, categories=narrow)
+    assert "0xinferred" not in got_with_inferred, (
+        "inferred entries are all cex_deposit and must respect the same category filter"
+    )
+
+
+def test_service_addresses_default_categories_is_unchanged():
+    """transfer_graph.py calls service_addresses(registry) positionally, with
+    no categories argument. That call site must keep behaving exactly as
+    before — this is the regression guard for it."""
+    inferred = {"0xdeposit": {"category": "cex_deposit", "entity": "Binance (inferred)"}}
+    assert (labels.service_addresses(registry(), inferred)
+            == labels.service_addresses(registry(), inferred, categories=None)
+            == labels.service_addresses(registry(), inferred,
+                                        categories=labels.SERVICE_CATEGORIES))
+
+
 def test_code_cache_asks_once_and_persists(tmp_path):
     calls = []
 
