@@ -32,7 +32,8 @@ jobs:
         if: inputs.investigate_wallet != ''
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        run: python scripts/backfill_transfers.py --wallet "${{ inputs.investigate_wallet }}"
+          INVESTIGATE_WALLET: ${{ inputs.investigate_wallet }}
+        run: python scripts/backfill_transfers.py --wallet "$INVESTIGATE_WALLET"
       - run: python src/tracer.py
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}

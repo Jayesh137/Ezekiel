@@ -1,6 +1,12 @@
 name: Historical Backfill
 on:
   workflow_dispatch:
+    inputs:
+      full_reset:
+        description: 'Clear all stored cursors first for a full re-read from block 0 (default: resume)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -25,7 +31,13 @@ jobs:
       - name: Backfill multi-chain transfer history
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        run: python scripts/backfill_transfers.py
+          FULL_RESET: ${{ inputs.full_reset }}
+        run: |
+          if [ "$FULL_RESET" = "true" ]; then
+            python scripts/backfill_transfers.py --reset
+          else
+            python scripts/backfill_transfers.py
+          fi
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"

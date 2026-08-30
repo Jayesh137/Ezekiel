@@ -8,7 +8,12 @@ poisoning records occupying a 1000-row window, which pushed everything older
 than 2025-11-30 out of reach and left a $13,000,000 transfer with no onward
 trail.
 
-Resetting the cursors is what makes the sweep re-read from block 0.
+Pass --reset for that first full re-read from block 0. Every run after that
+should omit it: this job's own budget (config.json under `backfill`) is far
+larger than the incremental trace job's, but still finite, and a run that gets
+cut off partway needs its cursor progress intact to finish on the next
+invocation — resetting unconditionally on every run would wipe that progress
+and the sweep could loop back to block 0 forever without ever completing.
 """
 
 import argparse
@@ -54,21 +59,30 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wallet", action="append", default=None,
                         help="sweep this address instead of the cluster; repeatable")
-    parser.add_argument("--keep-cursors", action="store_true",
-                        help="incremental sweep instead of full history")
+    parser.add_argument("--reset", action="store_true",
+                        help="clear stored cursors first for a full re-read from block 0; "
+                             "default is to resume from wherever the last run stopped")
     args = parser.parse_args(argv)
 
     config = load_config()
     wallets = [w.lower() for w in args.wallet] if args.wallet else cluster_wallets(config)
     collection = config.get("collection") or {}
+    backfill_cfg = config.get("backfill") or {}
 
-    if not args.keep_cursors:
+    if args.reset:
         reset_cursors(wallets)
         print(f"[backfill] cursors reset for {len(wallets)} wallet(s) — reading full history")
+    else:
+        print(f"[backfill] resuming from stored cursors for {len(wallets)} wallet(s)")
 
+    # backfill's own budget first — this job gets a 60-minute timeout, not the
+    # incremental trace job's 10 — falling back to `collection` and then the
+    # historical literals so a config written before this key keeps working.
     budget = CallBudget(
-        max_calls=collection.get("max_calls_per_run", 2500),
-        seconds=collection.get("time_budget_seconds", 420),
+        max_calls=backfill_cfg.get("max_calls_per_run",
+                                   collection.get("max_calls_per_run", 2500)),
+        seconds=backfill_cfg.get("time_budget_seconds",
+                                 collection.get("time_budget_seconds", 420)),
     )
 
     results = []
@@ -85,6 +99,17 @@ def main(argv=None) -> int:
           f"{health['calls']} API call(s)")
     if health["degraded_sources"]:
         print(f"[backfill] DEGRADED: could not fully read {health['degraded_sources']}")
+
+    # sweep_health only totals gap counts; naming which chains stopped short
+    # needs the per-chain detail sweep_wallet returned, still intact in `results`.
+    # A budget-truncated run must never exit looking the same as a complete one.
+    truncated = sorted({
+        name for res in results for name, chain_result in res["chains"].items()
+        if chain_result["truncated"] or chain_result["gaps"]
+    })
+    if truncated:
+        print(f"[backfill] TRUNCATED: budget ran out before finishing {truncated} "
+              f"— re-run (without --reset) to continue")
     return 0
 
 

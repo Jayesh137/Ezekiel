@@ -267,7 +267,7 @@ src/            backend — see the module table above
 dashboard/      SvelteKit 5 static SPA, deployed to GitHub Pages
 data/           collected JSON — also the dashboard's API
 profile/        computed fingerprint, recent fingerprint, backtest report
-scripts/        compact_data.py, dedupe_fills_by_tid.py
+scripts/        compact_data.py, dedupe_fills_by_tid.py, backfill_transfers.py
 docs/           architecture.md (see caveat below), plans, specs
 ```
 
