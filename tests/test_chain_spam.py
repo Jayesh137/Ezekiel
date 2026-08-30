@@ -182,6 +182,34 @@ def test_equal_volumes_flag_neither_side():
     assert spam.is_lookalike(address_b, vol) is None
 
 
+def test_the_swept_wallet_is_never_a_forgery_of_its_own_counterparty():
+    """counterparty_volume excludes the swept wallet, so it reads as $0.00 and
+    any counterparty over dust_usd sharing its head/tail beats it. Judging the
+    wallet against that map convicts it of forging its own counterparty."""
+    wallet = SELF_WALLET.lower()
+    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    vol = {forgery: 1.01, "0xa95d9c1f655341597c94393fddc30cf3c08e4fce": 13_500_000.0}
+
+    r = record(wallet, "0xa95d9c1f655341597c94393fddc30cf3c08e4fce", usd=13_500_000.0)
+    assert spam.classify_spam(r, vol, wallet=wallet) is None
+    # Without the wallet, the old behaviour is still what it was.
+    assert spam.classify_spam(r, vol) == "lookalike"
+
+
+def test_forged_side_names_the_forgery_and_never_the_swept_wallet():
+    wallet = SELF_WALLET.lower()
+    forgery = "0x1419b0d742da87d053373018740e7c3a41402d5f"
+    other = "0xa95d9c1f655341597c94393fddc30cf3c08e4fce"
+    vol = {forgery: 0.5, other: 13_500_000.0, wallet: 13_500_000.0}
+
+    # The forgery is adjudicated against the wallet as anchor and named.
+    assert spam.forged_side(record(forgery, other, usd=0.5), vol,
+                            wallet=other) == (forgery, wallet)
+    # The wallet itself is skipped even when it would otherwise match.
+    assert spam.forged_side(record(wallet, other, usd=1.0), vol,
+                            wallet=wallet) is None
+
+
 def test_rollup_aggregates_by_address_and_keeps_the_mimic_target():
     wallet = "0xtarget"
     records = [

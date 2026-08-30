@@ -52,6 +52,13 @@ def is_lookalike(addr: str, volume, *, prefix: int = 4, suffix: int = 4,
     An address A is a forgery of R only if R has moved strictly more value
     with the wallet than A has. This ordering distinguishes a forgery from
     the address it forges: forgers attack addresses richer than themselves.
+
+    `volume` is a counterparty map, so this only answers the question for a
+    counterparty. The swept wallet is deliberately absent from that map
+    (see counterparty_volume), so passing it here reads as volume 0.0 and any
+    counterparty sharing its head/tail beats it — the wallet would be judged a
+    forgery of its own counterparty. Callers must exclude the swept wallet
+    themselves; `forged_side` does it for them.
     """
     a = (addr or "").lower()
     if not a.startswith("0x") or len(a) != 42:
@@ -87,19 +94,51 @@ def derive_real_counterparties(records: list[dict], wallet: str,
     return {a for a, v in vol.items() if v >= dust_usd}
 
 
-def classify_spam(record: dict, volume, *, dust_usd: float = 1.0,
+def forged_side(record: dict, volume, *, wallet: str | None = None,
+                dust_usd: float = 1.0, prefix: int = 4,
+                suffix: int = 4) -> tuple[str, str] | None:
+    """(the forgery on this record, the address it forges), or None.
+
+    The single definition of "which side of this record is a forgery". The
+    classifier and the rollup both need it, and deriving it twice is how the
+    quarantine reason and the address it is filed under drift apart.
+
+    `wallet` is the address being swept, and is never a candidate. It is absent
+    from `volume` by construction — counterparty_volume excludes it — so
+    evaluating it reads as $0.00 of volume, which any counterparty sharing its
+    first-4/last-4 hex and clearing dust_usd beats on the strict-ordering test.
+    A single ~$1 transfer from a vanity forgery would therefore convict the
+    swept wallet of forging its own counterparty, and quarantine every record
+    of the sweep — real money silently reclassified as noise, with the cursor
+    advancing past it and only an address-keyed count left behind.
+    """
+    w = (wallet or "").lower()
+    for side in ((record.get("src") or ""), (record.get("dst") or "")):
+        s = side.lower()
+        if not s or s == w:
+            continue
+        mimicked = is_lookalike(s, volume, prefix=prefix, suffix=suffix,
+                                dust_usd=dust_usd)
+        if mimicked:
+            return s, mimicked
+    return None
+
+
+def classify_spam(record: dict, volume, *, wallet: str | None = None,
+                  dust_usd: float = 1.0,
                   prefix: int = 4, suffix: int = 4) -> str | None:
     """Why this record is noise, or None if it is real money.
 
     Order is deliberate. The lookalike check runs before the dust check because
     a forgery is almost always sub-dust, and reporting it as "dust" would throw
     away the mimic relationship that makes it worth recording.
+
+    Pass `wallet` — the address being swept — so it is never judged a forgery
+    of its own counterparty. See forged_side.
     """
-    for side in ((record.get("src") or ""), (record.get("dst") or "")):
-        s = side.lower()
-        if is_lookalike(s, volume, prefix=prefix, suffix=suffix,
-                        dust_usd=dust_usd):
-            return "lookalike"
+    if forged_side(record, volume, wallet=wallet, dust_usd=dust_usd,
+                   prefix=prefix, suffix=suffix):
+        return "lookalike"
 
     amount = record.get("amount")
     if amount is not None and float(amount) == 0.0:

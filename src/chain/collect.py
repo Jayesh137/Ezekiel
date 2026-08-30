@@ -204,7 +204,13 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
 
         clean, quarantined = [], []
         for rec in collected:
-            reason = spam_mod.classify_spam(rec, volume, dust_usd=dust_usd)
+            # `wallet=addr` is load-bearing, not decoration: the swept wallet is
+            # absent from `volume` by construction, so without it every record
+            # of a wallet that has a funded vanity forgery is convicted of
+            # forging its own counterparty and quarantined — the whole sweep
+            # lost, permanently, while the run still reports itself healthy.
+            reason = spam_mod.classify_spam(rec, volume, wallet=addr,
+                                            dust_usd=dust_usd)
             if reason is None:
                 clean.append(rec)
                 continue
@@ -213,13 +219,10 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             chain_result["spam_by_reason"][reason] = (
                 chain_result["spam_by_reason"].get(reason, 0) + 1)
             if reason == "lookalike":
-                for side in (rec["src"], rec["dst"]):
-                    mimicked = spam_mod.is_lookalike(side, volume,
-                                                     dust_usd=dust_usd)
-                    if mimicked:
-                        rec["mimics"] = mimicked   # the address being forged
-                        rec["forged"] = side       # the forgery itself
-                        break
+                found = spam_mod.forged_side(rec, volume, wallet=addr,
+                                             dust_usd=dust_usd)
+                if found:
+                    rec["forged"], rec["mimics"] = found
             quarantined.append(rec)
 
         if clean:

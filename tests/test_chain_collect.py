@@ -201,6 +201,94 @@ def test_a_partial_sweep_persists_what_it_collected(tmp_path, monkeypatch):
     assert len(written) == 1
 
 
+# --- the swept wallet is never a forgery of its own counterparty ---------------
+#
+# Every other sweep test uses "0xtarget", a 9-character string that exits
+# is_lookalike at its `len(a) != 42` guard, so none of them can reach this.
+# These two use real 42-character addresses on both sides.
+
+SELF_WALLET = "0x1419e75330c71ce463102e6a1eb62fe80b412d5f"   # config.known_self_wallets
+FORGERY = "0x1419b0d742da87d053373018740e7c3a41402d5f"       # live: forges SELF_WALLET
+UNRELATED = "0xa95d9c1f655341597c94393fddc30cf3c08e4fce"     # shares no head/tail
+TARGET = "0x45d26f28196d226497130c4bac709d808fed4029"        # config.target_wallet
+
+
+def _sandbox(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+
+
+def test_a_funded_forgery_does_not_erase_the_swept_wallets_own_sweep(tmp_path, monkeypatch):
+    """A ~$1 transfer from a vanity forgery used to quarantine the ENTIRE sweep.
+
+    counterparty_volume deliberately excludes the swept wallet, so the wallet
+    read as $0.00 of volume; the forgery, having cleared dust_usd, beat it on
+    the strict-ordering test and every record of the sweep was convicted of a
+    "forgery" on one side. Quarantined records never reach TRANSFERS_DIR, only
+    an address-keyed count survives, and the cursor advances regardless — so
+    $13.5M of real history was lost permanently while the run reported
+    degraded_sources == [] and looked perfectly healthy.
+    """
+    _sandbox(tmp_path, monkeypatch)
+
+    def fake_fetch_kind(address, chain, kind, start, b, **kw):
+        if kind != "erc20":
+            return WalkResult([], start, 1, False, []), None
+        return WalkResult([
+            # The wallet's own real money.
+            erc20_row(h="0xreal", frm=SELF_WALLET, to=UNRELATED,
+                      value="13500000000000"),
+            # The trigger: one $1.01 ping from the forgery of this very wallet.
+            erc20_row(h="0xping", frm=FORGERY, to=SELF_WALLET,
+                      value="1010000", log="1"),
+        ], 100, 1, False, []), None
+
+    monkeypatch.setattr(collect, "fetch_kind", fake_fetch_kind)
+
+    result = collect.sweep_wallet(SELF_WALLET, [ARB], budget(), cluster=True)
+    chain = result["chains"]["arbitrum"]
+
+    assert chain["records"] == 2          # was 0
+    assert chain["spam"] == 0             # was 3, all "lookalike"
+    assert chain["spam_by_reason"] == {}
+    assert result["degraded_sources"] == []
+
+    written = json.loads(next((tmp_path / "transfers" / "arbitrum").glob("*.json")).read_text())
+    assert {r["tx_hash"] for r in written} == {"0xreal", "0xping"}
+    assert max(r["amount_usd"] for r in written) == 13_500_000.0
+
+    # And the wallet is still readable through the one reader everything uses.
+    assert len(collect.records_for(SELF_WALLET)) == 2
+
+
+def test_a_forgery_is_still_quarantined_when_it_appears_as_a_counterparty(
+        tmp_path, monkeypatch):
+    """The fix must not disarm the detector. Sweeping the target, SELF_WALLET is
+    a $13.5M counterparty and its forgery is adjudicated against it as before."""
+    _sandbox(tmp_path, monkeypatch)
+
+    def fake_fetch_kind(address, chain, kind, start, b, **kw):
+        if kind != "erc20":
+            return WalkResult([], start, 1, False, []), None
+        return WalkResult([
+            erc20_row(h="0xreal", frm=TARGET, to=SELF_WALLET, value="13500000000000"),
+            erc20_row(h="0xpoison", frm=FORGERY, to=TARGET, value="500000", log="1"),
+        ], 100, 1, False, []), None
+
+    monkeypatch.setattr(collect, "fetch_kind", fake_fetch_kind)
+
+    result = collect.sweep_wallet(TARGET, [ARB], budget(), cluster=True)
+    chain = result["chains"]["arbitrum"]
+
+    assert chain["records"] == 1
+    assert chain["spam_by_reason"] == {"lookalike": 1}
+
+    rolled = json.loads((tmp_path / "transfers_spam" / "latest.json").read_text())
+    assert rolled["entries"][0]["address"] == FORGERY      # filed under the forgery
+    assert rolled["entries"][0]["mimics"] == SELF_WALLET   # not under the victim
+
+
 def test_records_for_reads_every_chain_and_excludes_spam(tmp_path, monkeypatch):
     monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
     for chain in ("arbitrum", "base"):
