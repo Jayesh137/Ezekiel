@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import DATA_DIR, etherscan_get, load_all_records, load_config
+from src.utils import etherscan_get, load_config
 
 
 def compute_linkage(candidate: str, candidate_first_funder: str | None,
@@ -102,44 +102,46 @@ def get_first_funder(wallet: str) -> str | None:
     return None
 
 
-def get_outbound_usdc_addresses(wallet: str, limit: int = 300) -> set:
-    """Addresses this wallet has sent USDC to on Arbitrum (candidate CEX deposit
-    addresses). Excludes the HL bridge itself."""
-    if not os.environ.get("ETHERSCAN_API_KEY"):
-        return set()
-    config = load_config()
+def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
+    """Every address this wallet has sent value to, on every collected chain.
+
+    Reads the substrate rather than the API: src/chain/collect.py has already
+    stored these, so widening the strongest linkage signal we have — a CEX
+    deposit address belongs to exactly one account, so two wallets funding the
+    same one are the same customer — from Arbitrum USDC to every chain and asset
+    costs no calls at all.
+    """
+    from src.chain.collect import records_for
+
+    config = config or load_config()
     bridge = config["hl_bridge_contract"].lower()
-    wl = wallet.lower()
-    res = etherscan_get({
-        "module": "account", "action": "tokentx", "address": wallet,
-        "contractaddress": config["usdc_contract_arbitrum"],
-        "page": 1, "offset": limit, "sort": "desc",
-    })
+    wl = (wallet or "").lower()
+
     out = set()
-    for t in res.get("result", []) if res.get("status") == "1" else []:
-        if (t.get("from", "") or "").lower() != wl:
+    for rec in records_for(wl):
+        if (rec.get("src") or "").lower() != wl:
             continue
-        to = (t.get("to", "") or "").lower()
-        if to and to != bridge and to != wl and int(t.get("value", 0) or 0) > 0:
-            out.add(to)
+        usd = rec.get("amount_usd")
+        if usd is None or float(usd) <= 0:
+            continue
+        dst = (rec.get("dst") or "").lower()
+        if dst and dst != bridge and dst != wl:
+            out.add(dst)
     return out
+
+
+def get_outbound_usdc_addresses(wallet: str, limit: int = 300) -> set:
+    """Backwards-compatible alias. `limit` is unused: the substrate is complete,
+    so there is no page to cap."""
+    return get_outbound_addresses(wallet)
 
 
 def target_l1_profile(target: str) -> dict:
     """Target's L1 fingerprint for clustering: first funder + outbound addresses.
-    Outbound addresses come from already-collected l1_transactions (no API calls);
-    first funder needs one Etherscan lookup."""
+    Outbound addresses come from the substrate, covering every collected chain
+    and asset with no API calls; first funder needs one Etherscan lookup."""
     config = load_config()
-    bridge = config["hl_bridge_contract"].lower()
-    tl = target.lower()
-
-    out_addrs = set()
-    for t in load_all_records(str(DATA_DIR / "l1_transactions")):
-        if (t.get("from", "") or "").lower() != tl:
-            continue
-        to = (t.get("to", "") or "").lower()
-        if to and to != bridge and to != tl and int(t.get("value", 0) or 0) > 0:
-            out_addrs.add(to)
+    out_addrs = get_outbound_addresses(target, config)
 
     return {
         "first_funder": get_first_funder(target),
