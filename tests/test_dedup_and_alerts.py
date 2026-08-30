@@ -42,6 +42,42 @@ def test_alert_cooldown(monkeypatch, tmp_path):
     assert len(sent) == 2
 
 
+def test_alert_fund_movement_labels_the_real_asset_and_chain(monkeypatch):
+    """Before the tracer read the substrate, every fund-movement alert WAS
+    Arbitrum USDC by construction, so hardcoding "USDC" in the body was
+    correct. It now spans every chain and asset, so a USDT withdrawal must
+    not be reported to the user as USDC — that would be a false statement in
+    the one artifact this system exists to produce."""
+    sent = []
+    monkeypatch.setattr(alerts, "send_alert", lambda s, b, h=None: sent.append((s, b)) or True)
+    monkeypatch.setattr(alerts, "read_cursor", lambda name: cursors.get(name, 0))
+    monkeypatch.setattr(alerts, "write_cursor", lambda name, v: cursors.__setitem__(name, v))
+    cursors = {}
+
+    assert alerts.alert_fund_movement("0xw", "5,000.00", "0xd", "0xhash",
+                                      asset="USDT", chain="base") is True
+    subject, body = sent[0]
+    assert "USDT" in subject and "base" in subject
+    assert "USDT" in body and "base" in body
+    assert "USDC" not in subject and "USDC" not in body
+
+
+def test_alert_fund_movement_defaults_preserve_pre_substrate_behavior(monkeypatch):
+    """A caller that doesn't pass asset/chain (there is currently none, but the
+    parameters are defaulted defensively) must keep reporting Arbitrum USDC,
+    exactly as this function always has."""
+    sent = []
+    monkeypatch.setattr(alerts, "send_alert", lambda s, b, h=None: sent.append((s, b)) or True)
+    monkeypatch.setattr(alerts, "read_cursor", lambda name: cursors.get(name, 0))
+    monkeypatch.setattr(alerts, "write_cursor", lambda name, v: cursors.__setitem__(name, v))
+    cursors = {}
+
+    assert alerts.alert_fund_movement("0xw", "5,000.00", "0xd", "0xhash2") is True
+    subject, body = sent[0]
+    assert "USDC" in subject and "arbitrum" in subject
+    assert "USDC" in body and "arbitrum" in body
+
+
 def test_unique_destinations_dedupes_and_skips_dust():
     wallet = "0xWALLET"
     outbound = [

@@ -105,10 +105,17 @@ def _as_etherscan_row(rec: dict) -> dict | None:
     usd = rec.get("amount_usd")
     if usd is None:
         return None
+    try:
+        value = str(int(round(float(usd) * 1e6)))
+    except (TypeError, ValueError):
+        # amount_usd is only ever produced internally as a float or None, but a
+        # hand-edited or truncated file in data/transfers/ should degrade to
+        # skipping one bad record, not crash the whole sweep.
+        return None
     return {
         "to": rec.get("dst", ""),
         "from": rec.get("src", ""),
-        "value": str(int(round(float(usd) * 1e6))),
+        "value": value,
         "hash": rec.get("tx_hash", ""),
         "blockNumber": str(rec.get("block", 0)),
         "timeStamp": str(rec.get("ts", 0)),
@@ -197,7 +204,15 @@ def save_fund_flow_findings(findings: list[dict]) -> None:
 
 def build_finding(source: str, destination: str, amount_usdc: float, tx_hash: str,
                   method: str, hop_count: int, deposited_to_hl: bool,
-                  bridge_tx_hash: str | None = None) -> dict:
+                  bridge_tx_hash: str | None = None,
+                  asset: str = "USDC", chain: str = CHAIN_DEFAULT) -> dict:
+    """`asset`/`chain` are additive fields, not a rename: `amount_usdc` and
+    `amount_usdc_raw` keep their names (the dashboard reads those keys) even
+    though the dollar value they hold may now come from a non-USDC transfer.
+    The defaults match this function's only callers that don't pass them —
+    the hop-2/hop-3 findings in trace_fund_flow, which are still genuinely
+    Arbitrum USDC, sourced from get_usdc_transfers rather than the substrate.
+    """
     return {
         "id": f"{method}:{tx_hash}:{destination}",
         "source": source,
@@ -212,6 +227,8 @@ def build_finding(source: str, destination: str, amount_usdc: float, tx_hash: st
         "confidence": 1.0 if method == "direct_fund_trace" else 0.9,
         "status": "NEW_WALLET_CANDIDATE" if deposited_to_hl else "PENDING_HL_DEPOSIT",
         "detected_at": utc_now(),
+        "asset": asset,
+        "chain": chain,
     }
 
 
@@ -276,12 +293,19 @@ def trace_fund_flow(wallet: str) -> list[dict]:
             break
         destination = transfer["to"]
         value_raw = int(transfer.get("value", 0))
-        value_usdc = value_raw / 1e6  # USDC has 6 decimals
+        value_usdc = value_raw / 1e6  # 6-decimal USDC units, whatever the real asset
         tx_hash = transfer.get("hash", "unknown")
+        # The substrate spans every asset and chain now, so both must come from the
+        # row instead of being assumed — before this task every row here WAS
+        # Arbitrum USDC by construction (get_usdc_transfers filtered on that one
+        # contract), which is the only reason hardcoding either used to be correct.
+        asset = transfer.get("tokenSymbol") or "USDC"
+        chain = transfer.get("chain") or CHAIN_DEFAULT
 
-        print(f"[tracer] OUTBOUND: {value_usdc:.2f} USDC -> {destination}")
+        print(f"[tracer] OUTBOUND: {value_usdc:.2f} {asset} -> {destination} (chain={chain})")
 
-        alert_fund_movement(wallet, f"{value_usdc:,.2f}", destination, tx_hash)
+        alert_fund_movement(wallet, f"{value_usdc:,.2f}", destination, tx_hash,
+                            asset=asset, chain=chain)
 
         print(f"[tracer] Checking if {destination} deposited to Hyperliquid...")
         direct_deposits = find_hl_deposits(destination)
@@ -298,10 +322,16 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                 1,
                 True,
                 direct_deposits[0].get("hash"),
+                asset=asset,
+                chain=chain,
             ))
         else:
             print("[tracer] Destination hasn't deposited to HL. Checking next hop...")
             pending_recorded = False
+            # get_usdc_transfers is still Arbitrum-USDC-only (see its own docstring),
+            # so every build_finding call below sourced from `nt`/`nt2` is genuinely
+            # USDC on arbitrum and relies on build_finding's defaults rather than
+            # threading asset/chain explicitly.
             next_transfers = get_usdc_transfers(destination)
             for nt in next_transfers[:5]:
                 next_dest = nt["to"]
@@ -360,6 +390,8 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                     "outbound_transfer",
                     1,
                     False,
+                    asset=asset,
+                    chain=chain,
                 ))
 
     save_fund_flow_findings(findings)

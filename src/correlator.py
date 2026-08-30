@@ -167,7 +167,13 @@ def collect_target_exits(target: str, min_amount: float) -> list[dict]:
         usd = rec.get("amount_usd")
         if usd is None:
             continue
-        amt = float(usd)
+        try:
+            amt = float(usd)
+        except (TypeError, ValueError):
+            # amount_usd is only ever produced internally, but a hand-edited or
+            # truncated file in data/transfers/ should skip one bad record, not
+            # crash the correlator.
+            continue
         if amt >= min_amount:
             exits.append({
                 "amount": amt,

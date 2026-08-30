@@ -154,6 +154,29 @@ def test_collect_target_exits_still_includes_hl_withdrawals(tmp_path, monkeypatc
     ]
 
 
+def test_collect_target_exits_skips_malformed_amount_usd_rather_than_raising(
+        tmp_path, monkeypatch):
+    """amount_usd is only ever produced internally, but a hand-edited or
+    truncated file in data/transfers/ should skip one bad record, not crash
+    the correlator. min_amount=0 so the ordinary amount gate can't coincide
+    with a skip and mask a real bug."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": T, "dst": "0xcex",
+         "tx_hash": "0xbad", "ts": 1000, "amount_usd": "not-a-number",
+         "value_basis": "stable_par", "spam": False},
+    ]))
+
+    assert correlator.collect_target_exits(T, min_amount=0) == []
+
+
 # --- linkage ------------------------------------------------------------------
 
 def test_linkage_direct_funding_by_target():

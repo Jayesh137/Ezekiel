@@ -95,3 +95,164 @@ def test_outbound_transfers_exclude_unpriced_majors(tmp_path, monkeypatch):
 
     out = tracer.trace_outbound_transfers("0xtarget")
     assert [r["to"] for r in out] == ["0xreal"]
+
+
+def test_outbound_transfers_skips_malformed_amount_usd_rather_than_raising(tmp_path, monkeypatch):
+    """amount_usd is only ever produced internally as a float or None, but a
+    hand-edited or truncated file in data/transfers/ should degrade to
+    skipping one bad record, not crash the whole sweep."""
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        substrate_record(chain="arbitrum", id="a", dst="0xbad", amount_usd="not-a-number"),
+        substrate_record(chain="arbitrum", id="b", dst="0xreal"),
+    ]))
+
+    assert [r["to"] for r in tracer.trace_outbound_transfers("0xtarget")] == ["0xreal"]
+
+
+# --- build_finding: asset/chain are additive, existing keys never renamed ------
+
+def test_build_finding_adds_asset_and_chain_without_renaming_existing_keys():
+    f = tracer.build_finding("0xw", "0xd", 1234.5, "0xhash", "outbound_transfer",
+                             1, False, asset="USDT", chain="base")
+    assert f["asset"] == "USDT"
+    assert f["chain"] == "base"
+    assert f["amount_usdc"] == "1,234.50"      # key name unchanged
+    assert f["amount_usdc_raw"] == 1234.5      # key name unchanged
+    assert f["source"] == "0xw"
+    assert f["destination"] == "0xd"
+
+
+def test_build_finding_defaults_asset_and_chain_to_usdc_arbitrum():
+    """The hop-2/hop-3 findings in trace_fund_flow don't pass asset/chain at
+    all — they're still genuinely Arbitrum USDC, sourced from
+    get_usdc_transfers rather than the substrate — so the defaults must stay
+    correct for them."""
+    f = tracer.build_finding("0xw", "0xd", 1234.5, "0xhash", "fund_trace_2hop", 2, True)
+    assert f["asset"] == "USDC"
+    assert f["chain"] == "arbitrum"
+
+
+# --- trace_fund_flow: the asset and chain must come from the row, not be assumed --
+
+def _no_op_hop_followup(monkeypatch):
+    """Every trace_fund_flow test below only exercises hop 1 (the substrate row
+    itself); find_hl_deposits and get_usdc_transfers are stubbed so the
+    hop-2/hop-3 Etherscan-backed loops never run and never reach the network."""
+    monkeypatch.setattr(tracer, "find_hl_deposits", lambda addr: [])
+    monkeypatch.setattr(tracer, "get_usdc_transfers", lambda addr, start_block=0: [])
+
+
+def test_trace_fund_flow_labels_a_non_usdc_asset_correctly(tmp_path, monkeypatch):
+    """Before this task every row reaching build_finding/alert_fund_movement WAS
+    USDC by construction (get_usdc_transfers filtered on the USDC contract).
+    assets.py's STABLES set prices USDT at par with no price lookup needed, so
+    a genuine USDT transfer now reaches the same path with a real amount_usd —
+    and must not be mislabelled "USDC" in the finding or the alert call."""
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    _no_op_hop_followup(monkeypatch)
+
+    calls = []
+    monkeypatch.setattr(tracer, "alert_fund_movement",
+                        lambda *a, **k: calls.append((a, k)) or True)
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        substrate_record(chain="arbitrum", asset="USDT", amount=5000.0, amount_usd=5000.0)]))
+
+    findings = tracer.trace_fund_flow("0xtarget")
+
+    assert len(findings) == 1
+    assert findings[0]["asset"] == "USDT"
+    assert findings[0]["chain"] == "arbitrum"
+    assert findings[0]["amount_usdc"] == "5,000.00"     # key unchanged, real USD value
+    assert findings[0]["amount_usdc_raw"] == 5000.0     # key unchanged
+
+    assert len(calls) == 1
+    _, kwargs = calls[0]
+    assert kwargs.get("asset") == "USDT"
+
+
+def test_trace_fund_flow_carries_a_non_arbitrum_chain_through(tmp_path, monkeypatch):
+    """The alert used to be unambiguous about chain too, because collection was
+    Arbitrum-only. It now spans six chains, so the finding (and the alert)
+    must say where the transfer happened, not assume Arbitrum."""
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    _no_op_hop_followup(monkeypatch)
+
+    calls = []
+    monkeypatch.setattr(tracer, "alert_fund_movement",
+                        lambda *a, **k: calls.append((a, k)) or True)
+
+    d = tmp_path / "transfers" / "base"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        substrate_record(chain="base", amount=5000.0, amount_usd=5000.0)]))
+
+    findings = tracer.trace_fund_flow("0xtarget")
+
+    assert len(findings) == 1
+    assert findings[0]["chain"] == "base"
+    assert findings[0]["asset"] == "USDC"          # unrelated dimension, unchanged
+
+    assert len(calls) == 1
+    _, kwargs = calls[0]
+    assert kwargs.get("chain") == "base"
+
+
+def test_trace_fund_flow_usdc_arbitrum_path_is_unchanged(tmp_path, monkeypatch):
+    """The pre-existing USDC-on-Arbitrum path must keep every key and value it
+    had before this fix — asset/chain are additive, not a replacement."""
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    _no_op_hop_followup(monkeypatch)
+
+    calls = []
+    monkeypatch.setattr(tracer, "alert_fund_movement",
+                        lambda *a, **k: calls.append((a, k)) or True)
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        substrate_record(chain="arbitrum", amount=5000.0, amount_usd=5000.0)]))
+
+    findings = tracer.trace_fund_flow("0xtarget")
+
+    assert len(findings) == 1
+    f = findings[0]
+    assert f["asset"] == "USDC"
+    assert f["chain"] == "arbitrum"
+    assert f["source"] == "0xtarget"
+    assert f["destination"] == "0xdest"
+    assert f["amount_usdc"] == "5,000.00"
+    assert f["amount_usdc_raw"] == 5000.0
+    assert f["tx_hash"] == "0xh"
+    assert f["method"] == "outbound_transfer"
+    assert f["hop_count"] == 1
+    assert f["deposited_to_hl"] is False
+    assert f["status"] == "PENDING_HL_DEPOSIT"
+    assert f["bridge_tx_hash"] is None
+    assert "id" in f and "detected_at" in f and "confidence" in f
+
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args[1] == "5,000.00"                # amount string, unchanged format
+    assert kwargs.get("asset") == "USDC"
+    assert kwargs.get("chain") == "arbitrum"
