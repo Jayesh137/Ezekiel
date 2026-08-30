@@ -62,6 +62,15 @@ def main(argv=None) -> int:
     parser.add_argument("--reset", action="store_true",
                         help="clear stored cursors first for a full re-read from block 0; "
                              "default is to resume from wherever the last run stopped")
+    parser.add_argument("--time-budget-seconds", type=int, default=None,
+                        help="override the config-derived wall-clock budget. The default "
+                             "(config.backfill, 2700s) is sized for backfill.yml's 3600s "
+                             "job; a caller sharing a tighter job (e.g. trace.yml's "
+                             "investigate step, inside a 600s job with other steps already "
+                             "budgeted) must state what it can actually afford instead")
+    parser.add_argument("--max-calls", type=int, default=None,
+                        help="override the config-derived call-count budget; same "
+                             "reasoning as --time-budget-seconds")
     args = parser.parse_args(argv)
 
     config = load_config()
@@ -78,11 +87,17 @@ def main(argv=None) -> int:
     # backfill's own budget first — this job gets a 60-minute timeout, not the
     # incremental trace job's 10 — falling back to `collection` and then the
     # historical literals so a config written before this key keeps working.
+    # --time-budget-seconds/--max-calls override both fallbacks: a caller
+    # invoked from inside a smaller job (trace.yml's investigate step) cannot
+    # use backfill's 2700s default without guaranteeing that job is CANCELLED
+    # before "Commit and push" runs — see trace.yml's job-level comment.
     budget = CallBudget(
-        max_calls=backfill_cfg.get("max_calls_per_run",
-                                   collection.get("max_calls_per_run", 2500)),
-        seconds=backfill_cfg.get("time_budget_seconds",
-                                 collection.get("time_budget_seconds", 420)),
+        max_calls=(args.max_calls if args.max_calls is not None else
+                  backfill_cfg.get("max_calls_per_run",
+                                   collection.get("max_calls_per_run", 2500))),
+        seconds=(args.time_budget_seconds if args.time_budget_seconds is not None else
+                backfill_cfg.get("time_budget_seconds",
+                                 collection.get("time_budget_seconds", 420))),
     )
 
     results = []

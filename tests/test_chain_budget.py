@@ -94,6 +94,45 @@ def test_the_trace_jobs_budgets_fit_inside_its_timeout():
         f"a cancelled job discards the cursors it advanced")
 
 
+def _investigate_budget_seconds() -> int:
+    """The --time-budget-seconds trace.yml's investigate step passes to
+    backfill_transfers.py, parsed out of the workflow file itself (not
+    duplicated as a Python constant) so this test fails the moment the two
+    drift apart."""
+    text = (ROOT / ".github" / "workflows" / "trace.yml").read_text()
+    match = re.search(r"backfill_transfers\.py.*--time-budget-seconds[= ](\d+)", text)
+    assert match, "trace.yml's investigate step has no --time-budget-seconds"
+    return int(match.group(1))
+
+
+def test_the_investigate_step_fits_inside_the_trace_job_too():
+    """'Investigate a specific wallet' (workflow_dispatch with
+    investigate_wallet set) runs BEFORE the tracer/graph steps inside the same
+    600s job, so its budget is additive to the total above, not a substitute
+    for any of it. Left uncovered, this is exactly the path that used to reach
+    for backfill_transfers.py's own (backfill-sized, 2700s) default and
+    guarantee the job is CANCELLED before "Commit and push" runs — discarding
+    every cursor the whole job advanced, not just the investigate step's own."""
+    from src import tracer
+    from src import transfer_graph as tg
+
+    config = _config()
+    budgeted = (
+        _investigate_budget_seconds()
+        + config["collection"]["time_budget_seconds"]
+        + tracer.TRACE_BUDGET_SECONDS
+        + config["transfer_graph"]["time_budget_seconds"]
+        + tg.CODE_LOOKUP_SECONDS
+    )
+    timeout = _timeout_seconds("trace.yml")
+    # Same 30s headroom as the steady-state test above — the checkout/pip/push
+    # overhead it covers does not change depending on which steps ran before it.
+    assert budgeted <= timeout - 30, (
+        f"trace job budgets total {budgeted}s (including the investigate "
+        f"step) against a {timeout}s timeout; a cancelled job discards the "
+        f"cursors it advanced")
+
+
 def test_the_backfill_jobs_budget_fits_inside_its_timeout():
     config = _config()
     budgeted = config["backfill"]["time_budget_seconds"]

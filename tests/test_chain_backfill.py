@@ -135,6 +135,75 @@ def test_main_falls_back_to_collection_budget_when_backfill_absent(tmp_path, mon
     assert captured == {"max_calls": 10, "seconds": 10}
 
 
+def test_main_time_budget_seconds_flag_overrides_backfill_config(tmp_path, monkeypatch):
+    """The caller states what it can afford — trace.yml's investigate step runs
+    inside a 600s job and cannot use backfill's own (backfill.yml-sized) 2700s
+    default without guaranteeing that job is cancelled before it commits."""
+    _stub_common(monkeypatch, tmp_path, {
+        "target_wallet": "0xtarget", "known_self_wallets": [],
+        "collection": {"max_calls_per_run": 10, "time_budget_seconds": 10},
+        "backfill": {"max_calls_per_run": 20000, "time_budget_seconds": 2700}})
+    monkeypatch.setattr(bf, "sweep_wallet", lambda *a, **k: {
+        "address": "0xtarget", "chains": {}, "degraded_sources": []})
+
+    captured = {}
+
+    class FakeBudget:
+        def __init__(self, max_calls, seconds, **kwargs):
+            captured["max_calls"] = max_calls
+            captured["seconds"] = seconds
+
+    monkeypatch.setattr(bf, "CallBudget", FakeBudget)
+
+    assert bf.main(["--time-budget-seconds", "9"]) == 0
+    assert captured == {"max_calls": 20000, "seconds": 9}
+
+
+def test_main_max_calls_flag_overrides_backfill_config(tmp_path, monkeypatch):
+    _stub_common(monkeypatch, tmp_path, {
+        "target_wallet": "0xtarget", "known_self_wallets": [],
+        "collection": {"max_calls_per_run": 10, "time_budget_seconds": 10},
+        "backfill": {"max_calls_per_run": 20000, "time_budget_seconds": 2700}})
+    monkeypatch.setattr(bf, "sweep_wallet", lambda *a, **k: {
+        "address": "0xtarget", "chains": {}, "degraded_sources": []})
+
+    captured = {}
+
+    class FakeBudget:
+        def __init__(self, max_calls, seconds, **kwargs):
+            captured["max_calls"] = max_calls
+            captured["seconds"] = seconds
+
+    monkeypatch.setattr(bf, "CallBudget", FakeBudget)
+
+    assert bf.main(["--max-calls", "5"]) == 0
+    assert captured == {"max_calls": 5, "seconds": 2700}
+
+
+def test_main_without_the_override_flags_keeps_existing_behaviour(tmp_path, monkeypatch):
+    """Regression guard: omitting the new flags (backfill.yml's own invocation,
+    and every existing call site) must resolve the budget exactly as before —
+    args.time_budget_seconds/args.max_calls default to None, not 0."""
+    _stub_common(monkeypatch, tmp_path, {
+        "target_wallet": "0xtarget", "known_self_wallets": [],
+        "collection": {"max_calls_per_run": 10, "time_budget_seconds": 10},
+        "backfill": {"max_calls_per_run": 20000, "time_budget_seconds": 2700}})
+    monkeypatch.setattr(bf, "sweep_wallet", lambda *a, **k: {
+        "address": "0xtarget", "chains": {}, "degraded_sources": []})
+
+    captured = {}
+
+    class FakeBudget:
+        def __init__(self, max_calls, seconds, **kwargs):
+            captured["max_calls"] = max_calls
+            captured["seconds"] = seconds
+
+    monkeypatch.setattr(bf, "CallBudget", FakeBudget)
+
+    assert bf.main([]) == 0
+    assert captured == {"max_calls": 20000, "seconds": 2700}
+
+
 def test_main_reports_truncation_naming_the_chain(tmp_path, monkeypatch, capsys):
     _stub_common(monkeypatch, tmp_path, {
         "target_wallet": "0xtarget", "known_self_wallets": [],

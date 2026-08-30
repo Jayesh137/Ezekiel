@@ -34,6 +34,26 @@ jobs:
     #                                          ---
     #                                          561   leaving ~39s for checkout,
     #                                                pip (cached) and the push
+    #
+    # The steps above run on every dispatch, scheduled or manual. "Investigate
+    # a specific wallet" below runs ONLY on a manual dispatch that sets
+    # investigate_wallet, and it runs FIRST, so on that path its own budget is
+    # additive to the 561 above, not a substitute for any of it:
+    #
+    #   backfill_transfers.py --time-budget-seconds   9   investigate (manual dispatch only)
+    #                        + the 561 above         561
+    #                                                ---
+    #                                                570   leaving 30s — this job's
+    #                                                      existing, unwidened margin
+    #
+    # 9s does not complete a multi-chain sweep for a wallet with real history —
+    # scripts/backfill_transfers.py's own default (config.backfill, 2700s) is
+    # what that takes, and this job cannot spare it. What 9s buys instead: the
+    # step always finishes on its OWN terms (CallBudget checks elapsed time
+    # before every call), so this job is never the reason a dispatch is
+    # cancelled. A wallet with real history reports TRUNCATED and the chains it
+    # could not reach; src/chain/collect.py flushes cursors per chain, so the
+    # next dispatch of this same workflow resumes rather than restarts.
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +67,10 @@ jobs:
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           INVESTIGATE_WALLET: ${{ inputs.investigate_wallet }}
-        run: python scripts/backfill_transfers.py --wallet "$INVESTIGATE_WALLET"
+        # 9s, not backfill_transfers.py's own (backfill-sized) default — see
+        # the job-level comment above for the arithmetic. Re-dispatch this
+        # workflow with the same wallet to continue a TRUNCATED sweep.
+        run: python scripts/backfill_transfers.py --wallet "$INVESTIGATE_WALLET" --time-budget-seconds 9
       - run: python src/tracer.py
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}

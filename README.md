@@ -338,6 +338,13 @@ the `investigate_wallet` input, or locally:
 python scripts/backfill_transfers.py --wallet 0xa95d9c1f655341597c94393fddc30cf3c08e4fce
 ```
 
+The workflow shares its 600s job with the regular trace/graph steps, so its
+sweep is time-boxed to 9s (see `.github/workflows/trace.yml`) — enough for a
+first look, not a full multi-chain history. A wallet with real history reports
+`TRUNCATED` and resumes from its cursor on the next dispatch of the same
+workflow; running locally has no such ceiling and reads to completion (or
+`backfill`'s own 2700s budget).
+
 To recover the **full history** of the target and its known self-wallets — the
 records the old 1000-row window evicted, which is everything before 2025-11-30 —
 run the **Historical Backfill** workflow with `full_reset` ticked, or locally:
