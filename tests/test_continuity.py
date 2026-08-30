@@ -299,7 +299,11 @@ def test_total_lookup_outage_is_reported_as_failed(monkeypatch):
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert diag["status"] == "failed", "a total outage is not a partial result"
     assert diag["error"]
-    assert diag["degraded_sources"] == ["arbitrum_l1"]
+    # Named per chain now that expansion spans all of them, not the single
+    # "arbitrum_l1" label from when collection read one chain.
+    from src.chain.chains import enabled_chains
+    from src.utils import load_config
+    assert diag["degraded_sources"] == [c["name"] for c in enabled_chains(load_config())]
 
 
 def test_resume_queue_is_consumed_on_the_next_run(monkeypatch):
@@ -429,3 +433,90 @@ def test_v1_graph_without_chains_is_still_readable():
 ])
 def test_relay_classification_matrix(received, forwarded, hours, dests, expected):
     assert ct.classify_relay(received, forwarded, hours, dests)["is_relay"] is expected
+
+
+# --- 12. a sweep that could not read is not a finished expansion ----------------
+#
+# sweep_wallet never raises on degradation: probe_activity and fetch_kind catch
+# BudgetExhausted and return an error string. Discarding its return value made
+# the except branch that keeps a wallet retryable unreachable for the failure
+# that actually happens, and `explored` persists as expanded_ledger — so the
+# marking was permanent across runs.
+
+def _sweeps(monkeypatch, by_wallet, rows_by_wallet=None):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr("src.chain.collect.sweep_wallet",
+                        lambda wallet, *a, **kw: by_wallet.get(wallet.lower()))
+    monkeypatch.setattr("src.chain.collect.records_for",
+                        lambda wallet, **kw: (rows_by_wallet or {}).get(wallet.lower(), []))
+
+
+def _sweep_result(address, degraded=(), status="ok"):
+    return {"address": address, "status": status, "chains": {},
+            "degraded_sources": list(degraded)}
+
+
+def test_a_degraded_sweep_leaves_the_wallet_out_of_explored(monkeypatch):
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
+    _sweeps(monkeypatch, {
+        A: _sweep_result(A, degraded=["base", "bsc"]),
+        B: _sweep_result(B),
+    })
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A not in diag["expanded_ledger"], \
+        "a wallet whose sweep could not read every chain is not fully explored"
+    assert B in diag["expanded_ledger"], "a clean sweep still finishes the wallet"
+
+    failed = {f["wallet"]: f for f in diag["partial_failures"]}
+    assert A in failed
+    assert failed[A]["chains"] == ["base", "bsc"]
+    # The failing chain names reach the run-level record, not a stale label.
+    assert diag["degraded_sources"] == ["base", "bsc"]
+    # And it is re-queued rather than silently dropped.
+    assert A in {q["wallet"] for q in diag["frontier_queue"]}
+
+
+def test_a_budget_exhausted_sweep_does_not_look_like_an_empty_wallet(monkeypatch):
+    """Constraint: an empty result and a failed read must never serialise the
+    same way. Both wallets return zero rows; only one of them was READ."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
+    _sweeps(monkeypatch, {
+        A: _sweep_result(A, degraded=["arbitrum"], status="ok"),
+        B: _sweep_result(B),
+    })
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    by_wallet = {d["wallet"]: d for d in diag["decisions"]}
+    assert by_wallet[B]["action"] == "expanded"        # genuinely nothing there
+    assert by_wallet[A]["action"] == "deferred"        # we could not tell
+    assert "arbitrum" in by_wallet[A]["reason"]
+    assert diag["status"] != "ok"
+
+
+def test_a_sweep_skipped_for_want_of_a_key_is_not_a_finished_expansion(monkeypatch):
+    """status != "ok" with no per-chain degradation still means "not read"."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
+    _sweeps(monkeypatch, {A: _sweep_result(A, status="skipped_no_api_key")})
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A not in diag["expanded_ledger"]
+    assert diag["partial_failures"][0]["wallet"] == A
+    assert "skipped_no_api_key" in diag["partial_failures"][0]["error"]
+
+
+def test_a_clean_sweep_returning_nothing_still_marks_the_wallet_explored(monkeypatch):
+    """The retry path must not become a treadmill: a wallet that was genuinely
+    read and had nothing is finished, and stays finished across runs."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
+    _sweeps(monkeypatch, {A: _sweep_result(A)})
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A in diag["expanded_ledger"]
+    assert diag["partial_failures"] == []
+    assert diag["degraded_sources"] == []
+    assert diag["status"] == "ok"

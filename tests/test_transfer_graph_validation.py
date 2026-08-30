@@ -104,14 +104,22 @@ def test_missing_api_key_degrades_explicitly_not_silently(monkeypatch, l1):
     target = l1["target"]
     seed = [normalise_l1_transfer(tx) for tx in l1["responses"][target]["result"]]
 
+    from src.chain.chains import enabled_chains
+    from src.utils import load_config
+
     edges, diag = expand_frontier(seed, target, tg.DEFAULTS)
     assert edges == seed
     assert diag["status"] == "skipped_no_api_key"
-    assert "arbitrum_l1" in diag["degraded_sources"]
+    # Every enabled chain, by name. "arbitrum_l1" was honest when collection
+    # read one asset on one chain; naming it now would report five of six
+    # chains as healthy on a run that read none of them.
+    expected = [c["name"] for c in enabled_chains(load_config())]
+    assert diag["degraded_sources"] == expected
+    assert len(expected) > 1
 
     graph = build_graph(edges, target, expansion=diag)
     assert graph["health"]["frontier_incomplete"] is True
-    assert graph["health"]["degraded_sources"] == ["arbitrum_l1"]
+    assert graph["health"]["degraded_sources"] == expected
 
 
 def test_expansion_failure_keeps_partial_results(monkeypatch, l1):

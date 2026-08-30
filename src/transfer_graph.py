@@ -1508,30 +1508,45 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         "error": None,
     }
 
+    from src.chain.budget import CallBudget
+    from src.chain.chains import enabled_chains
+    from src.chain.collect import records_for, sweep_wallet
+
+    sweep_chains = enabled_chains(load_config())
+    # Expansion spans every enabled chain. "arbitrum_l1" was the honest label
+    # when collection read one asset on one chain; naming it now would report
+    # five chains as healthy on a run that read none of them.
+    all_chain_names = [c["name"] for c in sweep_chains]
+
     def decide(wallet, depth, action, reason, priority=None):
         diag["decisions"].append({"wallet": wallet, "depth": depth,
                                   "action": action, "reason": reason,
                                   "priority": priority})
 
+    def degrade(names):
+        """Merge chain names into diag['degraded_sources'], order-stable.
+
+        Merge, never assign: a later failure must not erase the record of an
+        earlier one, and one wallet's failing chain is not the whole run's.
+        """
+        for name in names:
+            if name and name not in diag["degraded_sources"]:
+                diag["degraded_sources"].append(name)
+
     if not os.environ.get("ETHERSCAN_API_KEY"):
         diag["status"] = "skipped_no_api_key"
-        diag["degraded_sources"] = ["arbitrum_l1"]
+        degrade(all_chain_names)
         print("[graph] ETHERSCAN_API_KEY absent - L1 frontier expansion SKIPPED. "
               "Graph is limited to locally recorded edges (typically depth 1).")
         return edges, diag
-
-    from src.chain.budget import CallBudget
-    from src.chain.chains import enabled_chains
-    from src.chain.collect import records_for, sweep_wallet
 
     # The frontier's own ceiling, expressed in the units the substrate spends.
     # max_expansions counted wallet lookups when one wallet cost one call; a
     # wallet now costs up to three calls per chain, so the budget has to be
     # denominated in calls or the ceiling silently means something else.
     sweep_budget = CallBudget(
-        max_calls=budget["max_expansions"] * len(enabled_chains(load_config())) * 3,
+        max_calls=budget["max_expansions"] * len(sweep_chains) * 3,
         seconds=budget["time_budget_seconds"])
-    sweep_chains = enabled_chains(load_config())
 
     deadline = time.monotonic() + budget["time_budget_seconds"]
     max_calls = budget["max_expansions"]
@@ -1605,16 +1620,45 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 calls += 1
                 found = 0
                 try:
-                    sweep_wallet(wallet, sweep_chains, sweep_budget, cluster=False)
+                    sweep = sweep_wallet(wallet, sweep_chains, sweep_budget,
+                                         cluster=False)
                     rows = records_for(wallet)
                 except Exception as exc:
                     # One address failing must not abandon the rest of the walk.
                     # The wallet stays OUT of `explored` so it is retried next
                     # run rather than being recorded as finished.
                     diag["partial_failures"].append(
-                        {"wallet": wallet, "depth": d, "error": str(exc)[:120]})
-                    diag["degraded_sources"] = ["arbitrum_l1"]
+                        {"wallet": wallet, "depth": d, "error": str(exc)[:120],
+                         "chains": list(all_chain_names)})
+                    degrade(all_chain_names)
                     decide(wallet, d, "deferred", f"lookup failed: {str(exc)[:80]}", pr)
+                    continue
+
+                # sweep_wallet does not raise on degradation — probe_activity
+                # and fetch_kind catch BudgetExhausted and return an error
+                # string instead — so the except branch above cannot see it, and
+                # discarding the return value made the branch that exists to
+                # keep a wallet retryable unreachable for the failure that
+                # actually happens. `sweep_budget` is built with the graph's
+                # 150s time budget; at etherscan_get's 0.25s sleep plus round
+                # trip that exhausts near 300 calls, well before the 720-call
+                # ceiling, so a wallet whose sweep starts late gets some chains
+                # read and the rest budget-exhausted. Marking it explored is
+                # permanent — `explored` persists as expanded_ledger and is
+                # re-seeded as `done` — and the diagnostics would read
+                # "expanded, 0 new edge(s)", identical to a wallet that
+                # genuinely has nothing.
+                degraded = list((sweep or {}).get("degraded_sources") or [])
+                status = (sweep or {}).get("status", "ok")
+                if degraded or status != "ok":
+                    named = ", ".join(degraded) or "unknown chain(s)"
+                    diag["partial_failures"].append(
+                        {"wallet": wallet, "depth": d,
+                         "error": f"sweep {status}: could not read {named}",
+                         "chains": degraded})
+                    degrade(degraded)
+                    decide(wallet, d, "deferred",
+                           f"sweep {status}; could not read {named}", pr)
                     continue
                 explored.add(wallet)
                 expanded_now.add(wallet)
@@ -1648,7 +1692,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
         diag["error"] = str(exc)[:200]
-        diag["degraded_sources"] = ["arbitrum_l1"]
+        degrade(all_chain_names)
         print(f"[graph] frontier expansion FAILED after {calls} lookup(s): {exc}")
 
     # One entry per wallet at its SHALLOWEST outstanding depth. Keying on
@@ -1710,7 +1754,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             # result, and must not read as a successful-but-thin expansion.
             diag["status"] = "failed"
             diag["error"] = diag["partial_failures"][0]["error"]
-            diag["degraded_sources"] = ["arbitrum_l1"]
+            # Merge, not assign: the per-wallet handlers have already named the
+            # chains that actually failed, and overwriting would discard them.
+            degrade(all_chain_names)
         elif stopped_reason or pending or failures:
             if stopped_reason:
                 diag["status"] = "budget_exhausted"
@@ -1795,7 +1841,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
             known_services=known_services, already_expanded=already)
         write_cursor("transfer_graph_last_expansion_ms", now_ms())
     else:
-        expansion = {"status": "disabled", "degraded_sources": ["arbitrum_l1"],
+        from src.chain.chains import enabled_chains
+        expansion = {"status": "disabled",
+                     "degraded_sources": [c["name"] for c in enabled_chains(config)],
                      "attempted_at": utc_now()}
     # Carry the previous successful expansion forward so the dashboard can show
     # "last successful L1 expansion" even on a run where it was skipped.
