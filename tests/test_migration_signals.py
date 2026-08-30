@@ -208,6 +208,20 @@ def test_linkage_bonus_capped():
 
 # get_outbound_addresses: the address-reuse signal's own source, feeding compute_linkage.
 
+def _swept(monkeypatch, *wallets):
+    """Declare these wallets as ones the substrate is complete for.
+
+    get_outbound_addresses ALSO makes the one live Etherscan call it used to
+    make for a wallet that was never swept, because for those records_for() is
+    at best a subset of already-swept addresses rather than the wallet's real
+    outbound set. Every test below pre-plants the substrate, so every one of
+    them is testing the swept population and has to say so - otherwise they
+    pass only because no ETHERSCAN_API_KEY happens to be exported, and reach
+    the network on a machine where one is.
+    """
+    monkeypatch.setattr(linkage, "swept_wallets",
+                        lambda config: {(w or "").lower() for w in wallets})
+
 def test_outbound_addresses_come_from_every_chain_without_api_calls(tmp_path, monkeypatch):
     """Address reuse is the strongest linkage signal available, and it was
     limited to Arbitrum USDC. The substrate already holds every chain, so
@@ -218,6 +232,7 @@ def test_outbound_addresses_come_from_every_chain_without_api_calls(tmp_path, mo
 
     monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
     monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
     monkeypatch.setattr(linkage, "etherscan_get",
                         lambda *a, **k: pytest.fail("must not call the API"))
 
@@ -241,6 +256,7 @@ def test_outbound_addresses_exclude_spam_and_the_bridge(tmp_path, monkeypatch):
 
     monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
     monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
     bridge = load_config()["hl_bridge_contract"].lower()
 
     d = tmp_path / "transfers" / "arbitrum"
@@ -271,6 +287,7 @@ def test_outbound_addresses_exclude_labelled_infrastructure(tmp_path, monkeypatc
 
     monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
     monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
 
     labels_dir = tmp_path / "labels"
     labels_dir.mkdir()
@@ -306,6 +323,7 @@ def test_outbound_addresses_do_not_exclude_cex_deposit_labels(tmp_path, monkeypa
 
     monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
     monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
 
     labels_dir = tmp_path / "labels"
     labels_dir.mkdir()
@@ -333,6 +351,7 @@ def test_outbound_addresses_exclude_configured_service_addresses(tmp_path, monke
 
     monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
     monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
 
     d = tmp_path / "transfers" / "arbitrum"
     d.mkdir(parents=True)
@@ -345,6 +364,123 @@ def test_outbound_addresses_exclude_configured_service_addresses(tmp_path, monke
 
     config = {"hl_bridge_contract": "0xbridge", "known_service_addresses": ["0xrouter"]}
     assert linkage.get_outbound_addresses("0xtarget", config) == {"0xreal"}
+
+
+# --- the address-reuse signal must not be dark for unswept candidates ----------
+#
+# The substrate is populated only for wallets that were swept: the target,
+# known_self_wallets and graph-frontier wallets. Leaderboard behavioural
+# candidates are a different population and are never swept, so reading only
+# records_for() left this signal near-permanently empty for exactly the wallets
+# it exists to judge - and it fires alert_linkage_match as a standalone alert,
+# not gated behind the score threshold.
+
+CANDIDATE = "0xcandidate"
+
+
+def _live_rows(*destinations, frm=CANDIDATE):
+    return {"status": "1", "result": [
+        {"from": frm, "to": d, "value": "900000000"} for d in destinations]}
+
+
+def test_an_unswept_candidate_still_yields_its_outbound_addresses(tmp_path, monkeypatch):
+    """The required behaviour: a leaderboard candidate nobody swept must still
+    produce its real deposit destinations."""
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")          # the candidate is NOT in it
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: _live_rows("0xdeposita", "0xdepositb"))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == {"0xdeposita", "0xdepositb"}
+    # and through the alias the scanner actually calls
+    assert linkage.get_outbound_usdc_addresses(CANDIDATE) == {"0xdeposita", "0xdepositb"}
+
+
+def test_an_unswept_candidates_partial_substrate_is_unioned_not_trusted(
+        tmp_path, monkeypatch):
+    """For an unswept candidate records_for() returns only the records where it
+    transacted with an ALREADY-SWEPT wallet - a subset of swept addresses that
+    looks like an answer. A non-empty result is therefore not evidence the
+    wallet was swept, so the live lookup is unioned in rather than used only as
+    a fallback-on-empty."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: _live_rows("0xrealdeposit"))
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": CANDIDATE, "dst": "0xtarget",
+         "amount_usd": 900.0, "ts": 1, "spam": False}]))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == {"0xtarget", "0xrealdeposit"}
+
+
+def test_a_swept_wallet_still_costs_no_api_call(tmp_path, monkeypatch):
+    """The branch's gain is preserved where the substrate is actually complete:
+    the target's outbound set spans every chain and asset, for free."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: pytest.fail("a swept wallet needs no API call"))
+
+    for chain, dst in (("arbitrum", "0xdeposita"), ("base", "0xdepositb")):
+        d = tmp_path / "transfers" / chain
+        d.mkdir(parents=True)
+        (d / "2026-08-28.json").write_text(json.dumps([{
+            "id": f"{chain}:0xh:erc20:0", "chain": chain, "src": "0xtarget",
+            "dst": dst, "amount_usd": 500000.0, "ts": 1, "spam": False}]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xdeposita", "0xdepositb"}
+
+
+def test_the_live_lookup_excludes_infrastructure_exactly_like_the_substrate_path(
+        tmp_path, monkeypatch):
+    """The live half feeds the same "cryptographic certainty" bonus and the same
+    standalone alert, so it cannot have a weaker exclusion rule."""
+    from src.chain import collect
+    from src.utils import load_config
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    bridge = load_config()["hl_bridge_contract"].lower()
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: _live_rows(bridge, CANDIDATE, "0xreal"))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == {"0xreal"}
+
+
+def test_without_a_key_the_live_half_degrades_to_empty_rather_than_erroring(
+        tmp_path, monkeypatch):
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: pytest.fail("must not call the API without a key"))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == set()
 
 
 # --- risk score ---------------------------------------------------------------

@@ -113,15 +113,73 @@ def get_first_funder(wallet: str) -> str | None:
     return None
 
 
-def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
-    """Every address this wallet has sent value to, on every collected chain,
-    excluding known infrastructure.
+def swept_wallets(config: dict) -> set:
+    """Addresses the substrate is complete for: the target and its cluster.
 
-    Reads the substrate rather than the API: src/chain/collect.py has already
-    stored these, so widening the strongest linkage signal we have — a CEX
-    deposit address belongs to exactly one account, so two wallets funding the
-    same one are the same customer — from Arbitrum USDC to every chain and asset
-    costs no calls at all.
+    These are swept unconditionally by scripts/backfill_transfers.py and by the
+    tracer. For anything else, records_for() is at best partial — see
+    get_outbound_addresses.
+    """
+    out = {(config.get("target_wallet") or "").lower()}
+    out |= {(w or "").lower() for w in config.get("known_self_wallets", [])}
+    return out - {""}
+
+
+def _live_outbound_usdc(wallet: str, excluded: set, limit: int) -> set:
+    """Arbitrum USDC destinations straight from Etherscan. One call.
+
+    The pre-substrate implementation of this whole function, kept for the
+    population the substrate does not cover.
+    """
+    if not os.environ.get("ETHERSCAN_API_KEY"):
+        return set()
+    config = load_config()
+    wl = (wallet or "").lower()
+    res = etherscan_get({
+        "module": "account", "action": "tokentx", "address": wallet,
+        "contractaddress": config["usdc_contract_arbitrum"],
+        "page": 1, "offset": limit, "sort": "desc",
+    })
+    out = set()
+    for t in res.get("result", []) if res.get("status") == "1" else []:
+        if (t.get("from", "") or "").lower() != wl:
+            continue
+        to = (t.get("to", "") or "").lower()
+        if to and to not in excluded and int(t.get("value", 0) or 0) > 0:
+            out.add(to)
+    return out
+
+
+def get_outbound_addresses(wallet: str, config: dict | None = None,
+                           limit: int = 300) -> set:
+    """Every address this wallet has sent value to, excluding known
+    infrastructure.
+
+    For a swept wallet this reads the substrate: src/chain/collect.py has
+    already stored these, so widening the strongest linkage signal we have — a
+    CEX deposit address belongs to exactly one account, so two wallets funding
+    the same one are the same customer — from Arbitrum USDC to every chain and
+    asset costs no calls at all.
+
+    For anything else it ALSO makes the one live Etherscan call this function
+    used to make. The substrate is populated only for wallets that were swept —
+    the target, known_self_wallets and graph-frontier wallets. Leaderboard
+    behavioural candidates are a different population and are never swept, so
+    records_for() returns only the records where the candidate happened to
+    transact with an already-swept wallet: not an empty set that would be
+    obviously wrong, but a subset of swept addresses that looks like an answer.
+    Reading only the substrate therefore left this signal near-permanently dark
+    for exactly the wallets it exists to judge — and it fires
+    alert_linkage_match as a standalone alert, not gated behind the score
+    threshold.
+
+    Sweeping the candidate instead was the alternative. It is rejected here: a
+    sweep writes the candidate's whole history into the shared substrate, which
+    feeds collect_known_edges and therefore the transfer graph, so scoring a
+    leaderboard wallet would add unrelated wallets to the target's graph; and
+    scanner.py has no call budget to bound six chains x three kinds per
+    candidate. One call matches what this path already spends per candidate in
+    get_first_funder, and matches pre-branch behaviour exactly.
 
     That signal only holds for a private deposit address. Widening the search
     to every chain and asset also widens the odds of landing on a router, a
@@ -154,13 +212,19 @@ def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
         dst = (rec.get("dst") or "").lower()
         if dst and dst not in excluded:
             out.add(dst)
+
+    # Union, not a fallback-on-empty: a non-empty substrate result is not
+    # evidence the wallet was swept, only that it touched something that was.
+    if wl not in swept_wallets(config):
+        out |= _live_outbound_usdc(wl, excluded, limit)
     return out
 
 
 def get_outbound_usdc_addresses(wallet: str, limit: int = 300) -> set:
-    """Backwards-compatible alias. `limit` is unused: the substrate is complete,
-    so there is no page to cap."""
-    return get_outbound_addresses(wallet)
+    """Backwards-compatible alias. `limit` caps the live Etherscan page used
+    for wallets the substrate does not cover; the substrate itself is complete
+    for swept wallets, so there is no page to cap there."""
+    return get_outbound_addresses(wallet, limit=limit)
 
 
 def target_l1_profile(target: str) -> dict:
