@@ -74,3 +74,75 @@ def test_collect_known_edges_still_reads_legacy_l1_transactions(tmp_path, monkey
 
     edges = tg.collect_known_edges()
     assert any(e["dst"] == "0xlegacy" for e in edges)
+
+
+# --- fund_flows findings: must carry their own asset/chain, not the old --------
+# --- hardcoded Arbitrum-USDC assumption -----------------------------------------
+
+def _finding(**kw):
+    base = {"source": "0xtarget", "destination": "0xdest", "tx_hash": "0xh",
+            "amount_usdc_raw": 5000.0, "hop_count": 1,
+            "detected_at": "2026-06-16T00:00:00+00:00"}
+    base.update(kw)
+    return base
+
+
+def test_a_fund_flow_finding_carries_its_own_asset_and_chain(tmp_path, monkeypatch):
+    """Before round 2, every fund_flows finding WAS Arbitrum USDC by
+    construction. build_finding now records the real asset/chain on the
+    finding — this reader must use them instead of re-hardcoding the old
+    assumption, or a genuine USDT-on-Base finding is written into the graph
+    as USDC-on-Arbitrum."""
+    monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
+    ff_dir = tmp_path / "fund_flows"
+    ff_dir.mkdir(parents=True)
+    (ff_dir / "latest.json").write_text(json.dumps(
+        {"findings": [_finding(asset="USDT", chain="base")]}))
+
+    edges = tg.collect_known_edges()
+    assert len(edges) == 1
+    assert edges[0]["asset"] == "USDT"
+    assert edges[0]["chain"] == "base"
+
+
+def test_a_fund_flow_finding_without_asset_or_chain_defaults_to_usdc_arbitrum(
+        tmp_path, monkeypatch):
+    """A finding written before build_finding recorded asset/chain — or one
+    built by trace_fund_flow's hop-2/hop-3 paths, which are still genuinely
+    Arbitrum USDC and never pass these fields — has neither key. The fallback
+    here must match build_finding's own default, not silently drop the
+    record or invent a different assumption."""
+    monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
+    ff_dir = tmp_path / "fund_flows"
+    ff_dir.mkdir(parents=True)
+    (ff_dir / "latest.json").write_text(json.dumps({"findings": [_finding()]}))
+
+    edges = tg.collect_known_edges()
+    assert len(edges) == 1
+    assert edges[0]["asset"] == "USDC"
+    assert edges[0]["chain"] == "arbitrum"
+
+
+def test_a_fund_flow_finding_still_dedupes_with_its_substrate_edge(tmp_path, monkeypatch):
+    """edge_id is chain-scoped, so hardcoding chain="arbitrum" on every
+    finding-derived edge silently broke dedup against that same transfer's own
+    substrate edge for any chain other than Arbitrum: the two carried
+    different ids and both survived dedupe_edges as if they were two separate
+    movements. Reading the finding's own chain/asset fixes this — the same
+    real transfer, reachable through both the substrate and a fund_flows
+    finding, must still collapse to one edge, on every chain, not just
+    Arbitrum."""
+    monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
+
+    d = tmp_path / "transfers" / "base"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([record(chain="base", tx_hash="0xh")]))
+
+    ff_dir = tmp_path / "fund_flows"
+    ff_dir.mkdir(parents=True)
+    (ff_dir / "latest.json").write_text(json.dumps(
+        {"findings": [_finding(chain="base", asset="USDC")]}))
+
+    edges = tg.collect_known_edges()
+    assert len(edges) == 2                      # one substrate edge, one finding edge
+    assert len(tg.dedupe_edges(edges)) == 1      # ...but they are the same movement

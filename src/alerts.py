@@ -187,11 +187,21 @@ def alert_fund_movement(wallet: str, amount: str, destination: str, tx_hash: str
     Arbitrum USDC) so this stays correct for a caller that doesn't pass them.
     The caller now sourced from every chain and asset must pass the real
     ones — reporting "USDC" for a USDT withdrawal would be a false statement
-    in the one artifact this system exists to produce."""
-    subject = f"[EZEKIEL] CRITICAL: Fund Movement Detected ({asset} on {chain})"
+    in the one artifact this system exists to produce.
+
+    `amount` is expected to already be a dollar-qualified string (e.g.
+    "$2,000,000.00"), not a bare number — this function does not add its own
+    currency symbol. That figure is always a USD value, never a token
+    quantity, even when `asset` is not a dollar-pegged stablecoin: reporting
+    "Withdrawal of 2,000,000.00 ETH" would say the trader moved a thousand
+    times more ETH than they did the moment a non-stablecoin's price is
+    actually looked up, so the wording spells out "of <asset>" rather than
+    letting the number and the asset run together.
+    """
+    subject = f"[EZEKIEL] CRITICAL: Fund Movement Detected ({amount} of {asset} on {chain})"
     body = (
         f"{address_line(wallet, 'Wallet')}\n"
-        f"Event: Withdrawal of {amount} {asset} on {chain}\n"
+        f"Event: Withdrew {amount} of {asset} on {chain}\n"
         f"{address_line(destination, 'Destination')}\n"
         f"TX Hash: {tx_hash}\n"
         f"\nTracing destination wallet..."

@@ -293,7 +293,15 @@ def trace_fund_flow(wallet: str) -> list[dict]:
             break
         destination = transfer["to"]
         value_raw = int(transfer.get("value", 0))
-        value_usdc = value_raw / 1e6  # 6-decimal USDC units, whatever the real asset
+        # This is a USD dollar figure — _as_etherscan_row encodes amount_usd here,
+        # not a token quantity — regardless of what `asset` turns out to be. It
+        # only reads correctly as a bare number today because every asset that
+        # can reach this path is a STABLES member priced at par (see
+        # src/chain/assets.py), where quantity and dollar value coincide. The day
+        # a price_lookup for MAJORS is wired (tracked separately), that
+        # coincidence ends, so the dollar sign is made explicit here rather than
+        # left to hold only by accident of which assets happen to be priced.
+        value_usd = value_raw / 1e6
         tx_hash = transfer.get("hash", "unknown")
         # The substrate spans every asset and chain now, so both must come from the
         # row instead of being assumed — before this task every row here WAS
@@ -301,10 +309,11 @@ def trace_fund_flow(wallet: str) -> list[dict]:
         # contract), which is the only reason hardcoding either used to be correct.
         asset = transfer.get("tokenSymbol") or "USDC"
         chain = transfer.get("chain") or CHAIN_DEFAULT
+        amount_display = f"${value_usd:,.2f}"
 
-        print(f"[tracer] OUTBOUND: {value_usdc:.2f} {asset} -> {destination} (chain={chain})")
+        print(f"[tracer] OUTBOUND: {amount_display} of {asset} on {chain} -> {destination}")
 
-        alert_fund_movement(wallet, f"{value_usdc:,.2f}", destination, tx_hash,
+        alert_fund_movement(wallet, amount_display, destination, tx_hash,
                             asset=asset, chain=chain)
 
         print(f"[tracer] Checking if {destination} deposited to Hyperliquid...")
@@ -316,7 +325,7 @@ def trace_fund_flow(wallet: str) -> list[dict]:
             findings.append(build_finding(
                 wallet,
                 destination,
-                value_usdc,
+                value_usd,
                 tx_hash,
                 "direct_fund_trace",
                 1,
@@ -385,7 +394,7 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                 findings.append(build_finding(
                     wallet,
                     destination,
-                    value_usdc,
+                    value_usd,
                     tx_hash,
                     "outbound_transfer",
                     1,

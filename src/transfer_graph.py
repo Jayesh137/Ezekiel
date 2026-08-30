@@ -1303,11 +1303,23 @@ def collect_known_edges() -> list[dict]:
                             finding["detected_at"]).timestamp())
                     except (KeyError, TypeError, ValueError):
                         pass
+                    # A finding written before src/tracer.py threaded asset/chain
+                    # through (or one built by the hop-2/hop-3 paths, which are
+                    # still genuinely Arbitrum USDC) has neither key, so the
+                    # fallback here is the same one build_finding itself defaults
+                    # to — not a fresh assumption. A finding that DOES carry its
+                    # own asset/chain must win: hardcoding this unconditionally
+                    # mislabelled every non-Arbitrum, non-USDC finding as
+                    # Arbitrum USDC, and — since edge_id is chain-scoped — also
+                    # broke dedup against that same transfer's own substrate edge
+                    # for any chain other than Arbitrum.
+                    chain = finding.get("chain") or CHAIN_ARBITRUM
+                    asset = finding.get("asset") or "USDC"
                     edges.append({
-                        "id": edge_id(src, dst, CHAIN_ARBITRUM,
+                        "id": edge_id(src, dst, chain,
                                       finding.get("tx_hash", ""), ts),
-                        "src": src, "dst": dst, "chain": CHAIN_ARBITRUM,
-                        "asset": "USDC",
+                        "src": src, "dst": dst, "chain": chain,
+                        "asset": asset,
                         "amount_usd": round(float(finding.get("amount_usdc_raw", 0) or 0), 2),
                         "ref": finding.get("tx_hash", ""),
                         "ts": ts, "timestamp": _iso(ts),

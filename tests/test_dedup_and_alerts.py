@@ -54,7 +54,7 @@ def test_alert_fund_movement_labels_the_real_asset_and_chain(monkeypatch):
     monkeypatch.setattr(alerts, "write_cursor", lambda name, v: cursors.__setitem__(name, v))
     cursors = {}
 
-    assert alerts.alert_fund_movement("0xw", "5,000.00", "0xd", "0xhash",
+    assert alerts.alert_fund_movement("0xw", "$5,000.00", "0xd", "0xhash",
                                       asset="USDT", chain="base") is True
     subject, body = sent[0]
     assert "USDT" in subject and "base" in subject
@@ -72,10 +72,32 @@ def test_alert_fund_movement_defaults_preserve_pre_substrate_behavior(monkeypatc
     monkeypatch.setattr(alerts, "write_cursor", lambda name, v: cursors.__setitem__(name, v))
     cursors = {}
 
-    assert alerts.alert_fund_movement("0xw", "5,000.00", "0xd", "0xhash2") is True
+    assert alerts.alert_fund_movement("0xw", "$5,000.00", "0xd", "0xhash2") is True
     subject, body = sent[0]
     assert "USDC" in subject and "arbitrum" in subject
     assert "USDC" in body and "arbitrum" in body
+
+
+def test_alert_fund_movement_renders_an_unambiguous_dollar_qualified_message(monkeypatch):
+    """Round 2 made the asset label dynamic but left the number unqualified:
+    "Withdrawal of 2,000,000.00 ETH" reads as a token quantity. That is only
+    harmless today because every asset reaching this path is priced at par; the
+    day a MAJORS price_lookup exists it becomes a false statement. Assert the
+    full rendered strings, not a substring, so a future reword cannot silently
+    reintroduce that ambiguity."""
+    sent = []
+    monkeypatch.setattr(alerts, "send_alert", lambda s, b, h=None: sent.append((s, b)) or True)
+    monkeypatch.setattr(alerts, "read_cursor", lambda name: cursors.get(name, 0))
+    monkeypatch.setattr(alerts, "write_cursor", lambda name, v: cursors.__setitem__(name, v))
+    cursors = {}
+
+    assert alerts.alert_fund_movement("0xwallet", "$2,000,000.00", "0xdest", "0xhash3",
+                                      asset="ETH", chain="base") is True
+    subject, body = sent[0]
+    assert subject == "[EZEKIEL] CRITICAL: Fund Movement Detected ($2,000,000.00 of ETH on base)"
+    assert "Event: Withdrew $2,000,000.00 of ETH on base\n" in body
+    assert "2,000,000.00 ETH" not in body       # the old, ambiguous "N ASSET" form
+    assert "2,000,000.00 ETH" not in subject
 
 
 def test_unique_destinations_dedupes_and_skips_dust():

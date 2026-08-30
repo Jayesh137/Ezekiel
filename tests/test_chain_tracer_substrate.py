@@ -253,6 +253,36 @@ def test_trace_fund_flow_usdc_arbitrum_path_is_unchanged(tmp_path, monkeypatch):
 
     assert len(calls) == 1
     args, kwargs = calls[0]
-    assert args[1] == "5,000.00"                # amount string, unchanged format
+    # Dollar-qualified even for USDC: round 3 made this unconditional so the
+    # wording never again depends on which asset happens to be passing through.
+    assert args[1] == "$5,000.00"
     assert kwargs.get("asset") == "USDC"
     assert kwargs.get("chain") == "arbitrum"
+
+
+def test_trace_fund_flow_print_is_unambiguous_about_dollars_for_a_non_usdc_asset(
+        tmp_path, monkeypatch, capsys):
+    """value_raw/1e6 is a USD figure regardless of asset — it only reads
+    correctly as a bare number today because every asset reaching this path is
+    priced at par (assets.py's STABLES). The day a MAJORS price_lookup exists,
+    "5,000.00 ETH" would mean 5,000 ETH, not $5,000 of it. The OUTBOUND print
+    must say "of <asset>" with an explicit "$", not just interpolate the asset
+    symbol next to a bare number."""
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(tracer, "alert_fund_movement", lambda *a, **k: True)
+    _no_op_hop_followup(monkeypatch)
+
+    d = tmp_path / "transfers" / "base"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        substrate_record(chain="base", asset="USDT", amount=5000.0, amount_usd=5000.0)]))
+
+    tracer.trace_fund_flow("0xtarget")
+
+    out = capsys.readouterr().out
+    assert "[tracer] OUTBOUND: $5,000.00 of USDT on base -> 0xdest" in out
+    assert "5,000.00 USDT" not in out          # the old, ambiguous "N ASSET" form
