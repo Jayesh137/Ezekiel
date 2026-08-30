@@ -3518,9 +3518,32 @@ What it does that the previous single-endpoint collection did not:
   single forgery of the known self-wallet accounted for 510. Forged addresses are
   matched on their first and last 4 hex characters and rolled up into
   `data/transfers_spam/latest.json` instead of entering the graph.
+
+  The rule is **value-ordered**, not a membership test: an address is a forgery of
+  another only when the other has moved strictly more value with the wallet.
+  Nobody forges an address poorer than their own. A symmetric test gets this wrong
+  in both directions — it lets a $1 clone of a large counterparty quarantine the
+  genuine address, and a blanket exemption to prevent that whitewashes the clone.
 - **Entity labels.** `data/labels/entities.json` names exchanges, bridges and
   routers; bytecode is checked once per address and cached. A contract can never
   be graded a personal wallet.
+
+  **"Service" is purpose-relative.** The graph asks "may I walk into this
+  address?" and a CEX *deposit* address answers no. Linkage asks "does shared use
+  imply common ownership?" and the same address is the strongest possible yes —
+  it belongs to one exchange account. `service_addresses()` therefore takes the
+  categories to apply; linkage passes `SERVICE_CATEGORIES` minus the two deposit
+  categories.
+- **Prices that fail are not zero, and not spam.** A known asset the system could
+  not price this run is stored with `value_basis: "price_unavailable"` and
+  counted in `data/transfers/latest.json`'s `unpriced` field. It is retained, not
+  quarantined: booking it as `0.0` would drop a potentially large transfer below
+  every threshold silently, and quarantining it would keep it out of the
+  substrate entirely. Only a genuinely unknown token is quarantined.
+- **Alerts name the asset and the chain.** Collection used to be USDC-on-Arbitrum
+  by construction, so both were safe to hardcode. Neither is now, and the amount
+  is rendered as a dollar figure (`$X of ETH on base`) rather than a bare number
+  beside a symbol, which would read as a token quantity.
 
 **Blindness is reported, never inferred.** `data/transfers/latest.json` carries
 `degraded_sources`; a chain that could not be read is recorded there, and an empty
