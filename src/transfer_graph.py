@@ -1804,6 +1804,79 @@ def _read_previous_graph() -> dict:
         return {}
 
 
+# One cached eth_getCode call per address, ever, persisted to
+# data/labels/code_cache.json — but a first run over a wide graph would still
+# be hundreds of calls inside a job that already spends its budget on
+# expansion. Capped per run; the cache drains the backlog over a few runs and
+# the steady-state cost is zero.
+MAX_CODE_LOOKUPS_PER_RUN = 40
+
+
+def label_contracts(edges: list[dict], known_services: set, config: dict,
+                    dust_usd: float, cache=None) -> dict[str, str]:
+    """Add every graph address that has bytecode to `known_services`.
+
+    Enforces the binding constraint that an address with bytecode is not a
+    person and can never be graded MIGRATION_CANDIDATE. Before this, the
+    curated registry was the only tier that reached the running system:
+    classify_address, infer_deposit_addresses, CodeCache and fetch_code had
+    zero production call sites, so a fresh contract receiving the target's
+    funds could still be graded a personal wallet.
+
+    Scope: the destination of every expandable (non-dust, non-bridge) edge that
+    is not already a known service. That is exactly the set build_graph can
+    grade — a node only exists because value reached it — and it excludes the
+    sub-dollar poisoning clones that make up most raw edges. Each address is
+    checked on the chain its largest edge was observed on, because a contract
+    at an address on one chain need not exist at the same address on another.
+
+    A failed lookup returns None and marks nothing: absence of evidence is not
+    evidence of an externally owned account. CodeCache does not cache it
+    either, so a rate-limited run is retried rather than remembered wrong.
+    """
+    from src.chain.budget import CallBudget
+    from src.chain.chains import enabled_chains
+    from src.chain.client import fetch_code
+    from src.chain.labels import CodeCache
+
+    chains = {c["name"]: c for c in enabled_chains(config)}
+    if not chains:
+        return {}
+
+    # Largest edge per candidate address decides which chain to ask on.
+    best: dict[str, tuple[float, str]] = {}
+    for e in _expandable_edges(edges, dust_usd):
+        dst = (e.get("dst") or "").lower()
+        if not dst or dst in known_services:
+            continue
+        usd = float(e.get("amount_usd", 0) or 0)
+        chain = e.get("chain") or CHAIN_ARBITRUM
+        if chain not in chains:
+            continue
+        if dst not in best or usd > best[dst][0]:
+            best[dst] = (usd, chain)
+
+    if not best:
+        return {}
+
+    budget = CallBudget(max_calls=MAX_CODE_LOOKUPS_PER_RUN, seconds=120)
+    if cache is None:
+        cache = CodeCache(DATA_DIR / "labels" / "code_cache.json",
+                          lambda addr, chain: fetch_code(addr, chain, budget))
+
+    found: dict[str, str] = {}
+    # Highest value first: if the cap bites, the addresses closest to being
+    # graded are the ones that got checked.
+    for addr, (_usd, chain) in sorted(best.items(), key=lambda kv: -kv[1][0]):
+        if cache.has_code(addr, chains[chain]) is True:
+            known_services.add(addr)
+            found[addr] = chain
+    if found:
+        print(f"[graph] {len(found)} address(es) have bytecode and are not "
+              f"people: {sorted(found)[:3]}{'...' if len(found) > 3 else ''}")
+    return found
+
+
 def run_transfer_graph(expand: bool = True) -> dict:
     """Full pipeline: gather edges, traverse, score, persist, alert."""
     config = load_config()
@@ -1845,6 +1918,16 @@ def run_transfer_graph(expand: bool = True) -> dict:
         expansion = {"status": "disabled",
                      "degraded_sources": [c["name"] for c in enabled_chains(config)],
                      "attempted_at": utc_now()}
+    # After expansion, before grading: build_graph is where a node is classified,
+    # so this is where "an address with bytecode can never be graded
+    # MIGRATION_CANDIDATE" has to be true. Running it here also covers the
+    # addresses expansion just discovered, which a pre-expansion pass would miss
+    # for a whole run.
+    try:
+        label_contracts(edges, known_services, config, cfg["dust_usd"])
+    except Exception as exc:  # noqa: BLE001 - labelling must never break the graph
+        print(f"[graph] bytecode labelling failed: {type(exc).__name__}: {exc}")
+
     # Carry the previous successful expansion forward so the dashboard can show
     # "last successful L1 expansion" even on a run where it was skipped.
     prev_health = (previous_graph.get("health") or {}).get("expansion") or {}

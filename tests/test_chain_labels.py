@@ -1,6 +1,9 @@
 # tests/test_chain_labels.py
 import json
 
+import pytest
+
+from src import transfer_graph as tg
 from src.chain import labels
 
 BINANCE = "0xf977814e90da44bfa03b6295a0616a897441acec"
@@ -225,3 +228,143 @@ def test_code_cache_returns_none_and_caches_nothing_on_a_read_failure(tmp_path):
     cache = labels.CodeCache(tmp_path / "code_cache.json", lambda a, c: None)
     assert cache.has_code("0xabc", {"name": "arbitrum"}) is None
     assert not (tmp_path / "code_cache.json").exists()
+
+
+# --- the bytecode tier must actually reach the running system ------------------
+#
+# classify_address, CodeCache and fetch_code had zero production call sites, so
+# the binding constraint "an address with bytecode is not a person and can never
+# be graded MIGRATION_CANDIDATE" was asserted in prose and unenforced in code.
+
+CONFIG = {"chains": [{"name": "arbitrum", "chain_id": 42161, "native": "ETH",
+                      "enabled": True, "priority": 0},
+                     {"name": "base", "chain_id": 8453, "native": "ETH",
+                      "enabled": True, "priority": 1}]}
+TARGET = "0x45d26f28196d226497130c4bac709d808fed4029"
+CONTRACT = "0x" + "c" * 40
+PERSON = "0x" + "e" * 40
+
+
+class FakeCache:
+    def __init__(self, codes):
+        self.codes = codes
+        self.asked = []
+
+    def has_code(self, address, chain):
+        self.asked.append((address, chain["name"]))
+        return self.codes.get(address)
+
+
+def _edge(dst, usd=500_000.0, chain="arbitrum", src=TARGET):
+    """A real graph edge, via the same normaliser the substrate feeds."""
+    return tg.normalise_transfer_record({
+        "src": src, "dst": dst, "chain": chain, "amount_usd": usd,
+        "asset": "USDC", "ts": 1781000000, "tx_hash": f"0x{dst[-4:]}{int(usd)}",
+        "kind": "erc20", "spam": False})
+
+
+def test_an_address_with_bytecode_becomes_a_known_service():
+    known = set()
+    cache = FakeCache({CONTRACT: True, PERSON: False})
+    found = tg.label_contracts([_edge(CONTRACT), _edge(PERSON)], known, CONFIG, 1.0,
+                               cache=cache)
+    assert found == {CONTRACT: "arbitrum"}
+    assert known == {CONTRACT}
+
+
+def test_a_contract_can_never_be_graded_a_migration_candidate():
+    """The constraint itself, end to end through the grader."""
+    known = set()
+    edges = [_edge(CONTRACT, usd=9_000_000.0)]
+    tg.label_contracts(edges, known, CONFIG, 1.0, cache=FakeCache({CONTRACT: True}))
+
+    graph = tg.build_graph(edges, TARGET, known_services=known,
+                           behavioural={CONTRACT: 0.99})
+    node = next(n for n in graph["nodes"] if n["wallet"] == CONTRACT)
+    assert node["classification"] == tg.CLASS_SERVICE
+    assert node["confidence"] == 0.0
+
+    # Without the bytecode tier the same address is graded as a person.
+    ungraded = tg.build_graph(edges, TARGET, behavioural={CONTRACT: 0.99})
+    assert next(n for n in ungraded["nodes"]
+                if n["wallet"] == CONTRACT)["classification"] != tg.CLASS_SERVICE
+
+
+def test_a_failed_lookup_never_marks_an_address_codeless():
+    """has_code returns None when the lookup failed. Absence of evidence is not
+    evidence of an externally owned account."""
+    known = set()
+    found = tg.label_contracts([_edge(CONTRACT)], known, CONFIG, 1.0,
+                               cache=FakeCache({CONTRACT: None}))
+    assert found == {} and known == set()
+
+
+def test_only_gradeable_addresses_are_checked():
+    """Sub-dust poisoning clones make up most raw edges and can never be graded,
+    and an address already known to be infrastructure needs no call."""
+    known = {"0x" + "a" * 40}
+    cache = FakeCache({})
+    tg.label_contracts([
+        _edge(CONTRACT, usd=0.4),               # sub-dust: never a node
+        _edge("0x" + "a" * 40, usd=500_000.0),  # already a known service
+        _edge(PERSON, usd=500_000.0),
+    ], known, CONFIG, 1.0, cache=cache)
+    assert [a for a, _c in cache.asked] == [PERSON]
+
+
+def test_each_address_is_checked_on_the_chain_it_was_seen_on():
+    """A contract at an address on one chain need not exist at the same address
+    on another, so the question is only meaningful per chain."""
+    cache = FakeCache({CONTRACT: True})
+    tg.label_contracts([_edge(CONTRACT, usd=10.0, chain="arbitrum"),
+                        _edge(CONTRACT, usd=900.0, chain="base")],
+                       set(), CONFIG, 1.0, cache=cache)
+    assert cache.asked == [(CONTRACT, "base")]      # its largest edge
+
+
+def test_the_highest_value_addresses_are_checked_first():
+    """If the per-run cap bites, the addresses closest to being graded are the
+    ones that got checked."""
+    cache = FakeCache({})
+    tg.label_contracts([_edge("0x" + "1" * 40, usd=10.0),
+                        _edge("0x" + "2" * 40, usd=900_000.0),
+                        _edge("0x" + "3" * 40, usd=500.0)],
+                       set(), CONFIG, 1.0, cache=cache)
+    assert [a for a, _c in cache.asked] == ["0x" + "2" * 40, "0x" + "3" * 40,
+                                            "0x" + "1" * 40]
+
+
+def test_code_cache_asks_once_per_address_and_never_caches_a_failure(tmp_path):
+    calls = []
+
+    def fetcher(addr, chain):
+        calls.append(addr)
+        return None if addr == PERSON else "0x6080604052"
+
+    from src.chain.labels import CodeCache
+    cache = CodeCache(tmp_path / "code_cache.json", fetcher)
+    chain = CONFIG["chains"][0]
+
+    assert cache.has_code(CONTRACT, chain) is True
+    assert cache.has_code(CONTRACT, chain) is True
+    assert calls == [CONTRACT]                       # cached, one call ever
+
+    assert cache.has_code(PERSON, chain) is None
+    assert cache.has_code(PERSON, chain) is None
+    assert calls == [CONTRACT, PERSON, PERSON]       # a failure is retried
+
+
+def test_labelling_a_graph_without_enabled_chains_is_a_no_op():
+    assert tg.label_contracts([_edge(CONTRACT)], set(), {"chains": []}, 1.0,
+                              cache=FakeCache({CONTRACT: True})) == {}
+
+
+def test_labelling_never_reaches_the_network_without_a_key(monkeypatch):
+    """The real cache path, with fetch_code stubbed to prove the wiring: a
+    budget-exhausted or keyless lookup degrades to unknown, not to codeless."""
+    monkeypatch.setattr("src.chain.client.etherscan_get",
+                        lambda *a, **k: pytest.fail("must not call the API"))
+    monkeypatch.setattr("src.chain.client.fetch_code", lambda a, c, b: None)
+    known = set()
+    tg.label_contracts([_edge(CONTRACT)], known, CONFIG, 1.0)
+    assert known == set()

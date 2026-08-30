@@ -42,6 +42,9 @@ _PROBES = {
     "the tracer's already-traced marker": REAL_DATA_DIR / "state" / "traced_outbound.json",
     "the spam rollup": REAL_DATA_DIR / "transfers_spam" / "latest.json",
     "collected transfer records": REAL_DATA_DIR / "transfers",
+    # transfer_graph.label_contracts' bytecode cache. Asked once per address
+    # ever, so a wrong entry written by a test is permanent.
+    "the bytecode cache": REAL_DATA_DIR / "labels" / "code_cache.json",
 }
 
 

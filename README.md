@@ -298,9 +298,17 @@ What it does that the previous single-endpoint collection did not:
   Nobody forges an address poorer than their own. A symmetric test gets this wrong
   in both directions — it lets a $1 clone of a large counterparty quarantine the
   genuine address, and a blanket exemption to prevent that whitewashes the clone.
-- **Entity labels.** `data/labels/entities.json` names exchanges, bridges and
-  routers; bytecode is checked once per address and cached. A contract can never
-  be graded a personal wallet.
+- **Entity labels.** Phase 1 ships two tiers: the curated registry
+  (`data/labels/entities.json`, naming exchanges, bridges and routers) and
+  **bytecode** — every address the graph could grade is checked once with
+  `eth_getCode` and cached in `data/labels/code_cache.json`, so a contract can
+  never be graded a personal wallet. A lookup that fails marks nothing; it is
+  retried rather than remembered as "not a contract".
+
+  A third tier, **inferred CEX deposit addresses**, is specified and implemented
+  as a pure function but is deliberately **not wired in Phase 1** — it lands in
+  Phase 2 with the cross-gap re-linking that consumes it. Nothing today acts on
+  an inferred label.
 
   **"Service" is purpose-relative.** The graph asks "may I walk into this
   address?" and a CEX *deposit* address answers no. Linkage asks "does shared use

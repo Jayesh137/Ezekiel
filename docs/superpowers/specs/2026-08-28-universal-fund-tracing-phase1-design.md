@@ -235,19 +235,36 @@ match the 4+4 rule, including all 510 records of the single largest campaign.
 
 ## 7. Entity labels
 
+**What Phase 1 actually ships:** the **curated registry**, the **contract-code**
+tier and the pre-existing **fan-degree** heuristic. The **inferred CEX deposit
+address** tier is specified and implemented as a pure function
+(`infer_deposit_addresses`) but is **not wired into the running system in
+Phase 1** — it has no production call site, and lands in Phase 2 alongside the
+re-linking that consumes it. Only the tiers marked *shipped* below are load
+bearing today; the constraint in tier 2 is enforced by
+`transfer_graph.label_contracts`, which runs after expansion and before
+`build_graph` grades anything.
+
 `src/chain/labels.py`, `classify_address()` resolving in priority order:
 
-1. **Curated registry** — `data/labels/entities.json`, versioned in the repo:
+1. *(shipped)* **Curated registry** — `data/labels/entities.json`, versioned in the repo:
    CEX hot wallets and sweep addresses (Binance, OKX, Bybit, Coinbase, Kraken,
    Bitget, Gate, MEXC), bridges (Stargate, Across, deBridge, Relay, Hop, Synapse,
    Circle CCTP, Orbiter), DEX routers and aggregators, HL infrastructure. Each
    entry carries `{address, chain, entity, category, source, added}`.
-2. **Contract code** — `module=proxy&action=eth_getCode`, one call, cached
-   permanently. **An address with bytecode is not a person and can never be
-   graded `MIGRATION_CANDIDATE`.**
-3. **Fan-degree** — the existing `detect_services` heuristic, retained as the
-   fallback for unlabelled hubs.
-4. **Inferred CEX deposit address** — an address that receives from a cluster
+2. *(shipped)* **Contract code** — `module=proxy&action=eth_getCode`, one call,
+   cached permanently in `data/labels/code_cache.json`. **An address with
+   bytecode is not a person and can never be graded `MIGRATION_CANDIDATE`.**
+   Enforced by `transfer_graph.label_contracts`, scoped to the destinations of
+   expandable (non-dust, non-bridge) edges — the set `build_graph` can grade —
+   checked on the chain each address's largest edge was observed on, highest
+   value first, capped per run because the cache makes it a one-off per address.
+   A failed lookup returns `None` and marks nothing: absence of evidence is not
+   evidence of an externally owned account.
+3. *(shipped)* **Fan-degree** — the existing `detect_services` heuristic,
+   retained as the fallback for unlabelled hubs.
+4. *(Phase 2 — specified, implemented as a pure function, not wired)* **Inferred
+   CEX deposit address** — an address that receives from a cluster
    wallet and forwards **≥ 95% of the received value** to a known CEX hot wallet,
    where everything sent elsewhere **sums** to ≤ 5% of what it received, and the
    hot-wallet transfer **carrying the largest amount** lands **within 24 hours**
