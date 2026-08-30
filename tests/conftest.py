@@ -36,6 +36,10 @@ REAL_DATA_DIR = utils.DATA_DIR
 _PROBES = {
     "alert-delivery state": REAL_DATA_DIR / "alerts" / "latest.json",
     "sweep cursor state": REAL_DATA_DIR / "state" / "transfer_cursors.json",
+    # src/tracer.py's incremental gate. A test that reaches trace_fund_flow
+    # without repointing tracer.DATA_DIR would mark production records as
+    # already-traced, and a real fund movement would then never alert.
+    "the tracer's already-traced marker": REAL_DATA_DIR / "state" / "traced_outbound.json",
     "the spam rollup": REAL_DATA_DIR / "transfers_spam" / "latest.json",
     "collected transfer records": REAL_DATA_DIR / "transfers",
 }

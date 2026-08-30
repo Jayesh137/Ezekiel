@@ -1,6 +1,7 @@
 # src/tracer.py
 """Traces fund flows on Arbitrum L1 to detect wallet migrations."""
 
+import json
 import sys
 import time
 from datetime import UTC, datetime
@@ -39,6 +40,90 @@ TRACE_BUDGET_SECONDS = 240
 # The same address gets looked up repeatedly (find_hl_deposits + next-hop), so
 # caching avoids redundant rate-limited API calls. Cleared at the start of a run.
 _transfer_cache: dict[tuple[str, int], list[dict]] = {}
+
+# The incremental gate. Before the substrate landed, novelty came from
+# read_cursor("last_l1_block"): only transfers newer than the cursor were
+# returned, and the cursor then advanced. records_for() has no such notion — it
+# returns every record ever stored — so without this marker every scheduled run
+# re-traces the whole history: up to MAX_DESTINATIONS "CRITICAL: Fund Movement
+# Detected" emails every 24 hours forever (the alert cooldown is the only other
+# brake), plus a find_hl_deposits round trip per destination every 30 minutes.
+#
+# Record ids rather than a block or timestamp high-water mark, because
+# unique_destinations orders by VALUE and truncates at MAX_DESTINATIONS: what a
+# run actually processes is not a contiguous prefix of anything, and a
+# positional marker would therefore have to either skip the untraced tail
+# permanently or re-offer the traced head forever.
+TRACED_MARKER = "traced_outbound.json"
+
+
+def _traced_path() -> Path:
+    return Path(DATA_DIR) / "state" / TRACED_MARKER
+
+
+def _load_traced() -> dict:
+    try:
+        doc = json.loads(_traced_path().read_text())
+    except (OSError, ValueError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _save_traced(doc: dict) -> None:
+    path = _traced_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, indent=2, sort_keys=True))
+
+
+def untraced_outbound(wallet: str, rows: list[dict]) -> list[dict]:
+    """`rows` minus every record an earlier run already finished tracing.
+
+    First run decision — the marker is absent but the substrate is already deep
+    (the backfill recovers history back past 2025-11-30). Seeding it to
+    everything currently stored, and alerting on nothing, is chosen over
+    alerting on all of it: the alternative is a burst of up to MAX_DESTINATIONS
+    CRITICAL emails about months-old transfers on the first scheduled run after
+    merge, which is the exact failure this gate exists to prevent. Nothing is
+    discarded by seeding — the records stay in data/transfers/, on the transfer
+    graph, and in whatever fund_flows findings earlier runs already recorded.
+    Only the email is suppressed, and only for movements that predate the gate.
+
+    The seed is written loudly and stamped in the marker file rather than done
+    silently, because "we chose not to look at this" must be legible on disk.
+    """
+    wl = (wallet or "").lower()
+    doc = _load_traced()
+    entry = doc.get(wl)
+    if entry is None:
+        ids = sorted({r["record_id"] for r in rows if r.get("record_id")})
+        doc[wl] = {"seeded_at": utc_now(), "seeded": len(ids), "traced": ids}
+        _save_traced(doc)
+        print(f"[tracer] First run of the incremental gate for {wallet}: "
+              f"{len(ids)} stored outbound record(s) marked as already-seen. "
+              f"They remain in data/transfers/ and on the transfer graph; "
+              f"only movements from here on will alert.")
+        return []
+    already = set(entry.get("traced") or [])
+    return [r for r in rows if r.get("record_id") not in already]
+
+
+def mark_traced(wallet: str, record_ids, *, known_ids=None) -> None:
+    """Advance the marker over the records this run actually finished.
+
+    `known_ids` bounds the marker to records the substrate still holds, so it
+    can never grow past the outbound history it is tracking. It is ignored when
+    empty: an intersection against a transiently unreadable substrate would
+    erase the marker and re-alert everything on the next run.
+    """
+    wl = (wallet or "").lower()
+    doc = _load_traced()
+    entry = doc.setdefault(wl, {"traced": []})
+    merged = set(entry.get("traced") or []) | {i for i in record_ids if i}
+    if known_ids:
+        merged &= set(known_ids)
+    entry["traced"] = sorted(merged)
+    entry["last_traced_at"] = utc_now()
+    _save_traced(doc)
 
 
 def utc_now() -> str:
@@ -121,6 +206,10 @@ def _as_etherscan_row(rec: dict) -> dict | None:
         "timeStamp": str(rec.get("ts", 0)),
         "tokenSymbol": rec.get("asset", ""),
         "chain": rec.get("chain", CHAIN_DEFAULT),
+        # Additive, and not part of the Etherscan row shape: the substrate id
+        # this row came from, so the incremental gate can mark exactly the
+        # records a run finished. Nothing downstream reads it.
+        "record_id": rec.get("id"),
     }
 
 
@@ -236,6 +325,20 @@ def value_to_display(value: float) -> str:
     return f"{value:,.2f}"
 
 
+def is_traceable(transfer: dict, wallet: str) -> bool:
+    """Could this transfer ever be traced at all?
+
+    unique_destinations' own filter, named so the incremental gate can tell a
+    destination it deferred (must be retried) from a row it will never trace
+    (must be marked, or the wallet stays permanently "dirty" and the
+    no-new-transfers message never prints again).
+    """
+    dest = transfer.get("to", "")
+    if not dest or dest.lower() == wallet.lower():
+        return False
+    return int(transfer.get("value", 0)) > 0
+
+
 def unique_destinations(outbound: list[dict], wallet: str) -> list[dict]:
     """Collapse outbound transfers to one representative per destination.
 
@@ -244,15 +347,18 @@ def unique_destinations(outbound: list[dict], wallet: str) -> list[dict]:
     each destination is traced exactly once. Without this, a wallet spammed with
     hundreds of 0-USDC transfers to the same address triggers hundreds of
     identical Etherscan/SMTP round trips and blows the job timeout.
+
+    The MAX_DESTINATIONS cap is a per-run cap, not a ceiling: destinations that
+    fall outside it are left unmarked by the incremental gate and come back on
+    the next run. Against the full stored history it WOULD be a permanent
+    ceiling — once fifty historical destinations outranked a genuinely new
+    smaller movement, that movement would never be traced at all.
     """
     best: dict[str, dict] = {}
     for t in outbound:
-        dest = t.get("to", "")
-        if not dest or dest.lower() == wallet.lower():
+        if not is_traceable(t, wallet):
             continue
-        if int(t.get("value", 0)) <= 0:
-            continue
-        key = dest.lower()
+        key = t["to"].lower()
         if key not in best or int(t.get("value", 0)) > int(best[key].get("value", 0)):
             best[key] = t
     ordered = sorted(best.values(), key=lambda t: int(t.get("value", 0)), reverse=True)
@@ -268,11 +374,14 @@ def trace_fund_flow(wallet: str) -> list[dict]:
     print(f"[tracer] Checking fund flows for {wallet}")
     print(f"[tracer] Etherscan API key: {'configured' if api_key else 'MISSING!'}")
 
-    outbound = trace_outbound_transfers(wallet)
+    stored = trace_outbound_transfers(wallet)
+    # The novelty filter, applied before unique_destinations so its
+    # value-ordered cap ranks only what has not been traced yet.
+    outbound = untraced_outbound(wallet, stored)
     findings = []
 
     if not outbound:
-        print("[tracer] No new outbound transfers detected. Wallet has not moved USDC on L1.")
+        print("[tracer] No new outbound transfers detected since the last run.")
         latest_path = DATA_DIR / "fund_flows" / "latest.json"
         if not latest_path.exists():
             save_latest(str(DATA_DIR / "fund_flows"), {
@@ -286,12 +395,14 @@ def trace_fund_flow(wallet: str) -> list[dict]:
     print(f"[tracer] {len(outbound)} outbound transfers -> {len(destinations)} unique funded destination(s) to trace")
 
     deadline = time.monotonic() + TRACE_BUDGET_SECONDS
+    traced_dests: set[str] = set()
     for i, transfer in enumerate(destinations):
         if time.monotonic() > deadline:
             print(f"[tracer] Time budget ({TRACE_BUDGET_SECONDS}s) reached after {i} destination(s); "
                   f"saving partial results and stopping.")
             break
         destination = transfer["to"]
+        traced_dests.add(destination.lower())
         value_raw = int(transfer.get("value", 0))
         # This is a USD dollar figure — _as_etherscan_row encodes amount_usd here,
         # not a token quantity — regardless of what `asset` turns out to be. It
@@ -402,6 +513,22 @@ def trace_fund_flow(wallet: str) -> list[dict]:
                     asset=asset,
                     chain=chain,
                 ))
+
+    # Advance the marker over what was ACTUALLY processed, and nothing else. A
+    # destination the cap or the time budget deferred stays unmarked so the next
+    # run picks it up; rows that can never be traced at all (zero value, self
+    # transfer) are marked, or the wallet would look permanently dirty and
+    # "no new outbound transfers" would never print again.
+    deferred = {t["to"].lower() for t in outbound
+                if is_traceable(t, wallet)} - traced_dests
+    if deferred:
+        print(f"[tracer] {len(deferred)} destination(s) deferred to the next run "
+              f"(per-run cap {MAX_DESTINATIONS} / time budget); not marked as traced.")
+    mark_traced(
+        wallet,
+        [t.get("record_id") for t in outbound if (t.get("to") or "").lower() not in deferred],
+        known_ids={t.get("record_id") for t in stored if t.get("record_id")},
+    )
 
     save_fund_flow_findings(findings)
     _crossref_findings_with_candidates(findings)

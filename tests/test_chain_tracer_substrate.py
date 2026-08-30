@@ -148,6 +148,25 @@ def _no_op_hop_followup(monkeypatch):
     monkeypatch.setattr(tracer, "get_usdc_transfers", lambda addr, start_block=0: [])
 
 
+def _gate_already_initialised(tmp_path, wallet="0xtarget"):
+    """Declare this a run AFTER the incremental gate's first-ever run.
+
+    The first run against an existing substrate seeds the marker to everything
+    already stored and alerts on nothing (see untraced_outbound), so a test
+    exercising the tracing path has to say it is not that run. Requires
+    tracer.DATA_DIR to have been pointed at tmp_path / "data" already.
+    """
+    state = tmp_path / "data" / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / tracer.TRACED_MARKER).write_text(
+        json.dumps({wallet.lower(): {"traced": []}}))
+
+
+def _traced(tmp_path, wallet="0xtarget") -> set:
+    doc = json.loads((tmp_path / "data" / "state" / tracer.TRACED_MARKER).read_text())
+    return set(doc[wallet.lower()]["traced"])
+
+
 def test_trace_fund_flow_labels_a_non_usdc_asset_correctly(tmp_path, monkeypatch):
     """Before this task every row reaching build_finding/alert_fund_movement WAS
     USDC by construction (get_usdc_transfers filtered on the USDC contract).
@@ -160,6 +179,7 @@ def test_trace_fund_flow_labels_a_non_usdc_asset_correctly(tmp_path, monkeypatch
     monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
     monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
     _no_op_hop_followup(monkeypatch)
+    _gate_already_initialised(tmp_path)
 
     calls = []
     monkeypatch.setattr(tracer, "alert_fund_movement",
@@ -193,6 +213,7 @@ def test_trace_fund_flow_carries_a_non_arbitrum_chain_through(tmp_path, monkeypa
     monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
     monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
     _no_op_hop_followup(monkeypatch)
+    _gate_already_initialised(tmp_path)
 
     calls = []
     monkeypatch.setattr(tracer, "alert_fund_movement",
@@ -223,6 +244,7 @@ def test_trace_fund_flow_usdc_arbitrum_path_is_unchanged(tmp_path, monkeypatch):
     monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
     monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
     _no_op_hop_followup(monkeypatch)
+    _gate_already_initialised(tmp_path)
 
     calls = []
     monkeypatch.setattr(tracer, "alert_fund_movement",
@@ -275,6 +297,7 @@ def test_trace_fund_flow_print_is_unambiguous_about_dollars_for_a_non_usdc_asset
     monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
     monkeypatch.setattr(tracer, "alert_fund_movement", lambda *a, **k: True)
     _no_op_hop_followup(monkeypatch)
+    _gate_already_initialised(tmp_path)
 
     d = tmp_path / "transfers" / "base"
     d.mkdir(parents=True)
@@ -286,3 +309,146 @@ def test_trace_fund_flow_print_is_unambiguous_about_dollars_for_a_non_usdc_asset
     out = capsys.readouterr().out
     assert "[tracer] OUTBOUND: $5,000.00 of USDT on base -> 0xdest" in out
     assert "5,000.00 USDT" not in out          # the old, ambiguous "N ASSET" form
+
+
+# --- the incremental gate ------------------------------------------------------
+#
+# Before the substrate landed, novelty came from read_cursor("last_l1_block").
+# records_for() has no such notion, so without a gate every scheduled run
+# (cron '*/30 * * * *') re-traces the whole stored history forever.
+
+def _flow_fixture(tmp_path, monkeypatch, records):
+    from src.chain import collect
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "sweep_wallet", lambda *a, **k: None)
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    _no_op_hop_followup(monkeypatch)
+
+    alerts = []
+    monkeypatch.setattr(tracer, "alert_fund_movement",
+                        lambda *a, **k: alerts.append(a[2]) or True)
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "2026-08-28.json").write_text(json.dumps(records))
+    return alerts
+
+
+def test_the_first_run_seeds_the_marker_instead_of_alerting_on_all_history(
+        tmp_path, monkeypatch, capsys):
+    """Deliberate choice: on the first run the substrate already holds months of
+    recovered history, and alerting on it would mean up to MAX_DESTINATIONS
+    CRITICAL emails about June 2026 transfers. The records are not discarded —
+    they stay in data/transfers/ and on the graph — only the email is."""
+    alerts = _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="old-1", dst="0xd1", amount_usd=9000.0),
+        substrate_record(chain="arbitrum", id="old-2", dst="0xd2", amount_usd=8000.0),
+    ])
+
+    assert tracer.trace_fund_flow("0xtarget") == []
+    assert alerts == []
+    assert _traced(tmp_path) == {"old-1", "old-2"}
+
+    out = capsys.readouterr().out
+    assert "First run of the incremental gate" in out          # never silent
+    doc = json.loads((tmp_path / "data" / "state" / tracer.TRACED_MARKER).read_text())
+    assert doc["0xtarget"]["seeded"] == 2 and doc["0xtarget"]["seeded_at"]
+
+
+def test_an_already_traced_record_is_not_re_alerted_on_the_next_run(
+        tmp_path, monkeypatch):
+    """The live failure: 30-minute cron, a 24-hour per-tx_hash alert cooldown as
+    the only brake, and every stored record offered up on every run."""
+    alerts = _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="rec-1", dst="0xd1", amount_usd=9000.0)])
+    _gate_already_initialised(tmp_path)
+
+    assert len(tracer.trace_fund_flow("0xtarget")) == 1
+    assert alerts == ["0xd1"]
+    assert _traced(tmp_path) == {"rec-1"}          # the marker advanced
+
+    assert tracer.trace_fund_flow("0xtarget") == []
+    assert alerts == ["0xd1"]                      # not alerted a second time
+
+
+def test_a_genuinely_new_record_is_still_traced_after_the_gate(tmp_path, monkeypatch):
+    alerts = _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="rec-1", dst="0xd1", amount_usd=9000.0)])
+    _gate_already_initialised(tmp_path)
+    tracer.trace_fund_flow("0xtarget")
+
+    (tmp_path / "transfers" / "arbitrum" / "2026-08-28.json").write_text(json.dumps([
+        substrate_record(chain="arbitrum", id="rec-1", dst="0xd1", amount_usd=9000.0),
+        substrate_record(chain="arbitrum", id="rec-2", dst="0xd2", amount_usd=42.0,
+                         tx_hash="0xnew")]))
+
+    findings = tracer.trace_fund_flow("0xtarget")
+    assert [f["destination"] for f in findings] == ["0xd2"]
+    assert alerts == ["0xd1", "0xd2"]
+    assert _traced(tmp_path) == {"rec-1", "rec-2"}
+
+
+def test_the_no_new_outbound_message_is_accurate_again(tmp_path, monkeypatch, capsys):
+    """It used to print only for a wallet that had never sent anything, because
+    records_for returns all history. Rows that can never be traced (zero value,
+    self-transfer) must be marked too, or the wallet stays permanently dirty."""
+    _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="zero", dst="0xd1", amount_usd=0.0),
+        substrate_record(chain="arbitrum", id="self", dst="0xtarget", amount_usd=500.0),
+        substrate_record(chain="arbitrum", id="real", dst="0xd2", amount_usd=500.0),
+    ])
+    _gate_already_initialised(tmp_path)
+
+    tracer.trace_fund_flow("0xtarget")
+    capsys.readouterr()
+
+    assert tracer.trace_fund_flow("0xtarget") == []
+    assert "No new outbound transfers detected since the last run." in capsys.readouterr().out
+    assert _traced(tmp_path) == {"zero", "self", "real"}
+
+
+def test_a_destination_deferred_by_the_per_run_cap_is_traced_on_the_next_run(
+        tmp_path, monkeypatch):
+    """unique_destinations' cap was a spam guard against NEW transfers. Against
+    all history it would be a permanent ceiling: once MAX_DESTINATIONS
+    historical destinations outranked a genuinely new smaller movement, that
+    movement would never be traced at all. Deferred destinations must stay
+    unmarked so the backlog drains instead of blocking."""
+    n = tracer.MAX_DESTINATIONS + 1
+    alerts = _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id=f"rec-{i}", dst=f"0xd{i}",
+                         tx_hash=f"0xh{i}", amount_usd=float(n - i))
+        for i in range(n)])
+    _gate_already_initialised(tmp_path)
+
+    tracer.trace_fund_flow("0xtarget")
+    assert len(alerts) == tracer.MAX_DESTINATIONS
+    assert f"rec-{n - 1}" not in _traced(tmp_path)        # the smallest, deferred
+
+    tracer.trace_fund_flow("0xtarget")
+    assert alerts[-1] == f"0xd{n - 1}"                    # picked up next run
+    assert len(_traced(tmp_path)) == n
+
+
+def test_the_marker_never_grows_past_the_records_it_tracks(tmp_path, monkeypatch):
+    """Bounded by the substrate: an id for a record that is no longer stored is
+    dropped rather than accumulating in a file committed every 30 minutes."""
+    _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="rec-1", dst="0xd1", amount_usd=9000.0)])
+    state = tmp_path / "data" / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / tracer.TRACED_MARKER).write_text(
+        json.dumps({"0xtarget": {"traced": ["long-gone-1", "long-gone-2"]}}))
+
+    tracer.trace_fund_flow("0xtarget")
+    assert _traced(tmp_path) == {"rec-1"}
+
+
+def test_an_unreadable_substrate_never_erases_the_marker(tmp_path, monkeypatch):
+    """known_ids is ignored when empty: intersecting against a transiently
+    unreadable substrate would wipe the marker and re-alert everything."""
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    tracer.mark_traced("0xtarget", ["a", "b"])
+    tracer.mark_traced("0xtarget", [], known_ids=set())
+    assert _traced(tmp_path) == {"a", "b"}
