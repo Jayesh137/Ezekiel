@@ -1948,12 +1948,28 @@ def infer_deposit_addresses(records: list[dict], cex_hot,
     return out
 
 
-def service_addresses(registry: dict[str, dict],
-                      inferred: dict | None = None) -> set[str]:
-    """Every address the graph must treat as infrastructure."""
-    out = {a for a, e in registry.items()
-           if e.get("category") in SERVICE_CATEGORIES}
-    out |= {a.lower() for a in (inferred or {})}
+def service_addresses(registry: dict[str, dict], inferred: dict | None = None,
+                      categories: set[str] | None = None) -> set[str]:
+    """Addresses to treat as infrastructure, for a given purpose.
+
+    `categories` defaults to all of SERVICE_CATEGORIES, which is right for
+    traversal control: the graph must not walk into any of them.
+
+    A caller asking a different question passes a narrower set. Linkage does:
+    it asks "does shared use of this address imply common ownership?", and for
+    a cex_deposit address the answer is the strongest yes available — that
+    address belongs to exactly one exchange account. The same category set
+    cannot answer both questions, and using it for both silently inverts the
+    linkage signal.
+
+    `inferred` entries are all cex_deposit, so they are folded in only when the
+    caller actually wants that category. Otherwise a future task wiring
+    `inferred` through would quietly reintroduce the same inversion.
+    """
+    wanted = SERVICE_CATEGORIES if categories is None else categories
+    out = {a for a, e in registry.items() if e.get("category") in wanted}
+    if "cex_deposit" in wanted:
+        out |= {a.lower() for a in (inferred or {})}
     return out
 
 
@@ -2913,7 +2929,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `src.utils.load_all_records`, `src.chain.chains.enabled_chains`
-- Produces: `get_outbound_addresses(wallet, config=None) -> set[str]`. `get_outbound_usdc_addresses` is kept as a thin alias so no existing caller breaks.
+- Produces: `get_outbound_addresses(wallet, config=None) -> set[str]`, and the module constant `LINKAGE_EXCLUDED_CATEGORIES`, derived as `labels.SERVICE_CATEGORIES - {"cex_deposit", "cex_deposit_sweep"}` — by subtraction, never retyped, so a new infrastructure category added upstream cannot silently fail to be excluded here. `get_outbound_usdc_addresses` is kept as a thin alias so no existing caller breaks.
+
+> **Deposit addresses are evidence here, not infrastructure.** `transfer_graph` asks "may I walk into this address?" and a deposit address correctly answers no. Linkage asks "does shared use imply common ownership?" and a deposit address is the strongest possible yes — it belongs to exactly one exchange account. Reusing one category set for both questions inverts this signal, silently, in the one place the project most needs it to fire.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3004,7 +3022,9 @@ def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
     # confident ownership claim. Widening from one chain and one asset to six
     # chains, every asset and three record kinds is exactly what makes that
     # collision likely enough to defend against.
-    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
+    excluded = service_addresses(
+        load_registry(DATA_DIR / "labels" / "entities.json"),
+        categories=LINKAGE_EXCLUDED_CATEGORIES)
     excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
     excluded.add(config["hl_bridge_contract"].lower())
     excluded.add(wl)

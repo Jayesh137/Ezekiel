@@ -272,6 +272,15 @@ match the 4+4 rule, including all 510 records of the single largest campaign.
 
 - Labelling **strengthens** the existing invariant, never bends it: services
   still score 0.0, still never alert, still are never traversed through.
+- **"Service" is purpose-relative, and the category set must be passed
+  explicitly.** The graph asks "may I walk into this address?" — and for a CEX
+  deposit address the answer is no. Linkage asks "does shared use of this
+  address imply common ownership?" — and for the same address the answer is the
+  strongest yes available, since it belongs to exactly one exchange account.
+  One category set cannot answer both, so `service_addresses()` takes the
+  categories it should apply. Linkage passes `SERVICE_CATEGORIES` minus the two
+  deposit categories, derived by subtraction so a new infrastructure category
+  cannot silently escape exclusion.
 - A curated label always beats an inferred one; an inferred label always beats
   fan-degree.
 - Category `cex_deposit` is recorded as **evidence about the sender**, not a
