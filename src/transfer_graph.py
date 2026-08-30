@@ -188,6 +188,47 @@ def normalise_l1_transfer(tx: dict, decimals: int = 6) -> dict | None:
     }
 
 
+def normalise_transfer_record(rec: dict) -> dict | None:
+    """A src/chain normalised record into a graph edge.
+
+    Quarantined and unpriced records are dropped here rather than filtered by
+    the caller, so there is exactly one place that decides what the graph is
+    allowed to reason over. An unpriced token must never be able to satisfy a
+    value threshold; a poisoning forgery must never become a node.
+
+    The edge id is chain-scoped and hash-scoped, so a movement that arrives both
+    from data/l1_transactions and from data/transfers collapses to one edge.
+    """
+    if rec.get("spam"):
+        return None
+    amount_usd = rec.get("amount_usd")
+    if amount_usd is None:
+        return None
+    src = (rec.get("src") or "").lower()
+    dst = (rec.get("dst") or "").lower()
+    if not src or not dst or src == dst:
+        return None
+    chain = rec.get("chain") or CHAIN_ARBITRUM
+    ref = rec.get("tx_hash", "")
+    try:
+        ts = int(rec.get("ts", 0) or 0)
+    except (TypeError, ValueError):
+        ts = 0
+    return {
+        "id": edge_id(src, dst, chain, ref, ts),
+        "src": src,
+        "dst": dst,
+        "chain": chain,
+        "asset": rec.get("asset") or "UNKNOWN",
+        "amount_usd": round(float(amount_usd), 2),
+        "ref": ref,
+        "ts": ts,
+        "timestamp": _iso(ts),
+        "discovery_source": SRC_L1,
+        "kind": rec.get("kind"),
+    }
+
+
 def normalise_hl_ledger_entry(entry: dict) -> dict | None:
     """Normalise a Hyperliquid non-funding ledger update into a graph edge.
 
@@ -1223,6 +1264,19 @@ def collect_known_edges() -> list[dict]:
     """Build edges from data already on disk — no API calls, no budget needed."""
     edges = []
 
+    # Multi-chain substrate written by src/chain/collect.py. Read before the
+    # legacy table so the richer record wins on any field the two share (dedupe_edges
+    # keeps the first-seen edge for a given id); the legacy reader stays live because
+    # data/l1_transactions is the only copy of history collected before the substrate
+    # existed.
+    transfers_root = DATA_DIR / "transfers"
+    if transfers_root.exists():
+        for chain_dir in sorted(p for p in transfers_root.iterdir() if p.is_dir()):
+            for rec in load_all_records(str(chain_dir)):
+                e = normalise_transfer_record(rec)
+                if e:
+                    edges.append(e)
+
     for tx in load_all_records(str(DATA_DIR / "l1_transactions")):
         e = normalise_l1_transfer(tx)
         if e:
@@ -1454,7 +1508,18 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
               "Graph is limited to locally recorded edges (typically depth 1).")
         return edges, diag
 
-    from src.tracer import get_usdc_transfers
+    from src.chain.budget import CallBudget
+    from src.chain.chains import enabled_chains
+    from src.chain.collect import records_for, sweep_wallet
+
+    # The frontier's own ceiling, expressed in the units the substrate spends.
+    # max_expansions counted wallet lookups when one wallet cost one call; a
+    # wallet now costs up to three calls per chain, so the budget has to be
+    # denominated in calls or the ceiling silently means something else.
+    sweep_budget = CallBudget(
+        max_calls=budget["max_expansions"] * len(enabled_chains(load_config())) * 3,
+        seconds=budget["time_budget_seconds"])
+    sweep_chains = enabled_chains(load_config())
 
     deadline = time.monotonic() + budget["time_budget_seconds"]
     max_calls = budget["max_expansions"]
@@ -1528,7 +1593,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 calls += 1
                 found = 0
                 try:
-                    rows = list(get_usdc_transfers(wallet))
+                    sweep_wallet(wallet, sweep_chains, sweep_budget, cluster=False)
+                    rows = records_for(wallet)
                 except Exception as exc:
                     # One address failing must not abandon the rest of the walk.
                     # The wallet stays OUT of `explored` so it is retried next
@@ -1541,8 +1607,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 explored.add(wallet)
                 expanded_now.add(wallet)
                 diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
-                for tx in rows:
-                    e = normalise_l1_transfer(tx)
+                for rec in rows:
+                    e = normalise_transfer_record(rec)
                     if not e or e["id"] in known_ids:
                         continue
                     known_ids.add(e["id"])
@@ -1690,6 +1756,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
     known_services.add(config["hl_bridge_contract"].lower())
     known_services.add(config["usdc_contract_arbitrum"].lower())
     known_services |= {a.lower() for a in config.get("known_service_addresses", [])}
+
+    from src.chain.labels import load_registry, service_addresses
+    known_services |= service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
 
     # Loaded ONCE, before expansion, and migrated to the current schema: it
     # carries the unfinished frontier, the ledger of finished expansions and the

@@ -42,20 +42,21 @@ _PROBES = {
 
 
 def _signature(path: Path):
-    """Existence + mtime; for a directory, the same one level down too.
+    """Existence + mtime; for a directory, every entry beneath it, recursively.
 
-    A new file inside an existing subdirectory bumps that subdirectory's own
-    mtime but not its parent's, so checking only a directory's own mtime would
-    miss a leak into a chain subdirectory (data/transfers/arbitrum/...) that an
-    earlier real run had already created. One level of children is enough to
-    catch that without paying for a full recursive walk.
+    One level of children caught a new chain subdirectory being created, but
+    `append_records` truncates and rewrites an existing `{date}.json` in place —
+    that bumps the file's own mtime but neither its chain directory's nor
+    `transfers/`'s, so once a chain directory and a dated file both exist for
+    real, a test that appends into that same file on the same day went
+    undetected. A full recursive walk catches a rewrite at any depth.
     """
     if not path.exists():
         return None
     if path.is_file():
         return path.stat().st_mtime_ns
-    return {".": path.stat().st_mtime_ns,
-           **{child.name: child.stat().st_mtime_ns for child in path.iterdir()}}
+    return {str(child.relative_to(path)): child.stat().st_mtime_ns
+           for child in path.rglob("*")}
 
 
 @pytest.fixture(autouse=True)
