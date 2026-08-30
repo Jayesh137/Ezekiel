@@ -14,8 +14,6 @@ dashboard have to resolve to the same page.
 import re
 from pathlib import Path
 
-import pytest
-
 from src.links import HYPURRSCAN, address_line, address_path, address_url, is_address
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -209,56 +207,3 @@ def test_internal_navigation_links_are_unchanged():
     api = (DASHBOARD / "lib" / "api.js").read_text(encoding="utf-8")
     assert "/tx/" in api, "transaction links must remain transaction links"
     assert "arbiscan.io/tx/" in api, "Arbitrum tx hashes only resolve on Arbiscan"
-
-
-# --- 13. all-chain address reuse in linkage ---------------------------------
-
-def test_outbound_addresses_come_from_every_chain_without_api_calls(tmp_path, monkeypatch):
-    """Address reuse is the strongest linkage signal available, and it was
-    limited to Arbitrum USDC. The substrate already holds every chain, so
-    widening it costs nothing."""
-    import json
-
-    from src import linkage
-    from src.chain import collect
-
-    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
-    monkeypatch.setattr(linkage, "etherscan_get",
-                        lambda *a, **k: pytest.fail("must not call the API"))
-
-    for chain, dst in (("arbitrum", "0xdeposita"), ("base", "0xdepositb")):
-        d = tmp_path / "transfers" / chain
-        d.mkdir(parents=True)
-        (d / "2026-08-28.json").write_text(json.dumps([{
-            "id": f"{chain}:0xh:erc20:0", "chain": chain, "src": "0xtarget",
-            "dst": dst, "amount_usd": 500000.0, "ts": 1781000000,
-            "spam": False, "value_basis": "stable_par", "asset": "USDC"}]))
-
-    got = linkage.get_outbound_addresses("0xtarget")
-    assert got == {"0xdeposita", "0xdepositb"}
-
-
-def test_outbound_addresses_exclude_spam_and_the_bridge(tmp_path, monkeypatch):
-    import json
-
-    from src import linkage
-    from src.chain import collect
-    from src.utils import load_config
-
-    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
-    bridge = load_config()["hl_bridge_contract"].lower()
-
-    d = tmp_path / "transfers" / "arbitrum"
-    d.mkdir(parents=True)
-    (d / "2026-08-28.json").write_text(json.dumps([
-        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": bridge,
-         "amount_usd": 1.0, "ts": 1, "spam": False},
-        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xpoison",
-         "amount_usd": 0.0, "ts": 2, "spam": True, "spam_reason": "lookalike"},
-        {"id": "c", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
-         "amount_usd": 900.0, "ts": 3, "spam": False},
-        {"id": "d", "chain": "arbitrum", "src": "0xstranger", "dst": "0xtarget",
-         "amount_usd": 900.0, "ts": 4, "spam": False},
-    ]))
-
-    assert linkage.get_outbound_addresses("0xtarget") == {"0xreal"}

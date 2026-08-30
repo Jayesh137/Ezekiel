@@ -9,8 +9,11 @@ Two research-backed signals, applied to promising behavioral candidates:
    first funded by, that is a strong ownership link.
 
 2. Address reuse (highest-confidence heuristic — cryptographic certainty). A CEX
-   deposit address is unique to one account. If the candidate sends USDC to the
-   SAME address the target sends to, they almost certainly share a CEX account.
+   deposit address is unique to one account. If the candidate sends value to the
+   SAME address the target sends to — on any chain, in any asset — they almost
+   certainly share a CEX account. Labelled infrastructure (routers, wrapper
+   contracts, exchange hot wallets) is excluded first: those receive from
+   millions of unrelated people, so a shared one is coincidence, not ownership.
 """
 
 import os
@@ -19,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import etherscan_get, load_config
+from src.utils import DATA_DIR, etherscan_get, load_config
 
 
 def compute_linkage(candidate: str, candidate_first_funder: str | None,
@@ -58,7 +61,7 @@ def compute_linkage(candidate: str, candidate_first_funder: str | None,
     if shared_deposit:
         bonus += 0.18
         reasons.append(
-            f"Sends USDC to the same address as target (address reuse): "
+            f"Sends funds to the same address as target (address reuse): "
             f"{', '.join(a[:10] + '...' for a in shared_deposit[:2])}"
         )
 
@@ -103,19 +106,34 @@ def get_first_funder(wallet: str) -> str | None:
 
 
 def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
-    """Every address this wallet has sent value to, on every collected chain.
+    """Every address this wallet has sent value to, on every collected chain,
+    excluding known infrastructure.
 
     Reads the substrate rather than the API: src/chain/collect.py has already
     stored these, so widening the strongest linkage signal we have — a CEX
     deposit address belongs to exactly one account, so two wallets funding the
     same one are the same customer — from Arbitrum USDC to every chain and asset
     costs no calls at all.
+
+    That signal only holds for a private deposit address. Widening the search
+    to every chain and asset also widens the odds of landing on a router, a
+    wrapper contract, or an exchange HOT wallet — infrastructure that receives
+    from millions of unrelated people, where a shared destination is
+    coincidence rather than evidence of common ownership. This result feeds a
+    bonus the module calls "cryptographic certainty" and fires a standalone
+    alert, so labelled infrastructure is excluded before it ever reaches that
+    scoring step.
     """
     from src.chain.collect import records_for
+    from src.chain.labels import load_registry, service_addresses
 
     config = config or load_config()
-    bridge = config["hl_bridge_contract"].lower()
     wl = (wallet or "").lower()
+
+    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
+    excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
+    excluded.add(config["hl_bridge_contract"].lower())
+    excluded.add(wl)
 
     out = set()
     for rec in records_for(wl):
@@ -125,7 +143,7 @@ def get_outbound_addresses(wallet: str, config: dict | None = None) -> set:
         if usd is None or float(usd) <= 0:
             continue
         dst = (rec.get("dst") or "").lower()
-        if dst and dst != bridge and dst != wl:
+        if dst and dst not in excluded:
             out.add(dst)
     return out
 

@@ -2,6 +2,8 @@
 """Tests for the migration-detection upgrades: deposit/withdrawal correlation
 (FIFO amount+time matching), L1 clustering linkage, and the unified risk score."""
 
+import pytest
+
 from src import correlator, linkage, risk
 
 DAY = 86400
@@ -87,6 +89,114 @@ def test_linkage_bonus_capped():
     cex = "0xcexdeposit000000000000000000000000000000"
     out = linkage.compute_linkage(W1, T, {cex}, T, None, {cex}, excluded=set())
     assert out["linkage_bonus"] <= 0.30
+
+
+# get_outbound_addresses: the address-reuse signal's own source, feeding compute_linkage.
+
+def test_outbound_addresses_come_from_every_chain_without_api_calls(tmp_path, monkeypatch):
+    """Address reuse is the strongest linkage signal available, and it was
+    limited to Arbitrum USDC. The substrate already holds every chain, so
+    widening it costs nothing."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: pytest.fail("must not call the API"))
+
+    for chain, dst in (("arbitrum", "0xdeposita"), ("base", "0xdepositb")):
+        d = tmp_path / "transfers" / chain
+        d.mkdir(parents=True)
+        (d / "2026-08-28.json").write_text(json.dumps([{
+            "id": f"{chain}:0xh:erc20:0", "chain": chain, "src": "0xtarget",
+            "dst": dst, "amount_usd": 500000.0, "ts": 1781000000,
+            "spam": False, "value_basis": "stable_par", "asset": "USDC"}]))
+
+    got = linkage.get_outbound_addresses("0xtarget")
+    assert got == {"0xdeposita", "0xdepositb"}
+
+
+def test_outbound_addresses_exclude_spam_and_the_bridge(tmp_path, monkeypatch):
+    import json
+
+    from src.chain import collect
+    from src.utils import load_config
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    bridge = load_config()["hl_bridge_contract"].lower()
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": bridge,
+         "amount_usd": 1.0, "ts": 1, "spam": False},
+        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xpoison",
+         "amount_usd": 0.0, "ts": 2, "spam": True, "spam_reason": "lookalike"},
+        {"id": "c", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
+         "amount_usd": 900.0, "ts": 3, "spam": False},
+        {"id": "d", "chain": "arbitrum", "src": "0xstranger", "dst": "0xtarget",
+         "amount_usd": 900.0, "ts": 4, "spam": False},
+    ]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xreal"}
+
+
+def test_outbound_addresses_exclude_labelled_infrastructure(tmp_path, monkeypatch):
+    """A shared destination is only evidence of common ownership when it could
+    be a private deposit address. A CEX hot wallet receives from millions of
+    unrelated people, so an overlap there is coincidence — and this result
+    feeds a standalone alert, so a coincidence must never reach the user as a
+    confident ownership claim."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+
+    labels_dir = tmp_path / "labels"
+    labels_dir.mkdir()
+    (labels_dir / "entities.json").write_text(json.dumps({"entities": [
+        {"address": "0xhotwallet", "chain": "arbitrum", "entity": "Binance 8",
+         "category": "cex_hot", "source": "public label", "added": "2026-08-28"},
+    ]}))
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": "0xhotwallet",
+         "amount_usd": 900.0, "ts": 1, "spam": False},
+        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
+         "amount_usd": 900.0, "ts": 2, "spam": False},
+    ]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xreal"}
+
+
+def test_outbound_addresses_exclude_configured_service_addresses(tmp_path, monkeypatch):
+    """`known_service_addresses` in config.json is the other place infrastructure
+    can be named, alongside the curated label registry."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": "0xrouter",
+         "amount_usd": 900.0, "ts": 1, "spam": False},
+        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
+         "amount_usd": 900.0, "ts": 2, "spam": False},
+    ]))
+
+    config = {"hl_bridge_contract": "0xbridge", "known_service_addresses": ["0xrouter"]}
+    assert linkage.get_outbound_addresses("0xtarget", config) == {"0xreal"}
 
 
 # --- risk score ---------------------------------------------------------------
