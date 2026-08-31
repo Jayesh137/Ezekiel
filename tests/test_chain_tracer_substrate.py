@@ -1,6 +1,8 @@
 # tests/test_chain_tracer_substrate.py
 import json
 
+import pytest
+
 from src import tracer
 
 
@@ -452,6 +454,96 @@ def test_an_unreadable_substrate_never_erases_the_marker(tmp_path, monkeypatch):
     tracer.mark_traced("0xtarget", ["a", "b"])
     tracer.mark_traced("0xtarget", [], known_ids=set())
     assert _traced(tmp_path) == {"a", "b"}
+
+
+# --- a corrupt marker is a fault, not a first run -------------------------------
+#
+# _load_traced used to catch a parse error and return {}, indistinguishable
+# from "this wallet has never been traced". untraced_outbound would then seed
+# the marker to everything currently stored and alert on nothing — silently
+# suppressing that run's real alerts on the strength of a fault, not a clean
+# absence. Reproduced here the same way the re-reviewer found it live: invalid
+# JSON written into traced_outbound.json.
+
+def test_load_traced_distinguishes_absent_from_corrupt(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+
+    assert tracer._load_traced() == {}         # absent: quiet, not an error
+
+    state = tmp_path / "data" / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / tracer.TRACED_MARKER).write_text("{not valid json")
+    with pytest.raises(tracer.TracedMarkerCorrupt):
+        tracer._load_traced()
+
+    (state / tracer.TRACED_MARKER).write_text("[]")     # valid JSON, wrong shape
+    with pytest.raises(tracer.TracedMarkerCorrupt):
+        tracer._load_traced()
+
+
+def test_a_corrupt_marker_alerts_instead_of_seeding_quietly(tmp_path, monkeypatch, capsys):
+    """The live failure: a wallet with real outbound history and a corrupt
+    marker must alert on that history, not silently mark it all as already-seen."""
+    alerts = _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="rec-1", dst="0xd1", amount_usd=9000.0)])
+    state = tmp_path / "data" / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / tracer.TRACED_MARKER).write_text("{not valid json")
+
+    findings = tracer.trace_fund_flow("0xtarget")
+
+    assert len(findings) == 1                  # alerted, not silently seeded
+    assert alerts == ["0xd1"]
+    out = capsys.readouterr().out
+    assert "CORRUPT" in out
+    assert "First run of the incremental gate" not in out   # not mistaken for one
+
+
+def test_a_corrupt_marker_self_heals_by_the_end_of_the_run(tmp_path, monkeypatch):
+    """mark_traced runs after tracing regardless of the corruption, so the same
+    run that hits the fault also leaves a valid marker behind for the next one."""
+    _flow_fixture(tmp_path, monkeypatch, [
+        substrate_record(chain="arbitrum", id="rec-1", dst="0xd1", amount_usd=9000.0)])
+    state = tmp_path / "data" / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    (state / tracer.TRACED_MARKER).write_text("{not valid json")
+
+    tracer.trace_fund_flow("0xtarget")
+
+    doc = json.loads((state / tracer.TRACED_MARKER).read_text())    # parses: healed
+    assert doc["0xtarget"]["traced"] == ["rec-1"]
+
+
+def test_an_interrupted_write_leaves_the_previous_marker_intact(tmp_path, monkeypatch):
+    """Mirrors test_interrupted_write_leaves_the_previous_file_intact for
+    save_latest (test_continuity_adversarial.py): _save_traced now goes
+    through the same write-then-rename helper, for the same reason. A job
+    killed mid-write — the exact scenario this branch's job timeouts exist to
+    bound — must not leave a truncated, unparseable marker; a plain
+    path.write_text (the old implementation) would have manufactured exactly
+    the corruption the tests above have to recover from."""
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+    tracer.mark_traced("0xtarget", ["good-1"])
+
+    class Boom(Exception):
+        pass
+
+    def dying_dump(*a, **k):
+        raise Boom("killed mid-write")
+
+    monkeypatch.setattr(json, "dump", dying_dump)
+    try:
+        tracer.mark_traced("0xtarget", ["partial-1"])
+    except Boom:
+        pass
+    monkeypatch.undo()
+
+    state = tmp_path / "data" / "state"
+    survived = json.loads((state / tracer.TRACED_MARKER).read_text())
+    assert survived["0xtarget"]["traced"] == ["good-1"], (
+        "an interrupted write corrupted traced_outbound.json")
+    assert not list(state.glob(f".{tracer.TRACED_MARKER}.*.tmp")), (
+        "temp file must be cleaned up")
 
 
 # --- the scheduled path must write the blindness record ------------------------

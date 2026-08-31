@@ -17,6 +17,7 @@ from src.chain.collect import records_for, save_sweep_health, sweep_wallet
 from src.utils import (
     DATA_DIR,
     append_records,
+    atomic_write_json,
     candidate_current_score,
     etherscan_get,
     load_config,
@@ -68,18 +69,52 @@ def _traced_path() -> Path:
     return Path(DATA_DIR) / "state" / TRACED_MARKER
 
 
+class TracedMarkerCorrupt(Exception):
+    """traced_outbound.json exists but is not usable.
+
+    Raised rather than folded into {} so a caller can never mistake "this
+    marker is corrupt" for "this wallet has never been traced" — the two
+    demand different responses. See untraced_outbound and mark_traced.
+    """
+
+
 def _load_traced() -> dict:
+    """The traced-outbound marker document, keyed by lowercased wallet.
+
+    A missing file means this wallet has never been traced — {} is the
+    correct, quiet answer; untraced_outbound's first-run seed depends on
+    being able to tell that apart from a fault. A file that exists but will
+    not parse, or that decodes to something other than a JSON object, is a
+    fault: TracedMarkerCorrupt is raised instead of also collapsing to {},
+    which is what let a corrupted marker silently pass for a first run before
+    this (see untraced_outbound).
+    """
+    path = _traced_path()
     try:
-        doc = json.loads(_traced_path().read_text())
-    except (OSError, ValueError):
+        text = path.read_text()
+    except FileNotFoundError:
         return {}
-    return doc if isinstance(doc, dict) else {}
+    except OSError as exc:
+        raise TracedMarkerCorrupt(f"{path} unreadable: {exc}") from exc
+    try:
+        doc = json.loads(text)
+    except ValueError as exc:
+        raise TracedMarkerCorrupt(f"{path} is not valid JSON: {exc}") from exc
+    if not isinstance(doc, dict):
+        raise TracedMarkerCorrupt(
+            f"{path} decoded to a {type(doc).__name__}, not a JSON object")
+    return doc
 
 
 def _save_traced(doc: dict) -> None:
-    path = _traced_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc, indent=2, sort_keys=True))
+    """Write-then-rename, not truncate-in-place — see atomic_write_json.
+
+    _load_traced's whole point is to tell a fault apart from a first run; a
+    plain `write_text` cancelled mid-write would manufacture the exact fault
+    (a file that exists but will not parse) that distinction exists to catch,
+    during precisely the timeout scenarios this branch otherwise reduces.
+    """
+    atomic_write_json(_traced_path(), doc, sort_keys=True)
 
 
 def untraced_outbound(wallet: str, rows: list[dict]) -> list[dict]:
@@ -97,9 +132,24 @@ def untraced_outbound(wallet: str, rows: list[dict]) -> list[dict]:
 
     The seed is written loudly and stamped in the marker file rather than done
     silently, because "we chose not to look at this" must be legible on disk.
+
+    A CORRUPT marker is not a first run and must not be handled like one:
+    seeding-and-suppressing here would silently drop this run's real alerts on
+    the strength of a fault, not a clean absence — exactly the failure this
+    gate exists to prevent, just reached through disk corruption instead of a
+    missing marker. mark_traced rebuilds a clean marker from this run's output
+    once tracing finishes, so the fault self-heals within the same run.
     """
     wl = (wallet or "").lower()
-    doc = _load_traced()
+    try:
+        doc = _load_traced()
+    except TracedMarkerCorrupt as exc:
+        print(f"[tracer] CORRUPT traced-outbound marker ({exc}). Not treating "
+              f"this as a first run: every stored outbound transfer for "
+              f"{wallet} will be re-evaluated this run and may re-alert on "
+              f"already-seen history. mark_traced will rewrite a clean marker "
+              f"once this run finishes.")
+        return list(rows)
     entry = doc.get(wl)
     if entry is None:
         ids = sorted({r["record_id"] for r in rows if r.get("record_id")})
@@ -121,9 +171,20 @@ def mark_traced(wallet: str, record_ids, *, known_ids=None) -> None:
     can never grow past the outbound history it is tracking. It is ignored when
     empty: an intersection against a transiently unreadable substrate would
     erase the marker and re-alert everything on the next run.
+
+    A CORRUPT marker cannot be merged into — there is nothing readable to merge
+    with — so this rebuilds from empty instead of raising. That is safe only
+    because untraced_outbound already made the safety-critical call for this
+    run (alert on everything, not seed-and-suppress); this just persists the
+    outcome. The next call after this one sees a valid file again.
     """
     wl = (wallet or "").lower()
-    doc = _load_traced()
+    try:
+        doc = _load_traced()
+    except TracedMarkerCorrupt as exc:
+        print(f"[tracer] rebuilding traced-outbound marker from empty state "
+              f"for {wallet} (previous file was corrupt: {exc})")
+        doc = {}
     entry = doc.setdefault(wl, {"traced": []})
     merged = set(entry.get("traced") or []) | {i for i in record_ids if i}
     if known_ids:
