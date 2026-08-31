@@ -308,6 +308,36 @@ def test_priority_field_survives_a_serialisation_round_trip(monkeypatch):
     assert all({"wallet", "depth", "priority"} <= set(q) for q in revived)
 
 
+# --- frontier candidates are deliberately not priced ------------------------
+#
+# See the comment at this exact call site in src/transfer_graph.py: this job
+# shares trace.yml's ~39s of slack with src/tracer.py's cluster sweep, which
+# already prices the TARGET's own transfers. Frontier wallets matter less
+# (topology, not alerting), so giving this call its own second CoinGecko
+# budget was deliberately left out -- a regression guard, not just a report
+# claim, so a later change re-does the arithmetic instead of wiring it in by
+# accident.
+
+def test_expand_frontier_does_not_pass_a_price_lookup_override(monkeypatch):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    a = addr("a")
+    captured = {}
+
+    def fake_sweep(wallet, chains, budget, **kw):
+        captured["kw"] = kw
+        return None
+
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", fake_sweep)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda w, **kw: [])
+
+    seed = edges(l1(T, a, 1_000_000, 5, "0xta"))
+    tight = {**tg.DEFAULTS, "max_expansions": 1}
+    tg.expand_frontier(seed, T, tight, now_ts=NOW)
+
+    assert "kw" in captured, "sweep_wallet must have been called"
+    assert captured["kw"].get("price_lookup") is None
+
+
 # --- migration of real schema-v2 evidence -----------------------------------
 
 def test_schema_v2_evidence_survives_migration_unchanged():

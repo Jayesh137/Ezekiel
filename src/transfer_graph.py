@@ -1620,6 +1620,22 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 calls += 1
                 found = 0
                 try:
+                    # Deliberately no price_lookup: this sweeps a FRONTIER
+                    # candidate, not the target, and this job (transfer_graph's
+                    # own 150s time_budget_seconds) runs inside the same
+                    # trace.yml job as src/tracer.py's cluster sweep, which
+                    # already spends part of that job's ~39s of slack pricing
+                    # the target's own transfers -- the ones that can actually
+                    # fire alert_fund_movement. Giving this lower-value sweep
+                    # a second, independent CoinGecko budget would double that
+                    # worst-case cost in the tightest-margin job in the
+                    # system. Frontier majors stay price_unavailable (as they
+                    # are today) and so stay out of _expandable_edges; if a
+                    # frontier wallet is later confirmed and promoted to
+                    # known_self_wallets, backfill's cluster sweep prices it
+                    # properly. See docs/superpowers/price-source-report.md
+                    # for the full arithmetic and the repricing-pass gap this
+                    # leaves (out of scope here; recorded as a follow-up).
                     sweep = sweep_wallet(wallet, sweep_chains, sweep_budget,
                                          cluster=False)
                     rows = records_for(wallet)
