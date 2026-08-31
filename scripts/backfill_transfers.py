@@ -31,7 +31,19 @@ from src.chain.collect import (
     sweep_wallet,
     write_cursors,
 )
-from src.utils import load_config
+from src.chain.prices import coingecko_price_lookup
+from src.utils import DATA_DIR, load_config
+
+# This job's own CoinGecko allowance, deliberately larger than
+# src/tracer.py's default (12 requests / 12s): backfill.yml has ~900s of slack
+# beyond config.backfill.time_budget_seconds (its own job-level comment says
+# so), against the trace job's ~39s, and this script's whole purpose is deep
+# historical catch-up -- exactly what a bigger allowance buys. Worst case
+# added time is max_seconds + one request's own timeout (5s, prices.py's
+# default) = 95s, leaving ~805s for checkout/pip/`python src/backfill.py`/push.
+# See docs/superpowers/price-source-report.md for the full arithmetic.
+BACKFILL_PRICE_MAX_REQUESTS = 40
+BACKFILL_PRICE_MAX_SECONDS = 90.0
 
 
 def cluster_wallets(config: dict) -> list[str]:
@@ -100,12 +112,20 @@ def main(argv=None) -> int:
                                  collection.get("time_budget_seconds", 420))),
     )
 
+    # One price_lookup shared across every wallet this run sweeps, so the
+    # request/time ceiling is a genuine per-RUN budget rather than being
+    # multiplied by however many cluster wallets there are.
+    price_lookup = coingecko_price_lookup(
+        Path(DATA_DIR) / "prices",
+        max_requests=BACKFILL_PRICE_MAX_REQUESTS,
+        max_seconds=BACKFILL_PRICE_MAX_SECONDS)
+
     results = []
     for wallet in wallets:
         print(f"[backfill] sweeping {wallet} across "
               f"{len(enabled_chains(config))} chain(s)")
         results.append(sweep_wallet(wallet, enabled_chains(config), budget,
-                                    cluster=True))
+                                    cluster=True, price_lookup=price_lookup))
 
     # Merging rather than clobbering: the trace job writes this same file every
     # 30 minutes for the target alone, and a --wallet run here sweeps something

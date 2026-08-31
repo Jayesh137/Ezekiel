@@ -588,3 +588,37 @@ def test_a_skipped_sweep_is_recorded_rather_than_reading_as_a_quiet_run(
     assert tracer.trace_outbound_transfers("0xtarget") == []
     health = json.loads((tmp_path / "transfers" / "latest.json").read_text())
     assert health["degraded_sources"] == ["arbitrum"]
+
+
+# --- the cluster sweep prices majors instead of leaving them unpriced forever --
+
+def test_trace_outbound_transfers_wires_a_real_coingecko_price_lookup_into_the_sweep(
+        tmp_path, monkeypatch):
+    """Before this task price_lookup defaulted to `lambda s, d: None`
+    (src/chain/collect.py), so every ETH/WBTC/... transfer the target ever
+    made was stored price_unavailable and could never become a graph edge or
+    fire alert_fund_movement. sweep_wallet is stubbed here (this must stay
+    network-free) but the captured price_lookup's own identity proves it is
+    the real src.chain.prices machinery, not merely a non-None placeholder --
+    it is never CALLED here, since that would attempt a genuine HTTP request."""
+    from src.chain import collect
+    from src.chain.prices import coingecko_price_lookup
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(tracer, "DATA_DIR", tmp_path / "data")
+
+    captured = {}
+
+    def fake_sweep(address, chains, budget, *, cluster=False, price_lookup=None, **kw):
+        captured["price_lookup"] = price_lookup
+        return {"address": address, "status": "ok", "degraded_sources": [], "chains": {}}
+
+    monkeypatch.setattr(tracer, "sweep_wallet", fake_sweep)
+
+    tracer.trace_outbound_transfers("0xtarget")
+
+    price_lookup = captured.get("price_lookup")
+    assert price_lookup is not None
+    assert callable(price_lookup)
+    assert price_lookup.__module__ == coingecko_price_lookup.__module__
+    assert price_lookup.__name__ == "price_lookup"

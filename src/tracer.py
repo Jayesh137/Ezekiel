@@ -14,6 +14,7 @@ from src.alerts import alert_combined_match, alert_fund_movement, alert_new_wall
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
 from src.chain.collect import records_for, save_sweep_health, sweep_wallet
+from src.chain.prices import coingecko_price_lookup
 from src.utils import (
     DATA_DIR,
     append_records,
@@ -323,7 +324,16 @@ def trace_outbound_transfers(wallet: str) -> list[dict]:
         max_calls=(config.get("collection") or {}).get("max_calls_per_run", 2500),
         seconds=(config.get("collection") or {}).get("time_budget_seconds", 420),
     )
-    result = sweep_wallet(wallet, enabled_chains(config), budget, cluster=True)
+    # A fresh price_lookup every call, budgeted for exactly this run --
+    # src/chain/prices.py defaults it to the trace job's own arithmetic (its
+    # module docstring has the numbers; .github/workflows/trace.yml's job
+    # comment has the ~39s of slack this draws from). Read live from
+    # DATA_DIR rather than cached in a module constant, so a test that
+    # monkeypatches tracer.DATA_DIR (as several already do) redirects this
+    # too -- the same convention _traced_path() already follows.
+    price_lookup = coingecko_price_lookup(Path(DATA_DIR) / "prices")
+    result = sweep_wallet(wallet, enabled_chains(config), budget, cluster=True,
+                          price_lookup=price_lookup)
     # data/transfers/latest.json is the only place a chain outage is reported —
     # spec section 4's storage record, section 10's degradation record, and the
     # README's "blindness is reported, never inferred". It was written by the

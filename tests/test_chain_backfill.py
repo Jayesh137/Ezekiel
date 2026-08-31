@@ -254,6 +254,38 @@ def test_main_reports_no_truncation_when_clean(tmp_path, monkeypatch, capsys):
     assert "TRUNCATED" not in out
 
 
+def test_main_wires_one_shared_coingecko_price_lookup_across_every_wallet(
+        tmp_path, monkeypatch):
+    """Before this task price_lookup defaulted to None (collect.sweep_wallet
+    then falls back to `lambda s, d: None`), so every ETH/WBTC/... transfer
+    the backfill recovered was stored price_unavailable forever. The lookup
+    must also be built ONCE outside the per-wallet loop -- sharing one budget
+    across the whole run -- not once per wallet, which would multiply the
+    per-run request/time ceiling by cluster size."""
+    from src.chain.prices import coingecko_price_lookup
+
+    _stub_common(monkeypatch, tmp_path, {
+        "target_wallet": "0xtarget", "known_self_wallets": ["0xself"],
+        "collection": {"max_calls_per_run": 10, "time_budget_seconds": 10}})
+    monkeypatch.setattr(bf, "DATA_DIR", tmp_path / "data")
+
+    captured = []
+
+    def fake_sweep(address, chains, budget, *, cluster=False, price_lookup=None, **kw):
+        captured.append(price_lookup)
+        return {"address": address, "chains": {}, "degraded_sources": []}
+
+    monkeypatch.setattr(bf, "sweep_wallet", fake_sweep)
+
+    assert bf.main([]) == 0
+
+    assert len(captured) == 2                       # target + known_self_wallets
+    assert all(p is not None and callable(p) for p in captured)
+    assert captured[0] is captured[1], "one shared budget, not one per wallet"
+    assert captured[0].__module__ == coingecko_price_lookup.__module__
+    assert captured[0].__name__ == "price_lookup"
+
+
 def test_main_wallet_flag_is_repeatable_and_bypasses_the_cluster(tmp_path, monkeypatch):
     """--wallet was untested at the argparse level: this proves repeated flags
     both parse into the list (not just a single manually-set args.wallet) and
