@@ -45,6 +45,11 @@ _PROBES = {
     # transfer_graph.label_contracts' bytecode cache. Asked once per address
     # ever, so a wrong entry written by a test is permanent.
     "the bytecode cache": REAL_DATA_DIR / "labels" / "code_cache.json",
+    # src/chain/prices.py's CoinGecko cache (assets.PriceCache). A test that
+    # forgets to redirect this writes a wrong price -- or a wrongly-permanent
+    # None, see prices._BudgetExhausted's docstring -- straight into the file
+    # every run reads first, for a symbol/date pair that is never re-fetched.
+    "the price cache": REAL_DATA_DIR / "prices",
 }
 
 
