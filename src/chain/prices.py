@@ -25,11 +25,37 @@ looking assumption:
     confirmed boundary -- see its docstring for why it does not "round down"
     for extra safety margin.
 
-Every failure mode -- HTTP error, timeout, malformed JSON, a missing or
-nonsensical price field, an unknown symbol, a date outside the free tier's
-range, an exhausted budget -- resolves to `None`. Nothing in this module ever
-raises into a caller; `_request_history` is the one place exceptions are
-expected, and the one place they are guaranteed not to escape.
+## Definitive misses versus indeterminate ones
+
+Every outcome resolves to `None` and nothing here ever raises into a caller
+(`price_lookup`, at the bottom, is the one place `_Indeterminate` is ever
+caught). But `None` reaches the caller two structurally different ways, and
+`PriceCache` (src/chain/assets.py) only gets to see one of them:
+
+  * A **definitive** `None` is CoinGecko (or our own static knowledge)
+    affirmatively telling us there is nothing to find here, now or later: the
+    symbol is not one we price, the date is confirmed outside the free tier's
+    window, or a well-formed 200 response simply has no usable USD figure for
+    that date. `fetch` returns `None` normally for these, and `PriceCache.get`
+    persists that -- correctly, since re-asking never gets a different answer.
+  * An **indeterminate** outcome is anything that is not a verdict about the
+    price at all: a transport failure, a non-200 status (429 above all --
+    this whole design exists because the free tier rate-limits, so 429 is the
+    expected steady state, not an edge case), or a 200 body that will not
+    parse or is not even shaped like a coin-history object. `fetch` raises
+    `_Indeterminate` for these, which `PriceCache.get()` never gets to catch
+    (it propagates straight through, skipping the `table[date_str] = price`
+    write) -- so a later run's fresh attempt is not permanently foreclosed by
+    this run's bad luck. See `_Indeterminate`'s own docstring for the exact
+    mechanics, first built for budget exhaustion and reused here rather than
+    duplicated: one path for "no verdict," not two.
+
+Getting this split wrong in the indeterminate direction (caching a 429 as a
+confirmed miss) is the same failure as booking a price at `0.0` one layer up
+in `assets.value_usd`: both quietly convert "we could not tell" into "we
+checked and there is nothing," and the free tier's rate limiting makes the
+429 case common enough that a few runs would fill the cache with holes
+indistinguishable from genuine no-data days.
 """
 
 import math
@@ -53,7 +79,10 @@ COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 # attempting a doomed request and getting None back costs one wasted call out
 # of a small per-run budget -- a recoverable, one-time cost. That asymmetry
 # means the proactive check should sit exactly at the confirmed boundary, not
-# comfortably below it. 365 is attempted; 366 is skipped.
+# comfortably below it. 365 is attempted; 366 is skipped. (This one IS a
+# definitive miss, not an indeterminate one: we know the shape of the
+# rejection in advance -- error_code 10012, every time, confirmed live -- so
+# there is nothing to retry a later run for.)
 FREE_TIER_HISTORY_DAYS = 365
 
 # A registered (free) Demo API key's own historical range is not something
@@ -93,6 +122,31 @@ DEFAULT_MAX_REQUESTS_PER_RUN = 12
 DEFAULT_MAX_SECONDS_PER_RUN = 12.0
 
 
+class _Indeterminate(Exception):
+    """Internal signal only: we tried, or could not try, and learned nothing
+    about whether a price exists -- the opposite of a definitive miss.
+
+    Covers this run's budget being spent (we never tried) through every kind
+    of failed attempt (we tried and got nothing usable): a transport-level
+    exception, a non-200 status, or a 200 body that does not parse or is not
+    shaped like a coin-history response. See the module docstring's
+    definitive/indeterminate split for the full reasoning.
+
+    `PriceCache.get()` (src/chain/assets.py) writes whatever `fetch` returns
+    to disk, unconditionally, as soon as `fetch` returns normally -- that is
+    the whole point of it (a confirmed miss must not be re-requested every
+    run). None of the above are confirmed misses. Raising instead of
+    returning sidesteps the write: `PriceCache.get()` computes
+    `price = self._fetch(...)` and only reaches `table[date_str] = price` on
+    the line after, so an exception here skips it entirely and propagates out
+    of `PriceCache.get()` untouched. `coingecko_price_lookup`'s returned
+    wrapper is the only thing that ever catches this; it returns `None` for
+    THIS call, leaving the on-disk cache exactly as it was, so a later run's
+    fresh budget -- or a CoinGecko that has stopped rate-limiting -- gets a
+    real second attempt instead of a permanently poisoned entry.
+    """
+
+
 def _too_old(date_str: str, max_age_days: int) -> bool:
     """True if `date_str` is confirmed too old for a keyless request.
 
@@ -123,17 +177,20 @@ def _to_coingecko_date(date_str: str) -> str | None:
         return None
 
 
-def _extract_usd_price(payload) -> float | None:
-    """`market_data.current_price.usd` from a decoded history response.
+def _extract_usd_price(payload: dict) -> float | None:
+    """`market_data.current_price.usd` from an already-confirmed dict payload.
 
-    A missing key, a wrong-shaped payload, a non-numeric value, or a value no
-    real asset price could take (non-finite, zero, negative) are all treated
-    identically: not a usable price. Distinguishing "malformed" from
-    "nonsensical" from "absent" would not change what any caller does with the
-    result, and collapsing them keeps this the one place that logic lives.
+    Every path through here is a DEFINITIVE "no usable price for this date":
+    the caller (`_request_history`) has already confirmed the response parsed
+    as JSON and is shaped like an object, so a missing or nonsensical value
+    inside it -- no `market_data`, no `current_price`, a non-numeric or
+    non-finite or non-positive `usd` -- is CoinGecko's own well-formed
+    response affirmatively having nothing usable for us here, not a failure
+    to determine one. A missing key, a wrong-shaped nested value, and a
+    nonsensical number are all treated identically: not a usable price, and
+    distinguishing "malformed" from "nonsensical" from "absent" here would
+    not change what any caller does with the result.
     """
-    if not isinstance(payload, dict):
-        return None
     market_data = payload.get("market_data")
     if not isinstance(market_data, dict):
         return None
@@ -149,12 +206,17 @@ def _extract_usd_price(payload) -> float | None:
 
 def _request_history(transport: Callable, coin_id: str, cg_date: str, *,
                      timeout: float, api_key: str) -> float | None:
-    """One HTTP round trip to `/coins/{id}/history`. Never raises.
+    """One HTTP round trip to `/coins/{id}/history`.
 
-    This is the one place a network or parse exception is expected, and the
-    one place it is guaranteed not to escape -- matching etherscan_get's own
-    resilience pattern (src/utils.py) for the same reason: a single flaky
-    response from a third-party API must never abort a collection run.
+    Returns a price, or `None` for a DEFINITIVE "no price for this date" (a
+    well-formed 200 whose body simply lacks a usable USD figure --
+    `_extract_usd_price`). Raises `_Indeterminate` for everything that is not
+    a verdict about the price at all: a transport failure, a non-200 status,
+    or a 200 body that does not even parse as JSON or does not parse to a
+    dict (some other shape entirely -- not what a coin-history response ever
+    legitimately looks like). This is the one place those failures are
+    caught and reclassified; nothing above it needs its own exception
+    handling for them.
     """
     params = {"date": cg_date, "localization": "false"}
     if api_key:
@@ -162,33 +224,21 @@ def _request_history(transport: Callable, coin_id: str, cg_date: str, *,
     try:
         resp = transport(f"{COINGECKO_BASE}/coins/{coin_id}/history",
                          params=params, timeout=timeout)
-        if resp.status_code != 200:
-            return None
-        return _extract_usd_price(resp.json())
-    except Exception:
-        return None
+    except Exception as exc:
+        raise _Indeterminate from exc
 
+    if resp.status_code != 200:
+        raise _Indeterminate(f"http {resp.status_code}")
 
-class _BudgetExhausted(Exception):
-    """Internal signal only: this run's request/time ceiling is spent.
+    try:
+        payload = resp.json()
+    except Exception as exc:
+        raise _Indeterminate from exc
 
-    `PriceCache.get()` (src/chain/assets.py) writes whatever `fetch` returns
-    to disk, unconditionally, as soon as `fetch` returns normally -- that is
-    the whole point of it (a confirmed miss must not be re-requested every
-    run). But "this run's budget is already spent" is not a confirmed miss:
-    it is a deferral, and the very next run gets a fresh budget and should
-    still be free to try. Returning None the normal way would let PriceCache
-    persist that None forever, permanently blacklisting a date that was never
-    actually asked about -- silently defeating the "coverage improves across
-    runs" design this whole module exists for.
+    if not isinstance(payload, dict):
+        raise _Indeterminate("response body was not a JSON object")
 
-    Raising instead of returning sidesteps that: `PriceCache.get()` computes
-    `price = self._fetch(...)` and only writes to disk on the line after, so
-    an exception here skips the write entirely and propagates out of
-    `PriceCache.get()` untouched. `coingecko_price_lookup`'s returned wrapper
-    is the only thing that ever sees this exception; it catches it and
-    returns None for THIS call, leaving the on-disk cache exactly as it was.
-    """
+    return _extract_usd_price(payload)
 
 
 def coingecko_price_lookup(directory, *,
@@ -228,21 +278,24 @@ def coingecko_price_lookup(directory, *,
     # identical fact. PriceCache's own on-disk cache stays keyed per SYMBOL
     # (its existing, tested contract, unchanged here) -- this only dedupes the
     # network round trip within one run, then lets PriceCache persist the
-    # answer to both symbols' files as usual.
+    # answer to both symbols' files as usual. Only ever populated on a
+    # DEFINITIVE outcome (see below): an indeterminate one must remain
+    # retryable within this same run too, not just across runs, in case a
+    # 429 clears up a few seconds later.
     resolved: dict[tuple[str, str], float | None] = {}
 
     def fetch(symbol: str, date_str: str) -> float | None:
         coin_id = MAJORS.get((symbol or "").strip().upper())
         if not coin_id:
-            return None
+            return None                                  # definitive
 
         api_key = os.environ.get(DEMO_KEY_ENV_VAR, "")
         if not api_key and _too_old(date_str, FREE_TIER_HISTORY_DAYS):
-            return None
+            return None                                  # definitive
 
         cg_date = _to_coingecko_date(date_str)
         if cg_date is None:
-            return None
+            return None                                  # definitive
 
         key = (coin_id, date_str)
         if key in resolved:
@@ -259,12 +312,15 @@ def coingecko_price_lookup(directory, *,
         try:
             budget.spend()
         except BudgetExhausted as exc:
-            raise _BudgetExhausted from exc
+            raise _Indeterminate from exc                # indeterminate
         sleep(throttle_seconds)
 
+        # _request_history raises _Indeterminate itself for every failed-
+        # attempt case; only a genuine verdict (a price, or a confirmed
+        # absence of one) reaches the line below.
         price = _request_history(transport, coin_id, cg_date,
                                  timeout=request_timeout, api_key=api_key)
-        resolved[key] = price
+        resolved[key] = price                            # definitive either way
         return price
 
     cache = PriceCache(directory, fetch=fetch)
@@ -272,7 +328,7 @@ def coingecko_price_lookup(directory, *,
     def price_lookup(symbol: str, date_str: str) -> float | None:
         try:
             return cache.get(symbol, date_str)
-        except _BudgetExhausted:
+        except _Indeterminate:
             return None
 
     return price_lookup
