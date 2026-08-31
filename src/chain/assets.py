@@ -18,6 +18,19 @@ STABLES = {
 }
 
 # Symbol -> price-source id. Only assets we are willing to value.
+#
+# Verified live against CoinGecko on 2026-08-31 (see
+# docs/superpowers/price-source-report.md). One entry was wrong: POL pointed
+# at "matic-network", which CoinGecko's own API now reports as
+# `{"symbol": "matic", "name": "MATIC (migrated to POL)"}` -- a deprecated
+# legacy id, not the live POL token. `/search?query=POL` returns
+# "polygon-ecosystem-token" (symbol POL, name "POL (ex-MATIC)") as the correct
+# current id. MATIC is left pointing at "matic-network" deliberately: a row
+# genuinely labelled "MATIC" (pre-migration, before 2024-09-04) still needs
+# that legacy id's own historical price series, which CoinGecko continues to
+# serve under the old id. Every other id below was independently confirmed
+# correct (ETH/WETH share "ethereum" on purpose -- WETH is arbitrage-pegged
+# 1:1 to ETH, so pricing it off ETH's series is intentional, not an oversight).
 MAJORS = {
     "ETH": "ethereum",
     "WETH": "ethereum",
@@ -26,7 +39,7 @@ MAJORS = {
     "ARB": "arbitrum",
     "OP": "optimism",
     "BNB": "binancecoin",
-    "POL": "matic-network",
+    "POL": "polygon-ecosystem-token",
     "MATIC": "matic-network",
     "WSTETH": "wrapped-steth",
     "WEETH": "wrapped-eeth",
