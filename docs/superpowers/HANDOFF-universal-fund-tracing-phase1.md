@@ -170,3 +170,68 @@ derived rather than copied.**
 
 To resume cold: `git log --oneline 0fca737f0..HEAD` is the authoritative record.
 Every commit message states what it fixed and why.
+
+---
+
+## Addendum — 2026-08-31
+
+### Residual findings from the final gate: all three fixed
+
+- `4a2774393` — the README-documented `investigate_wallet` path always inherited
+  the 2700s backfill budget inside a 600s job, so it would blow the timeout and
+  discard its cursors. Now bounded to what that job can afford.
+- `bd352b5d7` — `fetch_code` fired real HTTP without an `ETHERSCAN_API_KEY`,
+  against the codebase's own convention; the test meant to cover it over-mocked
+  and never exercised the path. Both fixed.
+- `19c4b0938` — a corrupt `traced_outbound.json` was indistinguishable from a
+  clean first run and silently suppressed that run's alerts. A missing file is
+  still a quiet first run; a file that exists but will not parse now raises and
+  says so. The write is atomic via a shared `atomic_write_json`, extracted from
+  `save_latest` rather than reimplemented.
+
+### The price source is built (commits `d8d0332c8`..`87783a75a`)
+
+`src/chain/prices.py` supplies `PriceCache`'s fetcher from CoinGecko, wired into
+the tracer and the backfill. **This closes the "collection is multi-asset,
+detection is stablecoin-only" gap** listed as open item 2 above.
+
+Design points worth remembering:
+
+- **Best-effort within a per-run budget.** Pricing 11 majors across a year is
+  ~4,000 requests against a ~10-30/min free tier. Unaffordable in one run — so
+  the budget is small, the cache fills incrementally across runs, and unpriced
+  records are retained rather than dropped. That is what makes incremental
+  coverage safe.
+- **Budget arithmetic:** trace worst case +17s inside ~39s of slack; backfill
+  +95s inside ~805s. Both fit without moving a job timeout.
+- `expand_frontier` is **deliberately unpriced** — it shares the trace job's
+  tight margin and frontier data is lower value. A design choice, recorded in
+  `c37af64af` with a regression test. Worth revisiting if frontier ETH edges
+  turn out to matter.
+- **`MAJORS["POL"]` was pointing at a deprecated CoinGecko id** (`matic-network`
+  → `polygon-ecosystem-token`). Found by verifying against the live API rather
+  than trusting the plan.
+- `COINGECKO_API_KEY` is optional — verified the endpoint works keyless for
+  in-range dates, so a missing key is attempted rather than skipped. This
+  deliberately differs from `ETHERSCAN_API_KEY`'s "skip cleanly" convention.
+
+**Open at time of writing:** transient failures (connection error, timeout,
+non-200 including 429, malformed JSON) were being cached as permanent misses.
+`PriceCache` never re-requests a cached miss, so a single rate-limit response
+permanently burned that `(symbol, date)` — and 429s are the expected steady
+state on a free tier. The definitive/indeterminate split is being fixed; check
+`git log src/chain/prices.py` for whether it landed. `MATIC` may still carry the
+same stale id that `POL` had.
+
+### Still true, and still the most important thing
+
+**Nothing here has run against live data.** The $13M question remains open. Run
+the Backfill workflow once with `full_reset: true` and a real
+`ETHERSCAN_API_KEY` before scoping Phase 2.
+
+### New follow-up
+
+Records already stored as `price_unavailable` are not re-priced when the cache
+later gains their date — pricing happens at collection time in `normalise_row`.
+A repricing pass over stored records would make coverage genuinely self-healing.
+Not built; deliberately out of scope.
