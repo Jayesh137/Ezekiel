@@ -188,6 +188,47 @@ def normalise_l1_transfer(tx: dict, decimals: int = 6) -> dict | None:
     }
 
 
+def normalise_transfer_record(rec: dict) -> dict | None:
+    """A src/chain normalised record into a graph edge.
+
+    Quarantined and unpriced records are dropped here rather than filtered by
+    the caller, so there is exactly one place that decides what the graph is
+    allowed to reason over. An unpriced token must never be able to satisfy a
+    value threshold; a poisoning forgery must never become a node.
+
+    The edge id is chain-scoped and hash-scoped, so a movement that arrives both
+    from data/l1_transactions and from data/transfers collapses to one edge.
+    """
+    if rec.get("spam"):
+        return None
+    amount_usd = rec.get("amount_usd")
+    if amount_usd is None:
+        return None
+    src = (rec.get("src") or "").lower()
+    dst = (rec.get("dst") or "").lower()
+    if not src or not dst or src == dst:
+        return None
+    chain = rec.get("chain") or CHAIN_ARBITRUM
+    ref = rec.get("tx_hash", "")
+    try:
+        ts = int(rec.get("ts", 0) or 0)
+    except (TypeError, ValueError):
+        ts = 0
+    return {
+        "id": edge_id(src, dst, chain, ref, ts),
+        "src": src,
+        "dst": dst,
+        "chain": chain,
+        "asset": rec.get("asset") or "UNKNOWN",
+        "amount_usd": round(float(amount_usd), 2),
+        "ref": ref,
+        "ts": ts,
+        "timestamp": _iso(ts),
+        "discovery_source": SRC_L1,
+        "kind": rec.get("kind"),
+    }
+
+
 def normalise_hl_ledger_entry(entry: dict) -> dict | None:
     """Normalise a Hyperliquid non-funding ledger update into a graph edge.
 
@@ -1223,6 +1264,19 @@ def collect_known_edges() -> list[dict]:
     """Build edges from data already on disk — no API calls, no budget needed."""
     edges = []
 
+    # Multi-chain substrate written by src/chain/collect.py. Read before the
+    # legacy table so the richer record wins on any field the two share (dedupe_edges
+    # keeps the first-seen edge for a given id); the legacy reader stays live because
+    # data/l1_transactions is the only copy of history collected before the substrate
+    # existed.
+    transfers_root = DATA_DIR / "transfers"
+    if transfers_root.exists():
+        for chain_dir in sorted(p for p in transfers_root.iterdir() if p.is_dir()):
+            for rec in load_all_records(str(chain_dir)):
+                e = normalise_transfer_record(rec)
+                if e:
+                    edges.append(e)
+
     for tx in load_all_records(str(DATA_DIR / "l1_transactions")):
         e = normalise_l1_transfer(tx)
         if e:
@@ -1249,11 +1303,23 @@ def collect_known_edges() -> list[dict]:
                             finding["detected_at"]).timestamp())
                     except (KeyError, TypeError, ValueError):
                         pass
+                    # A finding written before src/tracer.py threaded asset/chain
+                    # through (or one built by the hop-2/hop-3 paths, which are
+                    # still genuinely Arbitrum USDC) has neither key, so the
+                    # fallback here is the same one build_finding itself defaults
+                    # to — not a fresh assumption. A finding that DOES carry its
+                    # own asset/chain must win: hardcoding this unconditionally
+                    # mislabelled every non-Arbitrum, non-USDC finding as
+                    # Arbitrum USDC, and — since edge_id is chain-scoped — also
+                    # broke dedup against that same transfer's own substrate edge
+                    # for any chain other than Arbitrum.
+                    chain = finding.get("chain") or CHAIN_ARBITRUM
+                    asset = finding.get("asset") or "USDC"
                     edges.append({
-                        "id": edge_id(src, dst, CHAIN_ARBITRUM,
+                        "id": edge_id(src, dst, chain,
                                       finding.get("tx_hash", ""), ts),
-                        "src": src, "dst": dst, "chain": CHAIN_ARBITRUM,
-                        "asset": "USDC",
+                        "src": src, "dst": dst, "chain": chain,
+                        "asset": asset,
                         "amount_usd": round(float(finding.get("amount_usdc_raw", 0) or 0), 2),
                         "ref": finding.get("tx_hash", ""),
                         "ts": ts, "timestamp": _iso(ts),
@@ -1442,19 +1508,45 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         "error": None,
     }
 
+    from src.chain.budget import CallBudget
+    from src.chain.chains import enabled_chains
+    from src.chain.collect import records_for, sweep_wallet
+
+    sweep_chains = enabled_chains(load_config())
+    # Expansion spans every enabled chain. "arbitrum_l1" was the honest label
+    # when collection read one asset on one chain; naming it now would report
+    # five chains as healthy on a run that read none of them.
+    all_chain_names = [c["name"] for c in sweep_chains]
+
     def decide(wallet, depth, action, reason, priority=None):
         diag["decisions"].append({"wallet": wallet, "depth": depth,
                                   "action": action, "reason": reason,
                                   "priority": priority})
 
+    def degrade(names):
+        """Merge chain names into diag['degraded_sources'], order-stable.
+
+        Merge, never assign: a later failure must not erase the record of an
+        earlier one, and one wallet's failing chain is not the whole run's.
+        """
+        for name in names:
+            if name and name not in diag["degraded_sources"]:
+                diag["degraded_sources"].append(name)
+
     if not os.environ.get("ETHERSCAN_API_KEY"):
         diag["status"] = "skipped_no_api_key"
-        diag["degraded_sources"] = ["arbitrum_l1"]
+        degrade(all_chain_names)
         print("[graph] ETHERSCAN_API_KEY absent - L1 frontier expansion SKIPPED. "
               "Graph is limited to locally recorded edges (typically depth 1).")
         return edges, diag
 
-    from src.tracer import get_usdc_transfers
+    # The frontier's own ceiling, expressed in the units the substrate spends.
+    # max_expansions counted wallet lookups when one wallet cost one call; a
+    # wallet now costs up to three calls per chain, so the budget has to be
+    # denominated in calls or the ceiling silently means something else.
+    sweep_budget = CallBudget(
+        max_calls=budget["max_expansions"] * len(sweep_chains) * 3,
+        seconds=budget["time_budget_seconds"])
 
     deadline = time.monotonic() + budget["time_budget_seconds"]
     max_calls = budget["max_expansions"]
@@ -1528,21 +1620,67 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 calls += 1
                 found = 0
                 try:
-                    rows = list(get_usdc_transfers(wallet))
+                    # Deliberately no price_lookup: this sweeps a FRONTIER
+                    # candidate, not the target, and this job (transfer_graph's
+                    # own 150s time_budget_seconds) runs inside the same
+                    # trace.yml job as src/tracer.py's cluster sweep, which
+                    # already spends part of that job's ~39s of slack pricing
+                    # the target's own transfers -- the ones that can actually
+                    # fire alert_fund_movement. Giving this lower-value sweep
+                    # a second, independent CoinGecko budget would double that
+                    # worst-case cost in the tightest-margin job in the
+                    # system. Frontier majors stay price_unavailable (as they
+                    # are today) and so stay out of _expandable_edges; if a
+                    # frontier wallet is later confirmed and promoted to
+                    # known_self_wallets, backfill's cluster sweep prices it
+                    # properly. See docs/superpowers/price-source-report.md
+                    # for the full arithmetic and the repricing-pass gap this
+                    # leaves (out of scope here; recorded as a follow-up).
+                    sweep = sweep_wallet(wallet, sweep_chains, sweep_budget,
+                                         cluster=False)
+                    rows = records_for(wallet)
                 except Exception as exc:
                     # One address failing must not abandon the rest of the walk.
                     # The wallet stays OUT of `explored` so it is retried next
                     # run rather than being recorded as finished.
                     diag["partial_failures"].append(
-                        {"wallet": wallet, "depth": d, "error": str(exc)[:120]})
-                    diag["degraded_sources"] = ["arbitrum_l1"]
+                        {"wallet": wallet, "depth": d, "error": str(exc)[:120],
+                         "chains": list(all_chain_names)})
+                    degrade(all_chain_names)
                     decide(wallet, d, "deferred", f"lookup failed: {str(exc)[:80]}", pr)
+                    continue
+
+                # sweep_wallet does not raise on degradation — probe_activity
+                # and fetch_kind catch BudgetExhausted and return an error
+                # string instead — so the except branch above cannot see it, and
+                # discarding the return value made the branch that exists to
+                # keep a wallet retryable unreachable for the failure that
+                # actually happens. `sweep_budget` is built with the graph's
+                # 150s time budget; at etherscan_get's 0.25s sleep plus round
+                # trip that exhausts near 300 calls, well before the 720-call
+                # ceiling, so a wallet whose sweep starts late gets some chains
+                # read and the rest budget-exhausted. Marking it explored is
+                # permanent — `explored` persists as expanded_ledger and is
+                # re-seeded as `done` — and the diagnostics would read
+                # "expanded, 0 new edge(s)", identical to a wallet that
+                # genuinely has nothing.
+                degraded = list((sweep or {}).get("degraded_sources") or [])
+                status = (sweep or {}).get("status", "ok")
+                if degraded or status != "ok":
+                    named = ", ".join(degraded) or "unknown chain(s)"
+                    diag["partial_failures"].append(
+                        {"wallet": wallet, "depth": d,
+                         "error": f"sweep {status}: could not read {named}",
+                         "chains": degraded})
+                    degrade(degraded)
+                    decide(wallet, d, "deferred",
+                           f"sweep {status}; could not read {named}", pr)
                     continue
                 explored.add(wallet)
                 expanded_now.add(wallet)
                 diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
-                for tx in rows:
-                    e = normalise_l1_transfer(tx)
+                for rec in rows:
+                    e = normalise_transfer_record(rec)
                     if not e or e["id"] in known_ids:
                         continue
                     known_ids.add(e["id"])
@@ -1570,7 +1708,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
         diag["error"] = str(exc)[:200]
-        diag["degraded_sources"] = ["arbitrum_l1"]
+        degrade(all_chain_names)
         print(f"[graph] frontier expansion FAILED after {calls} lookup(s): {exc}")
 
     # One entry per wallet at its SHALLOWEST outstanding depth. Keying on
@@ -1632,7 +1770,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             # result, and must not read as a successful-but-thin expansion.
             diag["status"] = "failed"
             diag["error"] = diag["partial_failures"][0]["error"]
-            diag["degraded_sources"] = ["arbitrum_l1"]
+            # Merge, not assign: the per-wallet handlers have already named the
+            # chains that actually failed, and overwriting would discard them.
+            degrade(all_chain_names)
         elif stopped_reason or pending or failures:
             if stopped_reason:
                 diag["status"] = "budget_exhausted"
@@ -1680,6 +1820,87 @@ def _read_previous_graph() -> dict:
         return {}
 
 
+# One cached eth_getCode call per address, ever, persisted to
+# data/labels/code_cache.json — but a first run over a wide graph would still
+# be hundreds of calls inside a job that already spends its budget on
+# expansion. Capped per run; the cache drains the backlog over a few runs and
+# the steady-state cost is zero.
+#
+# The wall-clock ceiling is deliberately small. The trace workflow's job
+# timeout is 600s and every budget inside it adds up: collection 150 +
+# TRACE_BUDGET_SECONDS 240 + expansion 150 + this. At etherscan_get's 0.25s
+# rate-limit sleep, 25 calls cost ~7s of sleeping, so 20s absorbs slow
+# responses without meaningfully moving that total.
+MAX_CODE_LOOKUPS_PER_RUN = 25
+CODE_LOOKUP_SECONDS = 20
+
+
+def label_contracts(edges: list[dict], known_services: set, config: dict,
+                    dust_usd: float, cache=None) -> dict[str, str]:
+    """Add every graph address that has bytecode to `known_services`.
+
+    Enforces the binding constraint that an address with bytecode is not a
+    person and can never be graded MIGRATION_CANDIDATE. Before this, the
+    curated registry was the only tier that reached the running system:
+    classify_address, infer_deposit_addresses, CodeCache and fetch_code had
+    zero production call sites, so a fresh contract receiving the target's
+    funds could still be graded a personal wallet.
+
+    Scope: the destination of every expandable (non-dust, non-bridge) edge that
+    is not already a known service. That is exactly the set build_graph can
+    grade — a node only exists because value reached it — and it excludes the
+    sub-dollar poisoning clones that make up most raw edges. Each address is
+    checked on the chain its largest edge was observed on, because a contract
+    at an address on one chain need not exist at the same address on another.
+
+    A failed lookup returns None and marks nothing: absence of evidence is not
+    evidence of an externally owned account. CodeCache does not cache it
+    either, so a rate-limited run is retried rather than remembered wrong.
+    """
+    from src.chain.budget import CallBudget
+    from src.chain.chains import enabled_chains
+    from src.chain.client import fetch_code
+    from src.chain.labels import CodeCache
+
+    chains = {c["name"]: c for c in enabled_chains(config)}
+    if not chains:
+        return {}
+
+    # Largest edge per candidate address decides which chain to ask on.
+    best: dict[str, tuple[float, str]] = {}
+    for e in _expandable_edges(edges, dust_usd):
+        dst = (e.get("dst") or "").lower()
+        if not dst or dst in known_services:
+            continue
+        usd = float(e.get("amount_usd", 0) or 0)
+        chain = e.get("chain") or CHAIN_ARBITRUM
+        if chain not in chains:
+            continue
+        if dst not in best or usd > best[dst][0]:
+            best[dst] = (usd, chain)
+
+    if not best:
+        return {}
+
+    budget = CallBudget(max_calls=MAX_CODE_LOOKUPS_PER_RUN,
+                        seconds=CODE_LOOKUP_SECONDS)
+    if cache is None:
+        cache = CodeCache(DATA_DIR / "labels" / "code_cache.json",
+                          lambda addr, chain: fetch_code(addr, chain, budget))
+
+    found: dict[str, str] = {}
+    # Highest value first: if the cap bites, the addresses closest to being
+    # graded are the ones that got checked.
+    for addr, (_usd, chain) in sorted(best.items(), key=lambda kv: -kv[1][0]):
+        if cache.has_code(addr, chains[chain]) is True:
+            known_services.add(addr)
+            found[addr] = chain
+    if found:
+        print(f"[graph] {len(found)} address(es) have bytecode and are not "
+              f"people: {sorted(found)[:3]}{'...' if len(found) > 3 else ''}")
+    return found
+
+
 def run_transfer_graph(expand: bool = True) -> dict:
     """Full pipeline: gather edges, traverse, score, persist, alert."""
     config = load_config()
@@ -1690,6 +1911,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
     known_services.add(config["hl_bridge_contract"].lower())
     known_services.add(config["usdc_contract_arbitrum"].lower())
     known_services |= {a.lower() for a in config.get("known_service_addresses", [])}
+
+    from src.chain.labels import load_registry, service_addresses
+    known_services |= service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
 
     # Loaded ONCE, before expansion, and migrated to the current schema: it
     # carries the unfinished frontier, the ledger of finished expansions and the
@@ -1714,8 +1938,20 @@ def run_transfer_graph(expand: bool = True) -> dict:
             known_services=known_services, already_expanded=already)
         write_cursor("transfer_graph_last_expansion_ms", now_ms())
     else:
-        expansion = {"status": "disabled", "degraded_sources": ["arbitrum_l1"],
+        from src.chain.chains import enabled_chains
+        expansion = {"status": "disabled",
+                     "degraded_sources": [c["name"] for c in enabled_chains(config)],
                      "attempted_at": utc_now()}
+    # After expansion, before grading: build_graph is where a node is classified,
+    # so this is where "an address with bytecode can never be graded
+    # MIGRATION_CANDIDATE" has to be true. Running it here also covers the
+    # addresses expansion just discovered, which a pre-expansion pass would miss
+    # for a whole run.
+    try:
+        label_contracts(edges, known_services, config, cfg["dust_usd"])
+    except Exception as exc:  # noqa: BLE001 - labelling must never break the graph
+        print(f"[graph] bytecode labelling failed: {type(exc).__name__}: {exc}")
+
     # Carry the previous successful expansion forward so the dashboard can show
     # "last successful L1 expansion" even on a run where it was skipped.
     prev_health = (previous_graph.get("health") or {}).get("expansion") or {}

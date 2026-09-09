@@ -9,8 +9,11 @@ Two research-backed signals, applied to promising behavioral candidates:
    first funded by, that is a strong ownership link.
 
 2. Address reuse (highest-confidence heuristic — cryptographic certainty). A CEX
-   deposit address is unique to one account. If the candidate sends USDC to the
-   SAME address the target sends to, they almost certainly share a CEX account.
+   deposit address is unique to one account. If the candidate sends value to the
+   SAME address the target sends to — on any chain, in any asset — they almost
+   certainly share a CEX account. Labelled infrastructure (routers, wrapper
+   contracts, exchange hot wallets) is excluded first: those receive from
+   millions of unrelated people, so a shared one is coincidence, not ownership.
 """
 
 import os
@@ -19,7 +22,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import DATA_DIR, etherscan_get, load_all_records, load_config
+from src.chain.labels import SERVICE_CATEGORIES
+from src.utils import DATA_DIR, etherscan_get, load_config
+
+# Categories that make a shared destination meaningless. Deliberately omits the
+# two deposit categories: a CEX deposit address belongs to exactly one exchange
+# account, so two wallets sharing one is the strongest ownership evidence there
+# is — the very thing this signal looks for. Those are infrastructure for graph
+# traversal and evidence here; one category set cannot serve both.
+LINKAGE_EXCLUDED_CATEGORIES = SERVICE_CATEGORIES - {"cex_deposit", "cex_deposit_sweep"}
 
 
 def compute_linkage(candidate: str, candidate_first_funder: str | None,
@@ -58,7 +69,7 @@ def compute_linkage(candidate: str, candidate_first_funder: str | None,
     if shared_deposit:
         bonus += 0.18
         reasons.append(
-            f"Sends USDC to the same address as target (address reuse): "
+            f"Sends funds to the same address as target (address reuse): "
             f"{', '.join(a[:10] + '...' for a in shared_deposit[:2])}"
         )
 
@@ -102,14 +113,28 @@ def get_first_funder(wallet: str) -> str | None:
     return None
 
 
-def get_outbound_usdc_addresses(wallet: str, limit: int = 300) -> set:
-    """Addresses this wallet has sent USDC to on Arbitrum (candidate CEX deposit
-    addresses). Excludes the HL bridge itself."""
+def swept_wallets(config: dict) -> set:
+    """Addresses the substrate is complete for: the target and its cluster.
+
+    These are swept unconditionally by scripts/backfill_transfers.py and by the
+    tracer. For anything else, records_for() is at best partial — see
+    get_outbound_addresses.
+    """
+    out = {(config.get("target_wallet") or "").lower()}
+    out |= {(w or "").lower() for w in config.get("known_self_wallets", [])}
+    return out - {""}
+
+
+def _live_outbound_usdc(wallet: str, excluded: set, limit: int) -> set:
+    """Arbitrum USDC destinations straight from Etherscan. One call.
+
+    The pre-substrate implementation of this whole function, kept for the
+    population the substrate does not cover.
+    """
     if not os.environ.get("ETHERSCAN_API_KEY"):
         return set()
     config = load_config()
-    bridge = config["hl_bridge_contract"].lower()
-    wl = wallet.lower()
+    wl = (wallet or "").lower()
     res = etherscan_get({
         "module": "account", "action": "tokentx", "address": wallet,
         "contractaddress": config["usdc_contract_arbitrum"],
@@ -120,26 +145,94 @@ def get_outbound_usdc_addresses(wallet: str, limit: int = 300) -> set:
         if (t.get("from", "") or "").lower() != wl:
             continue
         to = (t.get("to", "") or "").lower()
-        if to and to != bridge and to != wl and int(t.get("value", 0) or 0) > 0:
+        if to and to not in excluded and int(t.get("value", 0) or 0) > 0:
             out.add(to)
     return out
 
 
+def get_outbound_addresses(wallet: str, config: dict | None = None,
+                           limit: int = 300) -> set:
+    """Every address this wallet has sent value to, excluding known
+    infrastructure.
+
+    For a swept wallet this reads the substrate: src/chain/collect.py has
+    already stored these, so widening the strongest linkage signal we have — a
+    CEX deposit address belongs to exactly one account, so two wallets funding
+    the same one are the same customer — from Arbitrum USDC to every chain and
+    asset costs no calls at all.
+
+    For anything else it ALSO makes the one live Etherscan call this function
+    used to make. The substrate is populated only for wallets that were swept —
+    the target, known_self_wallets and graph-frontier wallets. Leaderboard
+    behavioural candidates are a different population and are never swept, so
+    records_for() returns only the records where the candidate happened to
+    transact with an already-swept wallet: not an empty set that would be
+    obviously wrong, but a subset of swept addresses that looks like an answer.
+    Reading only the substrate therefore left this signal near-permanently dark
+    for exactly the wallets it exists to judge — and it fires
+    alert_linkage_match as a standalone alert, not gated behind the score
+    threshold.
+
+    Sweeping the candidate instead was the alternative. It is rejected here: a
+    sweep writes the candidate's whole history into the shared substrate, which
+    feeds collect_known_edges and therefore the transfer graph, so scoring a
+    leaderboard wallet would add unrelated wallets to the target's graph; and
+    scanner.py has no call budget to bound six chains x three kinds per
+    candidate. One call matches what this path already spends per candidate in
+    get_first_funder, and matches pre-branch behaviour exactly.
+
+    That signal only holds for a private deposit address. Widening the search
+    to every chain and asset also widens the odds of landing on a router, a
+    wrapper contract, or an exchange HOT wallet — infrastructure that receives
+    from millions of unrelated people, where a shared destination is
+    coincidence rather than evidence of common ownership. This result feeds a
+    bonus the module calls "cryptographic certainty" and fires a standalone
+    alert, so labelled infrastructure is excluded before it ever reaches that
+    scoring step.
+    """
+    from src.chain.collect import records_for
+    from src.chain.labels import load_registry, service_addresses
+
+    config = config or load_config()
+    wl = (wallet or "").lower()
+
+    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"),
+                                 categories=LINKAGE_EXCLUDED_CATEGORIES)
+    excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
+    excluded.add(config["hl_bridge_contract"].lower())
+    excluded.add(wl)
+
+    out = set()
+    for rec in records_for(wl):
+        if (rec.get("src") or "").lower() != wl:
+            continue
+        usd = rec.get("amount_usd")
+        if usd is None or float(usd) <= 0:
+            continue
+        dst = (rec.get("dst") or "").lower()
+        if dst and dst not in excluded:
+            out.add(dst)
+
+    # Union, not a fallback-on-empty: a non-empty substrate result is not
+    # evidence the wallet was swept, only that it touched something that was.
+    if wl not in swept_wallets(config):
+        out |= _live_outbound_usdc(wl, excluded, limit)
+    return out
+
+
+def get_outbound_usdc_addresses(wallet: str, limit: int = 300) -> set:
+    """Backwards-compatible alias. `limit` caps the live Etherscan page used
+    for wallets the substrate does not cover; the substrate itself is complete
+    for swept wallets, so there is no page to cap there."""
+    return get_outbound_addresses(wallet, limit=limit)
+
+
 def target_l1_profile(target: str) -> dict:
     """Target's L1 fingerprint for clustering: first funder + outbound addresses.
-    Outbound addresses come from already-collected l1_transactions (no API calls);
-    first funder needs one Etherscan lookup."""
+    Outbound addresses come from the substrate, covering every collected chain
+    and asset with no API calls; first funder needs one Etherscan lookup."""
     config = load_config()
-    bridge = config["hl_bridge_contract"].lower()
-    tl = target.lower()
-
-    out_addrs = set()
-    for t in load_all_records(str(DATA_DIR / "l1_transactions")):
-        if (t.get("from", "") or "").lower() != tl:
-            continue
-        to = (t.get("to", "") or "").lower()
-        if to and to != bridge and to != tl and int(t.get("value", 0) or 0) > 0:
-            out_addrs.add(to)
+    out_addrs = get_outbound_addresses(target, config)
 
     return {
         "first_funder": get_first_funder(target),

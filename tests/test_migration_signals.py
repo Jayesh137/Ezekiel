@@ -2,6 +2,8 @@
 """Tests for the migration-detection upgrades: deposit/withdrawal correlation
 (FIFO amount+time matching), L1 clustering linkage, and the unified risk score."""
 
+import pytest
+
 from src import correlator, linkage, risk
 
 DAY = 86400
@@ -60,6 +62,121 @@ def test_correlation_ignores_below_min_amount():
     assert out == []
 
 
+# collect_target_exits: the L1 side now reads the substrate (records_for),
+# not the frozen pre-substrate data/l1_transactions table — nothing writes
+# that table any more since src/tracer.py was pointed at the substrate.
+
+def test_collect_target_exits_includes_outbound_substrate_transfer_above_min(
+        tmp_path, monkeypatch):
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": T, "dst": "0xcex",
+         "tx_hash": "0xexit", "ts": 1000, "amount_usd": 250_000.0,
+         "value_basis": "stable_par", "spam": False},
+    ]))
+
+    exits = correlator.collect_target_exits(T, min_amount=100_000)
+    assert exits == [
+        {"amount": 250_000.0, "ts": 1000, "source": "l1_outbound", "ref": "0xexit"},
+    ]
+
+
+def test_collect_target_exits_excludes_inbound_substrate_transfer(tmp_path, monkeypatch):
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xfunder", "dst": T,
+         "tx_hash": "0xin", "ts": 1000, "amount_usd": 250_000.0,
+         "value_basis": "stable_par", "spam": False},
+    ]))
+
+    assert correlator.collect_target_exits(T, min_amount=100_000) == []
+
+
+def test_collect_target_exits_skips_price_unavailable_rather_than_treating_as_zero(
+        tmp_path, monkeypatch):
+    """amount_usd is None when value_basis is price_unavailable — a known asset
+    (e.g. ETH) whose price we could not fetch this run. Amount-matching is the
+    entire basis of correlation, so an exit of unknown size must be excluded
+    outright: it must not raise (None reaching a numeric comparison), and it
+    must not silently become a $0 exit either, which — for a min_amount of
+    exactly 0 — `find_correlations` would not reject the way it rejects every
+    other below-minimum exit."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": T, "dst": "0xcex",
+         "tx_hash": "0xunpriced", "ts": 1000, "amount_usd": None, "asset": "ETH",
+         "value_basis": "price_unavailable", "spam": False},
+    ]))
+
+    assert correlator.collect_target_exits(T, min_amount=0) == []
+
+
+def test_collect_target_exits_still_includes_hl_withdrawals(tmp_path, monkeypatch):
+    """The ledger branch above the substrate rewrite must be unaffected."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    ledger_dir = tmp_path / "ledger"
+    ledger_dir.mkdir()
+    (ledger_dir / "2026-08-28.json").write_text(json.dumps([
+        {"delta": {"type": "withdraw", "usdc": "300000"}, "time": 1_700_000_000_000,
+         "hash": "0xwithdraw"},
+    ]))
+
+    exits = correlator.collect_target_exits(T, min_amount=100_000)
+    assert exits == [
+        {"amount": 300_000.0, "ts": 1_700_000_000, "source": "hl_withdraw",
+         "ref": "0xwithdraw"},
+    ]
+
+
+def test_collect_target_exits_skips_malformed_amount_usd_rather_than_raising(
+        tmp_path, monkeypatch):
+    """amount_usd is only ever produced internally, but a hand-edited or
+    truncated file in data/transfers/ should skip one bad record, not crash
+    the correlator. min_amount=0 so the ordinary amount gate can't coincide
+    with a skip and mask a real bug."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": T, "dst": "0xcex",
+         "tx_hash": "0xbad", "ts": 1000, "amount_usd": "not-a-number",
+         "value_basis": "stable_par", "spam": False},
+    ]))
+
+    assert correlator.collect_target_exits(T, min_amount=0) == []
+
+
 # --- linkage ------------------------------------------------------------------
 
 def test_linkage_direct_funding_by_target():
@@ -87,6 +204,283 @@ def test_linkage_bonus_capped():
     cex = "0xcexdeposit000000000000000000000000000000"
     out = linkage.compute_linkage(W1, T, {cex}, T, None, {cex}, excluded=set())
     assert out["linkage_bonus"] <= 0.30
+
+
+# get_outbound_addresses: the address-reuse signal's own source, feeding compute_linkage.
+
+def _swept(monkeypatch, *wallets):
+    """Declare these wallets as ones the substrate is complete for.
+
+    get_outbound_addresses ALSO makes the one live Etherscan call it used to
+    make for a wallet that was never swept, because for those records_for() is
+    at best a subset of already-swept addresses rather than the wallet's real
+    outbound set. Every test below pre-plants the substrate, so every one of
+    them is testing the swept population and has to say so - otherwise they
+    pass only because no ETHERSCAN_API_KEY happens to be exported, and reach
+    the network on a machine where one is.
+    """
+    monkeypatch.setattr(linkage, "swept_wallets",
+                        lambda config: {(w or "").lower() for w in wallets})
+
+def test_outbound_addresses_come_from_every_chain_without_api_calls(tmp_path, monkeypatch):
+    """Address reuse is the strongest linkage signal available, and it was
+    limited to Arbitrum USDC. The substrate already holds every chain, so
+    widening it costs nothing."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: pytest.fail("must not call the API"))
+
+    for chain, dst in (("arbitrum", "0xdeposita"), ("base", "0xdepositb")):
+        d = tmp_path / "transfers" / chain
+        d.mkdir(parents=True)
+        (d / "2026-08-28.json").write_text(json.dumps([{
+            "id": f"{chain}:0xh:erc20:0", "chain": chain, "src": "0xtarget",
+            "dst": dst, "amount_usd": 500000.0, "ts": 1781000000,
+            "spam": False, "value_basis": "stable_par", "asset": "USDC"}]))
+
+    got = linkage.get_outbound_addresses("0xtarget")
+    assert got == {"0xdeposita", "0xdepositb"}
+
+
+def test_outbound_addresses_exclude_spam_and_the_bridge(tmp_path, monkeypatch):
+    import json
+
+    from src.chain import collect
+    from src.utils import load_config
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    bridge = load_config()["hl_bridge_contract"].lower()
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": bridge,
+         "amount_usd": 1.0, "ts": 1, "spam": False},
+        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xpoison",
+         "amount_usd": 0.0, "ts": 2, "spam": True, "spam_reason": "lookalike"},
+        {"id": "c", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
+         "amount_usd": 900.0, "ts": 3, "spam": False},
+        {"id": "d", "chain": "arbitrum", "src": "0xstranger", "dst": "0xtarget",
+         "amount_usd": 900.0, "ts": 4, "spam": False},
+    ]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xreal"}
+
+
+def test_outbound_addresses_exclude_labelled_infrastructure(tmp_path, monkeypatch):
+    """A shared destination is only evidence of common ownership when it could
+    be a private deposit address. A CEX hot wallet receives from millions of
+    unrelated people, so an overlap there is coincidence — and this result
+    feeds a standalone alert, so a coincidence must never reach the user as a
+    confident ownership claim."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+
+    labels_dir = tmp_path / "labels"
+    labels_dir.mkdir()
+    (labels_dir / "entities.json").write_text(json.dumps({"entities": [
+        {"address": "0xhotwallet", "chain": "arbitrum", "entity": "Binance 8",
+         "category": "cex_hot", "source": "public label", "added": "2026-08-28"},
+    ]}))
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": "0xhotwallet",
+         "amount_usd": 900.0, "ts": 1, "spam": False},
+        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
+         "amount_usd": 900.0, "ts": 2, "spam": False},
+    ]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xreal"}
+
+
+def test_outbound_addresses_do_not_exclude_cex_deposit_labels(tmp_path, monkeypatch):
+    """Regression guard: a curated cex_deposit (or cex_deposit_sweep) label must
+    NOT be excluded here. service_addresses() was built to answer "may the
+    graph walk into this address?", where a deposit address correctly answers
+    no. Linkage asks a different question — "does shared use of this address
+    imply common ownership?" — and for that question a deposit address is the
+    strongest possible yes: it belongs to exactly one exchange account. That is
+    the entire signal this function exists to find; excluding it would invert
+    it silently the day someone curates a confirmed deposit address."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+
+    labels_dir = tmp_path / "labels"
+    labels_dir.mkdir()
+    (labels_dir / "entities.json").write_text(json.dumps({"entities": [
+        {"address": "0xcexdeposit", "chain": "arbitrum", "entity": "Binance deposit",
+         "category": "cex_deposit", "source": "curated", "added": "2026-08-28"},
+    ]}))
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": "0xcexdeposit",
+         "amount_usd": 900.0, "ts": 1, "spam": False},
+    ]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xcexdeposit"}
+
+
+def test_outbound_addresses_exclude_configured_service_addresses(tmp_path, monkeypatch):
+    """`known_service_addresses` in config.json is the other place infrastructure
+    can be named, alongside the curated label registry."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": "0xtarget", "dst": "0xrouter",
+         "amount_usd": 900.0, "ts": 1, "spam": False},
+        {"id": "b", "chain": "arbitrum", "src": "0xtarget", "dst": "0xreal",
+         "amount_usd": 900.0, "ts": 2, "spam": False},
+    ]))
+
+    config = {"hl_bridge_contract": "0xbridge", "known_service_addresses": ["0xrouter"]}
+    assert linkage.get_outbound_addresses("0xtarget", config) == {"0xreal"}
+
+
+# --- the address-reuse signal must not be dark for unswept candidates ----------
+#
+# The substrate is populated only for wallets that were swept: the target,
+# known_self_wallets and graph-frontier wallets. Leaderboard behavioural
+# candidates are a different population and are never swept, so reading only
+# records_for() left this signal near-permanently empty for exactly the wallets
+# it exists to judge - and it fires alert_linkage_match as a standalone alert,
+# not gated behind the score threshold.
+
+CANDIDATE = "0xcandidate"
+
+
+def _live_rows(*destinations, frm=CANDIDATE):
+    return {"status": "1", "result": [
+        {"from": frm, "to": d, "value": "900000000"} for d in destinations]}
+
+
+def test_an_unswept_candidate_still_yields_its_outbound_addresses(tmp_path, monkeypatch):
+    """The required behaviour: a leaderboard candidate nobody swept must still
+    produce its real deposit destinations."""
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")          # the candidate is NOT in it
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: _live_rows("0xdeposita", "0xdepositb"))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == {"0xdeposita", "0xdepositb"}
+    # and through the alias the scanner actually calls
+    assert linkage.get_outbound_usdc_addresses(CANDIDATE) == {"0xdeposita", "0xdepositb"}
+
+
+def test_an_unswept_candidates_partial_substrate_is_unioned_not_trusted(
+        tmp_path, monkeypatch):
+    """For an unswept candidate records_for() returns only the records where it
+    transacted with an ALREADY-SWEPT wallet - a subset of swept addresses that
+    looks like an answer. A non-empty result is therefore not evidence the
+    wallet was swept, so the live lookup is unioned in rather than used only as
+    a fallback-on-empty."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: _live_rows("0xrealdeposit"))
+
+    d = tmp_path / "transfers" / "arbitrum"
+    d.mkdir(parents=True)
+    (d / "2026-08-28.json").write_text(json.dumps([
+        {"id": "a", "chain": "arbitrum", "src": CANDIDATE, "dst": "0xtarget",
+         "amount_usd": 900.0, "ts": 1, "spam": False}]))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == {"0xtarget", "0xrealdeposit"}
+
+
+def test_a_swept_wallet_still_costs_no_api_call(tmp_path, monkeypatch):
+    """The branch's gain is preserved where the substrate is actually complete:
+    the target's outbound set spans every chain and asset, for free."""
+    import json
+
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: pytest.fail("a swept wallet needs no API call"))
+
+    for chain, dst in (("arbitrum", "0xdeposita"), ("base", "0xdepositb")):
+        d = tmp_path / "transfers" / chain
+        d.mkdir(parents=True)
+        (d / "2026-08-28.json").write_text(json.dumps([{
+            "id": f"{chain}:0xh:erc20:0", "chain": chain, "src": "0xtarget",
+            "dst": dst, "amount_usd": 500000.0, "ts": 1, "spam": False}]))
+
+    assert linkage.get_outbound_addresses("0xtarget") == {"0xdeposita", "0xdepositb"}
+
+
+def test_the_live_lookup_excludes_infrastructure_exactly_like_the_substrate_path(
+        tmp_path, monkeypatch):
+    """The live half feeds the same "cryptographic certainty" bonus and the same
+    standalone alert, so it cannot have a weaker exclusion rule."""
+    from src.chain import collect
+    from src.utils import load_config
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    bridge = load_config()["hl_bridge_contract"].lower()
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: _live_rows(bridge, CANDIDATE, "0xreal"))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == {"0xreal"}
+
+
+def test_without_a_key_the_live_half_degrades_to_empty_rather_than_erroring(
+        tmp_path, monkeypatch):
+    from src.chain import collect
+
+    monkeypatch.setattr(linkage, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    _swept(monkeypatch, "0xtarget")
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
+    monkeypatch.setattr(linkage, "etherscan_get",
+                        lambda *a, **k: pytest.fail("must not call the API without a key"))
+
+    assert linkage.get_outbound_addresses(CANDIDATE) == set()
 
 
 # --- risk score ---------------------------------------------------------------

@@ -34,6 +34,26 @@ def edges(*rows):
     return [normalise_l1_transfer(r) for r in rows]
 
 
+def as_substrate_record(row, chain="arbitrum"):
+    """A raw Etherscan row (this file's `l1()` shape) as src/chain/collect.py
+    now produces it — expand_frontier reads records_for(), not raw rows."""
+    usd = int(row.get("value", 0) or 0) / 1e6
+    ts = int(row.get("timeStamp", 0) or 0)
+    return {
+        "id": f"{chain}:{row.get('hash', '')}:erc20:0",
+        "chain": chain, "chain_id": 42161,
+        "block": int(row.get("blockNumber", 0) or 0),
+        "ts": ts, "timestamp": None,
+        "tx_hash": row.get("hash", ""),
+        "src": (row.get("from") or "").lower(),
+        "dst": (row.get("to") or "").lower(),
+        "kind": "erc20", "asset": row.get("tokenSymbol") or "USDC",
+        "token_address": None,
+        "amount": usd, "amount_usd": usd, "value_basis": "stable_par",
+        "spam": False, "spam_reason": None,
+    }
+
+
 def node(graph, addr):
     return next((n for n in graph["nodes"] if n["wallet"] == addr.lower()), None)
 
@@ -244,14 +264,17 @@ def test_failed_lookup_preserves_partial_edges_and_resume_queue(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
     calls = {"n": 0}
+    collected = {}
 
-    def flaky(address, start_block=0):
+    def flaky_sweep(wallet, *args, **kw):
         calls["n"] += 1
         if calls["n"] > 1:
             raise OSError("etherscan unreachable")
-        return [l1(A, C, 980_000, 4, "0x3")]
+        collected[wallet.lower()] = [as_substrate_record(l1(A, C, 980_000, 4, "0x3"))]
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", flaky)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", flaky_sweep)
+    monkeypatch.setattr("src.chain.collect.records_for",
+                        lambda wallet, **kw: collected.get(wallet.lower(), []))
     out, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     # One address failing must not abandon the walk: the successful lookup is
     # kept and the failed ones are re-queued rather than recorded as finished.
@@ -269,19 +292,24 @@ def test_total_lookup_outage_is_reported_as_failed(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
 
-    def dead(address, start_block=0):
+    def dead(wallet, *args, **kw):
         raise OSError("etherscan unreachable")
 
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", dead)
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", dead)
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
     assert diag["status"] == "failed", "a total outage is not a partial result"
     assert diag["error"]
-    assert diag["degraded_sources"] == ["arbitrum_l1"]
+    # Named per chain now that expansion spans all of them, not the single
+    # "arbitrum_l1" label from when collection read one chain.
+    from src.chain.chains import enabled_chains
+    from src.utils import load_config
+    assert diag["degraded_sources"] == [c["name"] for c in enabled_chains(load_config())]
 
 
 def test_resume_queue_is_consumed_on_the_next_run(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *args, **kw: [])
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS,
                                  resume=[{"wallet": E, "depth": 2}], now_ts=NOW)
@@ -290,7 +318,8 @@ def test_resume_queue_is_consumed_on_the_next_run(monkeypatch):
 
 def test_expansion_records_why_each_frontier_was_handled(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *args, **kw: [])
     seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, CEX, 9_000_000, 5, "0x2"))
     _, diag = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 1},
                                  now_ts=NOW)
@@ -301,7 +330,8 @@ def test_expansion_records_why_each_frontier_was_handled(monkeypatch):
 
 def test_budget_limits_are_respected(monkeypatch):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
-    monkeypatch.setattr("src.tracer.get_usdc_transfers", lambda a, start_block=0: [])
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda *args, **kw: [])
     seed = edges(*[l1(T, f"0x{i:040x}", 500_000, 5, f"0x{i}") for i in range(20)])
     _, diag = tg.expand_frontier(seed, T, {**tg.DEFAULTS, "max_expansions": 3},
                                  now_ts=NOW)
@@ -403,3 +433,90 @@ def test_v1_graph_without_chains_is_still_readable():
 ])
 def test_relay_classification_matrix(received, forwarded, hours, dests, expected):
     assert ct.classify_relay(received, forwarded, hours, dests)["is_relay"] is expected
+
+
+# --- 12. a sweep that could not read is not a finished expansion ----------------
+#
+# sweep_wallet never raises on degradation: probe_activity and fetch_kind catch
+# BudgetExhausted and return an error string. Discarding its return value made
+# the except branch that keeps a wallet retryable unreachable for the failure
+# that actually happens, and `explored` persists as expanded_ledger — so the
+# marking was permanent across runs.
+
+def _sweeps(monkeypatch, by_wallet, rows_by_wallet=None):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr("src.chain.collect.sweep_wallet",
+                        lambda wallet, *a, **kw: by_wallet.get(wallet.lower()))
+    monkeypatch.setattr("src.chain.collect.records_for",
+                        lambda wallet, **kw: (rows_by_wallet or {}).get(wallet.lower(), []))
+
+
+def _sweep_result(address, degraded=(), status="ok"):
+    return {"address": address, "status": status, "chains": {},
+            "degraded_sources": list(degraded)}
+
+
+def test_a_degraded_sweep_leaves_the_wallet_out_of_explored(monkeypatch):
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
+    _sweeps(monkeypatch, {
+        A: _sweep_result(A, degraded=["base", "bsc"]),
+        B: _sweep_result(B),
+    })
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A not in diag["expanded_ledger"], \
+        "a wallet whose sweep could not read every chain is not fully explored"
+    assert B in diag["expanded_ledger"], "a clean sweep still finishes the wallet"
+
+    failed = {f["wallet"]: f for f in diag["partial_failures"]}
+    assert A in failed
+    assert failed[A]["chains"] == ["base", "bsc"]
+    # The failing chain names reach the run-level record, not a stale label.
+    assert diag["degraded_sources"] == ["base", "bsc"]
+    # And it is re-queued rather than silently dropped.
+    assert A in {q["wallet"] for q in diag["frontier_queue"]}
+
+
+def test_a_budget_exhausted_sweep_does_not_look_like_an_empty_wallet(monkeypatch):
+    """Constraint: an empty result and a failed read must never serialise the
+    same way. Both wallets return zero rows; only one of them was READ."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
+    _sweeps(monkeypatch, {
+        A: _sweep_result(A, degraded=["arbitrum"], status="ok"),
+        B: _sweep_result(B),
+    })
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    by_wallet = {d["wallet"]: d for d in diag["decisions"]}
+    assert by_wallet[B]["action"] == "expanded"        # genuinely nothing there
+    assert by_wallet[A]["action"] == "deferred"        # we could not tell
+    assert "arbitrum" in by_wallet[A]["reason"]
+    assert diag["status"] != "ok"
+
+
+def test_a_sweep_skipped_for_want_of_a_key_is_not_a_finished_expansion(monkeypatch):
+    """status != "ok" with no per-chain degradation still means "not read"."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
+    _sweeps(monkeypatch, {A: _sweep_result(A, status="skipped_no_api_key")})
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A not in diag["expanded_ledger"]
+    assert diag["partial_failures"][0]["wallet"] == A
+    assert "skipped_no_api_key" in diag["partial_failures"][0]["error"]
+
+
+def test_a_clean_sweep_returning_nothing_still_marks_the_wallet_explored(monkeypatch):
+    """The retry path must not become a treadmill: a wallet that was genuinely
+    read and had nothing is finished, and stays finished across runs."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
+    _sweeps(monkeypatch, {A: _sweep_result(A)})
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A in diag["expanded_ledger"]
+    assert diag["partial_failures"] == []
+    assert diag["degraded_sources"] == []
+    assert diag["status"] == "ok"

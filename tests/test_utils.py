@@ -1,12 +1,16 @@
 # tests/test_utils.py
+import json
 import tempfile
+from pathlib import Path
 
 from src.utils import (
     append_records,
+    atomic_write_json,
     deduplicate_by_key,
     load_all_records,
     now_hhmm,
     read_cursor,
+    save_latest,
     today_str,
     write_cursor,
 )
@@ -59,3 +63,37 @@ def test_now_hhmm_format():
     s = now_hhmm()
     assert len(s) == 5  # HH-MM
     assert s[2] == "-"
+
+
+# --- atomic_write_json: shared by save_latest and src/tracer.py's marker -------
+
+def test_atomic_write_json_writes_valid_json_and_makes_parent_dirs():
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "nested" / "marker.json"
+        atomic_write_json(path, {"a": 1})
+        assert json.loads(path.read_text()) == {"a": 1}
+
+
+def test_atomic_write_json_honours_sort_keys():
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "marker.json"
+        atomic_write_json(path, {"b": 1, "a": 2}, sort_keys=True)
+        text = path.read_text()
+        assert text.index('"a"') < text.index('"b"')
+
+
+def test_atomic_write_json_leaves_no_temp_file_behind():
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "marker.json"
+        atomic_write_json(path, {"a": 1})
+        leftovers = [p.name for p in Path(d).iterdir() if p.name != "marker.json"]
+        assert leftovers == []
+
+
+def test_save_latest_still_produces_the_same_shape_after_the_refactor():
+    """save_latest is now a thin wrapper over atomic_write_json; this pins that
+    the refactor did not change its filename or output."""
+    with tempfile.TemporaryDirectory() as d:
+        filepath = save_latest(d, {"x": 1})
+        assert filepath == str(Path(d) / "latest.json")
+        assert json.loads(Path(filepath).read_text()) == {"x": 1}

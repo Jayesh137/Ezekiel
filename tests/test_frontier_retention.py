@@ -36,6 +36,26 @@ def addr(seed: str) -> str:
     return "0x" + (seed * 40)[:40]
 
 
+def as_substrate_record(row, chain="arbitrum"):
+    """A raw Etherscan row (this file's `l1()` shape) as src/chain/collect.py
+    now produces it — expand_frontier reads records_for(), not raw rows."""
+    usd = int(row.get("value", 0) or 0) / 1e6
+    ts = int(row.get("timeStamp", 0) or 0)
+    return {
+        "id": f"{chain}:{row.get('hash', '')}:erc20:0",
+        "chain": chain, "chain_id": 42161,
+        "block": int(row.get("blockNumber", 0) or 0),
+        "ts": ts, "timestamp": None,
+        "tx_hash": row.get("hash", ""),
+        "src": (row.get("from") or "").lower(),
+        "dst": (row.get("to") or "").lower(),
+        "kind": "erc20", "asset": row.get("tokenSymbol") or "USDC",
+        "token_address": None,
+        "amount": usd, "amount_usd": usd, "value_basis": "stable_par",
+        "spam": False, "spam_reason": None,
+    }
+
+
 LOW_ALPHA = addr("0")     # sorts FIRST alphabetically
 HIGH_ALPHA = addr("f")    # sorts LAST alphabetically
 
@@ -259,8 +279,10 @@ def test_persisted_frontier_resumes_on_the_following_run(monkeypatch):
     a, b, c = addr("a"), addr("b"), addr("c")
     pages = {a: [l1(a, b, 950_000, 4, "0xab")], b: [l1(b, c, 900_000, 3, "0xbc")],
              c: []}
-    monkeypatch.setattr("src.tracer.get_usdc_transfers",
-                        lambda w, start_block=0: list(pages.get(w.lower(), [])))
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", lambda *args, **kw: None)
+    monkeypatch.setattr(
+        "src.chain.collect.records_for",
+        lambda w, **kw: [as_substrate_record(r) for r in pages.get(w.lower(), [])])
     seed = edges(l1(T, a, 1_000_000, 5, "0xta"))
     tight = {**tg.DEFAULTS, "max_expansions": 1}
 
@@ -284,6 +306,36 @@ def test_priority_field_survives_a_serialisation_round_trip(monkeypatch):
     revived = json.loads(json.dumps(diag["frontier_queue"]))
     assert revived == diag["frontier_queue"]
     assert all({"wallet", "depth", "priority"} <= set(q) for q in revived)
+
+
+# --- frontier candidates are deliberately not priced ------------------------
+#
+# See the comment at this exact call site in src/transfer_graph.py: this job
+# shares trace.yml's ~39s of slack with src/tracer.py's cluster sweep, which
+# already prices the TARGET's own transfers. Frontier wallets matter less
+# (topology, not alerting), so giving this call its own second CoinGecko
+# budget was deliberately left out -- a regression guard, not just a report
+# claim, so a later change re-does the arithmetic instead of wiring it in by
+# accident.
+
+def test_expand_frontier_does_not_pass_a_price_lookup_override(monkeypatch):
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    a = addr("a")
+    captured = {}
+
+    def fake_sweep(wallet, chains, budget, **kw):
+        captured["kw"] = kw
+        return None
+
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", fake_sweep)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda w, **kw: [])
+
+    seed = edges(l1(T, a, 1_000_000, 5, "0xta"))
+    tight = {**tg.DEFAULTS, "max_expansions": 1}
+    tg.expand_frontier(seed, T, tight, now_ts=NOW)
+
+    assert "kw" in captured, "sweep_wallet must have been called"
+    assert captured["kw"].get("price_lookup") is None
 
 
 # --- migration of real schema-v2 evidence -----------------------------------
