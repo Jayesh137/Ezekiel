@@ -32,6 +32,17 @@ Two things make a tiny budget go a long way:
 
 Idempotent by construction: a record only changes when a real price arrives, so
 a second pass over an already-priced file rewrites nothing.
+
+**This is the only code in the project that mutates already-stored records.**
+Everything else appends (deduped by `id`) or writes a fresh `latest.json`. That
+makes it the one place a read-modify-write race could lose data: two processes
+reading the same daily file, each editing its own copy, the second overwriting
+the first's addition. `atomic_write_json` does not prevent that — it makes each
+individual write atomic, not the read-then-write pair.
+
+What prevents it is that every workflow touching `data/` shares GitHub Actions'
+`data-commit` concurrency group, so they are serialised. That guarantee does not
+extend to a local invocation: do not run this by hand while a sweep is running.
 """
 
 import json
@@ -91,6 +102,11 @@ def reprice_stored_records(price_lookup, *, root=None) -> dict:
         "still_unpriced": 0,
         "groups_tried": 0,
         "files_rewritten": 0,
+        # A file we could not read is blindness, not absence. Without this the
+        # only observable signal — `still_unpriced` trending down — looks
+        # identical whether the cache has caught up or a daily file has been
+        # permanently unreadable for a week.
+        "files_unreadable": [],
     }
     if not root.exists():
         return health
@@ -120,10 +136,11 @@ def reprice_stored_records(price_lookup, *, root=None) -> dict:
                 records = json.loads(path.read_text())
             except (OSError, ValueError):
                 # A file we cannot read is not a file we may rewrite. Leave it
-                # exactly as it is and let the sweep's own health reporting be
-                # the place unreadable data surfaces.
+                # exactly as it is — and say so, rather than skipping silently.
+                health["files_unreadable"].append(str(path))
                 continue
             if not isinstance(records, list):
+                health["files_unreadable"].append(str(path))
                 continue
 
             changed = False

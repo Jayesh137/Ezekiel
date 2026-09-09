@@ -265,3 +265,73 @@ def test_a_record_with_an_unusable_timestamp_is_counted_not_crashed(tmp_path):
 
     assert read(path)[0]["amount_usd"] is None
     assert health["still_unpriced"] == 1
+
+
+# --- the rewrite must not lose anything it does not understand ---------------
+#
+# This is the highest-risk behaviour in the module: it is the only code in the
+# project that mutates already-stored records, and it rewrites the WHOLE array.
+# Anything it does not recognise has to survive the trip byte-identical.
+#
+# The test matters more than it looks. A future "cleanup" like
+#     records = [r for r in records if isinstance(r, dict)]
+# would silently start discarding entries, and every other test in this file
+# would keep passing — because none of the others puts an unrecognised entry in
+# a file that actually gets rewritten.
+
+def test_entries_the_pass_does_not_understand_survive_a_rewrite(tmp_path):
+    exotic = [
+        "a bare string",
+        42,
+        None,
+        [1, 2, 3],
+        {"id": "from-an-older-schema", "amount_usd": 12.0, "unexpected_key": {"deep": True}},
+    ]
+    path = write(tmp_path, "arbitrum", "2026-06-16", [*exotic, record()])
+
+    health = reprice.reprice_stored_records(counting_lookup(2000.0), root=tmp_path)
+
+    assert health["files_rewritten"] == 1, "the file must actually have been rewritten"
+    after = read(path)
+    assert after[:len(exotic)] == exotic, "an unrecognised entry was altered or dropped"
+    assert after[-1]["amount_usd"] == 6000.0, "the real record was not repriced"
+    assert len(after) == len(exotic) + 1
+
+
+def test_record_order_is_preserved_across_a_rewrite(tmp_path):
+    """Order is not load-bearing today, but a rewrite that reorders records
+    would make every future diff of these files unreadable."""
+    ids = [f"arbitrum:0xh{i}:erc20:0" for i in range(6)]
+    path = write(tmp_path, "arbitrum", "2026-06-16",
+                 [record(id=i, tx_hash=i) for i in ids])
+
+    reprice.reprice_stored_records(counting_lookup(2000.0), root=tmp_path)
+
+    assert [r["id"] for r in read(path)] == ids
+
+
+# --- blindness is reported, not inferred -------------------------------------
+
+@pytest.mark.parametrize("body", ["not json at all", '{"not": "a list"}'])
+def test_an_unreadable_file_is_named_in_the_health_output(tmp_path, body):
+    """`still_unpriced` trending down is the only signal this pass is working.
+    A permanently unreadable file makes that number stop moving for a reason
+    nothing else would explain."""
+    d = tmp_path / "arbitrum"
+    d.mkdir(parents=True)
+    bad = d / "2026-06-16.json"
+    bad.write_text(body)
+
+    health = reprice.reprice_stored_records(counting_lookup(), root=tmp_path)
+
+    assert len(health["files_unreadable"]) == 1
+    assert "2026-06-16.json" in health["files_unreadable"][0]
+    assert bad.read_text() == body
+
+
+def test_a_clean_run_reports_no_unreadable_files(tmp_path):
+    write(tmp_path, "arbitrum", "2026-06-16", [record()])
+
+    health = reprice.reprice_stored_records(counting_lookup(2000.0), root=tmp_path)
+
+    assert health["files_unreadable"] == []
