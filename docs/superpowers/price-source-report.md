@@ -475,3 +475,143 @@ revisit the arithmetic).
   from an actual workflow run shows more slack than the ~39s assumed here),
   the regression test named in §7 will need to be updated deliberately, which
   is the intended friction.
+
+---
+
+## 9. Definitive misses versus indeterminate ones
+
+Added after review. §1's budget-exhaustion fix was the right idea applied to one
+door out of seven; this closes the rest.
+
+### The finding
+
+`PriceCache` persists whatever `fetch` returns, including `None`. That is the
+whole point of it — a confirmed miss must not be re-requested every run. But the
+original `_request_history` swallowed *every* failure and returned `None`
+normally, so a connection reset, a timeout, a 429 or an unparseable body were all
+written to disk as confirmed misses. `PriceCache` never re-requests a cached
+miss, so a single bad response permanently burned that `(symbol, date)`.
+
+The 429 case is the sharp one. This entire design exists *because* the free tier
+rate-limits, so 429 is the expected steady state rather than an edge case. The
+coverage that was supposed to improve incrementally across runs (§1) would
+instead have filled with holes indistinguishable from genuine no-data days.
+
+It is the same failure as booking a missing price at `0.0` one layer up in
+`assets.value_usd`: quietly converting *we could not tell* into *we checked and
+there is nothing*.
+
+### The split
+
+| Outcome | Class | Cached? |
+|---|---|---|
+| symbol not in `MAJORS` | definitive | yes |
+| date confirmed outside the keyless window | definitive | yes |
+| unparseable date string | definitive | yes |
+| 200, body parses to an object, no usable USD figure | definitive | yes |
+| transport exception (connection reset, DNS, timeout) | indeterminate | **no** |
+| any non-200 — 429 and 5xx above all | indeterminate | **no** |
+| 200 whose body will not parse | indeterminate | **no** |
+| 200 whose body parses to a non-object | indeterminate | **no** |
+| per-run budget spent | indeterminate | **no** |
+
+The line is *did CoinGecko give us a verdict about this price*. A well-formed 200
+that simply carries no USD figure for that date is CoinGecko affirmatively saying
+there is nothing — re-asking never gets a different answer, so persisting it is
+right. Everything else tells us nothing about the price at all.
+
+Note the two neighbouring cases that land on opposite sides: a 200 that parses to
+a dict but lacks a price is definitive; a 200 that does not parse to a dict is
+not. They were previously collapsed.
+
+### Mechanism
+
+`_BudgetExhausted` generalised to `_Indeterminate`, reusing the mechanism §1
+already built rather than adding a second one — one path for "no verdict" is
+easier to keep correct than two. `_request_history` now raises it for every
+failed-attempt case; only a genuine verdict returns normally. `PriceCache.get`
+computes `price = self._fetch(...)` and writes on the *next* line, so an
+exception skips the write entirely and propagates untouched. The wrapper returned
+by `coingecko_price_lookup` is the only thing that catches it, returning `None`
+for this call and leaving the on-disk cache exactly as it was.
+
+The in-run `resolved` memo is likewise only populated on a definitive outcome, so
+a 429 stays retryable within the same run as well as across runs.
+
+### Test evidence
+
+`tests/test_chain_prices.py` — every case asserts **both** the return value and
+whether anything reached the disk, which is what the original tests missed:
+
+- `test_an_indeterminate_outcome_returns_none_and_caches_nothing` (9 cases)
+- `test_budget_exhaustion_caches_nothing_like_every_other_non_verdict`
+- `test_a_definitive_miss_returns_none_and_is_cached` (6 cases)
+- `test_a_transient_failure_is_retried_and_can_succeed_within_the_same_run`
+- `test_a_transient_failure_is_retried_by_a_later_run`
+- `test_a_definitive_miss_is_not_retried_by_a_later_run`
+
+Mutation-checked rather than assumed: with the pre-fix `prices.py` restored,
+**11 of these fail** and the definitive-miss tests pass either way — correctly,
+since that half of the behaviour did not change.
+
+```
+$ git checkout 874173f4f -- src/chain/prices.py
+$ .venv/Scripts/python.exe -m pytest tests/test_chain_prices.py -q
+11 failed, 51 passed
+```
+
+---
+
+## 10. `MAJORS["MATIC"]` — verdict
+
+§4 corrected `POL` and left `MATIC` on the legacy `matic-network`, reasoning that
+a genuinely pre-migration MATIC row still needs the old series. That reasoning is
+sound and the conclusion was still wrong, because it never met the date
+arithmetic.
+
+Polygon migrated MATIC to POL on **2024-09-04**. CoinGecko froze the old series
+under `matic-network` (its API labels it `MATIC (migrated to POL)`) and began a
+new one under `polygon-ecosystem-token`. So the correct id depends on the **date**,
+not the symbol — and a static mapping is wrong in one direction whichever id it
+picks.
+
+Statically-legacy, which is what shipped, is wrong for every date currently
+reachable:
+
+- The keyless window is 365 days. Today that reaches back to ~2025-09-09.
+- The migration was 2024-09-04, roughly two years ago.
+- **Every date reachable without a key is therefore post-migration**, so
+  `_too_old` rejects every pre-migration date before a request is made and the
+  legacy id is unreachable in practice.
+- Meanwhile a *post*-migration row still labelled MATIC — a legacy-symbol
+  contract or a bridged wrapper, both common, since Etherscan reports whatever
+  `tokenSymbol` the contract carries — burned a request and cached a definitive
+  miss for an asset that does have a price.
+
+**Resolution:** `prices.MIGRATED_COIN_IDS` resolves the id per date. Before
+2024-09-04 MATIC keeps the legacy series (correct, and reachable with a
+full-history key); on or after it, MATIC prices off `polygon-ecosystem-token`.
+
+It lives in `prices.py` rather than `MAJORS` deliberately: `MAJORS` is a flat
+symbol → id table, and a date conditional inside a data table is how the table
+rots. The comment in `assets.py` points at it so the two do not drift.
+
+Because post-migration MATIC and POL resolve to the same id, the in-run memo
+collapses them into one request — the same way ETH and WETH already share
+`ethereum`.
+
+Covered by `test_matic_before_the_migration_uses_the_legacy_series`,
+`test_matic_on_or_after_the_migration_prices_off_pol`,
+`test_pol_always_uses_the_current_id`,
+`test_post_migration_matic_and_pol_share_one_request`, and
+`test_an_unmigrated_symbol_is_unaffected_by_the_date`. Mutation-checked: 3 fail
+without the change, 2 pass either way.
+
+**What was not verified:** a pre-migration date could not be queried live — the
+365-day cap applies uniformly across `/history` and `/market_chart/range`, and no
+full-history key was available. The pre-migration branch rests on CoinGecko's
+documented behaviour of preserving migrated coins' historical series under their
+old id, plus the observed fact that `matic-network` still resolves and returns a
+well-formed 200 (with no `market_data`) for post-migration dates rather than
+404ing — consistent with "frozen, not deleted". If a full-history key is ever
+added, that branch is worth confirming directly.

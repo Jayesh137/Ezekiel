@@ -121,6 +121,43 @@ THROTTLE_SECONDS = 2.5
 DEFAULT_MAX_REQUESTS_PER_RUN = 12
 DEFAULT_MAX_SECONDS_PER_RUN = 12.0
 
+# The one asset in MAJORS whose CoinGecko id changed underneath it. Polygon
+# migrated MATIC to POL on 2024-09-04; CoinGecko kept the old series under
+# "matic-network" (its API now labels that `MATIC (migrated to POL)`) and began
+# a new one under "polygon-ecosystem-token". So which id is right depends on the
+# DATE, not the symbol -- a row labelled MATIC before the migration needs the
+# legacy series, and one labelled MATIC after it is a legacy-symbol contract or
+# a bridged wrapper whose price is POL's.
+#
+# Mapping MATIC statically to either id is wrong in one direction. Statically
+# legacy -- what this module shipped with -- is wrong for every date currently
+# reachable: the keyless window is 365 days, so `_too_old` rejects every
+# pre-migration date before a request is made, leaving "matic-network"
+# unreachable in practice while post-migration MATIC rows burn a request and
+# cache a definitive miss for an asset that does have a price.
+#
+# This lives here rather than in MAJORS because MAJORS is a flat symbol -> id
+# table, and a date conditional inside a data table is how the table rots.
+MIGRATED_COIN_IDS = {
+    # legacy id: (first date the successor's series applies, successor id)
+    "matic-network": ("2024-09-04", "polygon-ecosystem-token"),
+}
+
+
+def _coin_id_for(coin_id: str, date_str: str) -> str:
+    """The id whose price series actually covers `date_str`.
+
+    `date_str` is ISO `YYYY-MM-DD`, so a plain string comparison orders it
+    correctly against the cutoff without parsing. A malformed date sorts
+    somewhere arbitrary but harmlessly: `_to_coingecko_date` rejects it a few
+    lines later either way, before any request is made.
+    """
+    migration = MIGRATED_COIN_IDS.get(coin_id)
+    if migration is None:
+        return coin_id
+    cutoff, successor = migration
+    return successor if date_str >= cutoff else coin_id
+
 
 class _Indeterminate(Exception):
     """Internal signal only: we tried, or could not try, and learned nothing
@@ -288,6 +325,8 @@ def coingecko_price_lookup(directory, *,
         coin_id = MAJORS.get((symbol or "").strip().upper())
         if not coin_id:
             return None                                  # definitive
+        # Resolved per date, not per symbol: see MIGRATED_COIN_IDS.
+        coin_id = _coin_id_for(coin_id, date_str)
 
         api_key = os.environ.get(DEMO_KEY_ENV_VAR, "")
         if not api_key and _too_old(date_str, FREE_TIER_HISTORY_DAYS):

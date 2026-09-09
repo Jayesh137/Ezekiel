@@ -415,3 +415,196 @@ def test_a_sweep_completes_and_marks_records_price_unavailable_when_coingecko_is
     assert len(got) == 1
     assert got[0]["amount_usd"] is None
     assert got[0]["value_basis"] == "price_unavailable"
+
+
+# --- definitive misses are cached; indeterminate ones are not -----------------
+#
+# PriceCache caches a miss so an unavailable date is not re-requested every run.
+# That is right for a verdict and wrong for a non-verdict, and the difference is
+# invisible in the return value -- both are None. So every case below asserts
+# BOTH halves: what came back, AND whether anything reached the disk.
+#
+# The 429 case is why this matters. The whole design is built around a
+# rate-limited free tier, so 429 is the expected steady state, not an edge case.
+# Cached as a confirmed miss it would permanently burn that (symbol, date), and
+# coverage meant to improve across runs would instead fill with holes
+# indistinguishable from genuine no-data days.
+
+def cache_file(tmp_path, symbol="ETH"):
+    return tmp_path / f"{symbol}.json"
+
+
+@pytest.mark.parametrize("name,response", [
+    ("connection error", requests.exceptions.ConnectionError("dns failed")),
+    ("timeout", requests.exceptions.Timeout("slow")),
+    ("rate limited", FakeResponse(status_code=429)),
+    ("server error", FakeResponse(status_code=500)),
+    ("gateway error", FakeResponse(status_code=502)),
+    ("unparseable body", FakeResponse(200, json_error=ValueError("not json"))),
+    ("body is not an object", FakeResponse(200, payload=["not", "an", "object"])),
+    ("body is a bare string", FakeResponse(200, payload="not-a-dict-at-all")),
+    ("body is null", FakeResponse(200, payload=None)),
+])
+def test_an_indeterminate_outcome_returns_none_and_caches_nothing(tmp_path, name, response):
+    """None of these is a verdict about whether a price exists, so none may be
+    written to disk -- a later run has to get a real second attempt."""
+    price_lookup = build(tmp_path, recording_transport(responses=[response]))
+
+    result = price_lookup("ETH", days_ago(5))
+
+    assert result is None, name
+    assert result != 0.0, name
+    assert not cache_file(tmp_path).exists(), (
+        f"{name}: wrote a cache entry for something that was never a verdict — "
+        f"PriceCache never re-requests a cached miss, so this date is now "
+        f"permanently unpriceable")
+
+
+def test_budget_exhaustion_caches_nothing_like_every_other_non_verdict(tmp_path):
+    """Spending the budget is 'we never tried', which is the same class as a
+    failed attempt even though it never touches the network."""
+    price_lookup = build(tmp_path, recording_transport(), max_requests=0)
+
+    assert price_lookup("ETH", days_ago(5)) is None
+    assert not cache_file(tmp_path).exists()
+
+
+@pytest.mark.parametrize("name,symbol,date,response", [
+    ("unknown symbol", "SCAMCOIN", days_ago(5), None),
+    ("date past the keyless window", "ETH", days_ago(400), None),
+    ("unparseable date", "ETH", "not-a-date", None),
+    ("200 with no market_data", "ETH", days_ago(5), FakeResponse(200, {})),
+    ("200 with no usd figure", "ETH", days_ago(5),
+     FakeResponse(200, {"market_data": {"current_price": {}}})),
+    ("200 with a nonsensical usd figure", "ETH", days_ago(5),
+     FakeResponse(200, {"market_data": {"current_price": {"usd": -1.0}}})),
+])
+def test_a_definitive_miss_returns_none_and_is_cached(tmp_path, name, symbol, date, response):
+    """CoinGecko -- or our own static knowledge -- affirmatively telling us there
+    is nothing here. Re-asking never gets a different answer, so the miss is
+    worth persisting."""
+    responses = [response] if response is not None else []
+    price_lookup = build(tmp_path, recording_transport(responses=responses))
+
+    result = price_lookup(symbol, date)
+
+    assert result is None, name
+    assert result != 0.0, name
+    written = cache_file(tmp_path, symbol)
+    assert written.exists(), f"{name}: a confirmed miss should not be re-requested every run"
+    assert json.loads(written.read_text())[date] is None, name
+
+
+def test_a_transient_failure_is_retried_and_can_succeed_within_the_same_run(tmp_path):
+    """The regression guard for the whole split: a 429 must not foreclose the
+    retry, in this run or any later one."""
+    transport = recording_transport(responses=[
+        FakeResponse(status_code=429),
+        FakeResponse(200, history_payload(2500.0)),
+    ])
+    price_lookup = build(tmp_path, transport)
+    date = days_ago(5)
+
+    assert price_lookup("ETH", date) is None
+    assert price_lookup("ETH", date) == 2500.0
+
+    assert len(transport.calls) == 2, "the retry never reached the transport"
+    assert json.loads(cache_file(tmp_path).read_text())[date] == 2500.0
+
+
+def test_a_transient_failure_is_retried_by_a_later_run(tmp_path):
+    """Same guarantee across process boundaries: a fresh instance over the same
+    directory must not inherit a poisoned entry."""
+    date = days_ago(5)
+    first = build(tmp_path, recording_transport(responses=[FakeResponse(status_code=429)]))
+    assert first("ETH", date) is None
+
+    second_transport = recording_transport(responses=[FakeResponse(200, history_payload(2500.0))])
+    second = build(tmp_path, second_transport)
+
+    assert second("ETH", date) == 2500.0
+    assert len(second_transport.calls) == 1
+
+
+def test_a_definitive_miss_is_not_retried_by_a_later_run(tmp_path):
+    """The other half of the contract -- otherwise every run re-asks CoinGecko
+    for a date it has already said it has nothing for."""
+    date = days_ago(5)
+    first = build(tmp_path, recording_transport(responses=[FakeResponse(200, {})]))
+    assert first("ETH", date) is None
+
+    second_transport = recording_transport()
+    second = build(tmp_path, second_transport)
+
+    assert second("ETH", date) is None
+    assert second_transport.calls == [], "a confirmed miss was re-requested"
+
+
+# --- MATIC's coin id depends on the date, not the symbol ----------------------
+#
+# Polygon migrated MATIC to POL on 2024-09-04. CoinGecko kept the old series
+# under "matic-network" and started a new one under "polygon-ecosystem-token",
+# so a static mapping is wrong in one direction whichever id it picks. See
+# prices.MIGRATED_COIN_IDS.
+
+@pytest.fixture
+def _with_key(monkeypatch):
+    """Migration-era dates are years old, so the keyless 365-day guard rejects
+    them before a request is ever made — which is itself why a static legacy
+    mapping is unreachable in practice. These tests are about which id gets
+    requested, so they need a key to get past that guard at all."""
+    monkeypatch.setenv("COINGECKO_API_KEY", "test-key")
+
+
+def test_matic_before_the_migration_uses_the_legacy_series(tmp_path, _with_key):
+    transport = recording_transport()
+    price_lookup = build(tmp_path, transport)
+
+    price_lookup("MATIC", "2024-09-03")
+
+    assert "matic-network" in transport.calls[0]["url"]
+
+
+@pytest.mark.parametrize("date", ["2024-09-04", "2024-09-05"])
+def test_matic_on_or_after_the_migration_prices_off_pol(tmp_path, date, _with_key):
+    """A row still labelled MATIC after the migration is a legacy-symbol
+    contract or a bridged wrapper — its price is POL's. Mapping it to the
+    frozen legacy series would return a definitive miss for an asset that
+    does have a price."""
+    transport = recording_transport()
+    price_lookup = build(tmp_path, transport)
+
+    price_lookup("MATIC", date)
+
+    assert "polygon-ecosystem-token" in transport.calls[0]["url"]
+    assert "matic-network" not in transport.calls[0]["url"]
+
+
+def test_pol_always_uses_the_current_id(tmp_path):
+    transport = recording_transport()
+    price_lookup = build(tmp_path, transport)
+
+    price_lookup("POL", days_ago(5))
+
+    assert "polygon-ecosystem-token" in transport.calls[0]["url"]
+
+
+def test_post_migration_matic_and_pol_share_one_request(tmp_path):
+    """They resolve to the same id, so the in-run memo should collapse them —
+    the same way ETH and WETH already do."""
+    transport = recording_transport()
+    price_lookup = build(tmp_path, transport)
+    date = days_ago(5)
+
+    assert price_lookup("MATIC", date) == 2500.0
+    assert price_lookup("POL", date) == 2500.0
+
+    assert len(transport.calls) == 1
+
+
+def test_an_unmigrated_symbol_is_unaffected_by_the_date(tmp_path, _with_key):
+    """The migration table must not touch anything it does not name."""
+    for date in ("2024-09-03", "2024-09-05", days_ago(5)):
+        transport = recording_transport()
+        build(tmp_path / date, transport)("ETH", date)
+        assert "ethereum" in transport.calls[0]["url"], date

@@ -25,10 +25,13 @@ STABLES = {
 # `{"symbol": "matic", "name": "MATIC (migrated to POL)"}` -- a deprecated
 # legacy id, not the live POL token. `/search?query=POL` returns
 # "polygon-ecosystem-token" (symbol POL, name "POL (ex-MATIC)") as the correct
-# current id. MATIC is left pointing at "matic-network" deliberately: a row
-# genuinely labelled "MATIC" (pre-migration, before 2024-09-04) still needs
-# that legacy id's own historical price series, which CoinGecko continues to
-# serve under the old id. Every other id below was independently confirmed
+# current id. MATIC maps to the legacy "matic-network" here, but that is only
+# the PRE-migration half of the answer: which id is correct for MATIC depends on
+# the date, so src/chain/prices.py resolves it per date via MIGRATED_COIN_IDS
+# (pre-2024-09-04 keeps the legacy series; on or after it, MATIC is a
+# legacy-symbol contract or bridged wrapper and prices off POL). The date
+# conditional lives there rather than in this table on purpose. Every other id
+# below was independently confirmed
 # correct (ETH/WETH share "ethereum" on purpose -- WETH is arbitrage-pegged
 # 1:1 to ETH, so pricing it off ETH's series is intentional, not an oversight).
 MAJORS = {
