@@ -1,9 +1,9 @@
 # RESUME HERE — say "continue where we left off"
 
-**Last session ended:** 2026-08-31 (hit the weekly API limit mid-task)
+**Last updated:** 2026-09-09 — Phase 1 complete, all loose ends closed
 **Branch:** `feat/universal-fund-tracing` — **pushed to `origin`, everything committed, working tree clean**
-**HEAD:** `fix(prices): stop transient failures poisoning the price cache`
-**Tests:** 640 passing (~20s) · `ruff check src tests scripts` clean · suite verified network-free
+**HEAD:** `fix(prices): resolve MATIC's coin id by date, and pin the cache split`
+**Tests:** 665 passing (~20s) · `ruff check src tests scripts` clean · suite verified network-free
 
 Nothing is lost. Everything below is in git and on GitHub.
 
@@ -115,37 +115,28 @@ movements can now become graph edges and fire alerts.
 
 ## PICK UP EXACTLY HERE
 
-The price-source agent died writing its report, *after* finishing and committing
-the code. Three small loose ends:
+**All three code loose ends are closed** (2026-09-09, commit `93000c327`).
+Phase 1 is complete. The only thing left is the live run.
 
-### 1. Finish the price-source test coverage (small)
+For the record, what closed:
 
-`tests/test_chain_prices.py` has 27 tests but only ~4 assert the **cache side**.
-I verified the full taxonomy by hand and it is correct, but it is not locked in.
+1. **Price-cache test coverage** — every failure case now asserts *both* the
+   return value and whether anything reached disk, which is the half the
+   original tests missed. Mutation-checked: 11 fail against the pre-fix module.
+2. **`MAJORS["MATIC"]` settled, and the previous answer was wrong.** The id
+   depends on the *date*, not the symbol: Polygon migrated MATIC to POL on
+   2024-09-04, CoinGecko froze the old series and began a new one. Leaving MATIC
+   statically on `matic-network` was wrong for every date currently reachable —
+   the keyless window is 365 days and the migration was ~two years ago, so
+   `_too_old` rejects every pre-migration date before a request is made, while a
+   *post*-migration row still labelled MATIC (legacy-symbol contracts and
+   bridged wrappers are common) burned a request and cached a miss for an asset
+   that does have a price. `prices.MIGRATED_COIN_IDS` now resolves per date.
+3. **`docs/superpowers/price-source-report.md`** — §9 (the definitive /
+   indeterminate split) and §10 (the MATIC verdict, including what could *not*
+   be verified live) are written.
 
-Add tests asserting **both** the return value and whether a cache file was written:
-
-- **Must return `None` and write NOTHING:** connection error, timeout, 429, 500,
-  malformed JSON, non-object body, budget exhausted
-- **Must return `None` and CACHE the miss:** unknown symbol, date outside the
-  free-tier window, well-formed 200 with no usable `usd`
-- **The regression guard:** a retry after a transient failure reaches the
-  transport again and can succeed
-
-### 2. Settle `MAJORS["MATIC"]` (small)
-
-`POL` was corrected to `polygon-ecosystem-token`; `MATIC` still maps to
-`matic-network`. The agent's last finding before dying: for a post-migration date
-`matic-network` returns HTTP 200 with **no `market_data` at all** — a clean
-"nothing here", consistent with "frozen at migration, not deleted" — while
-`polygon-ecosystem-token` has live data. It could **not** query a pre-migration
-date (the 365-day keyless cap applies uniformly). So: either `matic-network` is
-still right for historical MATIC, or it is the same staleness half-fixed. Settle
-it and record the verdict.
-
-### 3. Finish `docs/superpowers/price-source-report.md`
-
-The definitive/indeterminate split section was never written.
+So: **go run the backfill.** See the top of this document.
 
 ---
 
