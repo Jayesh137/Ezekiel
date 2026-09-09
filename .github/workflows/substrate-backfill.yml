@@ -22,6 +22,10 @@ on:
         required: false
         type: boolean
         default: false
+      wallet:
+        description: 'Sweep only this address instead of the cluster (follows the money out of a counterparty)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -49,12 +53,14 @@ jobs:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
           FULL_RESET: ${{ inputs.full_reset }}
+          # Via env, never spliced into the run: text — an address arriving from
+          # a manual dispatch is untrusted input.
+          WALLET: ${{ inputs.wallet }}
         run: |
-          if [ "$FULL_RESET" = "true" ]; then
-            python scripts/backfill_transfers.py --reset
-          else
-            python scripts/backfill_transfers.py
-          fi
+          ARGS=""
+          if [ -n "$WALLET" ]; then ARGS="--wallet $WALLET"; fi
+          if [ "$FULL_RESET" = "true" ]; then ARGS="$ARGS --reset"; fi
+          python scripts/backfill_transfers.py $ARGS
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
