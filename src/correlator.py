@@ -29,7 +29,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.chain.collect import records_for
 from src.utils import (
     DATA_DIR,
-    etherscan_get,
     load_all_records,
     load_config,
     save_latest,
@@ -40,9 +39,18 @@ def utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+# Below this many candidate deposits, "this amount is unique" says more about
+# the sample size than about the amount, so the shape proxy is the honest read.
+MIN_POPULATION_FOR_RARITY = 30
+
+
 def _uniqueness(amount: float) -> float:
-    """How distinctive an amount is. Round numbers are common (many wallets move
-    exactly $1M), so a round-number match is weak; an odd amount match is strong."""
+    """How distinctive an amount is, judged by shape alone.
+
+    Round numbers are common — many wallets move exactly $1M — so a round-number
+    match is weak and an odd one is strong. This is a *proxy* for rarity, used
+    when the real candidate pool is too small to measure against.
+    """
     a = round(amount)
     if a <= 0:
         return 0.0
@@ -57,6 +65,35 @@ def _uniqueness(amount: float) -> float:
     return 1.0
 
 
+def _rarity(amount: float, population: list[float], tol_pct: float) -> tuple[float, int]:
+    """How distinctive an amount is against the deposits actually competing.
+
+    The round-number proxy above asks what an amount looks like. This asks the
+    question that actually matters: how many OTHER deposits in this window would
+    have matched the same exit just as well? One is near-proof. Fifty is noise,
+    however odd the number looks.
+
+    That distinction only became measurable once the candidate pool stopped
+    being truncated to the most recent page — see get_recent_bridge_deposits.
+    Note the proxy is subsumed rather than contradicted: round amounts recur
+    more often in a real population, so they score low here without needing a
+    special case.
+
+    Falls back to the proxy when the pool is too small to say anything: with a
+    handful of candidates, "unique" is an artefact of the sample, not a fact
+    about the amount. Returns (rarity, competitors).
+    """
+    if len(population) < MIN_POPULATION_FOR_RARITY:
+        return _uniqueness(amount), 0
+    if amount <= 0:
+        return 0.0, 0
+    competitors = sum(1 for p in population
+                      if p > 0 and abs(p - amount) / amount <= tol_pct)
+    if competitors <= 1:
+        return 1.0, 0
+    return round(1.0 / competitors, 4), competitors - 1
+
+
 def find_correlations(exits: list[dict], entries: list[dict],
                       tol_pct: float = 0.03, window_days: float = 14,
                       min_amount: float = 100_000, min_confidence: float = 0.55) -> list[dict]:
@@ -67,6 +104,10 @@ def find_correlations(exits: list[dict], entries: list[dict],
     can't spawn many spurious findings. Pure function — no I/O, fully testable.
     """
     window_s = window_days * 86400
+    # The amounts every candidate deposit is competing with. Measured once, on
+    # the whole pool, so rarity is a fact about the window rather than about
+    # the order matches happen to be evaluated in.
+    population = [float(e.get("amount", 0) or 0) for e in entries]
     usable_exits = sorted(
         [e for e in exits if e.get("amount", 0) >= min_amount and e.get("ts")],
         key=lambda e: e["ts"],
@@ -104,7 +145,7 @@ def find_correlations(exits: list[dict], entries: list[dict],
         dt_days = (ets - ex["ts"]) / 86400
         amount_score = 1.0 - (r / tol_pct if tol_pct else 0)
         time_score = 1.0 - (dt_days / window_days if window_days else 0)
-        uniq = _uniqueness(ex["amount"])
+        uniq, competitors = _rarity(ex["amount"], population, tol_pct)
         confidence = round(0.5 * amount_score + 0.2 * max(0.0, time_score) + 0.3 * uniq, 4)
         if confidence < min_confidence:
             continue
@@ -119,6 +160,10 @@ def find_correlations(exits: list[dict], entries: list[dict],
             "exit_source": ex.get("source", "unknown"),
             "exit_ref": ex.get("ref", ""),
             "uniqueness": uniq,
+            # How many OTHER deposits in the window would have matched this
+            # exit just as well. 0 means nothing else came close, which is what
+            # makes an amount match evidence rather than coincidence.
+            "competing_deposits": competitors,
             "confidence": confidence,
             "deposit_ts": ets,
             "detected_at": utc_now(),
@@ -184,45 +229,73 @@ def collect_target_exits(target: str, min_amount: float) -> list[dict]:
     return exits
 
 
-def get_recent_bridge_deposits(window_days: float, min_amount: float) -> list[dict]:
-    """Fresh HL bridge deposits (to the bridge) within the window, excluding the
-    target and excluded/system addresses. Returns [{wallet, amount, ts}]."""
-    api_key = os.environ.get("ETHERSCAN_API_KEY", "")
-    if not api_key:
-        print("[correlator] Etherscan API key missing, skipping bridge deposit scan")
-        return []
+def get_recent_bridge_deposits(window_days: float, min_amount: float,
+                               budget=None) -> tuple[list[dict], str | None]:
+    """Every fresh HL bridge deposit within the window. Returns (deposits, error).
+
+    This used to be one call: `offset=2000, sort=desc`, no pagination. The
+    Hyperliquid bridge is among the busiest contracts on Arbitrum, so the most
+    recent 2,000 USDC transfers cover hours — against a window that defaults to
+    fourteen days. The re-link most likely to actually find a migrated wallet
+    was therefore searching a sliver of the candidate pool and reporting
+    match_count 0 with no indication that it had only looked at a fraction.
+
+    Now the window's start is converted to a block and walked forward with the
+    same paginated reader the substrate uses, so it reads the whole window and
+    nothing older. An error is RETURNED rather than swallowed: finding nothing
+    because we could not look must never read as finding nothing because there
+    was nothing there.
+    """
+    from src.chain.budget import CallBudget
+    from src.chain.chains import chain_by_name
+    from src.chain.client import block_at_time, fetch_transfers_to
+
+    if not os.environ.get("ETHERSCAN_API_KEY"):
+        return [], "skipped_no_api_key"
 
     config = load_config()
-    result = etherscan_get({
-        "module": "account", "action": "tokentx",
-        "address": config["hl_bridge_contract"],
-        "contractaddress": config["usdc_contract_arbitrum"],
-        "page": 1, "offset": 2000, "sort": "desc",
-    })
-    transfers = result.get("result", []) if result.get("status") == "1" else []
-    if not isinstance(transfers, list):
-        return []
+    chain = chain_by_name("arbitrum", config)
+    budget = budget or CallBudget(
+        max_calls=(config.get("correlation") or {}).get("max_calls_per_run", 60),
+        seconds=(config.get("correlation") or {}).get("time_budget_seconds", 90))
 
     cutoff = int(time.time()) - int(window_days * 86400)
+    start_block, err = block_at_time(chain, cutoff, budget)
+    if start_block is None:
+        # Walking from 0 instead would read the bridge's entire history and
+        # exhaust the budget long before reaching the window we wanted.
+        return [], f"could not resolve the window start block: {err}"
+
+    walk, err = fetch_transfers_to(
+        config["hl_bridge_contract"], chain, config["usdc_contract_arbitrum"],
+        start_block, budget)
+
     bridge = config["hl_bridge_contract"].lower()
     target = config["target_wallet"].lower()
     excluded = {a.lower() for a in config.get("excluded_addresses", [])}
     excluded |= {a.lower() for a in config.get("known_self_wallets", [])}
 
     deposits = []
-    for t in transfers:
-        ts = int(t.get("timeStamp", 0))
+    for row in walk.rows:
+        try:
+            ts = int(row.get("timeStamp", 0) or 0)
+            amt = int(row.get("value", 0) or 0) / 1e6
+        except (TypeError, ValueError):
+            continue
         if ts < cutoff:
             continue
-        if (t.get("to", "") or "").lower() != bridge:
+        if (row.get("to", "") or "").lower() != bridge:
             continue
-        frm = (t.get("from", "") or "").lower()
+        frm = (row.get("from", "") or "").lower()
         if not frm or frm == target or frm == bridge or frm in excluded:
             continue
-        amt = int(t.get("value", 0)) / 1e6
         if amt >= min_amount:
             deposits.append({"wallet": frm, "amount": amt, "ts": ts})
-    return deposits
+
+    if walk.truncated and not err:
+        err = (f"read {len(walk.rows)} rows and hit the page ceiling before the "
+               f"window ended — the candidate pool is incomplete")
+    return deposits, err
 
 
 def run_correlation() -> dict:
@@ -238,9 +311,14 @@ def run_correlation() -> dict:
     min_conf = cfg.get("min_confidence", 0.55)
 
     exits = collect_target_exits(target, min_amount)
-    entries = get_recent_bridge_deposits(window_days, min_amount)
+    entries, entries_error = get_recent_bridge_deposits(window_days, min_amount)
     print(f"[correlator] {len(exits)} exits vs {len(entries)} fresh deposits "
           f"(>= ${min_amount:,.0f}, {window_days}d window)")
+    if entries_error:
+        # A correlation run that could not see the whole candidate pool has not
+        # cleared the target — it has not looked. Saying so is the difference
+        # between "no match" and "no idea".
+        print(f"[correlator] INCOMPLETE candidate pool: {entries_error}")
 
     findings = find_correlations(exits, entries, tol_pct, window_days, min_amount, min_conf)
 
@@ -250,6 +328,10 @@ def run_correlation() -> dict:
         "params": {"min_amount_usd": min_amount, "window_days": window_days,
                    "tolerance_pct": tol_pct, "min_confidence": min_conf},
         "match_count": len(findings),
+        # Absent or empty means the pool was whole. Present means a zero match
+        # count is not evidence of absence.
+        "candidate_pool_error": entries_error,
+        "candidates_considered": len(entries),
         "matches": findings[:50],
     }
     save_latest(str(DATA_DIR / "correlations"), result)

@@ -163,6 +163,80 @@ def newest_block(address: str, chain: dict, kind: str,
         return None, f"unparseable blockNumber: {rows[0].get('blockNumber')!r}"
 
 
+def block_at_time(chain: dict, timestamp: int,
+                  budget: CallBudget) -> tuple[int | None, str | None]:
+    """The block closest to a unix timestamp. One call.
+
+    Lets a caller bound a walk by TIME rather than by history. Reading a busy
+    contract's recent activity by asking for "the newest N rows" silently
+    truncates to whatever N covers — on the Hyperliquid bridge that is hours,
+    not the fourteen days the correlator's window assumes. Converting the
+    window's start into a block and walking forward from there reads the whole
+    window and nothing older.
+
+    Returns (block, error). A non-None error means we could not tell, which a
+    caller must not read as block 0 — that would walk the chain from genesis.
+    """
+    try:
+        budget.spend()
+    except BudgetExhausted as exc:
+        return None, f"budget_exhausted:{exc}"
+    payload = etherscan_get({
+        "module": "block",
+        "action": "getblocknobytime",
+        "timestamp": int(timestamp),
+        "closest": "before",
+    }, chain_id=chain["chain_id"])
+    result = payload.get("result")
+    if payload.get("status") != "1":
+        return None, str(payload.get("message") or result or "unknown error")
+    try:
+        return int(result), None
+    except (TypeError, ValueError):
+        return None, f"unparseable block: {result!r}"
+
+
+def fetch_transfers_to(address: str, chain: dict, token: str, start_block: int,
+                       budget: CallBudget, *, page_size: int = 1000,
+                       max_pages: int = 50) -> tuple[WalkResult, str | None]:
+    """Every token transfer involving `address` from `start_block` forward.
+
+    Same paginated walk `fetch_kind` uses, pointed at a contract rather than a
+    wallet, and filtered to one token. The correlator needs this to see every
+    deposit into the Hyperliquid bridge across its window instead of the most
+    recent page of them.
+    """
+    error: str | None = None
+
+    def fetch(start: int, size: int) -> list[dict]:
+        nonlocal error
+        if error is not None:
+            return []
+        try:
+            budget.spend()
+        except BudgetExhausted as exc:
+            error = f"budget_exhausted:{exc}"
+            return []
+        payload = etherscan_get({
+            "module": "account",
+            "action": "tokentx",
+            "address": address,
+            "contractaddress": token,
+            "startblock": start,
+            "endblock": ENDBLOCK,
+            "page": 1,
+            "offset": size,
+            "sort": "asc",
+        }, chain_id=chain["chain_id"])
+        rows, err = _rows_or_error(payload)
+        if err:
+            error = err
+        return rows
+
+    result = walk_blocks(fetch, start_block, page_size=page_size, max_pages=max_pages)
+    return result, error
+
+
 def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
     """The address's deployed bytecode, or None if it could not be read.
 

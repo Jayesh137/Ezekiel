@@ -540,3 +540,113 @@ def test_xyz_abandoned_detection():
     assert risk._xyz_abandoned([{"coin": "xyz:SP500", "time": old}]) is True
     assert risk._xyz_abandoned([{"coin": "xyz:SP500", "time": recent}]) is False
     assert risk._xyz_abandoned([{"coin": "BTC", "time": old}]) is False  # never traded xyz
+
+
+# --- amount rarity, measured against the real candidate pool ------------------
+#
+# The correlator is the mechanism most likely to actually find a migrated
+# wallet: he exits ~$X to an exchange and a fresh wallet re-enters ~$X. Whether
+# that match is evidence depends entirely on how many OTHER deposits would have
+# matched just as well — which only became answerable once the candidate pool
+# stopped being truncated to the most recent page.
+
+def _pool(*amounts):
+    return [{"wallet": f"0xw{i}", "amount": a, "ts": 1000} for i, a in enumerate(amounts)]
+
+
+def test_a_unique_amount_in_a_real_pool_scores_maximum_rarity():
+    from src import correlator
+    population = [1_000_000.0] * 50 + [7_253_701.06]
+
+    rarity, competitors = correlator._rarity(7_253_701.06, population, 0.03)
+
+    assert rarity == 1.0
+    assert competitors == 0
+
+
+def test_a_crowded_amount_scores_low_however_odd_it_looks():
+    """The round-number proxy would call 7,253,701.06 maximally distinctive.
+    Against a pool where fifty deposits sit within tolerance of it, it is not."""
+    from src import correlator
+    population = [7_253_701.06] * 50
+
+    rarity, competitors = correlator._rarity(7_253_701.06, population, 0.03)
+
+    assert rarity < 0.05
+    assert competitors == 49
+    assert correlator._uniqueness(7_253_701.06) == 1.0, (
+        "the shape proxy still calls it unique — which is the point")
+
+
+def test_rarity_counts_near_matches_not_only_exact_ones():
+    """A deposit 1% away would have matched the same exit, so it competes."""
+    from src import correlator
+    population = [1_000_000.0, 1_005_000.0, 1_009_000.0, 5_000_000.0]
+    population += [9_000_000.0 + i for i in range(30)]   # push past the floor
+
+    rarity, competitors = correlator._rarity(1_000_000.0, population, 0.03)
+
+    assert competitors == 2, "the two amounts within 3% should compete"
+    assert rarity == pytest.approx(1 / 3, abs=0.01)
+
+
+def test_a_small_pool_falls_back_to_the_shape_proxy():
+    """With a handful of candidates, 'unique' is an artefact of the sample."""
+    from src import correlator
+    tiny = [1_234_567.0, 2_000_000.0]
+
+    rarity, competitors = correlator._rarity(1_000_000.0, tiny, 0.03)
+
+    assert rarity == correlator._uniqueness(1_000_000.0) == 0.30
+    assert competitors == 0
+
+
+def test_a_crowded_match_is_scored_below_a_unique_one_end_to_end():
+    from src import correlator
+    exits = [{"amount": 1_000_000.0, "ts": 1_000_000, "source": "hl_withdraw", "ref": "x"}]
+    crowded = _pool(*([1_000_000.0] * 40))
+    for e in crowded:
+        e["ts"] = 1_100_000
+
+    unique_pool = _pool(*([3_000_000.0 + i * 100_000 for i in range(39)] + [1_000_000.0]))
+    for e in unique_pool:
+        e["ts"] = 1_100_000
+
+    crowded_hits = correlator.find_correlations(exits, crowded, min_confidence=0.0)
+    unique_hits = correlator.find_correlations(
+        [dict(exits[0])], unique_pool, min_confidence=0.0)
+
+    assert crowded_hits and unique_hits
+    assert unique_hits[0]["confidence"] > crowded_hits[0]["confidence"], (
+        "a match nothing else could explain must outrank one forty deposits share")
+    assert crowded_hits[0]["competing_deposits"] == 39
+    assert unique_hits[0]["competing_deposits"] == 0
+
+
+def test_an_incomplete_candidate_pool_is_reported_not_silently_scored(monkeypatch):
+    """A run that could not see the whole pool has not cleared the target — it
+    has not looked. match_count 0 must not read as 'no migration'."""
+    from src import correlator
+    monkeypatch.setattr(correlator, "collect_target_exits", lambda t, m: [])
+    monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
+                        lambda w, m: ([], "hit the page ceiling before the window ended"))
+    monkeypatch.setattr(correlator, "save_latest", lambda d, data: "")
+
+    result = correlator.run_correlation()
+
+    assert result["match_count"] == 0
+    assert result["candidate_pool_error"], (
+        "a zero match count with a truncated pool must say the pool was truncated")
+
+
+def test_a_whole_candidate_pool_records_no_error(monkeypatch):
+    from src import correlator
+    monkeypatch.setattr(correlator, "collect_target_exits", lambda t, m: [])
+    monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
+                        lambda w, m: ([{"wallet": "0xa", "amount": 1e6, "ts": 1}], None))
+    monkeypatch.setattr(correlator, "save_latest", lambda d, data: "")
+
+    result = correlator.run_correlation()
+
+    assert result["candidate_pool_error"] is None
+    assert result["candidates_considered"] == 1

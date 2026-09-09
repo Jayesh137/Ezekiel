@@ -688,15 +688,15 @@ def main():
     findings = trace_fund_flow(config["target_wallet"])
     print(f"[tracer] Trace complete. Findings: {len(findings)}")
 
-    # Deposit/withdrawal correlation — re-link the target to a fresh wallet across a
-    # CEX/cross-chain gap by matching exit amounts to new bridge deposits. Uses the
-    # same Etherscan budget as tracing, so it belongs in this job.
-    try:
-        from src.correlator import run_correlation
-        corr = run_correlation()
-        print(f"[tracer] Correlation complete. Matches: {corr.get('match_count', 0)}")
-    except Exception as e:
-        print(f"[tracer] Correlation step failed: {e}")
+    # Correlation used to run here, on the tail of this job's budget. It no
+    # longer fits: reading the WHOLE 14-day candidate pool (rather than the most
+    # recent page of it, which is what it used to do) needs real time, and
+    # 150 + 240 + 150 + 20 + 90 is 650s against a 600s job.
+    #
+    # It moved to analyze.yml, which has the slack. A 14-day window does not
+    # need half-hourly cadence, and a complete daily answer is worth more than a
+    # permanently-partial frequent one — a run that only saw a slice of the pool
+    # cannot distinguish "no match" from "did not look".
 
 
 if __name__ == "__main__":
