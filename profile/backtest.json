@@ -1,49 +1,49 @@
 {
-  "run_at": "2026-08-12T01:10:31.778128+00:00",
+  "run_at": "2026-09-09T02:12:38.355994+00:00",
   "scoring_schema": "2026-08-05.1",
-  "older_fills": 42025,
-  "recent_fills": 9501,
+  "older_fills": 25833,
+  "recent_fills": 63511,
   "older_distinct_days": 12,
   "recent_distinct_days": 12,
   "windows": {
     "selection": "activity_based",
     "target_days_per_window": 12,
     "min_days_per_window": 8,
-    "total_active_days_available": 66,
+    "total_active_days_available": 75,
     "older": {
-      "fills": 42025,
+      "fills": 25833,
       "active_days": 12,
-      "first_day": "2026-05-10",
-      "last_day": "2026-06-12",
-      "calendar_span_days": 34
+      "first_day": "2026-05-25",
+      "last_day": "2026-08-04",
+      "calendar_span_days": 72
     },
     "recent": {
-      "fills": 9501,
+      "fills": 63511,
       "active_days": 12,
-      "first_day": "2026-06-15",
-      "last_day": "2026-08-08",
-      "calendar_span_days": 55
+      "first_day": "2026-08-05",
+      "last_day": "2026-09-06",
+      "calendar_span_days": 33
     },
     "leakage": {
       "shared_tids": 0,
       "shared_days": 0,
       "chronological": true
     },
-    "excluded": "42 older active day(s) outside the two most recent windows"
+    "excluded": "51 older active day(s) outside the two most recent windows"
   },
-  "self_score": 0.5365,
+  "self_score": 0.533,
   "self_dimensions": {
-    "asset_preferences": 0.2979,
-    "timing_profile": 0.251,
+    "asset_preferences": 0.3966,
+    "timing_profile": 0.2605,
     "leverage_profile": 1.0,
     "entry_exit_style": 1.0,
-    "hold_duration": 0.6176,
-    "account_size": 0.8138,
-    "trade_sequencing": 0.7015,
-    "position_sizing": 0.7071,
-    "activity": 0.6238,
-    "direction_bias": 0.9924,
-    "position_management": 0.8839,
+    "hold_duration": 0.5357,
+    "account_size": 0.7459,
+    "trade_sequencing": 0.5117,
+    "position_sizing": 0.5,
+    "activity": 0.7213,
+    "direction_bias": 0.9921,
+    "position_management": 0.8505,
     "loss_handling": null
   },
   "self_vetoes": [],
@@ -52,31 +52,34 @@
     "loss_handling"
   ],
   "strangers_scored": 20,
-  "best_stranger_score": 0.45,
+  "best_stranger_score": 0.5727,
   "top_strangers": [
     {
-      "wallet": "0x7c930969fcf3e5a5c78bcf2e1cefda3f53e3c8fd",
+      "wallet": "0x920fa68300c8aa95c4563e0daf79a0b0e51f0cfe",
+      "score": 0.5727
+    },
+    {
+      "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
+      "score": 0.546
+    },
+    {
+      "wallet": "0x8be37c37f9532276643b27f75daaf4b102f4c8f0",
+      "score": 0.488
+    },
+    {
+      "wallet": "0xfc27136e42af1732ddc9ce2605ea9bff1b959d9d",
       "score": 0.45
     },
     {
-      "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
-      "score": 0.45
-    },
-    {
-      "wallet": "0xc30c7ea910a71ce06ae840868b0c7e47616ba4c9",
-      "score": 0.45
-    },
-    {
-      "wallet": "0x905393f6c29aa218f52dd8a4ec8933c0bf71b56e",
-      "score": 0.45
-    },
-    {
-      "wallet": "0xbeccae9ffcb69e9d42a1d4e744abf8056149562d",
+      "wallet": "0x51f63885534cb494f4592a0311551f369bff2b39",
       "score": 0.45
     }
   ],
-  "self_rank": 1,
-  "margin_over_best_stranger": 0.0865,
-  "failures": [],
-  "passed": true
+  "self_rank": 3,
+  "margin_over_best_stranger": -0.0397,
+  "failures": [
+    "self-match ranked 3, not 1",
+    "margin -0.0397 below required 0.05"
+  ],
+  "passed": false
 }
