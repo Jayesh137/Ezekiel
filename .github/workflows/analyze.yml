@@ -30,6 +30,17 @@ jobs:
       # Runs before the fingerprint so the rebuild reads the compacted tree.
       - name: Compact data
         run: python scripts/compact_data.py --apply
+      # Records collected while the price cache was cold sit on disk as
+      # price_unavailable and are dropped before they reach the graph. The
+      # per-sweep price budget is a dozen requests, so a sweep prices a handful
+      # and leaves the rest; this is the pass that goes back for them, daily,
+      # which is the cadence "coverage improves across runs" actually assumes.
+      # Budgeted at ~240s of this 30-minute job (config.reprice). Grouped by
+      # (asset, date), so ~96 reachable requests cover far more records.
+      - name: Reprice stored transfers
+        env:
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: python scripts/reprice_transfers.py
       - name: Rebuild fingerprint
         run: python src/fingerprint.py
       - name: Build trader profile
