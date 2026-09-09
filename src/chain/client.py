@@ -23,6 +23,19 @@ ACTIONS = {
     "internal": "txlistinternal",
 }
 
+# "latest", not a big number. A hardcoded ceiling is a silent walk-stopper on
+# any chain taller than it: Arbitrum is past block 501,000,000, and with
+# endblock=99999999 every request whose startblock had climbed above 99,999,999
+# came back "No transactions found" — indistinguishable from reaching the end.
+#
+# Measured directly (scripts/diagnose_pagination.py, 2026-09-09):
+#   startblock=281,189,292 endblock=99999999 -> status 0, "No transactions found"
+#   startblock=281,189,292 endblock=latest   -> status 1, 1000 rows, 281M..289M
+#
+# That one parameter is why an Arbitrum sweep stopped 220 million blocks early
+# and why the $13,000,000 trail this project exists to follow was never fetched.
+ENDBLOCK = "latest"
+
 EMPTY_MESSAGES = ("no transactions found", "no records found")
 
 
@@ -67,7 +80,7 @@ def fetch_kind(address: str, chain: dict, kind: str, start_block: int,
             "action": action,
             "address": address,
             "startblock": start,
-            "endblock": 99999999,
+            "endblock": ENDBLOCK,
             "page": 1,
             "offset": size,
             "sort": "asc",
@@ -97,7 +110,7 @@ def probe_activity(address: str, chain: dict, budget: CallBudget) -> tuple[bool,
         "action": "txlist",
         "address": address,
         "startblock": 0,
-        "endblock": 99999999,
+        "endblock": ENDBLOCK,
         "page": 1,
         "offset": 1,
         "sort": "asc",
@@ -132,7 +145,7 @@ def newest_block(address: str, chain: dict, kind: str,
         "action": ACTIONS[kind],
         "address": address,
         "startblock": 0,
-        "endblock": 99999999,
+        "endblock": ENDBLOCK,
         "page": 1,
         "offset": 1,
         "sort": "desc",

@@ -237,3 +237,58 @@ def test_newest_block_passes_the_chain_id_through(monkeypatch):
     client.newest_block("0xabc", {"name": "base", "chain_id": 8453}, "erc20", budget())
 
     assert seen["chain_id"] == 8453
+
+
+# --- endblock must not be a hardcoded ceiling --------------------------------
+#
+# This one parameter is why an Arbitrum sweep stopped 220 million blocks early
+# and the $13,000,000 trail was never fetched. With endblock=99999999, every
+# request whose startblock had climbed above 99,999,999 came back
+# "No transactions found" — which walk_blocks correctly reads as "finished",
+# because a short page is the only end-of-data signal the endpoint gives.
+#
+# Measured directly against the live API (scripts/diagnose_pagination.py):
+#   startblock=281,189,292 endblock=99999999 -> status 0, "No transactions found"
+#   startblock=281,189,292 endblock=latest   -> status 1, 1000 rows, 281M..289M
+
+@pytest.mark.parametrize("call,kwargs", [
+    ("fetch_kind", {}),
+    ("probe_activity", {}),
+    ("newest_block", {}),
+])
+def test_no_request_sends_a_numeric_endblock_ceiling(monkeypatch, call, kwargs):
+    seen = []
+
+    def fake_get(params, chain_id=None):
+        seen.append(params)
+        return {"status": "1", "result": [{"blockNumber": "501451359", "hash": "0xa"}]}
+
+    monkeypatch.setattr(client, "etherscan_get", fake_get)
+    b = budget()
+    if call == "fetch_kind":
+        client.fetch_kind("0xabc", ARB, "erc20", 0, b, page_size=1)
+    elif call == "probe_activity":
+        client.probe_activity("0xabc", ARB, b)
+    else:
+        client.newest_block("0xabc", ARB, "erc20", b)
+
+    assert seen, f"{call} made no request"
+    for params in seen:
+        end = params["endblock"]
+        assert end == "latest", (
+            f"{call} sent endblock={end!r}. A numeric ceiling silently ends the "
+            f"walk on any chain taller than it — Arbitrum is past block 501M.")
+
+
+def test_a_startblock_above_a_numeric_endblock_is_what_broke_the_walk(monkeypatch):
+    """Pins the mechanism, not just the parameter: Etherscan answers an
+    inverted window with the same 'No transactions found' it uses for a genuine
+    end of data, and _rows_or_error correctly treats that as empty rather than
+    an error. The bug was never in the error handling — the request was wrong."""
+    rows, error = client._rows_or_error(
+        {"status": "0", "message": "No transactions found", "result": []})
+
+    assert rows == []
+    assert error is None, (
+        "an inverted window is indistinguishable from real emptiness at this "
+        "layer, which is why the ceiling had to go rather than the handling")
