@@ -163,3 +163,77 @@ def test_etherscan_get_defaults_to_arbitrum_and_honours_an_override(monkeypatch)
     assert seen["chainid"] == 42161
     utils.etherscan_get({"module": "account"}, chain_id=8453)
     assert seen["chainid"] == 8453
+
+
+# --- newest_block: the completeness probe ------------------------------------
+#
+# Exists because walk_blocks concludes "finished" from a short page, which is a
+# claim about what the API returned rather than about what exists. On the first
+# live run those differed by 220 million blocks and nothing noticed.
+
+def test_newest_block_returns_the_most_recent_block(monkeypatch):
+    seen = []
+
+    def fake_get(params, chain_id=None):
+        seen.append(params)
+        return {"status": "1", "result": [{"blockNumber": "501442874", "hash": "0xa"}]}
+
+    monkeypatch.setattr(client, "etherscan_get", fake_get)
+    b = budget()
+
+    assert client.newest_block("0xabc", ARB, "erc20", b) == (501442874, None)
+    assert b.calls_used == 1
+    assert seen[0]["sort"] == "desc", "the newest record needs the other end of the range"
+    assert seen[0]["offset"] == 1, "one row is enough; this must stay cheap"
+    assert seen[0]["action"] == "tokentx", "must ask about the same kind it is checking"
+
+
+def test_newest_block_treats_no_records_as_a_complete_answer(monkeypatch):
+    """A wallet with nothing really has been swept completely — that must not
+    read as 'we could not tell'."""
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "0", "message": "No transactions found", "result": []})
+
+    assert client.newest_block("0xabc", ARB, "native", budget()) == (0, None)
+
+
+def test_newest_block_reports_a_read_error_rather_than_a_block(monkeypatch):
+    """None must never be read as 'complete'. It means we could not tell."""
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "0", "message": "Max rate limit reached", "result": []})
+
+    block, error = client.newest_block("0xabc", ARB, "erc20", budget())
+    assert block is None
+    assert error == "Max rate limit reached"
+
+
+def test_newest_block_reports_an_unparseable_block_rather_than_guessing(monkeypatch):
+    monkeypatch.setattr(client, "etherscan_get", lambda p, chain_id=None: {
+        "status": "1", "result": [{"blockNumber": "not-a-number"}]})
+
+    block, error = client.newest_block("0xabc", ARB, "erc20", budget())
+    assert block is None
+    assert error and "not-a-number" in error
+
+
+def test_newest_block_with_no_budget_reports_exhaustion(monkeypatch):
+    monkeypatch.setattr(client, "etherscan_get",
+                        lambda p, chain_id=None: pytest.fail("must not spend a call"))
+    b = CallBudget(max_calls=0, seconds=1000, clock=lambda: 0.0)
+
+    block, error = client.newest_block("0xabc", ARB, "erc20", b)
+    assert block is None
+    assert error == "budget_exhausted:call_budget"
+
+
+def test_newest_block_passes_the_chain_id_through(monkeypatch):
+    seen = {}
+
+    def fake_get(params, chain_id=None):
+        seen["chain_id"] = chain_id
+        return {"status": "1", "result": [{"blockNumber": "1"}]}
+
+    monkeypatch.setattr(client, "etherscan_get", fake_get)
+    client.newest_block("0xabc", {"name": "base", "chain_id": 8453}, "erc20", budget())
+
+    assert seen["chain_id"] == 8453

@@ -22,7 +22,7 @@ from pathlib import Path
 
 from src.chain import spam as spam_mod
 from src.chain.assets import decimals_of, value_usd
-from src.chain.client import fetch_kind, probe_activity
+from src.chain.client import fetch_kind, newest_block, probe_activity
 from src.utils import DATA_DIR, append_records, load_all_records, save_latest
 
 TRANSFERS_DIR = DATA_DIR / "transfers"
@@ -119,7 +119,20 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
 def _blank_chain_result() -> dict:
     return {"records": 0, "spam": 0, "calls": 0, "cursor": 0, "gaps": [],
             "truncated": False, "error": None, "probed_inactive": False,
-            "unpriced": 0, "spam_by_reason": {}, "errors_by_kind": {}}
+            "unpriced": 0, "spam_by_reason": {}, "errors_by_kind": {},
+            # Per kind, because the chain-level `cursor` is a summary and a
+            # summary is what hid the first live failure: erc20 stopped at
+            # block 281,189,292 while native reached 501,442,874, and the
+            # single reported number was the 501M.
+            "cursor_by_kind": {},
+            # A kind whose sweep provably did not reach the newest record on
+            # chain. Distinct from `truncated` (we know we stopped early) and
+            # from `error` (we could not read at all): this is "we believed we
+            # had finished, and we had not".
+            "incomplete_kinds": {},
+            # We could not check whether this kind finished. Not the same as
+            # knowing it did not — see the probe_err branch in sweep_wallet.
+            "unverified_kinds": {}}
 
 
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
@@ -193,7 +206,34 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
 
             if walk.last_block > start:
                 cursors[key] = walk.last_block
-                chain_result["cursor"] = max(chain_result["cursor"], walk.last_block)
+            reached = max(int(cursors.get(key, 0) or 0), start)
+            chain_result["cursor_by_kind"][kind] = reached
+            # `cursor` stays the furthest-along kind, as a summary. Taking
+            # the minimum instead was tried and is worse: a kind with no
+            # records legitimately sits at 0 forever and would drag the whole
+            # chain's cursor to 0. The per-kind truth lives in
+            # `cursor_by_kind`, and the actual verdict on coverage lives in
+            # `incomplete_kinds`, which is evidence-based rather than inferred
+            # from comparing cursors.
+            chain_result["cursor"] = max(chain_result["cursor"], reached)
+
+            # Completeness is checked, not inferred. `walk_blocks` stops when a
+            # page comes back short, which says what the API returned, not what
+            # exists — see client.newest_block for the live case where those
+            # differed by 220 million blocks and nothing noticed.
+            if error is None and cluster:
+                newest, probe_err = newest_block(addr, chain, kind, budget)
+                chain_result["calls"] += 1
+                if probe_err:
+                    # Could not check. Recorded, but NOT degradation: a failed
+                    # probe says nothing about whether the sweep was complete,
+                    # and treating it as failure would flag every chain on any
+                    # rate-limited run.
+                    chain_result["unverified_kinds"][kind] = probe_err
+                elif newest is not None and newest > reached:
+                    chain_result["incomplete_kinds"][kind] = (
+                        f"stopped at block {reached}, but records exist to "
+                        f"{newest}")
 
         # Volume, not membership: the lookalike rule needs to know which side of
         # a matched pair moved more money. The genuine anchors earn their
@@ -234,7 +274,10 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         chain_result["spam"] = len(quarantined)
         chain_result["unpriced"] = sum(
             1 for rec in clean if rec.get("value_basis") == "price_unavailable")
-        if chain_result["error"]:
+        if chain_result["error"] or chain_result["incomplete_kinds"]:
+            # Incomplete counts as degraded. A sweep that stopped short is
+            # blindness whether or not anything raised, and the frontier must
+            # not mark a wallet explored on the strength of it.
             result["degraded_sources"].append(name)
 
         # Flushed per chain, immediately after that chain's own writes, rather
@@ -282,6 +325,7 @@ def sweep_health(results: list[dict]) -> dict:
     """One summary across every wallet swept this run."""
     records = spam = calls = gaps = unpriced = 0
     degraded: list[str] = []
+    incomplete: dict[str, str] = {}
     spam_by_reason: dict[str, int] = {}
     for res in results:
         for name, chain_result in res["chains"].items():
@@ -292,7 +336,10 @@ def sweep_health(results: list[dict]) -> dict:
             unpriced += chain_result.get("unpriced", 0)
             for reason, count in chain_result.get("spam_by_reason", {}).items():
                 spam_by_reason[reason] = spam_by_reason.get(reason, 0) + count
-            if chain_result["error"] and name not in degraded:
+            for kind, why in (chain_result.get("incomplete_kinds") or {}).items():
+                incomplete.setdefault(f"{name}:{kind}", why)
+            if (chain_result["error"] or chain_result.get("incomplete_kinds")) \
+                    and name not in degraded:
                 degraded.append(name)
     return {
         "computed_at": datetime.now(UTC).isoformat(),
@@ -303,6 +350,11 @@ def sweep_health(results: list[dict]) -> dict:
         "spam_by_reason": spam_by_reason,
         "calls": calls,
         "possible_gaps": gaps,
+        # Sweeps that believed they had finished and had not. Kept beside
+        # `degraded_sources` rather than folded into it, because "could not
+        # read" and "read the wrong amount and did not notice" need different
+        # fixes — and the second is the one that hid a $13M trail.
+        "incomplete": incomplete,
         "degraded_sources": sorted(degraded),
         "per_wallet": results,
     }

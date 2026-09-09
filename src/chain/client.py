@@ -106,6 +106,50 @@ def probe_activity(address: str, chain: dict, budget: CallBudget) -> tuple[bool,
     return bool(rows), err
 
 
+def newest_block(address: str, chain: dict, kind: str,
+                 budget: CallBudget) -> tuple[int | None, str | None]:
+    """The block of this address's most recent record of `kind`. One call.
+
+    Exists to check a sweep's completeness rather than infer it. `walk_blocks`
+    concludes it has reached the end when a page comes back shorter than the
+    page size — which is a statement about what the API returned, not about
+    what exists. Measured on live data: an Arbitrum sweep stopped after 1,659
+    records at block 281,061,617 and reported `truncated=False, gaps=0`, while
+    the wallet had transfers out to block 501,442,874 — including the
+    $13,000,000 movement the whole project is trying to follow. Nothing in the
+    walk could tell.
+
+    Asking the other end of the range costs one request and turns that silence
+    into a reportable fact. Returns (block, error); a non-None error means we
+    could not tell, which must never be read as "the sweep was complete".
+    """
+    try:
+        budget.spend()
+    except BudgetExhausted as exc:
+        return None, f"budget_exhausted:{exc}"
+    payload = etherscan_get({
+        "module": "account",
+        "action": ACTIONS[kind],
+        "address": address,
+        "startblock": 0,
+        "endblock": 99999999,
+        "page": 1,
+        "offset": 1,
+        "sort": "desc",
+    }, chain_id=chain["chain_id"])
+    rows, err = _rows_or_error(payload)
+    if err:
+        return None, err
+    if not rows:
+        # No records at all is a complete answer, not a failure: a sweep that
+        # collected nothing really did reach the end.
+        return 0, None
+    try:
+        return int(rows[0].get("blockNumber")), None
+    except (TypeError, ValueError):
+        return None, f"unparseable blockNumber: {rows[0].get('blockNumber')!r}"
+
+
 def fetch_code(address: str, chain: dict, budget: CallBudget) -> str | None:
     """The address's deployed bytecode, or None if it could not be read.
 

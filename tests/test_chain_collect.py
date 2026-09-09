@@ -517,3 +517,152 @@ def test_a_re_sweep_of_the_same_wallet_replaces_rather_than_duplicates(tmp_path,
     assert len(health["per_wallet"]) == 1
     assert health["degraded_sources"] == []
     assert "carried_over_wallets" not in health
+
+
+# --- completeness is checked, not inferred -----------------------------------
+#
+# The bug these pin, measured on the first live run:
+#
+#   arbitrum erc20 collected blocks 185,763,477 .. 281,061,617
+#   the wallet had transfers out to 501,442,874, including the $13,000,000
+#   movement this whole project exists to follow
+#   the sweep reported truncated=False, gaps=0, error=None
+#
+# `walk_blocks` stops when a page comes back shorter than the page size. That
+# is a statement about what the API returned, not about what exists, and
+# nothing in the walk could tell the difference. Asking the other end of the
+# range costs one request and turns that silence into a reportable fact.
+
+def _sweep_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "cursors.json")
+
+
+def _walk_to(block):
+    """A sweep that collected one erc20 record and believes it finished there.
+
+    native and internal collect nothing, so they legitimately reach block 0 —
+    pair this with `_newest(erc20=..., other=0)` so an honestly-empty kind is
+    not mistaken for an incomplete one.
+    """
+    def fake(address, chain, kind, start, b, **kw):
+        if kind != "erc20":
+            return WalkResult([], start, 1, False, []), None
+        return WalkResult([erc20_row(block=str(block))], block, 1, False, []), None
+    return fake
+
+
+def _newest(erc20, other=0, error=None):
+    """A newest_block stub that answers per kind."""
+    def fake(address, chain, kind, b):
+        if error:
+            return None, error
+        return (erc20 if kind == "erc20" else other), None
+    return fake
+
+
+def test_a_sweep_that_stopped_short_of_the_newest_record_says_so(tmp_path, monkeypatch):
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "fetch_kind", _walk_to(281_061_617))
+    monkeypatch.setattr(collect, "newest_block", _newest(501_442_874))
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+    chain = result["chains"]["arbitrum"]
+
+    assert "erc20" in chain["incomplete_kinds"]
+    assert "281061617" in chain["incomplete_kinds"]["erc20"]
+    assert "501442874" in chain["incomplete_kinds"]["erc20"]
+    assert result["degraded_sources"] == ["arbitrum"], (
+        "a sweep that provably stopped short is blindness and must degrade")
+
+
+def test_a_sweep_that_reached_the_newest_record_is_not_flagged(tmp_path, monkeypatch):
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "fetch_kind", _walk_to(501_442_874))
+    monkeypatch.setattr(collect, "newest_block", _newest(501_442_874))
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+
+    assert result["chains"]["arbitrum"]["incomplete_kinds"] == {}
+    assert result["degraded_sources"] == []
+
+
+def test_a_chain_with_no_records_at_all_is_complete_not_incomplete(tmp_path, monkeypatch):
+    """Collecting nothing from a wallet that has nothing really is finished."""
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []), None))
+    monkeypatch.setattr(collect, "newest_block", lambda a, c, k, b: (0, None))
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+
+    assert result["chains"]["arbitrum"]["incomplete_kinds"] == {}
+    assert result["degraded_sources"] == []
+
+
+def test_an_unverifiable_probe_is_recorded_but_does_not_degrade(tmp_path, monkeypatch):
+    """A failed probe says nothing about whether the sweep finished. Degrading
+    on it would flag every chain on any rate-limited run, which destroys the
+    signal precisely when it matters."""
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "fetch_kind", _walk_to(281_061_617))
+    monkeypatch.setattr(collect, "newest_block",
+                        _newest(0, error="Max rate limit reached"))
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+    chain = result["chains"]["arbitrum"]
+
+    assert chain["unverified_kinds"]["erc20"] == "Max rate limit reached"
+    assert chain["incomplete_kinds"] == {}
+    assert result["degraded_sources"] == []
+
+
+def test_the_cursor_is_recorded_per_kind_not_only_as_a_summary(tmp_path, monkeypatch):
+    """The chain-level cursor is the furthest-along kind, which is what hid the
+    live failure: native reached 501M while erc20 had stopped at 281M and the
+    health output showed only the 501M."""
+    _sweep_dirs(tmp_path, monkeypatch)
+
+    def fake(address, chain, kind, start, b, **kw):
+        block = {"erc20": 281_061_617, "native": 501_442_874, "internal": 0}[kind]
+        if not block:
+            return WalkResult([], start, 1, False, []), None
+        return WalkResult([erc20_row(block=str(block))], block, 1, False, []), None
+
+    monkeypatch.setattr(collect, "fetch_kind", fake)
+    monkeypatch.setattr(collect, "newest_block", lambda a, c, k, b: (0, None))
+
+    chain = collect.sweep_wallet(
+        "0xtarget", [ARB], budget(), cluster=True)["chains"]["arbitrum"]
+
+    assert chain["cursor_by_kind"]["erc20"] == 281_061_617
+    assert chain["cursor_by_kind"]["native"] == 501_442_874
+    assert chain["cursor"] == 501_442_874, "the summary stays the furthest kind"
+    assert chain["cursor_by_kind"]["erc20"] < chain["cursor"], (
+        "the per-kind figure is what makes the shortfall visible")
+
+
+def test_a_frontier_sweep_does_not_pay_for_the_completeness_check(tmp_path, monkeypatch):
+    """Frontier wallets are lower value and the graph job's budget is far
+    tighter, so only cluster sweeps buy the extra call per kind."""
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "probe_activity", lambda a, c, b: (True, None))
+    monkeypatch.setattr(collect, "fetch_kind", _walk_to(100))
+    monkeypatch.setattr(collect, "newest_block",
+                        lambda a, c, k, b: pytest.fail("frontier sweeps must not probe"))
+
+    collect.sweep_wallet("0xfrontier", [ARB], budget(), cluster=False)
+
+
+def test_sweep_health_surfaces_incompleteness_at_the_top_level(tmp_path, monkeypatch):
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "fetch_kind", _walk_to(281_061_617))
+    monkeypatch.setattr(collect, "newest_block", _newest(501_442_874))
+
+    result = collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+    health = collect.sweep_health([result])
+
+    assert "arbitrum:erc20" in health["incomplete"]
+    assert "501442874" in health["incomplete"]["arbitrum:erc20"]
+    assert health["degraded_sources"] == ["arbitrum"]
