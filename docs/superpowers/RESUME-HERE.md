@@ -189,3 +189,74 @@ Phase 2 ("The chase") and Phase 3 ("The empire") are scoped in spec §2.
 
 `git log --oneline 0fca737f0..HEAD` is the authoritative record — every commit
 message states what it fixed and why.
+
+---
+
+# ANSWERED — 2026-09-09
+
+Phase 1 ran against live data. The `$13,000,000` question has an answer, and
+finding it turned up two real bugs first.
+
+## The answer
+
+`0xa95d9c1f655341597c94393fddc30cf3c08e4fce` is **infrastructure, not a wallet.**
+
+Swept directly, it has **15,193 distinct senders**, is USDC-only, and has zero
+outbound. `detect_services` classifies it unaided: *"high fan-in (15185 distinct
+senders)"*. Our target accounts for 18 of its 25,484 transactions.
+
+So the money went into an exchange or bridge deposit address. The trail ends
+there **correctly** — the graph scores it 0.0, never alerts on it, and never
+traverses through it. Following it further is Phase 2's CEX-gap re-linking
+problem, exactly where that was scoped.
+
+The old truncated window also understated the relationship badly: it showed 5
+records and $13M. The real figure from the cluster sweep is **$438,100,887.53
+across 519 transfers**.
+
+## Two bugs the live run exposed
+
+**1. `endblock=99999999` silently ended every walk.** Hardcoded in all three
+Etherscan requests. Arbitrum is past block 501,000,000, so once the cursor
+climbed above 99,999,999 the window inverted and Etherscan answered *"No
+transactions found"* — indistinguishable from genuinely reaching the end.
+Measured directly:
+
+```
+startblock=281,189,292 endblock=99999999 -> status 0, "No transactions found"
+startblock=281,189,292 endblock=latest   -> status 1, 1000 rows, 281M..289M
+```
+
+The sweep stopped 220 million blocks early reporting `truncated=False, gaps=0,
+error=None`. Fixed to `latest`; a test asserts no request ever sends a numeric
+ceiling again. Records went 1,057 -> 2,805 on the next run.
+
+**2. The health output hid it.** `chain_result["cursor"]` reported the
+furthest-along kind, so native's 501,442,874 masked erc20 stopping at
+281,189,292. Now `cursor_by_kind` carries the per-kind truth, and
+`client.newest_block` *verifies* completeness with one request instead of
+inferring it from a short page — the chain is degraded when a sweep provably
+stopped short. A failed probe records `unverified_kinds` and does NOT degrade,
+because degrading on an unverifiable check would flag every chain on any
+rate-limited run.
+
+## What the live runs proved about the rest
+
+| | |
+|---|---|
+| Spam quarantine | 49,944 suppressed against 24,967 kept on one address — the poisoning problem is real and handled |
+| Multi-chain | Ethereum turned up 687 records the old Arbitrum-only system never saw, incl. repeated $7.25M USDC |
+| Degradation reporting | `base`, `optimism`, `bsc` return *"Free API access is not supported for this endpoint"* and are named, not silently empty |
+| Truncation reporting | *"budget ran out before finishing ['arbitrum'] — re-run (without --reset) to continue"* |
+
+**Correction to the spec:** "six chains on one Etherscan key" is wrong. The free
+tier serves **arbitrum, ethereum, polygon** for these account endpoints. The
+other three need a paid plan.
+
+## Next
+
+- The `0xa95d9c1f` sweep is **truncated** — re-run Substrate Backfill with
+  `wallet` set and **no** `full_reset` to continue from its cursor, if a full
+  picture of that address is ever wanted. It is a service, so probably not.
+- Phase 2 ("The chase") is now the real work: CEX-gap re-linking is what picks
+  the trail up on the far side of an address like this one.
