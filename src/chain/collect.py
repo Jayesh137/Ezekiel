@@ -23,7 +23,7 @@ from pathlib import Path
 from src.chain import spam as spam_mod
 from src.chain.assets import decimals_of, value_usd
 from src.chain.client import fetch_kind, newest_block, probe_activity
-from src.utils import DATA_DIR, append_records, load_all_records, save_latest
+from src.utils import DATA_DIR, append_records, save_latest
 
 TRANSFERS_DIR = DATA_DIR / "transfers"
 SPAM_DIR = DATA_DIR / "transfers_spam"
