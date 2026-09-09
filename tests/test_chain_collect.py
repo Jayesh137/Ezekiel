@@ -666,3 +666,148 @@ def test_sweep_health_surfaces_incompleteness_at_the_top_level(tmp_path, monkeyp
     assert "arbitrum:erc20" in health["incomplete"]
     assert "501442874" in health["incomplete"]["arbitrum:erc20"]
     assert health["degraded_sources"] == ["arbitrum"]
+
+
+# --- the parsed-file cache ---------------------------------------------------
+#
+# records_for cost 0.94s against 51MB / 76,150 records, of which 0.88s was JSON
+# parsing, and expand_frontier calls it once per frontier wallet — up to 37s of
+# a 150s job budget re-parsing the same bytes. Files are per chain per day, so
+# every historical one is immutable and only today's can change.
+#
+# The correctness risk is the whole point: a cache that serves a stale file
+# after a sweep appended to it would make the graph reason over data it has
+# already superseded. These pin that it cannot.
+
+@pytest.fixture(autouse=True)
+def _fresh_record_cache():
+    collect.clear_record_cache()
+    yield
+    collect.clear_record_cache()
+
+
+def _rec(wallet, rid, spam=False):
+    return {"id": rid, "chain": "arbitrum", "ts": 1781000000, "src": wallet,
+            "dst": "0xdest", "amount_usd": 1000.0, "spam": spam}
+
+
+def _write_records(root, day, records):
+    d = root / "arbitrum"
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{day}.json"
+    p.write_text(json.dumps(records))
+    return p
+
+
+def test_the_same_file_is_parsed_once_across_repeated_reads(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    _write_records(tmp_path, "2026-06-16", [_rec("0xa", "r1")])
+    parses = []
+    real = json.loads
+    monkeypatch.setattr(collect.json, "loads",
+                        lambda s, **kw: (parses.append(1), real(s, **kw))[1])
+
+    for _ in range(5):
+        assert len(collect.records_for("0xa")) == 1
+
+    assert len(parses) == 1, f"parsed {len(parses)} times; the cache is not holding"
+
+
+def test_a_file_rewritten_between_reads_is_re_read(tmp_path, monkeypatch):
+    """The correctness invariant. A sweep appends to today's file and then the
+    frontier reads it back — serving the pre-append copy would make the graph
+    reason over data it has already superseded."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    _write_records(tmp_path, "2026-06-16", [_rec("0xa", "r1")])
+    assert len(collect.records_for("0xa")) == 1
+
+    _write_records(tmp_path, "2026-06-16", [_rec("0xa", "r1"), _rec("0xa", "r2")])
+
+    got = collect.records_for("0xa")
+    assert len(got) == 2, "served a stale parse after the file changed"
+    assert {r["id"] for r in got} == {"r1", "r2"}
+
+
+def test_a_sweep_then_read_in_the_same_process_sees_the_new_records(tmp_path, monkeypatch):
+    """The exact expand_frontier cycle: sweep_wallet appends, records_for reads
+    it back, in one process."""
+    _sweep_dirs(tmp_path, monkeypatch)
+    monkeypatch.setattr(collect, "newest_block", _newest(100))
+    monkeypatch.setattr(collect, "fetch_kind", _walk_to(100))
+
+    assert collect.records_for("0xtarget") == []
+    collect.sweep_wallet("0xtarget", [ARB], budget(), cluster=True)
+
+    assert len(collect.records_for("0xtarget")) == 1, (
+        "the sweep's own records were invisible to the very next read")
+
+
+def test_a_new_file_in_an_existing_chain_directory_is_picked_up(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    _write_records(tmp_path, "2026-06-16", [_rec("0xa", "r1")])
+    assert len(collect.records_for("0xa")) == 1
+
+    _write_records(tmp_path, "2026-06-17", [_rec("0xa", "r2")])
+
+    assert len(collect.records_for("0xa")) == 2
+
+
+def test_the_cache_does_not_change_what_is_returned(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    _write_records(tmp_path, "2026-06-16", [
+        _rec("0xa", "r1"), _rec("0xa", "spam1", spam=True), _rec("0xb", "r2")])
+
+    cold_clean = collect.records_for("0xa")
+    cold_spam = collect.records_for("0xa", include_spam=True)
+    warm_clean = collect.records_for("0xa")
+    warm_spam = collect.records_for("0xa", include_spam=True)
+
+    assert cold_clean == warm_clean
+    assert cold_spam == warm_spam
+    assert len(cold_clean) == 1 and len(cold_spam) == 2
+
+
+def test_an_unreadable_file_is_not_cached_so_a_transient_failure_does_not_stick(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    d = tmp_path / "arbitrum"
+    d.mkdir(parents=True)
+    bad = d / "2026-06-16.json"
+    bad.write_text("not json")
+
+    assert collect.records_for("0xa") == []
+    bad.write_text(json.dumps([_rec("0xa", "r1")]))
+
+    assert len(collect.records_for("0xa")) == 1, (
+        "a read failure was cached and outlived the condition that caused it")
+
+
+def test_clear_record_cache_forces_a_re_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    _write_records(tmp_path, "2026-06-16", [_rec("0xa", "r1")])
+    collect.records_for("0xa")
+
+    collect.clear_record_cache()
+    parses = []
+    real = json.loads
+    monkeypatch.setattr(collect.json, "loads",
+                        lambda s, **kw: (parses.append(1), real(s, **kw))[1])
+
+    collect.records_for("0xa")
+    assert len(parses) == 1
+
+
+def test_the_cache_is_bounded_and_evicts_least_recently_used(tmp_path, monkeypatch):
+    """data/ is already ~142MB and only compaction holds it down; an unbounded
+    cache would grow with it."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    monkeypatch.setattr(collect, "_FILE_CACHE_MAX_BYTES", 200)
+    for i in range(6):
+        _write_records(tmp_path, f"2026-06-{10 + i}", [_rec("0xa", f"r{i}")])
+
+    collect.records_for("0xa")
+
+    held = sum(entry[1] for entry in collect._FILE_CACHE.values())
+    assert len(collect._FILE_CACHE) >= 1, "evicted everything, including the newest"
+    assert held <= 200 or len(collect._FILE_CACHE) == 1, (
+        f"cache holds {held} bytes against a 200-byte ceiling")

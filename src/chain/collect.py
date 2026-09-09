@@ -94,6 +94,64 @@ def normalise_row(row: dict, chain: dict, kind: str, price_lookup) -> dict | Non
     }
 
 
+# Parsed stored files, keyed by path. Each entry is
+# (mtime_ns, size, records) — the identity of the bytes we parsed, so a file
+# rewritten between calls is re-read rather than served stale.
+#
+# Measured before this existed: records_for cost 0.94s against 51MB / 76,150
+# records, of which 0.88s was JSON parsing. expand_frontier calls it once per
+# frontier wallet, so a full run spent up to 37s — a quarter of the graph job's
+# 150s budget — re-parsing the same bytes. The scanner calls it per candidate
+# and the correlator once per run on top.
+#
+# Files are per chain, per day. Today's is the only one a sweep can touch, so
+# after the first call every historical file is a cache hit forever and the
+# per-call cost collapses to the filter (~0.06s).
+_FILE_CACHE: dict[str, tuple[int, int, list]] = {}
+
+# Ceiling on retained source bytes, evicting least-recently-used. Without it the
+# cache grows with data/transfers/ without bound; data/ is already ~142MB and
+# only compaction holds it down.
+_FILE_CACHE_MAX_BYTES = 256 * 1024 * 1024
+
+
+def _load_cached(path: Path) -> list:
+    """Records from one stored file, parsed at most once per version of it."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return []
+    key = str(path)
+    hit = _FILE_CACHE.get(key)
+    if hit and hit[0] == stat.st_mtime_ns and hit[1] == stat.st_size:
+        _FILE_CACHE[key] = _FILE_CACHE.pop(key)      # mark most-recently-used
+        return hit[2]
+    try:
+        records = json.loads(path.read_text())
+    except (OSError, ValueError):
+        # Same posture as load_all_records: an unreadable file is skipped, not
+        # fatal. It is deliberately not cached, so a transient read failure
+        # does not stick for the life of the process.
+        return []
+    if not isinstance(records, list):
+        return []
+    _FILE_CACHE[key] = (stat.st_mtime_ns, stat.st_size, records)
+    # dict preserves insertion order and a hit re-inserts, so the first key is
+    # the least recently used. Never evict the entry just added, even if it
+    # alone exceeds the ceiling — returning it having dropped it would make the
+    # next call re-parse the same file forever.
+    total = sum(entry[1] for entry in _FILE_CACHE.values())
+    while total > _FILE_CACHE_MAX_BYTES and len(_FILE_CACHE) > 1:
+        oldest = next(iter(_FILE_CACHE))
+        total -= _FILE_CACHE.pop(oldest)[1]
+    return records
+
+
+def clear_record_cache() -> None:
+    """Drop every parsed file. For tests that rewrite a tree in place."""
+    _FILE_CACHE.clear()
+
+
 def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
     """Every stored record touching `wallet`, across every collected chain.
 
@@ -101,6 +159,10 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
     exactly this, and defining it three times would guarantee three different
     spam-filtering rules — which is how a quarantined forgery ends up alerting
     through one path while being suppressed on another.
+
+    Parsed files are cached by (path, mtime, size) — see _FILE_CACHE. A sweep
+    that appends changes today's file's mtime, so the next read of it re-parses
+    while every untouched historical file stays a hit.
     """
     wl = (wallet or "").lower()
     root = Path(TRANSFERS_DIR)
@@ -108,11 +170,15 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
         return []
     out = []
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for rec in load_all_records(str(chain_dir)):
-            if rec.get("spam") and not include_spam:
-                continue
-            if wl in ((rec.get("src") or "").lower(), (rec.get("dst") or "").lower()):
-                out.append(rec)
+        for path in sorted(chain_dir.glob("*.json")):
+            for rec in _load_cached(path):
+                if not isinstance(rec, dict):
+                    continue
+                if rec.get("spam") and not include_spam:
+                    continue
+                if wl in ((rec.get("src") or "").lower(),
+                          (rec.get("dst") or "").lower()):
+                    out.append(rec)
     return out
 
 
