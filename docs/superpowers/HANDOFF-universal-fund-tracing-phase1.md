@@ -85,7 +85,7 @@ Every review gated on these. All are satisfied at HEAD.
 Everything verified is unit-level or replayed from stored records. **No real
 multi-chain sweep has happened.** The $13M question is still unanswered.
 
-**Next action:** run the **Backfill** workflow manually with `full_reset: true`,
+**Next action:** run the **Substrate Backfill** workflow manually with `full_reset: true`,
 once, with a real `ETHERSCAN_API_KEY`. Then read `data/transfers/latest.json` and
 `data/transfer_graph/latest.json`. Do this before starting Phase 2 — the result
 should shape what Phase 2 actually is.
@@ -226,7 +226,7 @@ same stale id that `POL` had.
 ### Still true, and still the most important thing
 
 **Nothing here has run against live data.** The $13M question remains open. Run
-the Backfill workflow once with `full_reset: true` and a real
+the Substrate Backfill workflow once with `full_reset: true` and a real
 `ETHERSCAN_API_KEY` before scoping Phase 2.
 
 ### New follow-up

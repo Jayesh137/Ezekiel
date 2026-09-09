@@ -22,7 +22,7 @@ has pressed the button.
 **Do this first, before anything else:**
 
 1. Confirm `ETHERSCAN_API_KEY` is set in the repo's GitHub Actions secrets.
-2. Run the **Backfill** workflow manually (`workflow_dispatch`) with
+2. Run the **Substrate Backfill** workflow manually (`workflow_dispatch`) with
    `full_reset: true`. It has a 60-minute timeout and re-reads from block 0
    across six chains.
 3. Read the results:

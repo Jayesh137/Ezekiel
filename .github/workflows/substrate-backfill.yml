@@ -1,0 +1,79 @@
+name: Substrate Backfill (multi-chain transfers)
+# Re-reads the cluster's transfer history across every enabled chain into
+# data/transfers/. Separate from "Historical Backfill" (src/backfill.py, which
+# rebuilds Hyperliquid fill history) because the two have very different
+# runtimes and must not share a timeout.
+#
+# That sharing is not hypothetical: it was tried, and it does not work.
+# src/backfill.py alone takes 48-50 minutes on this repo — every historical run
+# of that workflow ran 48m16s, 49m10s, 50m16s. Adding a sweep budgeted at 2700s
+# to a 3600s job leaves the sweep roughly 12 minutes before the job timeout
+# kills it. And because every commit happens in the final step, a cancelled job
+# discards BOTH steps' work: the sweep's cursors and the fill history alike.
+#
+# Split, each gets a whole job. This one spends 2700s of its 3600s ceiling on
+# the sweep, leaving 15 minutes for checkout, pip and the commit/push — which
+# is a real allowance here, because nothing else runs in this job.
+on:
+  workflow_dispatch:
+    inputs:
+      full_reset:
+        description: 'Clear stored cursors first for a full re-read from block 0 (default: resume)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+# Shared with every other workflow that writes data/. This is what makes the
+# read-modify-write in scripts/reprice_transfers.py safe, so it must stay.
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
+jobs:
+  substrate-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Sweep every enabled chain
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          FULL_RESET: ${{ inputs.full_reset }}
+        run: |
+          if [ "$FULL_RESET" = "true" ]; then
+            python scripts/backfill_transfers.py --reset
+          else
+            python scripts/backfill_transfers.py
+          fi
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
+          git commit -m "data: substrate backfill [automated]"
+          for i in 1 2 3; do
+            if git push origin main; then exit 0; fi
+            git pull --rebase origin main
+          done
+          git push origin main
+      - name: Open failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="[pipeline] substrate backfill failing"
+          count=$(gh issue list --state open --search "in:title $title" --json number --jq 'length')
+          if [ "$count" = "0" ]; then
+            gh issue create --title "$title" --body "Failing run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi

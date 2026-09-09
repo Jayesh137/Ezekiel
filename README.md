@@ -94,7 +94,8 @@ Before trusting a change to scoring or matching:
 | `heartbeat.yml` | every 2h | Alert if collection has stalled |
 | `test.yml` | on push/PR | Ruff + pytest + dashboard build |
 | `deploy-dashboard.yml` | on `dashboard/**` push | Build and publish to Pages |
-| `backfill.yml` | manual | One-off historical pull |
+| `backfill.yml` | manual | One-off historical pull (Hyperliquid fills; ~50 min) |
+| `substrate-backfill.yml` | manual | Multi-chain transfer re-read into `data/transfers/`. Separate job from `backfill.yml`: sharing one 60-minute timeout starves it. |
 
 Every job that commits data shares the `data-commit` concurrency group so pushes
 serialise instead of racing on rebase.
@@ -347,7 +348,7 @@ workflow; running locally has no such ceiling and reads to completion (or
 
 To recover the **full history** of the target and its known self-wallets — the
 records the old 1000-row window evicted, which is everything before 2025-11-30 —
-run the **Historical Backfill** workflow with `full_reset` ticked, or locally:
+run the **Substrate Backfill** workflow with `full_reset` ticked, or locally:
 
 ```powershell
 python scripts/backfill_transfers.py --reset

@@ -1,12 +1,6 @@
 name: Historical Backfill
 on:
   workflow_dispatch:
-    inputs:
-      full_reset:
-        description: 'Clear all stored cursors first for a full re-read from block 0 (default: resume)'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -19,10 +13,10 @@ concurrency:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    # 3600s against config.backfill.time_budget_seconds = 2700, leaving 15
-    # minutes for checkout, pip, the pre-existing `python src/backfill.py`
-    # step and the commit/push. A cancelled job never commits, so the cursor
-    # progress this run made is lost and --reset's livelock returns.
+    # src/backfill.py alone runs 48-50 minutes on this repo (measured across
+    # every historical run), so 60 is a genuine ceiling, not a generous one.
+    # The multi-chain sweep deliberately does NOT run here - see
+    # substrate-backfill.yml for why sharing this job does not work.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -32,16 +26,6 @@ jobs:
           cache: 'pip'
       - run: pip install -r requirements.txt
       - run: python src/backfill.py
-      - name: Backfill multi-chain transfer history
-        env:
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-          FULL_RESET: ${{ inputs.full_reset }}
-        run: |
-          if [ "$FULL_RESET" = "true" ]; then
-            python scripts/backfill_transfers.py --reset
-          else
-            python scripts/backfill_transfers.py
-          fi
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
