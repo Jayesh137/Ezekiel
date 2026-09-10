@@ -2,7 +2,7 @@
   "schema_version": 1,
   "updated": "2026-09-10",
   "_comment": [
-    "The one contract that really is each token on each chain. A transfer is",
+    "The contract(s) that really are each token on each chain. A transfer is",
     "priced from its tokenSymbol, which the SENDER chooses, so anyone can",
     "deploy a token called USDC for a few cents. Entries here are what makes a",
     "counterfeit detectable.",
@@ -11,17 +11,23 @@
     "A wrong entry quarantines real money, which is worse than the bug this",
     "fixes. Anything not listed is still priced by symbol and still vulnerable.",
     "",
+    "A symbol may have SEVERAL legitimate contracts - use \"contracts\". On",
+    "Optimism both native USDC and bridged USDC.e report symbol \"USDC\"",
+    "on-chain (the bridged one was never renamed), so naming either as the only",
+    "real one would quarantine the other's genuine transfers.",
+    "",
     "Deliberately ABSENT, and why:",
-    "  polygon USDT - no canonical contract could be established. The only",
-    "    polygon USDT contract in the substrate (0x26c68e12..., 6 records / 3",
-    "    addresses) reads name 'Tether USD' symbol 'USDT' on-chain but declares",
-    "    a supply of 1,000,000,000,000, which is the counterfeit signature. The",
-    "    commonly cited 0xc2132D05... is NOT polygon USDT: read on-chain it is",
-    "    name 'USDT0' symbol 'USDT0', a different token. Mapping it to USDT",
-    "    would have quarantined every genuine polygon USDT record.",
-    "  bridged USDC.e - a different token at a different address carrying the",
-    "    symbol USDC.E, so it cannot collide with the native USDC entry. The",
-    "    substrate holds no USDC.E records; an unverified entry could only harm."
+    "  bsc USDC - could not be verified. Every public BSC RPC tried refused the",
+    "    call, and the explorers 403. Unverified is left unmapped.",
+    "  polygon USDT - no canonical contract could be established. The only one",
+    "    in the substrate (0x26c68e12..., 6 records) reads name 'Tether USD'",
+    "    symbol 'USDT' but declares a supply of 1,000,000,000,000 - the",
+    "    counterfeit signature. The commonly cited 0xc2132D05... is NOT polygon",
+    "    USDT: on-chain it is name 'USDT0' symbol 'USDT0', a different token.",
+    "",
+    "base, bsc and optimism carry NO records: the free Etherscan tier does not",
+    "serve account endpoints for them. These entries are protective, correct",
+    "from the moment those chains become readable."
   ],
   "tokens": [
     {
@@ -51,6 +57,34 @@
       "contract": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
       "verified": "read on-chain via polygon.drpc.org - name() 'USDT0', symbol() 'USDT0', supply 771,730,187.78",
       "substrate_support": "none yet - protective entry, so a counterfeit USDT0 cannot be priced at par"
+    },
+    {
+      "chain": "base",
+      "symbol": "USDC",
+      "contracts": [
+        "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+      ],
+      "verified": "read on-chain via base.drpc.org - name() 'USD Coin', symbol() 'USDC', decimals 6, supply 4,289,141,235.59",
+      "substrate_support": "none - chain unreadable on the free tier; protective entry"
+    },
+    {
+      "chain": "base",
+      "symbol": "USDBC",
+      "contracts": [
+        "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"
+      ],
+      "verified": "read on-chain via base.drpc.org - name() 'USD Base Coin', symbol() 'USDbC', decimals 6, supply 5,906,879.84",
+      "substrate_support": "none - protective entry; distinct symbol so it cannot collide with base USDC"
+    },
+    {
+      "chain": "optimism",
+      "symbol": "USDC",
+      "contracts": [
+        "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+        "0x7f5c764cbc14f9669b88837ca1490cca17c31607"
+      ],
+      "verified": "both read on-chain via optimism.drpc.org and BOTH report symbol 'USDC': native (supply 174,407,187.25) and bridged USDC.e (supply 19,988,193.42). Both are legitimate, hence two contracts.",
+      "substrate_support": "none - chain unreadable on the free tier; protective entry"
     }
   ]
 }

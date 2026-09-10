@@ -73,7 +73,7 @@ def test_value_usd_is_unchanged_without_a_canonical_map():
 
 def test_load_canonical_contracts_seeds_from_config():
     canon = load_canonical_contracts({"usdc_contract_arbitrum": REAL.upper()})
-    assert canon[("arbitrum", "USDC")] == REAL
+    assert canon[("arbitrum", "USDC")] == {REAL}
 
 
 def test_load_canonical_contracts_survives_a_missing_registry(tmp_path):
@@ -86,7 +86,7 @@ def test_load_canonical_contracts_reads_a_registry_file(tmp_path):
     path.write_text(json.dumps({"tokens": [
         {"chain": "ethereum", "symbol": "usdt", "contract": "0xABC"}]}))
     canon = load_canonical_contracts({}, path)
-    assert canon[("ethereum", "USDT")] == "0xabc"
+    assert canon[("ethereum", "USDT")] == {"0xabc"}
 
 
 def _rec(contract, usd=8_999_999.0, **over):
@@ -134,3 +134,60 @@ def test_scrub_survives_junk_rows():
     records = ["not a dict", None, _rec(FAKE)]
     marked, _ = scrub_records(records, CANON)
     assert marked == 1
+
+
+OP_NATIVE = "0x0b2c639c533813f4aa9d7837caf62653d097ff85"
+OP_BRIDGED = "0x7f5c764cbc14f9669b88837ca1490cca17c31607"
+MULTI = {("optimism", "USDC"): {OP_NATIVE, OP_BRIDGED}}
+
+
+def test_several_legitimate_contracts_can_share_one_symbol():
+    """On Optimism BOTH native USDC and bridged USDC.e report symbol "USDC"
+    on-chain — the bridged one was never renamed. Naming either as the only real
+    one would quarantine the other's genuine transfers."""
+    assert is_impostor("USDC", OP_NATIVE, "optimism", MULTI) is False
+    assert is_impostor("USDC", OP_BRIDGED, "optimism", MULTI) is False
+
+
+def test_a_third_contract_is_still_an_impostor_among_several():
+    assert is_impostor("USDC", FAKE, "optimism", MULTI) is True
+
+
+def test_a_single_string_entry_still_works():
+    """The config-seeded form is a bare set of one; a plain string must not
+    silently mean 'no canonical contract'."""
+    assert is_impostor("USDC", FAKE, "arbitrum", {("arbitrum", "USDC"): REAL}) is True
+    assert is_impostor("USDC", REAL, "arbitrum", {("arbitrum", "USDC"): REAL}) is False
+
+
+def test_registry_reads_the_plural_contracts_field(tmp_path):
+    path = tmp_path / "tokens.json"
+    path.write_text(json.dumps({"tokens": [
+        {"chain": "optimism", "symbol": "USDC",
+         "contracts": [OP_NATIVE.upper(), OP_BRIDGED]}]}))
+    canon = load_canonical_contracts({}, path)
+    assert canon[("optimism", "USDC")] == {OP_NATIVE, OP_BRIDGED}
+
+
+def test_registry_still_reads_the_singular_contract_field(tmp_path):
+    path = tmp_path / "tokens.json"
+    path.write_text(json.dumps({"tokens": [
+        {"chain": "ethereum", "symbol": "USDC", "contract": REAL.upper()}]}))
+    assert load_canonical_contracts({}, path)[("ethereum", "USDC")] == {REAL}
+
+
+def test_the_live_registry_parses_and_covers_the_expected_pairs():
+    """Guards the shipped file itself: a typo there quarantines real money."""
+    # The committed file itself, by repo-relative path: DATA_DIR is redirected
+    # during tests so they never touch real data, and this registry is source,
+    # not collected data.
+    import pathlib
+    registry = pathlib.Path(__file__).parent.parent / "data" / "labels" / "token_contracts.json"
+    canon = load_canonical_contracts({}, registry)
+    for pair in [("ethereum", "USDC"), ("ethereum", "USDT"),
+                 ("polygon", "USDC"), ("base", "USDC"), ("optimism", "USDC")]:
+        assert pair in canon, pair
+        assert canon[pair], pair
+    assert len(canon[("optimism", "USDC")]) == 2
+    # bsc could not be verified on any public RPC and must stay unmapped.
+    assert ("bsc", "USDC") not in canon

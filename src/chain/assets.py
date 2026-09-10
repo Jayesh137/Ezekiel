@@ -66,7 +66,7 @@ def decimals_of(row: dict, kind: str) -> int:
         return DEFAULT_DECIMALS
 
 
-# (chain, SYMBOL) -> the one contract that really is that token there.
+# (chain, SYMBOL) -> the contract(s) that really are that token there.
 #
 # A transfer is priced from its `tokenSymbol`, which the sender chooses. Anyone
 # can deploy a token called "USDC" for a few cents, and address-poisoning kits
@@ -91,16 +91,23 @@ def load_canonical_contracts(config: dict | None = None,
     config = config or {}
     arb_usdc = (config.get("usdc_contract_arbitrum") or "").lower()
     if arb_usdc:
-        out[("arbitrum", "USDC")] = arb_usdc
+        out.setdefault(("arbitrum", "USDC"), set()).add(arb_usdc)
     if registry_path is not None:
         try:
             with open(registry_path) as f:
                 for row in _json.load(f).get("tokens", []):
                     chain = (row.get("chain") or "").lower()
                     sym = (row.get("symbol") or "").strip().upper()
-                    addr = (row.get("contract") or "").lower()
-                    if chain and sym and addr:
-                        out[(chain, sym)] = addr
+                    # One symbol can have several legitimate contracts. On
+                    # Optimism BOTH native USDC (0x0b2C639c...) and bridged
+                    # USDC.e (0x7F5c764c...) report symbol "USDC" on-chain — the
+                    # bridged one was never renamed. Treating either as the only
+                    # real one would quarantine the other's genuine transfers.
+                    addrs = row.get("contracts") or (
+                        [row["contract"]] if row.get("contract") else [])
+                    addrs = {str(a).lower() for a in addrs if a}
+                    if chain and sym and addrs:
+                        out.setdefault((chain, sym), set()).update(addrs)
         except (OSError, ValueError, AttributeError):
             pass
     return out
@@ -117,7 +124,13 @@ def is_impostor(symbol: str, contract: str | None, chain: str | None,
     if not canonical or not contract or not chain:
         return False
     known = canonical.get((chain.lower(), (symbol or "").strip().upper()))
-    return bool(known and known != contract.lower())
+    if not known:
+        return False
+    # A str entry is one legitimate contract; a set is several, and a token
+    # matching ANY of them is genuine.
+    if isinstance(known, str):
+        known = {known}
+    return contract.lower() not in known
 
 
 def value_usd(symbol: str, amount: float, date_str: str,
