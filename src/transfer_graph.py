@@ -797,6 +797,7 @@ def _continuity_for(node: dict, chain: dict | None, evidence: dict,
 def build_graph(edges: list[dict], target: str, *,
                 known_services: set | None = None,
                 service_reasons: dict | None = None,
+                not_exits: set | None = None,
                 behavioural: dict | None = None,
                 hl_active: set | None = None,
                 linkage: dict | None = None,
@@ -817,6 +818,7 @@ def build_graph(edges: list[dict], target: str, *,
     thresholds = thresholds if thresholds is not None else _resolved_thresholds()
     now_ts = now_ts if now_ts is not None else time.time()
     known_services = {a.lower() for a in (known_services or set())}
+    not_exits = {a.lower() for a in (not_exits or set())}
     behavioural = {k.lower(): v for k, v in (behavioural or {}).items()}
     hl_active = {a.lower() for a in (hl_active or set())}
     linkage = {k.lower(): v for k, v in (linkage or {}).items()}
@@ -824,6 +826,21 @@ def build_graph(edges: list[dict], target: str, *,
 
     edges = dedupe_edges(edges)
     services = detect_services(edges, known_services, reasons=service_reasons)
+
+    # Money in transit is not a destination. Conduits are found AFTER services,
+    # because "forwards to infrastructure" is only meaningful once we know what
+    # infrastructure is, and they are folded in so a wallet downstream of a
+    # conduit is not scored as though the target had paid it directly.
+    conduits = detect_conduits(
+        edges, set(services),
+        # Depositing to the Hyperliquid bridge is entering the arena, not
+        # exiting; and a wallet that trades there is a participant, never a
+        # conduit. Without these two, the migration this system exists to catch
+        # is reclassified as infrastructure and disappears.
+        not_exits=frozenset(not_exits or ()),
+        never=frozenset(hl_active))
+    if conduits:
+        services.update(conduits)
 
     # Adjacency over real wallet-to-wallet movement only.
     adj: dict[str, list[dict]] = {}
@@ -1404,6 +1421,81 @@ def collect_known_edges() -> list[dict]:
             print(f"[graph] could not read fund_flows: {e}")
 
     return edges
+
+
+def detect_conduits(edges: list[dict], services: set,
+                    min_forwarded_share: float = 0.9,
+                    min_usd: float = 1_000_000.0,
+                    not_exits: frozenset = frozenset(),
+                    never: frozenset = frozenset()) -> dict:
+    """Wallets that pass money straight through to infrastructure.
+
+    A conduit receives and forwards; it is money in transit, not a destination.
+    It never looks like a service to `detect_services` because its fan degree is
+    small — one or two senders, one or two recipients — so it sits in the roster
+    as an unexplained lead holding millions.
+
+    Measured 2026-09-10, this was every remaining lead. All three wallets
+    holding the $63,337,937 the accounting could not explain turned out to be
+    the same shape:
+
+        0x8570c2ae   $58.3M in   -> 3 destinations, all infrastructure
+        0x499662e0   $13.2M in   -> out equals in EXACTLY, to Binance + 1
+        0x373d7f33  $172.0M in   -> 99% of outbound to one Binance address
+
+    Requires BOTH a high forwarded share and a real amount, so a wallet that
+    happens to have made one small onward payment is not swept up. Conservative
+    on purpose: calling a genuine destination a conduit ends the trail at the
+    wallet we are looking for.
+
+    Two exemptions exist because without them this destroys the scenario the
+    whole project is built to catch — funds leave the target, land on a fresh
+    wallet, and that wallet deposits to Hyperliquid and starts trading:
+
+      `not_exits`  destinations whose receipt is not an exit. The Hyperliquid
+                   bridge above all: depositing there is entering the arena the
+                   target trades in, not cashing out of it.
+      `never`      wallets that trade on Hyperliquid. A conduit does nothing
+                   with the money; a wallet that trades is a participant, and
+                   the most interesting one this system can find.
+    """
+    sent = {}
+    received = {}
+    to_services = {}
+    for e in edges:
+        if e.get("bridge_event") or e.get("inferred"):
+            continue
+        usd = float(e.get("amount_usd") or 0)
+        if usd <= 0:
+            continue
+        src, dst = e.get("src"), e.get("dst")
+        if src:
+            sent[src] = sent.get(src, 0.0) + usd
+            if dst in services and dst not in not_exits:
+                to_services[src] = to_services.get(src, 0.0) + usd
+        if dst:
+            received[dst] = received.get(dst, 0.0) + usd
+
+    out = {}
+    for addr, total_out in sent.items():
+        if addr in services or addr in never:
+            continue
+        total_in = received.get(addr, 0.0)
+        if total_in < min_usd:
+            continue
+        forwarded = to_services.get(addr, 0.0)
+        # Share of what it RECEIVED, not of what it sent. Against total_out, a
+        # wallet that took $58,000,000 and forwarded $1,000,000 scores 100% —
+        # it kept $57,000,000 and is a destination, not a conduit.
+        share = forwarded / total_in
+        if share < min_forwarded_share:
+            continue
+        # And it must be passing money THROUGH, not spending its own.
+        if total_out > total_in * 1.5:
+            continue
+        out[addr] = (f"conduit: forwards {share:.0%} of the ${total_in:,.0f} "
+                     f"it receives straight to infrastructure")
+    return out
 
 
 def _hl_native_services(known_services: set, cfg: dict) -> set:
@@ -2229,6 +2321,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
         edges, target,
         known_services=known_services,
         service_reasons=hl_services,
+        # The Hyperliquid bridge: money going in is entering the arena the
+        # target trades in, so forwarding there is not an exit.
+        not_exits={config["hl_bridge_contract"].lower()},
         behavioural=behavioural,
         hl_active=hl_active,
         linkage=linkage_evidence,

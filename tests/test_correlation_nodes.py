@@ -217,3 +217,91 @@ def test_frontier_priority_prefers_the_larger_destination():
     pr_big, _ = tg._frontier_priority(big, 1, edges, now)
     pr_small, _ = tg._frontier_priority(small, 1, edges, now)
     assert pr_big > pr_small
+
+
+def _e(src, dst, usd):
+    import src.transfer_graph as tg
+    return {"src": src, "dst": dst, "amount_usd": usd, "ts": 1,
+            "chain": "arbitrum", "asset": "USDC", "discovery_source": tg.SRC_L1,
+            "bridge_event": False}
+
+
+def test_a_pass_through_wallet_is_detected_as_a_conduit():
+    """Every remaining lead turned out to be this shape: receives millions,
+    forwards nearly all of it to infrastructure, and never looks like a service
+    itself because its fan degree is one or two."""
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    conduit = "0x" + "cc" * 20
+    edges = [_e(TARGET, conduit, 58_000_000.0), _e(conduit, exch, 57_000_000.0)]
+    got = tg.detect_conduits(edges, {exch})
+    assert conduit in got
+    assert "conduit" in got[conduit]
+
+
+def test_a_wallet_that_keeps_its_money_is_not_a_conduit():
+    """The guard that matters: calling a genuine destination a conduit ends the
+    trail at the wallet we are looking for."""
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    holder = "0x" + "dd" * 20
+    edges = [_e(TARGET, holder, 58_000_000.0), _e(holder, exch, 1_000_000.0)]
+    assert tg.detect_conduits(edges, {exch}) == {}
+
+
+def test_forwarding_to_a_non_service_is_not_a_conduit():
+    """Passing money to another WALLET is exactly the trail worth following."""
+    import src.transfer_graph as tg
+    edges = [_e(TARGET, WALLET, 58_000_000.0), _e(WALLET, "0x" + "ab" * 20, 57_000_000.0)]
+    assert tg.detect_conduits(edges, set()) == {}
+
+
+def test_a_small_pass_through_is_ignored():
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    small = "0x" + "cc" * 20
+    edges = [_e(TARGET, small, 5_000.0), _e(small, exch, 5_000.0)]
+    assert tg.detect_conduits(edges, {exch}) == {}
+
+
+def test_a_wallet_spending_its_own_funds_is_not_a_conduit():
+    """Out far exceeding in means the money did not pass through from here."""
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    spender = "0x" + "cc" * 20
+    edges = [_e(TARGET, spender, 1_000_000.0), _e(spender, exch, 50_000_000.0)]
+    assert tg.detect_conduits(edges, {exch}) == {}
+
+
+def test_a_known_service_is_not_relabelled_as_a_conduit():
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    other = "0x" + "ff" * 20
+    edges = [_e(TARGET, exch, 58_000_000.0), _e(exch, other, 57_000_000.0)]
+    assert exch not in tg.detect_conduits(edges, {exch, other})
+
+
+def test_depositing_to_the_bridge_is_not_being_a_conduit():
+    """The scenario this project exists to catch: funds leave the target, land
+    on a fresh wallet, and that wallet deposits to Hyperliquid. Counting the
+    bridge as an exit reclassified that wallet as infrastructure and buried the
+    migration."""
+    import src.transfer_graph as tg
+    bridge = "0x" + "bb" * 20
+    fresh = "0x" + "cc" * 20
+    edges = [_e(TARGET, fresh, 1_000_000.0), _e(fresh, bridge, 990_000.0)]
+    assert tg.detect_conduits(edges, {bridge}) != {}          # without the guard
+    assert tg.detect_conduits(edges, {bridge},
+                              not_exits=frozenset({bridge})) == {}
+
+
+def test_a_wallet_that_trades_is_never_a_conduit():
+    """A conduit does nothing with the money. A wallet that trades on
+    Hyperliquid is a participant, and the most interesting thing this system
+    can find."""
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    trader = "0x" + "cc" * 20
+    edges = [_e(TARGET, trader, 58_000_000.0), _e(trader, exch, 57_000_000.0)]
+    assert trader in tg.detect_conduits(edges, {exch})
+    assert tg.detect_conduits(edges, {exch}, never=frozenset({trader})) == {}
