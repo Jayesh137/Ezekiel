@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-10T06:22:31.546348+00:00",
+  "computed_at": "2026-09-10T06:37:11.852170+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 167,
   "behavioural_counts_as_a_vector": false,
@@ -56,7 +56,7 @@
         "linkage",
         "transfer"
       ],
-      "confidence": 0.5067,
+      "confidence": 0.5065,
       "classification": "POSSIBLE_LINKED_WALLET",
       "reasons": [
         "Received funds directly from the target wallet",
@@ -64,7 +64,7 @@
         "Repeated transfers (241 separate movements)",
         "Two-way flow \u2014 funds move both to and from this wallet",
         "Sends to the same deposit address as the target (address reuse)",
-        "Last movement 249 days ago \u2014 transfer evidence aged to 56%"
+        "Last movement 250 days ago \u2014 transfer evidence aged to 56%"
       ],
       "evidence": {
         "service_reason": null,
@@ -93,7 +93,7 @@
       "classification": "POSSIBLE_LINKED_WALLET",
       "reasons": [
         "Received funds directly from the target wallet",
-        "Repeated transfers (1348 separate movements)",
+        "Repeated transfers (1351 separate movements)",
         "Sends to the same deposit address as the target (address reuse)"
       ],
       "evidence": {
@@ -101,7 +101,7 @@
         "totals": {
           "received_from_target_usd": 999999.8,
           "sent_to_target_usd": 0,
-          "edge_count": 1348
+          "edge_count": 1351
         },
         "depth": 1,
         "chains": [
@@ -201,6 +201,35 @@
         "correlation_confidence": 0.7399,
         "correlation_gap_hours": 4.5,
         "competing_deposits": 4
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x25681ab599b4e2ceea31f8b498052c53fc2d74db",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.2105,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Sent funds to the target wallet",
+        "Repeated transfers (9 separate movements)",
+        "Last movement 121 days ago \u2014 transfer evidence aged to 92%"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 10689918.59,
+          "edge_count": 9
+        },
+        "depth": 1,
+        "chains": [
+          "arbitrum"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -361,7 +390,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (3 separate movements)",
+        "Repeated transfers (4 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -369,7 +398,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 3
+          "edge_count": 4
         },
         "depth": 2,
         "chains": [
@@ -417,7 +446,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (16 separate movements)",
+        "Repeated transfers (17 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -425,7 +454,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 16
+          "edge_count": 17
         },
         "depth": 2,
         "chains": [
@@ -669,35 +698,6 @@
           "arbitrum",
           "ethereum",
           "polygon"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x25681ab599b4e2ceea31f8b498052c53fc2d74db",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.092,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Sent funds to the target wallet",
-        "Repeated transfers (8 separate movements)",
-        "Last movement 423 days ago \u2014 transfer evidence aged to 40%"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 10689918.59,
-          "edge_count": 8
-        },
-        "depth": 1,
-        "chains": [
-          "arbitrum"
         ]
       },
       "is_service": false,
@@ -2793,14 +2793,14 @@
       "confidence": 0.0,
       "classification": "SERVICE",
       "reasons": [
-        "Excluded: many-to-many flow (52 senders, 100 recipients)"
+        "Excluded: many-to-many flow (54 senders, 101 recipients)"
       ],
       "evidence": {
-        "service_reason": "many-to-many flow (52 senders, 100 recipients)",
+        "service_reason": "many-to-many flow (54 senders, 101 recipients)",
         "totals": {
           "received_from_target_usd": 147708227.62,
           "sent_to_target_usd": 134884798.87,
-          "edge_count": 1147
+          "edge_count": 1152
         },
         "depth": 1,
         "chains": [
