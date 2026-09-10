@@ -114,14 +114,31 @@ def get_first_funder(wallet: str) -> str | None:
 
 
 def swept_wallets(config: dict) -> set:
-    """Addresses the substrate is complete for: the target and its cluster.
+    """Addresses the substrate holds a real sweep for.
 
-    These are swept unconditionally by scripts/backfill_transfers.py and by the
-    tracer. For anything else, records_for() is at best partial — see
-    get_outbound_addresses.
+    Config names the cluster swept unconditionally by
+    scripts/backfill_transfers.py and by the tracer. But the graph frontier
+    sweeps wallets config cannot know about, and those are swept just as
+    completely — get_outbound_addresses' own docstring counts them as covered.
+    Reading only config therefore under-reported: measured 2026-09-10, config
+    named 2 wallets while the sweep had stored cursors for 13.
+
+    The cursors are the sweep's own record of what it has read, so they are the
+    authoritative answer to "did we sweep this". Under-reporting here does not
+    corrupt a result — get_outbound_addresses unions the substrate with a live
+    call — but it spends an Etherscan call per already-swept wallet out of a
+    free-tier budget, and it leaves substrate-only callers believing a wallet is
+    uncovered when it is not.
     """
     out = {(config.get("target_wallet") or "").lower()}
     out |= {(w or "").lower() for w in config.get("known_self_wallets", [])}
+
+    from src.chain.collect import read_cursors
+    for key in read_cursors():
+        # "chain:wallet:kind" — the wallet is the one field that is an address.
+        parts = str(key).split(":")
+        if len(parts) >= 2 and parts[1].startswith("0x"):
+            out.add(parts[1].lower())
     return out - {""}
 
 
@@ -238,6 +255,56 @@ def target_l1_profile(target: str) -> dict:
         "first_funder": get_first_funder(target),
         "out_addrs": out_addrs,
     }
+
+
+def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
+    """Linkage for wallets the substrate already covers. No network calls.
+
+    The graph's linkage evidence came only from `data/candidates/latest.json`,
+    which the scanner writes for leaderboard wallets. Graph nodes are a different
+    population and were never in it, so `shared_deposit_address` and
+    `gas_funded_by_target` — two of the five corroborating vectors
+    `classify_node` accepts, worth 0.18 and 0.15 of confidence — could never be
+    true for a wallet the graph found itself. Measured 2026-09-10: 0 of 50
+    stored candidates carried a linkage block, while the target's own treasury
+    shared seven deposit addresses with him.
+
+    Restricted to swept wallets on purpose. For anything else `records_for`
+    returns only the records where that wallet happened to transact with an
+    already-swept one — a subset that looks like an answer, which is exactly how
+    this signal produces confident nonsense. Those still need the live call in
+    `get_outbound_addresses`; this pass simply skips them.
+    """
+    config = config or load_config()
+    target = (target or "").lower()
+    swept = swept_wallets(config)
+
+    excluded = set(config.get("excluded_addresses", [])) | \
+        set(config.get("known_self_wallets", []))
+    profile = target_l1_profile(target)
+    target_out = profile.get("out_addrs") or set()
+
+    out: dict[str, dict] = {}
+    for wallet in wallets:
+        w = (wallet or "").lower()
+        if not w or w == target or w not in swept:
+            continue
+        link = compute_linkage(
+            w,
+            # First-funder needs a live lookup, so it is deliberately not
+            # asserted here: a False `shared_funder` from this pass means "not
+            # established offline", and the scanner's live path remains the
+            # only thing that can turn it on.
+            None,
+            get_outbound_addresses(w, config),
+            target,
+            profile.get("first_funder"),
+            target_out,
+            excluded,
+        )
+        if link.get("linkage_bonus", 0) > 0:
+            out[w] = link
+    return out
 
 
 def check_candidate(wallet: str, target: str, profile: dict) -> dict:

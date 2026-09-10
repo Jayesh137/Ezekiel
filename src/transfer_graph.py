@@ -1281,6 +1281,31 @@ def _load_linkage_evidence() -> dict:
     return out
 
 
+def _substrate_linkage(target: str, edges: list[dict], config: dict) -> dict:
+    """Linkage the substrate can establish for graph wallets, at no call cost.
+
+    `_load_linkage_evidence` reads what the scanner stored for LEADERBOARD
+    candidates. Graph nodes are a different population and were never in that
+    file, so two of the five vectors `classify_node` accepts as corroboration
+    could never be true for a wallet the graph discovered itself.
+    """
+    addresses = set()
+    for e in edges:
+        for side in ("src", "dst"):
+            a = (e.get(side) or "").lower()
+            if a and a != target:
+                addresses.add(a)
+    if not addresses:
+        return {}
+    try:
+        from src.linkage import substrate_linkage
+        return substrate_linkage(target, addresses, config)
+    except Exception as exc:                          # noqa: BLE001
+        # Evidence we could not gather, not a reason to lose the graph.
+        print(f"[graph] substrate linkage unavailable: {type(exc).__name__}: {exc}")
+        return {}
+
+
 def _load_correlations() -> dict:
     """Deposit/withdrawal amount correlations from correlator.py."""
     out: dict[str, dict] = {}
@@ -2129,6 +2154,17 @@ def run_transfer_graph(expand: bool = True) -> dict:
         print(f"[graph] {len(inferred)} correlation-derived node(s) admitted "
               f"(inferred, never traversed)")
 
+    # Scanner-stored linkage covers leaderboard candidates only; the substrate
+    # pass adds the graph's own wallets for free. Scanner evidence wins on a
+    # clash: it is the only source that can establish a first funder, which
+    # needs a live lookup the substrate pass deliberately does not make.
+    linkage_evidence = _substrate_linkage(target, edges, config)
+    scanner_linkage = _load_linkage_evidence()
+    linkage_evidence.update(scanner_linkage)
+    if linkage_evidence:
+        print(f"[graph] linkage evidence for {len(linkage_evidence)} wallet(s) "
+              f"({len(scanner_linkage)} from the scanner)")
+
     behavioural, hl_active = _load_behavioural_scores()
     graph = build_graph(
         edges, target,
@@ -2136,7 +2172,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
         service_reasons=hl_services,
         behavioural=behavioural,
         hl_active=hl_active,
-        linkage=_load_linkage_evidence(),
+        linkage=linkage_evidence,
         correlations=correlations,
         max_depth=cfg["max_depth"],
         max_nodes=cfg["max_nodes"],

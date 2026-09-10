@@ -124,3 +124,31 @@ def test_alert_for_a_correlation_lead_states_no_transfer_was_seen(monkeypatch):
     assert "no transfer between this wallet and the target was observed" \
         in captured["body"].lower()
     assert "a transfer relationship is NOT proof" not in captured["body"]
+
+
+def test_scanner_linkage_wins_over_the_substrate_pass(monkeypatch):
+    """Only the scanner's live path can establish a first funder. If the
+    substrate pass overwrote it, an offline run would erase live evidence."""
+    import src.transfer_graph as tg
+
+    monkeypatch.setattr(tg, "_substrate_linkage",
+                        lambda t, e, c: {WALLET: {"shared_funder": False,
+                                                  "shared_deposit_addresses": ["0xd"]}})
+    monkeypatch.setattr(tg, "_load_linkage_evidence",
+                        lambda: {WALLET: {"shared_funder": True,
+                                          "shared_deposit_addresses": ["0xd"]}})
+    merged = tg._substrate_linkage(TARGET, [], {})
+    merged.update(tg._load_linkage_evidence())
+    assert merged[WALLET]["shared_funder"] is True
+
+
+def test_substrate_linkage_failure_does_not_lose_the_graph(monkeypatch):
+    """Evidence we could not gather is not a reason to drop every node."""
+    import src.transfer_graph as tg
+
+    def boom(*a, **k):
+        raise RuntimeError("substrate unreadable")
+
+    monkeypatch.setattr("src.linkage.substrate_linkage", boom)
+    edges = [{"src": TARGET, "dst": WALLET}]
+    assert tg._substrate_linkage(TARGET, edges, {}) == {}
