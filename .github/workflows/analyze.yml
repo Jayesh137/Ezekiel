@@ -53,7 +53,16 @@ jobs:
           # Lets a failed email fall back to a GitHub issue.
           GITHUB_TOKEN: ${{ github.token }}
         run: python src/correlator.py
+      # Runs the self-match backtest, which is the only thing that can tell the
+      # operator the behavioural scorer cannot identify the target. Needs the
+      # alert credentials for that: without them the finding stays in a CI log.
       - name: Rebuild fingerprint
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          # Lets a failed email fall back to a GitHub issue.
+          GITHUB_TOKEN: ${{ github.token }}
         run: python src/fingerprint.py
       - name: Build trader profile
         run: python src/profile_builder.py
