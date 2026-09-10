@@ -35,7 +35,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 369 passed
+.\.venv\Scripts\python.exe -m pytest -q          # expect: 819 passed
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
@@ -110,10 +110,19 @@ never once a 5-minute gap). See *Monitoring limits* for the measurement and
 | Secret | Used by | Needed for |
 |---|---|---|
 | `ETHERSCAN_API_KEY` | trace, scan | Arbitrum L1 tracing (free tier) |
+| `BREVO_SMTP_LOGIN` | all alerting jobs | Brevo SMTP login (`<id>@smtp-brevo.com`), not the account email |
 | `BREVO_SMTP_KEY` | all alerting jobs | Email alerts (free tier) |
-| `ALERT_EMAIL` | all alerting jobs | Recipient address |
+| `ALERT_EMAIL` | all alerting jobs | Recipient address, and the From address |
 
 Everything degrades gracefully without them — modules log and continue.
+
+**Email delivery has never succeeded on this deployment.** Brevo answers
+`502 5.7.0 Your SMTP account is not yet activated`, which no code change can fix
+— the account needs activating with Brevo. Until then, CRITICAL and HIGH alerts
+fall back to **opening a GitHub issue** (`_github_issue_fallback` in
+`src/alerts.py`), which needs no new secret: the workflows already hold
+`issues: write` and Actions supplies the token. Check the Issues tab, not your
+inbox. Delivery health is tracked in `data/alerts/latest.json`.
 
 ## Storage
 
