@@ -117,6 +117,17 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_agents.py
+      # The migration signature that needs NO connection between the wallets.
+      # Judged against his own rhythm (median gap 2d, p90 5d, longest ever 21d),
+      # so a fixed "dormant after a week" rule cannot cry wolf. Runs before the
+      # roster so a handoff lands in the same run.
+      - name: Check dormancy and handoffs
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_dormancy.py
       - name: Build wallet roster
         run: python src/roster.py
       # After the roster, because it classifies each destination using the tiers

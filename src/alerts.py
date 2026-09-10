@@ -448,6 +448,69 @@ WHAT THIS MEANS
     return _send_with_cooldown("scorer_unreliable", 168, subject, body)
 
 
+def alert_target_dormant(silent_days: int, stats: dict, unprecedented: bool) -> bool:
+    """Fire when the target is quiet for longer than his own history allows.
+
+    "Dormant" means nothing in the abstract. This trader's median gap between
+    active days is 2 and he has taken 21 off before, so a fixed "silent for a
+    week" rule would cry wolf constantly. The comparison is against HIS
+    distribution.
+
+    It matters because a silence is the one migration signal that needs no
+    connection at all: if he abandons this wallet and funds a fresh one from
+    somewhere unobservable, the alignment of his silence with another wallet's
+    birth is the only thing left to find him by.
+    """
+    level = "unprecedented" if unprecedented else "unusual"
+    subject = f"[EZEKIEL] CRITICAL: Target Silent {silent_days} Days ({level})"
+    verdict = (
+        "This is LONGER THAN ANY SILENCE HE HAS EVER TAKEN. That is a change of\n"
+        "behaviour, not a quiet week."
+        if unprecedented else
+        "This is longer than usual for him, but not unprecedented."
+    )
+    body = f"""The target has not traded for {silent_days} day(s).
+
+HIS OWN RHYTHM
+  median gap between active days : {stats.get('median')}
+  90th percentile                : {stats.get('p90')}
+  longest silence ever recorded  : {stats.get('max')}
+  active days observed           : {stats.get('active_days')}
+
+{verdict}
+
+WHY IT MATTERS
+  A wallet going quiet while another comes alive is the clearest migration
+  signature there is, and the only one needing no transfer, shared address or
+  authorised agent to connect them.
+
+Action: look for wallets that STARTED trading in the last few days.
+"""
+    # Keyed in 3-day bands so a lengthening silence re-alerts as it worsens,
+    # rather than once and then never again.
+    return _send_with_cooldown(f"dormant_{silent_days // 3}", 48, subject, body)
+
+
+def alert_dormancy_handoff(wallet: str, detail: dict) -> bool:
+    """Fire when a wallet's first-ever activity lands inside a target silence."""
+    subject = "[EZEKIEL] CRITICAL: Dormancy Handoff - Wallet Born During Target Silence"
+    body = f"""A wallet began trading while the target was unusually quiet.
+
+{address_line(wallet, 'Wallet')}
+Its first activity came {detail.get('delay_days')} day(s) into a {detail.get('gap_length')}-day silence.
+Handoff score: {detail.get('score')}
+
+This needs no transfer between them, which is exactly why it is worth having:
+it is the one signal that survives funding a fresh wallet from somewhere
+unobservable.
+
+Action: check whether it trades like him, and whether it shares any deposit
+address.
+"""
+    return _send_with_cooldown(f"handoff_{wallet.lower()}", 168, subject, body)
+
+
+
 def alert_shared_agent(agent: str, accounts: list) -> bool:
     """Fire when two accounts authorise the same Hyperliquid agent.
 

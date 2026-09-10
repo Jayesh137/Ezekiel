@@ -38,6 +38,8 @@ trading style. Never promote a wallet on one vector alone.
 | Amount correlation | `correlator.py` | Exit re-appears as a same-size deposit across a CEX gap |
 | Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated — see below** |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
+| Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
+| Dormancy handoff | `dormancy.py` | One wallet goes quiet, another is born. The only vector needing NO connection between them |
 | HyperEVM watch | `scripts/check_hyperevm.py` | Nonce tripwire; history there cannot be reconstructed after the fact |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
@@ -72,8 +74,12 @@ Think about these; none is implemented:
 
 - **Naming schemes beyond agents** — vault names and referral codes are also
   human-chosen. `naming_families` handles agents; the same idea applies there.
-- **Dormancy handoff** — wallet A goes quiet, wallet B starts within hours. The
-  clearest migration signature there is, and cheap to compute from fills.
+- ~~Dormancy handoff~~ — **built 2026-09-10** (`src/dormancy.py`,
+  `scripts/check_dormancy.py`). Calibrated on HIS rhythm: median gap 2d, p90 5d,
+  longest ever 21d, so a fixed "dormant after a week" rule would cry wolf. Two
+  alerts: an unusual/unprecedented silence, and a wallet whose FIRST activity
+  lands inside one. Live: silent 4d (normal), 7 anomalous gaps in his history,
+  no handoffs among 13 candidates.
 - **Portfolio correlation** — returns or position-basket correlation between the
   target and a candidate over the same window. Two wallets holding the same
   unusual basket at the same time is hard to fake.
