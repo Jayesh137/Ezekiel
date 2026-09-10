@@ -57,8 +57,12 @@ Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
   windows would draw from the same order pool, so that dimension would score
   ~1.0 by leakage and falsely inflate the validation. Wiring it there needs
   orders split by the same time windows — worth doing, carefully.
-- **`data/twitter/`** — not referenced anywhere in `src/`. Off-chain signal,
-  entirely unexploited.
+- ~~`data/twitter/`~~ — **removed 2026-09-10**. It was three empty directories
+  with no collector and no reference anywhere: scaffolding for an intention
+  never built, not data going unused. X's API is paid and scraping is fragile
+  and ToS-questionable, so it is not being built. The free equivalent of the
+  same idea — a human-chosen label that travels between accounts — is agent
+  NAMING SCHEMES, now in `agent_links.naming_families`.
 - `data/vaults/`, `data/referral/`, `data/subaccounts/` reach `scanner.py` but
   only for leaderboard candidates, not for graph-discovered wallets.
 
@@ -66,6 +70,8 @@ Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 
 Think about these; none is implemented:
 
+- **Naming schemes beyond agents** — vault names and referral codes are also
+  human-chosen. `naming_families` handles agents; the same idea applies there.
 - **Dormancy handoff** — wallet A goes quiet, wallet B starts within hours. The
   clearest migration signature there is, and cheap to compute from fills.
 - **Portfolio correlation** — returns or position-basket correlation between the

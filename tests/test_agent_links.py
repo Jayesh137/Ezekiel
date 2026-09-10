@@ -98,3 +98,33 @@ def test_build_survives_empty_input():
     assert out["wallets_checked"] == 0
     assert out["linked_to_target"] == {}
     assert out["target_has_agents"] is False
+
+
+def test_a_naming_scheme_links_accounts():
+    """One owner ran chip_oe02b through chip_oe05b. A different account using
+    chip_oe06b is the same person, and exact-name matching misses it."""
+    from src.agent_links import naming_families
+    got = naming_families({A: [{"address": AG1, "name": "chip_oe02b"}],
+                           B: [{"address": AG2, "name": "chip_oe06b"}]})
+    assert got == {"chip_oe#b": [A, B]}
+
+
+def test_ui_default_names_are_not_evidence():
+    """Measured across 61 wallets, the only shared agent names were "Mobile QR"
+    and "APTS" — Hyperliquid's own UI defaults. Matching on those would link
+    every mobile user to every other one."""
+    from src.agent_links import naming_families
+    assert naming_families({A: [{"address": AG1, "name": "Mobile QR"}],
+                            B: [{"address": AG2, "name": "mobile qr"}]}) == {}
+
+
+def test_a_name_used_by_one_account_is_not_a_link():
+    from src.agent_links import naming_families
+    assert naming_families({A: [{"address": AG1, "name": "chip_oe02b"}]}) == {}
+
+
+def test_a_template_used_by_many_accounts_is_a_tool_not_a_habit():
+    from src.agent_links import naming_families
+    many = {f"0x{i:040x}": [{"address": f"0x{i+900:040x}", "name": f"bot{i}"}]
+            for i in range(8)}
+    assert naming_families(many) == {}

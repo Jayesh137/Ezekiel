@@ -22,6 +22,7 @@ ever be found; the first is a baseline, and the target acquiring an agent is a
 new address he controls.
 """
 
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -98,6 +99,48 @@ def linked_wallets(index: dict, target: str) -> dict:
     return {k: sorted(v) for k, v in out.items()}
 
 
+# Names the Hyperliquid UI generates, which say nothing about a person. Matching
+# on these would link every mobile user to every other mobile user.
+GENERIC_AGENT_NAMES = frozenset({
+    "mobile qr", "trading", "apts", "agent", "api", "default", "",
+})
+
+# A template used by more accounts than this is a convention of some tool, not a
+# habit of one person.
+MAX_ACCOUNTS_FOR_DISTINCTIVE = 4
+
+
+def name_template(name: str) -> str:
+    """A name with its digits collapsed, so a SCHEME is comparable.
+
+    `chip_oe02b` and `chip_oe06b` share the template `chip_oe#b`. One owner ran
+    chip_oe02b through chip_oe05b; a different account using chip_oe06b would be
+    the same person, and exact-name matching would miss it entirely.
+    """
+    return re.sub(r"[0-9]+", "#", (name or "").strip().lower())
+
+
+def naming_families(by_wallet: dict) -> dict:
+    """template -> accounts using it, for DISTINCTIVE templates only.
+
+    Exact-name sharing turns out to be almost entirely Hyperliquid's own UI
+    defaults — measured across 61 wallets, the only shared names were
+    "Mobile QR" and "APTS". Matching on those would link every mobile user to
+    every other one, so they are excluded, as is any template common enough to
+    be a tool's convention rather than a person's habit.
+    """
+    by_template: dict[str, set] = {}
+    for wallet, agents in (by_wallet or {}).items():
+        w = (wallet or "").lower()
+        for agent in normalise_agents(agents):
+            name = (agent.get("name") or "").strip()
+            if not name or name.lower() in GENERIC_AGENT_NAMES:
+                continue
+            by_template.setdefault(name_template(name), set()).add(w)
+    return {tpl: sorted(accts) for tpl, accts in by_template.items()
+            if 1 < len(accts) <= MAX_ACCOUNTS_FOR_DISTINCTIVE}
+
+
 def build_agent_links(by_wallet: dict, target: str) -> dict:
     """The full picture: index, shared agents, and anything linked to the target."""
     index = agent_index(by_wallet)
@@ -112,6 +155,9 @@ def build_agent_links(by_wallet: dict, target: str) -> dict:
             (target or "").lower() in accts for accts in index.values()),
         "shared_agents": shared_agents(index),
         "linked_to_target": linked_wallets(index, target),
+        # A naming SCHEME shared between accounts is a habit, where a shared
+        # agent address is an act of control. Weaker, and kept separate.
+        "naming_families": naming_families(by_wallet),
         "index": {a: sorted(accts) for a, accts in index.items()},
     }
 
