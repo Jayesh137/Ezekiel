@@ -83,6 +83,13 @@ jobs:
       # discovery. Daily is plenty - the source material is from 2021-2023.
       - name: Test the GCR hypothesis
         run: python scripts/check_gcr_hypothesis.py
+      # The only GCR vector that is flow rather than style. His own tweet led to
+      # a confirmed Ethereum address; none of that cluster has ever touched
+      # Hyperliquid or the target, so this is a tripwire whose value is entirely
+      # in the day one of them moves. Cheap: five HL calls against addresses
+      # already on disk. This one DOES alert.
+      - name: Watch GCR's Ethereum addresses
+        run: python scripts/check_gcr_wallets.py
       - name: Build trader profile
         run: python src/profile_builder.py
       # Refresh the manifest so the dashboard sees the archived days and the

@@ -253,6 +253,14 @@
       "claim": "About 75% of net profit came from spot, other exchanges, IEOs/IDOs, DeFi, NFTs and on-chain activity rather than the perp account.",
       "evidence": "img337; img144 ('most of my position was actually spot and not reflected here'); img163 (a 2,000,000 USDC NFT sale).",
       "note": "Every blotter in this corpus is a partial view, and so is any read of a single Hyperliquid perp account."
+    },
+    {
+      "name": "Confirmed Ethereum footprint",
+      "testable": true,
+      "predicate": "gcr_wallets",
+      "claim": "GCR controlled 0x246eA68F4516F2d09DE8754708255D567477Ec21 in 2021-22, and moved $21.6M of its proceeds to 0xd7d8f266... which stayed active until 2024-12-21.",
+      "evidence": "Zora token 3372's full transfer history plus the 2,000,000 USDC payment, cross-checked against four claims in img163.",
+      "note": "THE ONLY GCR VECTOR THAT IS FLOW RATHER THAN STYLE. It currently returns nothing - no contact with the target, no Hyperliquid presence - which is expected given the 2024/2026 gap and is NOT evidence against the hypothesis. Its value is as a tripwire."
     }
   ],
   "observed_trades": [
@@ -353,7 +361,7 @@
     "note": "All 406 images triaged via scripts/contact_sheets.py; everything with notes was then read at full resolution. Three review passes each overturned or corrected a check: hedged_book removed, net_short_bias stopped disconfirming, and the runner was found blind to the HIP-3 xyz: book. Remaining unreviewed entries are charts and duplicates the sheets showed carried nothing new.",
     "how_to_find_blotters": "Pixel heuristics FAIL — blotters run 1 row to 9, light (Binance) and dark (FTX); a filter tuned on three light blotters missed img335. Use scripts/contact_sheets.py and look at the grids.",
     "highest_value_next": "Remaining blotters. Positions, sizes and leverage are the only material that compares directly against on-chain data.",
-    "open_lead": "img163/img164: GCR sold his SAD DOGE [KABOSU] NFT for 2,000,000 USDC on or about 2021-08-27 to @TwoDollaHotDoge, contract prefix 0xabefb..., screenshot taken from inside his own logged-in OpenSea session ('From: you'). The seller side is a GCR-controlled Ethereum address. This is the ONLY thing in the corpus that could move the hypothesis on flow rather than style. Not yet pursued.",
+    "open_lead": "RESOLVED 2026-09-10. The img163/img164 NFT sale led to a confirmed GCR Ethereum address, 0x246eA68F4516F2d09DE8754708255D567477Ec21, and a cluster around it worth $66.6M. None of it touches Hyperliquid or the target. See data/labels/gcr_addresses.json and src/gcr_wallets.py; it is now a tripwire.",
     "compiler_redactions": "Redactions come from TWO sources. GCR himself blurred market names and sizes before posting, to stop copytrading (img320, explained in img321). Whoever assembled the PDF additionally whites out liquidation prices (img012, img036, img200 x2, img335), position sizes (img007, img032) and third-party handles (img203, img219). Liquidation distance is therefore only partly measurable from this corpus, which matters because it is the one disconfirming check.",
     "images_triaged": 406
   }

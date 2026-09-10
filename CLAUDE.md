@@ -252,14 +252,37 @@ as `shorts_high_emission_tokens` and **not implemented**: it needs a float and
 unlock-schedule source this project does not have. If one is ever added, it beats
 every behavioural dimension here.
 
-**An open on-chain lead, not pursued.** img163/img164: he sold his SAD DOGE
-[KABOSU] NFT for **2,000,000 USDC** on or about **2021-08-27** to
-@TwoDollaHotDoge, contract prefix `0xabefb...`, in a screenshot whose From column
-reads "you" — his own logged-in OpenSea session. The seller is a GCR-controlled
-Ethereum address. Everything else here is style, which can only nudge a prior;
-this is the one item that could move it on **flow**. It is L1 in 2021 against a
-target whose history starts 2026-02-05 on Hyperliquid, so no connection would
-prove little — but a connection would be very strong.
+**The NFT lead was pursued, and it produced a confirmed GCR address.**
+`0x246eA68F4516F2d09DE8754708255D567477Ec21`. Four things GCR said publicly in
+img163 all land on it: it won Zora token 3372 (Sad Doge / Kabosu) on 2021-06-23
+settling a **15.6558675 ETH** June bid, sold it on **2021-08-27** to
+`0x7d01dd0c...`, was paid exactly **2,000,000 USDC** in that same transaction,
+and that buyer is the under-bidder who lost the June auction — matching the
+public account that @TwoDollaHotDoge lost then acquired it. No single fact would
+be enough; four are. Funded on 2021-06-11 with 676.8 ETH straight out of Binance.
+
+Following the money: **$21.6M (84% of its outflow) went to
+`0xd7d8f266c637948846bd2fdc4d906f6ba112de39`** — 75 transactions, $66.6M through
+it, **active until 2024-12-21** — and on into Binance and MEXC deposit
+addresses. All of it is in `data/labels/gcr_addresses.json` with per-address
+evidence and confidence tiers.
+
+**None of it connects to the target.** No GCR-side address has ever touched
+Hyperliquid (all four HL endpoints answered, all empty — a real "no"), and none
+is a counterparty of the target. The only shared counterparties are two Binance
+hot wallets with 15.8M and 30.5M transactions, which identify nobody and are
+listed in `not_gcr` so they can never be matched on. **This is not evidence
+against the hypothesis**: the confirmed wallet went quiet in 2022 and the
+treasury in Dec 2024, while the target's history starts 2026-02-05, so there is
+nothing to connect yet.
+
+So it is wired as a **tripwire**, not a finding: `src/gcr_wallets.py` +
+`scripts/check_gcr_wallets.py`, in the daily workflow, and it **does** alert. If
+a confirmed GCR address ever appears in the target's graph or trades on
+Hyperliquid, that is flow rather than resemblance — the strongest evidence this
+project can produce, in either direction. Watch out for two traps the tests pin:
+matching on shared exchange infrastructure, and reading inbound airdrop spam as
+activity (`0x398d2824...` looks live and is not).
 
 Live: net-short bias CONSISTENT (54/56), liquidation distance UNTESTABLE (closest
 22%, the isolated `xyz:XYZ100` index long), broad short basket CONSISTENT (54

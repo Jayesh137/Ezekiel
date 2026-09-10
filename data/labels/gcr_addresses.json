@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "updated": "2026-09-10",
+  "_what_this_is": [
+    "Ethereum addresses reached from GCR's own public claims, with the evidence",
+    "for each and an explicit confidence tier. This is the only part of the GCR",
+    "material that is FLOW rather than STYLE: every other check in",
+    "src/gcr_hypothesis.py compares trading habits and can at best nudge a prior,",
+    "whereas an address either transacts with the target or it does not.",
+    "",
+    "NONE of these has ever touched Hyperliquid (checked 2026-09-10: all four HL",
+    "endpoints answered, all empty -- a real 'no', not a failed read). None is a",
+    "counterparty of the target. That is why they are a WATCHLIST and not a",
+    "finding: their value is entirely in the future, if one of them ever moves.",
+    "",
+    "Rule 8 applies throughout: a transfer is not ownership. Only the 'confirmed'",
+    "tier is asserted as GCR's; everything below it is a lead."
+  ],
+
+  "provenance": {
+    "source_image": "research/trade_review_images/img163.jpg + img164.jpg",
+    "claim": "GCR, 2021-08-27: 'Sold my SAD DOGE [KABOSU] NFT for 2 million USDC. Purchase price was 15 ETH in June. Hope this nice doggo finds a comfortable home to rest with @TwoDollaHotDoge', linking opensea.io/assets/0xabefb...",
+    "resolution": "0xabefb... resolves to Zora: Media 0xabEFBc9fD2F806065b4f3C237d4b59D9A97Bcac7. very.auction/doge/sad-doge gives token id 3372.",
+    "verification": "Every ERC-721 Transfer of token 3372 was read from chain (Blockscout, keyless). The June winning bid and the August sale both resolve to one address, and the sale transaction carries exactly 2,000,000 USDC to it."
+  },
+
+  "addresses": {
+    "0x246ea68f4516f2d09de8754708255d567477ec21": {
+      "tier": "confirmed",
+      "role": "GCR's 2021 Ethereum wallet",
+      "evidence": [
+        "Received Zora token 3372 on 2021-06-23 (tx 0xae0b2f271dfb170713969c8ceff95ab1d11120de18caba3947ad58d709865807), settling a 15.6558675 ETH winning bid placed 2021-06-14 -- GCR said 'purchase price was 15 ETH in June'.",
+        "Sent token 3372 on 2021-08-27 02:51 UTC to 0x7d01dd0c1c293c73500d00d649516161cee3e387 in tx 0x5f148a662e1a85a8478b5d0bc4d78921dfe8d7afdeba947af56c371d55646b8d.",
+        "That same transaction paid it exactly 2,000,000.0 USDC and took 50,000 USDC (2.5%) as marketplace fee -- GCR said 'sold for 2 million USDC'.",
+        "The buyer 0x7d01dd0c... had bid 14.2 ETH and LOST the June auction to this address, matching the public account that @TwoDollaHotDoge lost the auction and acquired it later."
+      ],
+      "why_confirmed": "Four independent facts GCR stated publicly -- purchase month, purchase price, sale price, and buyer identity -- all resolve to this one address. No single one would be enough.",
+      "funded_by": "676.7963 ETH from Binance hot wallet 0x21a31ee1afc51d94c2efccaa2092ad1028285549 on 2021-06-11, three days before the auction. An exchange hot wallet, so the funder gives no further linkage.",
+      "active": "2021-06-11 .. 2022-12-16",
+      "eth_balance_2026_09_10": 0.0226,
+      "hyperliquid": "never used"
+    },
+
+    "0xd7d8f266c637948846bd2fdc4d906f6ba112de39": {
+      "tier": "linked",
+      "role": "where the money went; probable treasury",
+      "evidence": [
+        "Received $21,596,915.19 of stablecoins from the confirmed address -- 84% of everything that left it.",
+        "Only 75 transactions, far too low a fan-in to be exchange infrastructure.",
+        "$66,625,482.29 of stablecoins passed through it in total.",
+        "Active 2021-07-09 .. 2024-12-21, the most recent of anything in this cluster."
+      ],
+      "caution": "A transfer is not ownership. $21.6M between two low-fan-in addresses is a strong ownership inference, not a proof -- it could be a counterparty, an OTC desk, or a partner.",
+      "hyperliquid": "never used"
+    },
+
+    "0x507dbd9f3ebdcc8b885bda73f45f0e20f8ae5b56": {
+      "tier": "linked",
+      "role": "took $23.2M from the treasury and sends back to it",
+      "evidence": ["Two-way flow with 0xd7d8f266..., plus onward to a Binance deposit address."],
+      "hyperliquid": "never used"
+    },
+
+    "0xa8fdf6b23da4e56bc2f5d198d751b3c4c13179f0": {
+      "tier": "exchange_deposit",
+      "role": "GCR's Binance deposit address",
+      "evidence": ["Took $12.4M from the treasury and forwards only to Binance 14 (0x28c6c06298d514db089934071355e5743bf21d60, 30.5M transactions)."],
+      "why_it_matters": "A CEX deposit address belongs to ONE account, which makes it the strongest single linkage signal this project has. If the target ever sends to this address, that is a direct link between the tracked wallet and GCR's Binance account.",
+      "hyperliquid": "never used"
+    },
+
+    "0xef4d4d9706f8deccf9d41c7e58c5606f46b10220": {
+      "tier": "exchange_deposit",
+      "role": "GCR's MEXC-side deposit address",
+      "evidence": ["Took $1.1M from the treasury and forwards to 0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88 (9.1M transactions)."],
+      "hyperliquid": "never used"
+    },
+
+    "0x0e869a01b4cd302a07d37171f19ce7f60a11dd34": {
+      "tier": "lead",
+      "role": "took $648,871 from the treasury; no onward transfers sampled",
+      "hyperliquid": "never used"
+    },
+
+    "0x398d282487b44b6e53ce0aebca3cb60c3b6325e9": {
+      "tier": "lead",
+      "role": "took $4.7M from the treasury and $1.0M from the confirmed wallet",
+      "hyperliquid": "airdrop spam only -- three unsolicited inbound spotTransfers (LADY, OMNIX) from unrelated addresses and one automatic Spot Dust Conversion. It has never traded. Do not read this as GCR using Hyperliquid.",
+      "caution": "The 'has HL activity' flag on this address is a false positive of exactly the kind src/chain/spam.py exists to catch."
+    },
+
+    "0x2536e296ce51e9239a21fd5c8c9c029de33f88e9": {
+      "tier": "lead",
+      "role": "took $664,250 from the treasury",
+      "hyperliquid": "never used"
+    },
+
+    "0x3ad721278d361c20a22fa33f45ce893781c12030": {
+      "tier": "lead",
+      "role": "sent the confirmed wallet 1.5 ETH in June 2021; frequent counterparty",
+      "hyperliquid": "never used"
+    }
+  },
+
+  "not_gcr": {
+    "_note": "Recorded so a future session does not mistake these for linkage. All are shared infrastructure with millions of users; two of them ARE counterparties of the target, and mean nothing.",
+    "0x7d01dd0c1c293c73500d00d649516161cee3e387": "@TwoDollaHotDoge, the NFT buyer -- a counterparty, not GCR",
+    "0x21a31ee1afc51d94c2efccaa2092ad1028285549": "Binance hot wallet, 15.8M transactions. Also a counterparty of the target.",
+    "0x28c6c06298d514db089934071355e5743bf21d60": "Binance 14 hot wallet, 30.5M transactions. Also a counterparty of the target.",
+    "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88": "exchange hot wallet, 9.1M transactions",
+    "0xabefbc9fd2f806065b4f3c237d4b59d9a97bcac7": "Zora: Media, the NFT contract itself",
+    "0xe468ce99444174bd3bbbed09209577d25d1ad673": "Zora AuctionHouse escrow",
+    "0x337071a7e907f5a599747a2c9baf6efdf7eb4bcc": "the NFT creator (Atsuko Sato / Zora mint)",
+    "0x5b3256965e7c3cf26e11fcaf296dfc8807c01073": "OpenSea marketplace fee wallet"
+  }
+}
