@@ -89,11 +89,98 @@ def _cooldown_ok(key: str, hours: float) -> bool:
     return not last or (now_ms() - last) >= hours * 3600 * 1000
 
 
+# A second channel that needs no credential the operator has to activate. The
+# workflows already hold `issues: write` and Actions already injects a token, so
+# this works with nothing new configured — which is the point: email delivery has
+# never once succeeded on this deployment (last_success_at was null across 1,947
+# consecutive failures, Brevo answering "your SMTP account is not yet activated"),
+# and a detector that cannot reach its operator is not a detector.
+#
+# Severities worth waking someone for. INFO alerts stay email-only: there are
+# hundreds of them and they would bury the two that matter.
+ESCALATING_SEVERITIES = ("CRITICAL", "HIGH")
+
+# Per run, across every call. The backlog is in the thousands; without this an
+# outage that clears would open an issue for every one of them.
+MAX_ISSUES_PER_RUN = 3
+_issues_opened_this_run = 0
+
+
+def _severity_of(subject: str) -> str:
+    """The severity the subject was built with, or "" if it carries none."""
+    for level in ("CRITICAL", "HIGH", "INFO"):
+        if f"] {level}:" in subject:
+            return level
+    return ""
+
+
+def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
+    """Open a GitHub issue so a failed email still reaches the operator.
+
+    Returns True only when an issue was actually created or already exists for
+    this alert — either way the operator can see it, so the caller may treat it
+    as delivered and start the cooldown.
+
+    Silent no-op without a token (every local run), so this never becomes a
+    reason a developer's run behaves differently from CI's.
+    """
+    global _issues_opened_this_run
+
+    if _severity_of(subject) not in ESCALATING_SEVERITIES:
+        return False
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    if not token or not repo:
+        return False
+    if _issues_opened_this_run >= MAX_ISSUES_PER_RUN:
+        print(f"[alerts] GitHub fallback cap reached ({MAX_ISSUES_PER_RUN} this "
+              f"run), not opening an issue for: {subject}")
+        return False
+
+    import requests
+
+    title = f"{subject} [{key}]"
+    headers = {"Authorization": f"Bearer {token}",
+               "Accept": "application/vnd.github+json"}
+    api = f"https://api.github.com/repos/{repo}/issues"
+    try:
+        # An open issue for this exact alert already reaches the operator;
+        # opening a second one every 30 minutes would not add information.
+        existing = requests.get(api, headers=headers,
+                                params={"state": "open", "per_page": 100},
+                                timeout=20)
+        if existing.status_code == 200:
+            for issue in existing.json():
+                if issue.get("title") == title:
+                    print(f"[alerts] GitHub issue already open for {key}")
+                    return True
+
+        created = requests.post(
+            api, headers=headers, timeout=20,
+            json={"title": title,
+                  "body": (f"{body}\n\n---\nRaised by Ezekiel because email "
+                           f"delivery failed. Close this once actioned.")})
+        if created.status_code in (200, 201):
+            _issues_opened_this_run += 1
+            print(f"[alerts] Email failed — raised GitHub issue instead: {subject}")
+            _record_delivery(subject, True, "delivered via GitHub issue fallback")
+            return True
+        print(f"[alerts] GitHub fallback failed (HTTP {created.status_code})")
+    except Exception as exc:                          # noqa: BLE001 - transport
+        print(f"[alerts] GitHub fallback failed ({type(exc).__name__}): {exc}")
+    return False
+
+
 def _send_with_cooldown(key: str, hours: float, subject: str, body: str) -> bool:
     if not _cooldown_ok(key, hours):
         print(f"[alerts] Cooldown active for {key}, skipping: {subject}")
         return False
     if send_alert(subject, body):
+        write_cursor(f"alert_{key}", now_ms())
+        return True
+    # Email failed. For anything worth waking someone for, try the channel that
+    # does not depend on a mail provider being activated.
+    if _github_issue_fallback(key, subject, body):
         write_cursor(f"alert_{key}", now_ms())
         return True
     return False
