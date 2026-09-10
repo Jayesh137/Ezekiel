@@ -397,6 +397,48 @@ def alert_hl_native_transfer(destination: str, out_usd: float, in_usd: float,
     return _send_with_cooldown(f"hl_transfer_{destination.lower()}", 72, subject, body)
 
 
+def alert_scorer_unreliable(self_score: float, best_stranger: float,
+                            margin: float, rank: int, total: int,
+                            failures: list) -> bool:
+    """Fire when the self-match backtest says the scorer cannot identify the target.
+
+    The backtest scores the trader's own recent window against his own fingerprint
+    and ranks it among strangers. If he does not come first by a clear margin,
+    then "trades like the target" does not mean what the rest of the system
+    assumes, and every behavioural score is noise dressed as evidence.
+
+    This has to be loud because its consequence is silence: with no validated
+    ceiling the thresholds stay at conservative config values the scorer cannot
+    reach, so behavioural corroboration contributes nothing and the failure shows
+    up as an absence of alerts rather than as a problem.
+    """
+    subject = "[EZEKIEL] CRITICAL: Behavioural Scorer Cannot Identify The Target"
+    reasons = "\n".join(f"  - {f}" for f in failures) or "  - (none recorded)"
+    body = f"""The self-match backtest FAILED. The target's own recent trading was
+scored against his own fingerprint and did not stand out from strangers.
+
+  self-match score : {self_score:.4f}
+  best stranger    : {best_stranger:.4f}
+  margin           : {margin:+.4f}  (needs >= +0.05)
+  rank             : {rank} of {total} strangers  (needs 1)
+
+WHY IT FAILED
+{reasons}
+
+WHAT THIS MEANS
+  Behavioural similarity is not currently reliable evidence of identity for
+  this trader. Thresholds stay in OBSERVING, so a behavioural score
+  contributes nothing to migration confidence and cannot promote a wallet on
+  its own. Fund-flow, HL-native transfers, amount correlation and address
+  reuse are unaffected and remain the vectors worth acting on.
+
+  Do NOT fix this by lowering thresholds or reweighting dimensions until it
+  passes: that fits the one measurement that validates the scorer, and would
+  turn an honest negative into false confidence.
+"""
+    return _send_with_cooldown("scorer_unreliable", 168, subject, body)
+
+
 def alert_hyperevm_activation(wallet: str, label: str, nonce: int,
                               previous_nonce: int) -> bool:
     """Fire when a wallet that had never transacted on HyperEVM starts to.

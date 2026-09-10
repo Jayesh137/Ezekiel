@@ -298,6 +298,22 @@ def run_backtest() -> dict:
     })
     _save(report)
 
+    # A failing scorer announces itself as an ABSENCE: with no validated ceiling
+    # the thresholds stay where the scorer cannot reach them, so behavioural
+    # corroboration contributes nothing and the symptom is alerts that never
+    # arrive. Say it out loud instead. Weekly cooldown — it fails every run until
+    # someone changes the scorer, and repeating it daily would train the operator
+    # to ignore it.
+    if not passed:
+        try:
+            from src.alerts import alert_scorer_unreliable
+            alert_scorer_unreliable(self_score, best_stranger, margin, rank,
+                                    len(strangers), failures)
+        except Exception as exc:                      # noqa: BLE001
+            # A diagnostic must never take down the thing it diagnoses.
+            print(f"[backtest] could not raise scorer alert: "
+                  f"{type(exc).__name__}: {exc}")
+
     status = "PASS" if passed else "FAIL"
     print(f"[backtest] {status}: self-match {self_score:.4f}, rank {rank} "
           f"of {len(strangers) + 1}, margin {margin}")

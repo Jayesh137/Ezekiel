@@ -151,3 +151,35 @@ def test_no_cooldown_is_written_when_both_channels_fail(monkeypatch):
 
     assert alerts._send_with_cooldown("k", 48, "[EZEKIEL] CRITICAL: x", "b") is False
     assert written == []
+
+
+def test_scorer_alert_reports_the_numbers_and_warns_against_tuning(monkeypatch):
+    """The failure's consequence is an ABSENCE of alerts, so the message has to
+    carry the numbers and say plainly what is and is not still trustworthy —
+    including that tuning weights until it passes would fit the very measurement
+    that validates the scorer."""
+    captured = {}
+    monkeypatch.setattr(alerts, "_send_with_cooldown",
+                        lambda k, h, s, b: captured.update(key=k, subject=s, body=b) or True)
+
+    alerts.alert_scorer_unreliable(0.5522, 0.5571, -0.0049, 2, 21,
+                                   ["self-match ranked 2, not 1"])
+
+    assert captured["key"] == "scorer_unreliable"
+    assert "CRITICAL" in captured["subject"]
+    body = captured["body"]
+    assert "0.5522" in body and "0.5571" in body and "-0.0049" in body
+    assert "2 of 21" in body
+    assert "self-match ranked 2, not 1" in body
+    # Names the vectors that still work, so the operator does not discard the
+    # whole system over one broken one.
+    assert "address" in body.lower() and "correlation" in body.lower()
+    assert "Do NOT fix this by lowering thresholds" in body
+
+
+def test_scorer_alert_survives_no_recorded_failures(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(alerts, "_send_with_cooldown",
+                        lambda k, h, s, b: captured.update(body=b) or True)
+    alerts.alert_scorer_unreliable(0.5, 0.6, -0.1, 3, 10, [])
+    assert "(none recorded)" in captured["body"]
