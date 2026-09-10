@@ -144,6 +144,38 @@ the next session rebuilding them:
 
 ---
 
+## The GCR hypothesis — use it, but never circularly
+
+`research/` holds public GCR material: a 149-tweet archive
+(`GCR_tweet_archive.docx`, text in `gcr_archive.txt`) and 119 pages of annotated
+trade reviews (`Trade Reviews.pdf`, 406 images extracted to
+`trade_review_images/`, catalogued in `trade_review_index.json`). Structured in
+`research/gcr_reference.json`; tested by `src/gcr_hypothesis.py`.
+
+**The operator puts the odds that this wallet is GCR's at 55-75%.** So:
+
+- The profile must be able to move that estimate DOWN. A test that can only
+  confirm is worthless. `check_*` returns CONTRADICTS as readily as CONSISTENT.
+- **Never reason "the target is GCR, GCR does X, so a wallet doing X is the
+  target."** That is circular and manufactures leads. The profile is an
+  INDEPENDENT reference — a wallet may match GCR's style with no link to the
+  target at all, which is exactly the case that matters if he migrates somewhere
+  flow cannot reach.
+- Unmeasurable traits return UNTESTABLE, never "consistent". Counting absent
+  evidence as agreement is how a profile confirms itself.
+- The writing is 2021-2023; on-chain history starts 2026-02-05. Only enduring
+  style crosses that gap, and people change.
+
+**Read the sources before trusting the summaries.** The distilled slogan "never
+short small caps" is contradicted by GCR's own posts, which fade listing pumps on
+IOTX/TRU/CLV/MNGO/AXS — all small caps. Reading the slogan literally would have
+manufactured a false contradiction about the target. That tweet exists ONLY in
+the PDF images, not in the tweet archive.
+
+Live: net-short bias CONSISTENT (52/52 short), hedged book CONTRADICTS (0 longs
+against the "short weaker alts against your favourite plays" structure he
+described), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak.
+
 ## Not detection
 
 `profile_builder.py` ingests research documents into `trader_profile.json`, which
