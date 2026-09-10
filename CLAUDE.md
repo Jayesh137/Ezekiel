@@ -1,6 +1,7 @@
 # Ezekiel — the mission
 
-**Find this trader's other wallets, and catch him the moment he moves to a new one.**
+**Find this trader's other HYPERLIQUID wallets, and catch him the moment he
+moves to a new one.**
 
 Target: `0x45d26f28196d226497130c4bac709d808fed4029` (Hyperliquid, possibly GCR).
 The owner copy-trades him manually. If he migrates undetected, the owner is
@@ -11,6 +12,39 @@ He almost certainly has other wallets already. Assume so, and hunt accordingly.
 Everything else in this repo — the graph, the scanner, the correlator, the
 accounting — exists only to serve that. When a design choice is unclear, pick the
 one that makes an undetected migration less likely.
+
+## What counts as a result
+
+**A Hyperliquid address. Nothing else is the deliverable.**
+
+The owner copy-trades on Hyperliquid. A wallet he cannot follow there is worth
+nothing to him, however interesting it is otherwise. So:
+
+- The output of every vector is ultimately **an address that trades on
+  Hyperliquid**. If a lead cannot be converted into one, it has not paid off yet.
+- Other chains are **instruments, not targets**. Ethereum, Arbitrum, Base and the
+  rest matter exactly insofar as they carry flow that lands on a Hyperliquid
+  address — a bridge deposit, a shared CEX deposit address, a funder. Trace them
+  freely, but the question at the end of every trace is always "and which
+  Hyperliquid account does this reach?"
+- **Always close the loop by asking Hyperliquid directly.** Any EVM address is a
+  Hyperliquid address too. Before calling a trail dead, put the candidate to the
+  HL API — and ask its whole surface, not just perp state: an account can exist
+  spot-only, in a vault, under a subaccount, or holding only an authorised agent.
+  `scripts/check_gcr_wallets.py` does this correctly; copy its shape.
+- **Prefer the HL-native vectors when they apply.** `ledger_analyzer.py`,
+  `agent_links.py`, `dormancy.py`, `subaccounts` and `vaults` see movement that
+  never touches L1 at all, so an L1-only search is blind to the most likely kind
+  of migration: one that happens entirely inside Hyperliquid.
+- A worked example of this rule biting: the GCR Ethereum cluster below is
+  confirmed, traced across four chains, and **reaches no Hyperliquid account**.
+  Real work, correctly done, and it did not move the mission. Good research on
+  the wrong chain still leaves the owner following a dead wallet.
+
+Two things are worth chasing off-Hyperliquid anyway, and only these: evidence
+that identifies the person (which then tells you where to look on HL), and flow
+that ends at a bridge or a deposit address (which can be joined to an HL account
+later). Everything else is a detour.
 
 ---
 
