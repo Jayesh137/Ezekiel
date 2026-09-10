@@ -697,6 +697,47 @@ def alert_solana_activity(address: str, signatures: list, last_activity: str | N
     return _send_with_cooldown(f"solana_{address}", 24, subject, body)
 
 
+def alert_same_hand(wallet: str, result: dict) -> bool:
+    """Fire when a wallet's decisions lead or tie the target's too often to be a copier."""
+    subject = "[EZEKIEL] HIGH: Wallet Moves With or Before the Target (not a copier)"
+    body = (
+        f"{address_line(wallet, 'Wallet')}\n"
+        f"Paired decisions: {result.get('pairs')} (excess over a day-shifted control "
+        f"{result.get('excess'):+.2f})\n"
+        f"Leads or ties the target: {result.get('lead_share'):.0%}\n"
+        f"Median lag: {result.get('median_lag_min')} min\n"
+        f"Coins: {', '.join(result.get('coins') or [])[:200]}\n\n"
+        f"A copy-trader reacts after the target's fills reach the tape. A wallet\n"
+        f"that moves first, this often, is either the same hand or shares his\n"
+        f"signal source. Corroborate with flow, a shared deposit address, an\n"
+        f"agent or an explicit link before concluding.\n"
+    )
+    return _send_with_cooldown(f"same_hand_{wallet.lower()}", 72, subject, body)
+
+
+def alert_vault_led(vault: str, leader: str, name: str | None, tvl) -> bool:
+    subject = "[EZEKIEL] HIGH: A Cluster Wallet Leads a Hyperliquid Vault"
+    body = (
+        f"{address_line(vault, 'Vault')}\n"
+        f"{address_line(leader, 'Leader')}\n"
+        f"Name: {name or '(none)'}\nTVL: {tvl}\n\n"
+        f"A vault he leads is a tradeable address of his that never appears as a\n"
+        f"counterparty in fills or ledgers.\n"
+    )
+    return _send_with_cooldown(f"vault_led_{vault.lower()}", 168, subject, body)
+
+
+def alert_name_hit(address: str, name: str, source: str) -> bool:
+    subject = "[EZEKIEL] HIGH: Naming-Family Match on Hyperliquid"
+    body = (
+        f"A human-chosen {source} name matches the target's known naming family.\n\n"
+        f"{address_line(address, 'Address')}\nName: {name}\n\n"
+        f"A name is a reason to look, never a conclusion: check the roster and\n"
+        f"the identity report for this address.\n"
+    )
+    return _send_with_cooldown(f"name_{address.lower()}", 168, subject, body)
+
+
 def alert_target_gained_agent(agent: str, name: str | None) -> bool:
     """Fire when the target authorises an agent he did not have before.
 

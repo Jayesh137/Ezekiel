@@ -267,6 +267,22 @@ def build_roster(config: dict | None = None) -> dict:
         if ident.get("agent_address"):
             e["evidence"]["frontend_agent"] = ident["agent_address"]
 
+    # Lead/lag co-movement: evidence, and the one behavioural reading a copier
+    # cannot fake. A `same_hand` verdict still needs an independent vector.
+    try:
+        with open(DATA_DIR / "comovement" / "latest.json") as f:
+            comove = json.load(f).get("results") or {}
+    except (OSError, ValueError, AttributeError):
+        comove = {}
+    for a, r in comove.items():
+        a = (a or "").lower()
+        if not a or a == target or r.get("verdict") in (None, "untestable"):
+            continue
+        e = entry(a)
+        e["evidence"]["comovement"] = {k: r.get(k) for k in
+                                       ("verdict", "pairs", "lead_share", "excess",
+                                        "median_lag_min")}
+
     for acct in _read(DATA_DIR / "hyperevm" / "latest.json", "wallets"):
         a = (acct.get("address") or "").lower()
         if not a or a == target:

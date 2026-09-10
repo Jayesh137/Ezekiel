@@ -131,6 +131,30 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_solana.py
+      # Who moves first. A copy-trader follows the target's fills; a second
+      # account run by the same hand moves with them or before. One fills call
+      # per roster candidate over the scanner's 21-day window.
+      - name: Score lead/lag co-movement
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_comovement.py
+      # A vault led by a cluster wallet is a tradeable address of his. One call.
+      - name: Watch vault leadership
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_vaults.py
+      # Does the Etherscan key serve HyperEVM (chain 999)? Recorded, so the
+      # answer to "can HyperEVM be swept" comes from CI rather than a guess.
+      - name: Probe the HyperEVM index
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: python scripts/probe_hyperevm_index.py
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
       - name: Rebuild transfer graph

@@ -1059,6 +1059,22 @@ def persist_candidate(result: dict) -> None:
     save_latest(str(candidate_dir), {"candidates": latest[:50]})
 
 
+def tooling_fingerprint(wallet: str, fetch=None) -> dict | None:
+    """Requests per $1,000 of cumulative volume, from `userRateLimit`. Pure
+    given `fetch`. None when unreadable — never a zero that looks like a hand."""
+    fetch = fetch or hl_post
+    try:
+        rl = fetch({"type": "userRateLimit", "user": wallet})
+        used = float(rl.get("nRequestsUsed") or 0)
+        vlm = float(rl.get("cumVlm") or 0)
+    except Exception:                                 # noqa: BLE001 - transport / shape
+        return None
+    if vlm <= 0:
+        return {"requests": used, "cum_volume_usd": vlm, "requests_per_1k_usd": None}
+    return {"requests": used, "cum_volume_usd": round(vlm, 2),
+            "requests_per_1k_usd": round(used / (vlm / 1000.0), 4)}
+
+
 def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
                           source: str = "targeted", eff: dict | None = None,
                           market_freq: dict | None = None) -> dict | None:
@@ -1084,6 +1100,11 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
     candidate_fp = build_candidate_fingerprint(fills, state,
                                                orders=get_candidate_orders(wallet))
     score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
+    # Tooling: how many exchange actions per dollar of volume. A script fires
+    # far more requests per dollar than a hand; the target runs ~0.41 per
+    # $1,000 of cumulative volume. One call, recorded as evidence and not
+    # scored — adding a dimension would change the scorer under validation.
+    evidence["tooling"] = tooling_fingerprint(wallet)
 
     return {
         "wallet": wallet,
