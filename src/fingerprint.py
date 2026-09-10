@@ -2,6 +2,7 @@
 """Computes behavioral fingerprint from all collected trading data."""
 
 import json
+import math
 import shutil
 import sys
 import time as _time
@@ -106,6 +107,31 @@ def compute_leverage_profile(fills: list[dict], positions: dict) -> dict:
     }
 
 
+def _sig(value: float, digits: int = 6) -> float:
+    """Round to significant figures, not decimal places.
+
+    A position-size-to-account ratio is naturally ~1e-5 here: the target TWAPs a
+    $24,000,000 account in roughly $1,000 slices, so a typical fill is 0.000041
+    of the account. round(0.000041, 4) is 0.0, which is what the stored
+    fingerprint held for mean AND median.
+
+    That silently killed a whole scoring dimension. compare_position_sizing
+    treats a non-positive ratio as "unavailable" and returns the neutral 0.5, so
+    every wallet scored identically on it — including the target against his own
+    history — while the dimension kept its 0.12 weight and diluted the score
+    that has to separate him from strangers.
+    """
+    if value is None:
+        return 0.0
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(value) or value == 0.0:
+        return 0.0
+    return float(f"%.{digits}g" % value)
+
+
 def compute_position_sizing(fills: list[dict], positions: dict) -> dict:
     """Position sizes relative to account value."""
     if not fills:
@@ -141,9 +167,9 @@ def compute_position_sizing(fills: list[dict], positions: dict) -> dict:
         ratios = [n / account_value for n in all_notionals]
         arr = np.array(ratios)
         size_ratio = {
-            "mean": round(float(np.mean(arr)), 4),
-            "median": round(float(np.median(arr)), 4),
-            "std": round(float(np.std(arr)), 4),
+            "mean": _sig(float(np.mean(arr))),
+            "median": _sig(float(np.median(arr))),
+            "std": _sig(float(np.std(arr))),
         }
 
     return {
