@@ -168,7 +168,7 @@ events from the USDC EVM contract `0x6b9e7731…` (same count, same total after
 dedupe). The RESUME-HERE "$13M question" is answered: it came back to him.
 
 The Solana address is a cluster member the project has never seen. It is alive
-(last signature 2026-08-17, dust SOL, no USDC left), and Solana → Hyperliquid
+(last signature 2026-08-21, dust SOL, no USDC left), and Solana → Hyperliquid
 via CCTP domain 19 is a funding path for a brand-new account.
 
 Unresolved: the **$23M** sent Core → HyperEVM (five `send`s to `0x2000…0000`)

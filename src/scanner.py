@@ -1170,6 +1170,10 @@ def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
 CORROBORATING_SOURCES = {"fund_flow", "hl_transfer", "known_linked", "correlation",
                          "subaccount", "bridge_depositor"}
 
+# Newborn accounts scanned as priority targets per sweep, youngest and largest
+# first. Bounded so the sweep's runtime stays predictable.
+MAX_NEWBORN_PRIORITY = 30
+
 
 def _is_corroborated(result: dict, source: str | None = None) -> bool:
     """Independent (non-behavioural) evidence tying this wallet to the target.
@@ -1394,6 +1398,23 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     for addr in get_recent_bridge_depositors():
         if addr not in priority:
             priority[addr] = {"source": "bridge_depositor"}
+
+    # 6. Newborn accounts: born within a month and already large, read from
+    # the leaderboard's window volumes by scripts/check_newborn.py. Birth is
+    # orthogonal to the size ordering the sweep uses, and it is the one
+    # selection that sees a fresh wallet early. Not corroborating on its own.
+    newborn_path = DATA_DIR / "newborn" / "latest.json"
+    if newborn_path.exists():
+        try:
+            with open(newborn_path) as f:
+                born = json.load(f).get("newborn", [])
+            for b in born[:MAX_NEWBORN_PRIORITY]:
+                addr = (b.get("wallet") or "").lower()
+                if addr and addr not in priority:
+                    priority[addr] = {"source": "newborn", "age": b.get("age"),
+                                      "account_value": b.get("account_value")}
+        except Exception as e:
+            print(f"[scanner] Could not load newborn accounts: {e}")
 
     if not priority:
         print("[scanner] No priority targets to scan")

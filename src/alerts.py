@@ -559,6 +559,75 @@ def alert_explicit_link(kind: str, address: str, linked_to: str, why: str) -> bo
     return _send_with_cooldown(f"explicit_{kind}_{address.lower()}", 168, subject, body)
 
 
+def alert_foreign_destination(wallet: str, kind: str, destination: str,
+                              amount, token: str | None, when: str | None,
+                              tx_hash: str | None = None) -> bool:
+    """Fire when a cluster wallet hands value or control to an address outside
+    the cluster, as seen in its own Hyperliquid actions.
+
+    The info API's ledger cannot show where a withdrawal went or which agent
+    was approved; the explorer's action record can. A `withdraw3` to a fresh
+    Arbitrum address, a `usdSend` to an unknown account, a new agent or a new
+    sub-account are each the first observable step of a migration.
+    """
+    subject = f"[EZEKIEL] CRITICAL: {kind} to an address outside the cluster"
+    body = (
+        f"A cluster wallet performed `{kind}` towards an address the roster does\n"
+        f"not know as his.\n\n"
+        f"{address_line(wallet, 'Wallet')}\n"
+        f"{address_line(destination, 'Destination')}\n"
+        f"Amount: {amount if amount is not None else 'n/a'} {token or ''}\n"
+        f"When: {when or 'unknown'}\n"
+        f"Hyperliquid tx: {tx_hash or 'n/a'}\n\n"
+        f"This is the account's OWN action, read from the Hyperliquid explorer,\n"
+        f"not an inference from flow or style. Check the destination on\n"
+        f"Hyperliquid at once: an account funded this way is a new wallet he\n"
+        f"controls until shown otherwise.\n"
+    )
+    key = f"foreign_{kind}_{(destination or '').lower()}"
+    return _send_with_cooldown(key, 72, subject, body)
+
+
+def alert_newborn_whale(wallet: str, account_value: float, age: str,
+                        volume: float, display_name: str | None) -> bool:
+    """Fire when a large account that did not exist a week ago appears.
+
+    The behavioural sweep scans the 500 largest accounts, so a migrated wallet
+    is invisible to it until it has grown. Birth, read from the leaderboard's
+    own window volumes, is orthogonal to size and is the one selection that
+    catches a fresh wallet early.
+    """
+    subject = f"[EZEKIEL] HIGH: Newborn Account Holding ${account_value:,.0f}"
+    body = (
+        f"An account born within the last {age} already holds a large balance.\n\n"
+        f"{address_line(wallet, 'Wallet')}\n"
+        f"Account value: ${account_value:,.2f}\n"
+        f"All-time volume: ${volume:,.0f} (all of it inside the {age})\n"
+        f"Display name: {display_name or '(none)'}\n\n"
+        f"It is being scanned behaviourally as a priority target. Birth alone\n"
+        f"is not evidence of anything; check the roster for corroboration and\n"
+        f"whether the target has been quiet.\n"
+    )
+    return _send_with_cooldown(f"newborn_{wallet.lower()}", 168, subject, body)
+
+
+def alert_solana_activity(address: str, signatures: list, last_activity: str | None) -> bool:
+    """Fire when a cluster Solana address moves."""
+    subject = "[EZEKIEL] HIGH: Cluster Solana Address Active"
+    sigs = "\n".join(f"  - {s}" for s in signatures[:10]) or "  (none listed)"
+    body = (
+        f"A Solana address tied to the cluster by decoded bridge calldata has new\n"
+        f"transactions.\n\n"
+        f"Address: {address}\n"
+        f"Latest activity: {last_activity or 'unknown'}\n"
+        f"New signatures:\n{sigs}\n\n"
+        f"Solana reaches Hyperliquid through Circle CCTP (domain 19). Check\n"
+        f"whether any of these is a CCTP burn and, if so, which Hyperliquid\n"
+        f"account the hook data names.\n"
+    )
+    return _send_with_cooldown(f"solana_{address}", 24, subject, body)
+
+
 def alert_target_gained_agent(agent: str, name: str | None) -> bool:
     """Fire when the target authorises an agent he did not have before.
 

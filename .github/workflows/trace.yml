@@ -93,6 +93,38 @@ jobs:
           # Lets a failed email fall back to a GitHub issue.
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_hyperevm.py
+      # Where every bridge transfer from the cluster went: CCTP and Socket
+      # calldata name the destination chain and recipient, and Hyperliquid's
+      # CCTP extension names the HyperCore account. Blockscout, no key, each
+      # transaction decoded once and cached. A recipient outside the cluster
+      # alerts.
+      - name: Decode bridge destinations
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_bridge_destinations.py
+      # Every Hyperliquid withdrawal paired with the bridge payout at his own
+      # address; an unpaired one is a withdrawal to a foreign address, which
+      # the ledger cannot show. Resolving one costs a few Etherscan calls.
+      - name: Pair withdrawals with their payouts
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_withdrawals.py
+      # One public-RPC call per cluster Solana address (the CCTP recipient of
+      # $22.75M of his). Solana reaches Hyperliquid through Circle too.
+      - name: Watch cluster Solana addresses
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_solana.py
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
       - name: Rebuild transfer graph

@@ -270,6 +270,64 @@ def collect_portfolio(wallet: str) -> None:
     save_latest(str(DATA_DIR / "portfolio"), portfolio)
 
 
+def collect_actions() -> None:
+    """The cluster's own non-trading actions, from the Hyperliquid explorer.
+
+    The ledger says money moved; the explorer says where a withdrawal went,
+    which agent was approved, whether a sub-account was created. Its window is
+    the last 300 actions and cannot be paged — a few hours on a heavy day — so
+    it is read on every collection run and everything non-trading is kept.
+    A withdrawal, send or approval to an address outside the cluster alerts.
+    """
+    import time as _time
+
+    from src.alerts import alert_foreign_destination
+    from src.hl_actions import (
+        ACTIONS_DIR,
+        fetch_actions,
+        foreign_destinations,
+        own_actions,
+        record,
+        save,
+        summarise,
+    )
+    from src.utils import load_all_records
+
+    config = load_config()
+    cluster = {(config.get("target_wallet") or "").lower()}
+    cluster |= {(w or "").lower() for w in config.get("known_self_wallets", [])}
+    # Destinations that receive from everyone and identify nobody.
+    ignore = {(a or "").lower() for a in config.get("excluded_addresses", [])}
+    ignore |= {(a or "").lower() for a in config.get("hl_shared_destinations", [])}
+
+    reports = {}
+    for wallet in sorted(cluster):
+        rows, error = fetch_actions(wallet)
+        acts = own_actions(rows, wallet) if not error else []
+        already = {r.get("_key") for r in load_all_records(str(ACTIONS_DIR / wallet))}
+        fresh = [a for a in acts if a.get("hash") and a["hash"] not in already]
+        foreign = foreign_destinations(fresh, cluster, ignore)
+        for f in foreign:
+            when = None
+            try:
+                from datetime import UTC, datetime
+                when = datetime.fromtimestamp(int(f["time"]) / 1000, tz=UTC).isoformat()
+            except (TypeError, ValueError):
+                pass
+            alert_foreign_destination(wallet, f["type"], f["destination"],
+                                      f.get("amount"), f.get("token"), when, f.get("hash"))
+        added = record(wallet, acts)
+        reports[wallet] = summarise(wallet, acts, foreign_destinations(acts, cluster, ignore), error)
+        reports[wallet]["new_this_run"] = added
+        if error:
+            print(f"[collector] actions for {wallet[:12]}... UNREADABLE: {error}")
+        else:
+            print(f"[collector] actions for {wallet[:12]}...: {len(acts)} non-trading in window, "
+                  f"{added} new, {len(foreign)} new foreign destination(s)")
+        _time.sleep(0.2)
+    save({"computed_at": now_ms(), "wallets": reports})
+
+
 def analyze_and_alert_hl_transfers() -> None:
     """Rebuild the HL-native transfer counterparty map from the freshly-collected
     ledger and alert on any new large outbound transfer to an unknown wallet."""
@@ -405,6 +463,7 @@ def main():
         ("referral", lambda: collect_referral(wallet)),
         ("agents", lambda: collect_agents(wallet)),
         ("portfolio", lambda: collect_portfolio(wallet)),
+        ("actions", collect_actions),
         ("hl transfer analysis", analyze_and_alert_hl_transfers),
         ("silence check", check_silence),
         ("account drop check", check_account_value_drop),

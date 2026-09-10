@@ -97,8 +97,8 @@ def own_actions(rows: list, address: str) -> list[dict]:
             continue
         field = DESTINATION_FIELDS.get(kind)
         dest = action.get(field) if field else None
-        if isinstance(dest, str) and dest.startswith("0x"):
-            dest = dest.lower()
+        if isinstance(dest, str):
+            dest = dest.strip().lower()
         out.append({
             "hash": tx.get("hash"),
             "time": tx.get("time"),
