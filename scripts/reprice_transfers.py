@@ -65,11 +65,19 @@ def main(argv=None) -> int:
           f"still unpriced {health['still_unpriced']}, "
           f"rewrote {health['files_rewritten']} file(s)")
     if health["still_unpriced"]:
-        # Not a failure. It is the honest count of what a bounded run could not
-        # reach, and the number that should shrink day over day as the cache
-        # fills. A run where it stops shrinking is the signal worth noticing.
-        print(f"[reprice] {health['still_unpriced']} record(s) remain unpriced — "
-              f"expected while the price cache fills; watch that it trends down")
+        # Not a failure, but only the reachable part is a backlog. The rest
+        # predates the price source's history window and will never resolve on
+        # this key tier, so telling an operator to watch the combined number
+        # trend down points them at a figure that cannot move.
+        stuck = health.get("unpriceable_out_of_window", 0)
+        pending = health["still_unpriced"] - stuck
+        if pending:
+            print(f"[reprice] {pending} record(s) still reachable and unpriced — "
+                  f"expected while the price cache fills; watch that it trends down")
+        if stuck:
+            print(f"[reprice] {stuck} record(s) predate the price source's "
+                  f"history window and cannot be priced without an API key — "
+                  f"this number will not shrink on its own")
 
     save_latest(str(REPRICE_DIR), health)
     return 0

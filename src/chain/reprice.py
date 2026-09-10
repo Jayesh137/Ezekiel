@@ -46,6 +46,7 @@ extend to a local invocation: do not run this by hand while a sweep is running.
 """
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -75,6 +76,24 @@ def _date_of(rec: dict) -> str:
         return ""
 
 
+def _out_of_price_window(date_str: str) -> bool:
+    """Is this date beyond what the configured price source can serve?
+
+    Mirrors the same check prices.py applies before it spends a request, so the
+    two cannot disagree about which dates are reachable. With a key configured
+    the window does not apply, and nothing is reported as permanently
+    unpriceable.
+    """
+    from src.chain.prices import (
+        DEMO_KEY_ENV_VAR,
+        FREE_TIER_HISTORY_DAYS,
+        _too_old,
+    )
+    if os.environ.get(DEMO_KEY_ENV_VAR, ""):
+        return False
+    return _too_old(date_str, FREE_TIER_HISTORY_DAYS)
+
+
 def _needs_price(rec: dict) -> bool:
     return (not rec.get("spam")
             and rec.get("amount_usd") is None
@@ -100,6 +119,14 @@ def reprice_stored_records(price_lookup, *, root=None) -> dict:
         "examined": 0,
         "repriced": 0,
         "still_unpriced": 0,
+        # Of `still_unpriced`, the part that will NEVER price on the current
+        # key tier because the date predates the price source's history window.
+        # Without this split the residual conflates "not reached yet" with
+        # "unreachable", so the one number an operator watches cannot go to
+        # zero and the advice to watch it trend down is unactionable. Measured
+        # live: 1,164 of 1,359 unpriced records predated the free tier's
+        # 365-day window and were counted as a growing backlog every run.
+        "unpriceable_out_of_window": 0,
         "groups_tried": 0,
         "files_rewritten": 0,
         # A file we could not read is blindness, not absence. Without this the
@@ -164,6 +191,8 @@ def reprice_stored_records(price_lookup, *, root=None) -> dict:
 
                 if amount_usd is None:
                     health["still_unpriced"] += 1
+                    if _out_of_price_window(date_str):
+                        health["unpriceable_out_of_window"] += 1
                     continue
 
                 # Only ever widened from None to a real number. A price that

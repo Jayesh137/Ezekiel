@@ -335,3 +335,54 @@ def test_a_clean_run_reports_no_unreadable_files(tmp_path):
     health = reprice.reprice_stored_records(counting_lookup(2000.0), root=tmp_path)
 
     assert health["files_unreadable"] == []
+
+
+def test_out_of_window_records_are_reported_separately(tmp_path, monkeypatch):
+    """A residual that mixes "not reached yet" with "unreachable" cannot go to
+    zero, so the one number an operator watches becomes unactionable. Live data
+    had 1,164 of 1,359 unpriced records predating the free tier's 365-day
+    window, counted every run as though the backlog were growing."""
+    import src.chain.prices as prices
+    from src.chain.reprice import reprice_stored_records
+
+    monkeypatch.delenv(prices.DEMO_KEY_ENV_VAR, raising=False)
+
+    root = tmp_path / "arbitrum"
+    root.mkdir(parents=True)
+    # `_date_of` derives the date from `ts`, not the stored string.
+    records = [
+        {"id": "a", "asset": "ETH", "amount": 1.0, "amount_usd": None,
+         "value_basis": "price_unavailable", "ts": _epoch_days_ago(2000)},
+        {"id": "b", "asset": "ETH", "amount": 1.0, "amount_usd": None,
+         "value_basis": "price_unavailable", "ts": _epoch_days_ago(5)},
+    ]
+    (root / "f.json").write_text(json.dumps(records))
+
+    health = reprice_stored_records(lambda sym, date: None, root=tmp_path)
+
+    assert health["still_unpriced"] == 2
+    assert health["unpriceable_out_of_window"] == 1
+
+
+def test_nothing_is_unpriceable_when_a_key_is_configured(tmp_path, monkeypatch):
+    """With a key the history window does not apply, so no record should be
+    reported as permanently unpriceable."""
+    import src.chain.prices as prices
+    from src.chain.reprice import reprice_stored_records
+
+    monkeypatch.setenv(prices.DEMO_KEY_ENV_VAR, "some-key")
+
+    root = tmp_path / "arbitrum"
+    root.mkdir(parents=True)
+    (root / "f.json").write_text(json.dumps([
+        {"id": "a", "asset": "ETH", "amount": 1.0, "amount_usd": None,
+         "value_basis": "price_unavailable", "ts": _epoch_days_ago(2000)}]))
+
+    health = reprice_stored_records(lambda sym, date: None, root=tmp_path)
+    assert health["still_unpriced"] == 1
+    assert health["unpriceable_out_of_window"] == 0
+
+
+def _epoch_days_ago(days: int) -> int:
+    from datetime import UTC, datetime, timedelta
+    return int((datetime.now(UTC) - timedelta(days=days)).timestamp())
