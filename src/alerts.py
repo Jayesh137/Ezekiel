@@ -269,7 +269,8 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
 
 
 def alert_fund_movement(wallet: str, amount: str, destination: str, tx_hash: str,
-                        asset: str = "USDC", chain: str = "arbitrum") -> bool:
+                        asset: str = "USDC", chain: str = "arbitrum",
+                        occurred_at: str | None = None) -> bool:
     """`asset`/`chain` default to the pre-substrate behavior (this was always
     Arbitrum USDC) so this stays correct for a caller that doesn't pass them.
     The caller now sourced from every chain and asset must pass the real
@@ -285,10 +286,18 @@ def alert_fund_movement(wallet: str, amount: str, destination: str, tx_hash: str
     actually looked up, so the wording spells out "of <asset>" rather than
     letting the number and the asset run together.
     """
+    when = (f"When: {occurred_at}\n" if occurred_at
+            else "When: unknown - this may be a historical transfer surfacing now\n")
     subject = f"[EZEKIEL] CRITICAL: Fund Movement Detected ({amount} of {asset} on {chain})"
     body = (
         f"{address_line(wallet, 'Wallet')}\n"
         f"Event: Withdrew {amount} of {asset} on {chain}\n"
+        # WHEN the money moved, not when we noticed. An alert omitting it
+        # reads as breaking news regardless of age: this fired for a transfer
+        # from 2025-10-17 and the first person to read it took it for current
+        # activity. A cursor advancing, a queued alert finally delivering, or
+        # a newly swept wallet all surface old transfers.
+        f"{when}"
         f"{address_line(destination, 'Destination')}\n"
         f"TX Hash: {tx_hash}\n"
         f"\nTracing destination wallet..."

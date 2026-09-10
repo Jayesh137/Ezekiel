@@ -515,8 +515,19 @@ def trace_fund_flow(wallet: str) -> list[dict]:
 
         print(f"[tracer] OUTBOUND: {amount_display} of {asset} on {chain} -> {destination}")
 
+        # The transfer's OWN timestamp, so an old movement surfacing now cannot
+        # read as breaking news. Etherscan returns unix seconds as a string.
+        occurred_at = None
+        raw_ts = transfer.get("timeStamp") or transfer.get("ts")
+        try:
+            if raw_ts:
+                occurred_at = datetime.fromtimestamp(
+                    int(raw_ts), tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+        except (TypeError, ValueError, OSError):
+            occurred_at = None
+
         alert_fund_movement(wallet, amount_display, destination, tx_hash,
-                            asset=asset, chain=chain)
+                            asset=asset, chain=chain, occurred_at=occurred_at)
 
         print(f"[tracer] Checking if {destination} deposited to Hyperliquid...")
         direct_deposits = find_hl_deposits(destination)

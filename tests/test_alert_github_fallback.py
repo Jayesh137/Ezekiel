@@ -183,3 +183,26 @@ def test_scorer_alert_survives_no_recorded_failures(monkeypatch):
                         lambda k, h, s, b: captured.update(body=b) or True)
     alerts.alert_scorer_unreliable(0.5, 0.6, -0.1, 3, 10, [])
     assert "(none recorded)" in captured["body"]
+
+
+def test_a_fund_movement_alert_states_when_the_money_moved(monkeypatch):
+    """An alert omitting the date reads as breaking news regardless of age. One
+    fired for a transfer from 2025-10-17 and was taken for current activity — a
+    cursor advancing, a queued alert finally delivering, or a newly swept wallet
+    all surface old transfers."""
+    captured = {}
+    monkeypatch.setattr(alerts, "_send_with_cooldown",
+                        lambda k, h, s, b: captured.update(body=b) or True)
+    alerts.alert_fund_movement("0xw", "$3,234,700.00", "0xd", "0xtx",
+                               asset="USDC", chain="ethereum",
+                               occurred_at="2025-10-17 19:47 UTC")
+    assert "When: 2025-10-17 19:47 UTC" in captured["body"]
+
+
+def test_an_undated_fund_movement_says_so_rather_than_implying_recency(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(alerts, "_send_with_cooldown",
+                        lambda k, h, s, b: captured.update(body=b) or True)
+    alerts.alert_fund_movement("0xw", "$1.00", "0xd", "0xtx")
+    assert "When: unknown" in captured["body"]
+    assert "historical transfer" in captured["body"]
