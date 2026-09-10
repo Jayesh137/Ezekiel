@@ -21,6 +21,12 @@ def load_fills() -> list[dict]:
     return load_all_records(str(DATA_DIR / "fills"))
 
 
+def load_orders() -> list[dict]:
+    """Historical order records. See compute_order_profile for why they matter."""
+    return [r for r in load_all_records(str(DATA_DIR / "orders"))
+            if isinstance(r, dict) and isinstance(r.get("order"), dict)]
+
+
 def load_funding() -> list[dict]:
     return load_all_records(str(DATA_DIR / "funding"))
 
@@ -130,6 +136,69 @@ def _sig(value: float, digits: int = 6) -> float:
     if not math.isfinite(value) or value == 0.0:
         return 0.0
     return float(f"%.{digits}g" % value)
+
+
+def compute_order_profile(orders: list[dict]) -> dict:
+    """How a trader OPERATES, from the orders themselves rather than the fills.
+
+    54,866 historical order records were being collected and never read. Fills
+    are the shadow of an order — they show what happened, not how it was asked
+    for. These fields are habits, and habits travel with a person to a new
+    wallet:
+
+      status      cancel rate. How often they change their mind.
+      orderType   Market vs Limit vs the trigger types.
+      tif         Gtc / Alo / Ioc / FrontendMarket — a UI-vs-API tell.
+      reduceOnly  whether closes are flagged, which is a discipline.
+      isTrigger   TP/SL usage, a risk habit rather than a directional one.
+      cloid       a client order id means PROGRAMMATIC placement. Whether
+                  someone trades by hand or through their own code is one of
+                  the most durable things about them.
+
+    Deliberately distinct from `entry_exit_style`, which infers a market/limit
+    ratio from fills. This reads what was actually submitted.
+    """
+    total = 0
+    status = Counter()
+    order_type = Counter()
+    tif = Counter()
+    reduce_only = 0
+    triggers = 0
+    with_cloid = 0
+    for rec in orders or []:
+        o = rec.get("order") if isinstance(rec, dict) else None
+        if not isinstance(o, dict):
+            continue
+        total += 1
+        status[str(rec.get("status") or "unknown")] += 1
+        order_type[str(o.get("orderType") or "unknown")] += 1
+        tif[str(o.get("tif") or "unknown")] += 1
+        if o.get("reduceOnly"):
+            reduce_only += 1
+        if o.get("isTrigger"):
+            triggers += 1
+        if o.get("cloid"):
+            with_cloid += 1
+
+    if not total:
+        # Distinguishable from "measured and all zero": a caller checks `orders`.
+        return {"weight": 0.10, "orders": 0}
+
+    def dist(counter):
+        return {k: round(v / total, 4) for k, v in counter.most_common(12)}
+
+    filled = status.get("filled", 0)
+    return {
+        "weight": 0.10,
+        "orders": total,
+        "status_mix": dist(status),
+        "order_type_mix": dist(order_type),
+        "tif_mix": dist(tif),
+        "cancel_rate": round(1.0 - (filled / total), 4),
+        "reduce_only_rate": round(reduce_only / total, 4),
+        "trigger_rate": round(triggers / total, 4),
+        "programmatic_rate": round(with_cloid / total, 4),
+    }
 
 
 def compute_position_sizing(fills: list[dict], positions: dict) -> dict:
@@ -672,6 +741,7 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         "trade_sequencing": compute_trade_sequencing(fills),
         "account_characteristics": compute_account_characteristics(positions, fills),
         "style_profile": compute_style_profile(fills),
+        "order_profile": compute_order_profile(load_orders()),
     }
 
     return fingerprint

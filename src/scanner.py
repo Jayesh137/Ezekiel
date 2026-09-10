@@ -210,6 +210,20 @@ def get_candidate_fills(wallet: str, lookback_days: int = 7) -> list[dict]:
         return []
 
 
+def get_candidate_orders(wallet: str) -> list[dict]:
+    """A candidate's historical orders. One call; empty list on any failure.
+
+    Empty is safe here in a way it usually is not: `compare_order_profile`
+    treats an absent profile as None and redistributes the weight, so a failed
+    fetch cannot vote against a genuine match.
+    """
+    try:
+        resp = hl_post({"type": "historicalOrders", "user": wallet})
+    except Exception:                                 # noqa: BLE001 - transport
+        return []
+    return [r for r in resp if isinstance(r, dict) and isinstance(r.get("order"), dict)]         if isinstance(resp, list) else []
+
+
 def get_candidate_state(wallet: str) -> dict:
     """Get current clearinghouse state for a candidate wallet."""
     try:
@@ -258,6 +272,47 @@ def compare_asset_preferences(fp_a: dict, fp_b: dict) -> float:
 
     freq_sim = cosine_similarity(vec_a, vec_b)
     return (jaccard + freq_sim) / 2
+
+
+def _dist_similarity(a: dict, b: dict) -> float:
+    """Cosine over the union of keys, so a category present on one side only
+    counts against the match rather than being quietly dropped."""
+    keys = sorted(set(a or {}) | set(b or {}))
+    if not keys:
+        return 0.0
+    return cosine_similarity([float((a or {}).get(k, 0)) for k in keys],
+                             [float((b or {}).get(k, 0)) for k in keys])
+
+
+def compare_order_profile(fp_a: dict, fp_b: dict) -> float | None:
+    """How two traders OPERATE, from submitted orders rather than fills.
+
+    None when either side has no order data, so the weight redistributes instead
+    of a missing source scoring 0.0 and voting against a real match — the same
+    rule hold_duration and the style dims follow.
+
+    The target's own profile is sharply specific: 94.6% Limit orders at `Ioc`,
+    zero cancels, zero triggers, zero client order ids. That is TWAP slicing by
+    hand, and it looks nothing like a trader resting Gtc orders and cancelling
+    them, which is exactly the kind of distinction fills alone cannot draw.
+    """
+    a = fp_a.get("order_profile") or {}
+    b = fp_b.get("order_profile") or {}
+    if not a.get("orders") or not b.get("orders"):
+        return None
+
+    parts = [
+        _dist_similarity(a.get("order_type_mix"), b.get("order_type_mix")),
+        _dist_similarity(a.get("tif_mix"), b.get("tif_mix")),
+        _dist_similarity(a.get("status_mix"), b.get("status_mix")),
+    ]
+    # Rates are proportions already, so closeness is 1 - |difference|.
+    parts.extend(
+        1.0 - abs(float(a.get(key, 0)) - float(b.get(key, 0)))
+        for key in ("cancel_rate", "reduce_only_rate", "trigger_rate",
+                    "programmatic_rate")
+    )
+    return float(sum(parts) / len(parts))
 
 
 def get_asset_overlap(fp_a: dict, fp_b: dict) -> dict:
@@ -676,6 +731,12 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     dim_score = compare_position_sizing(ezekiel_fp, candidate_fp)
     dimensions["position_sizing"] = round(dim_score, 4)
 
+    # How orders were SUBMITTED, not just what filled. None when either side has
+    # no order data, so the weight redistributes rather than a missing source
+    # voting against a real match.
+    op_score = compare_order_profile(ezekiel_fp, candidate_fp)
+    dimensions["order_profile"] = round(op_score, 4) if op_score is not None else None
+
     # Style dimensions — how the trader trades. These return None when either
     # side lacks the data to judge; None dims are excluded and weights renormalized
     # so thin data never fakes a signal in either direction.
@@ -707,6 +768,10 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
         "direction_bias": 0.03,
         "position_management": 0.06,
         "loss_handling": 0.03,
+        # Added without disturbing the others: `usable` renormalises, so every
+        # existing weight keeps its RELATIVE size. Introducing signal, not
+        # reweighting to reach a wanted answer.
+        "order_profile": 0.10,
     }
 
     candidate_acct_val = float(
@@ -817,13 +882,21 @@ def _estimate_weekly_volume(fills: list[dict]) -> float:
     return round(total / max(weeks, 1), 2)
 
 
-def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
+def build_candidate_fingerprint(fills: list[dict], state: dict,
+                                orders: list[dict] | None = None) -> dict:
     """Build a mini-fingerprint for a candidate wallet from their data.
-    Now includes all 8 comparable dimensions (trade_sequencing, position_sizing added)."""
+
+    `orders` is optional and costs one extra API call, so only targeted scans
+    pass it. Without it `order_profile` is absent, `compare_order_profile`
+    returns None, and that dimension's weight redistributes — a leaderboard
+    sweep is scored exactly as before rather than penalised for data nobody
+    fetched.
+    """
     from src.fingerprint import (
         compute_entry_exit_style,
         compute_hold_duration,
         compute_leverage_profile,
+        compute_order_profile,
         compute_style_profile,
     )
 
@@ -844,6 +917,7 @@ def build_candidate_fingerprint(fills: list[dict], state: dict) -> dict:
         "trade_sequencing": compute_trade_sequencing(fills),
         "position_sizing": compute_position_sizing(fills, positions),
         "style_profile": compute_style_profile(fills),
+        "order_profile": compute_order_profile(orders) if orders else {},
         "account_characteristics": {
             "account_value_usd": acct_val,
             "weekly_volume_usd": _estimate_weekly_volume(fills),
@@ -966,7 +1040,11 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
         return None
 
     state = get_candidate_state(wallet)
-    candidate_fp = build_candidate_fingerprint(fills, state)
+    # One extra call, only on targeted scans. How someone submits orders — Ioc
+    # slices versus resting Gtc, cancels, triggers, client order ids — is a
+    # durable habit that fills alone cannot show.
+    candidate_fp = build_candidate_fingerprint(fills, state,
+                                               orders=get_candidate_orders(wallet))
     score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
 
     return {

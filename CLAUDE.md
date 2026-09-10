@@ -49,9 +49,14 @@ Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
   by an account. An agent shared between two accounts is close to proof of common
   control. Collected by `collector.py`, used by nothing. **Highest-value unused
   signal.**
-- **`data/orders/`** — order-level behaviour: cancel rates, order types, TWAP
-  slice sizing, price offsets from mid, maker/taker mix. The fingerprint uses
-  fills only, which is a coarser shadow of the same habits.
+- ~~`data/orders/`~~ — **wired 2026-09-10** as the `order_profile` dimension.
+  54,866 records were being collected and never read. It discriminates hard:
+  the target is 94.6% `Ioc` limit slices with **0% cancels and 0% client order
+  ids** (manual TWAP), while all three correlation leads are ~100% cancels and
+  **100% client order ids** (bots). **Not in the self-match backtest**: both
+  windows would draw from the same order pool, so that dimension would score
+  ~1.0 by leakage and falsely inflate the validation. Wiring it there needs
+  orders split by the same time windows — worth doing, carefully.
 - **`data/twitter/`** — not referenced anywhere in `src/`. Off-chain signal,
   entirely unexploited.
 - `data/vaults/`, `data/referral/`, `data/subaccounts/` reach `scanner.py` but
