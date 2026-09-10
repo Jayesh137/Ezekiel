@@ -37,6 +37,12 @@ jobs:
       # which is the cadence "coverage improves across runs" actually assumes.
       # Budgeted at ~240s of this 30-minute job (config.reprice). Grouped by
       # (asset, date), so ~96 reachable requests cover far more records.
+      # New sweeps refuse to price a counterfeit at collection time. This is for
+      # records already on disk, and for the day someone adds a canonical
+      # contract for another (chain, symbol) pair — it is idempotent and only
+      # judges pairs whose real contract is known.
+      - name: Quarantine impostor tokens
+        run: python scripts/quarantine_impostor_tokens.py --apply
       - name: Reprice stored transfers
         env:
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
