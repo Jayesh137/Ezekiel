@@ -85,3 +85,43 @@ def test_a_category_on_one_side_only_counts_against_the_match():
     # BELOW a perfect match. Dropping unmatched categories would score 1.0.
     assert score < 1.0
     assert score == pytest.approx(6 / 7, abs=0.01)
+
+
+def test_order_windows_are_disjoint_so_the_self_match_is_not_leaked():
+    """Both sides of the self-match drawing from the whole order history would
+    score order_profile at ~1.0 and inflate the one measurement that validates
+    the scorer. Splitting orders by the same calendar days as the fills is what
+    makes the dimension admissible there at all."""
+    from src.backtest import orders_in_window
+
+    def fill(day):
+        return {"time": day * 86_400_000 + 1}
+
+    def order(day, oid):
+        return {"oid": oid, "order": {"orderType": "Limit", "tif": "Ioc"},
+                "status": "filled", "statusTimestamp": day * 86_400_000 + 5}
+
+    older_fills = [fill(1), fill(2)]
+    recent_fills = [fill(3), fill(4)]
+    orders = [order(1, 10), order(2, 11), order(3, 12), order(4, 13), order(9, 99)]
+
+    older = orders_in_window(orders, older_fills)
+    recent = orders_in_window(orders, recent_fills)
+    assert {o["oid"] for o in older} == {10, 11}
+    assert {o["oid"] for o in recent} == {12, 13}
+    # No overlap, and a day outside both windows belongs to neither.
+    assert not ({o["oid"] for o in older} & {o["oid"] for o in recent})
+    assert 99 not in {o["oid"] for o in older + recent}
+
+
+def test_orders_without_a_usable_timestamp_are_dropped():
+    from src.backtest import orders_in_window
+    orders = [{"oid": 1, "statusTimestamp": None}, {"oid": 2}, "junk", None]
+    assert orders_in_window(orders, [{"time": 86_400_000}]) == []
+
+
+def test_the_summary_carries_the_order_profile():
+    """Strangers must be comparable on the same dimension as the target."""
+    from src.scanner import _summarize_fingerprint
+    got = _summarize_fingerprint({"order_profile": {"orders": 5, "cancel_rate": 0.2}})
+    assert got["order_profile"]["orders"] == 5

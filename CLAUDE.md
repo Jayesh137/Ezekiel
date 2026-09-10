@@ -53,10 +53,10 @@ Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
   54,866 records were being collected and never read. It discriminates hard:
   the target is 94.6% `Ioc` limit slices with **0% cancels and 0% client order
   ids** (manual TWAP), while all three correlation leads are ~100% cancels and
-  **100% client order ids** (bots). **Not in the self-match backtest**: both
-  windows would draw from the same order pool, so that dimension would score
-  ~1.0 by leakage and falsely inflate the validation. Wiring it there needs
-  orders split by the same time windows — worth doing, carefully.
+  **100% client order ids** (bots). Now IN the backtest too, split by the same
+  calendar days as the fills (verified disjoint: 0 shared oids, 0 shared days),
+  with strangers given the same dimension so the target cannot score on one
+  nobody else could earn.
 - ~~`data/twitter/`~~ — **removed 2026-09-10**. It was three empty directories
   with no collector and no reference anywhere: scaffolding for an intention
   never built, not data going unused. X's API is paid and scraping is fragile
@@ -104,10 +104,13 @@ Think about these; none is implemented:
 3. **Verify "well-known" addresses.** Twice the commonly cited address was a
    different token — Polygon's cited USDT is `USDT0`; Optimism has **two**
    legitimate contracts both reporting `USDC`.
-4. **Never tune the thing that validates you.** The behavioural self-match
-   backtest **currently FAILS** (self 0.5522 vs a stranger's 0.5571). Fixing it
-   by reweighting dimensions would fit the one measurement that proves the scorer
-   works. Treat any behavioural score as unvalidated until
+4. **Never tune the thing that validates you.** The self-match backtest still
+   FAILS, but on one condition rather than two: he is now **rank 1** (his own
+   best match) with a margin of **+0.0361** against a required **+0.05**. It got
+   there by adding independent signal — order-submission habits, windowed to
+   avoid leakage — not by moving weights or lowering the bar. Closing the last
+   0.0139 by reweighting, or by relaxing the 0.05, would fit the one measurement
+   that proves the scorer works. Treat any behavioural score as unvalidated until
    `profile/backtest.json` has `passed: true`.
 5. **A failed read must never serialise as a clean result.** Distinguish
    "we could not tell" from "there is nothing there", everywhere.

@@ -164,6 +164,30 @@ def zero_dimensions(dims: dict) -> list[str]:
                   if isinstance(v, (int, float)) and float(v) == 0.0)
 
 
+def orders_in_window(orders: list[dict], window_fills: list[dict]) -> list[dict]:
+    """Orders from the same CALENDAR DAYS as a fills window.
+
+    The windows are built from active trading days, so bucketing orders by the
+    same day set guarantees the two order sets are disjoint exactly where the
+    fill sets are. Without this, both sides of the self-match would draw from
+    the whole order history, `order_profile` would score ~1.0, and the one
+    measurement that validates the scorer would be inflated by leakage.
+    """
+    days = {int(f.get("time", 0)) // 86_400_000 for f in window_fills if f.get("time")}
+    out = []
+    for rec in orders or []:
+        if not isinstance(rec, dict):
+            continue
+        ts = rec.get("statusTimestamp") or (rec.get("order") or {}).get("timestamp")
+        try:
+            day = int(ts) // 86_400_000
+        except (TypeError, ValueError):
+            continue
+        if day in days:
+            out.append(rec)
+    return out
+
+
 def run_backtest() -> dict:
     from src.fingerprint import load_fills, load_positions_latest
     from src.scanner import _effective_thresholds, build_candidate_fingerprint, compute_similarity
@@ -243,9 +267,17 @@ def run_backtest() -> dict:
     # re-read backtest.json for every stranger it scores.
     eff = _effective_thresholds(load_config()["alert_thresholds"])
 
+    # Orders split by the SAME calendar days as the fills, so the two sides
+    # share none. Both windows drawing from the whole order history would make
+    # order_profile score ~1.0 and inflate the self-match by leakage.
+    from src.fingerprint import load_orders
+    all_orders = load_orders()
+    older_orders = orders_in_window(all_orders, older)
+    recent_orders = orders_in_window(all_orders, recent)
+
     # Same account on both sides is legitimate: it IS the same account.
-    target_fp = build_candidate_fingerprint(recent, positions)
-    self_fp = build_candidate_fingerprint(older, positions)
+    target_fp = build_candidate_fingerprint(recent, positions, orders=recent_orders)
+    self_fp = build_candidate_fingerprint(older, positions, orders=older_orders)
     self_score, self_dims, self_evidence = compute_similarity(target_fp, self_fp, eff)
 
     # Strangers: fingerprint summaries from the latest scan sweep
@@ -257,9 +289,21 @@ def run_backtest() -> dict:
                 scan = json.load(f)
             for r in scan.get("results", []):
                 cand_fp = r.get("fingerprint")
-                if cand_fp:
-                    s, _, _ = compute_similarity(target_fp, cand_fp, eff)
-                    strangers.append({"wallet": r["wallet"], "score": s})
+                if not cand_fp:
+                    continue
+                # Give strangers the same dimension the target gets. Scoring the
+                # self-match on order_profile while strangers lack it would
+                # hand the target a dimension nobody else could earn - the same
+                # inflation the window split exists to prevent, arriving by a
+                # different door.
+                if "order_profile" not in cand_fp:
+                    from src.fingerprint import compute_order_profile
+                    from src.scanner import get_candidate_orders
+                    cand_fp = dict(cand_fp)
+                    cand_fp["order_profile"] = compute_order_profile(
+                        get_candidate_orders(r["wallet"]))
+                s, _, _ = compute_similarity(target_fp, cand_fp, eff)
+                strangers.append({"wallet": r["wallet"], "score": s})
         except Exception as e:
             print(f"[backtest] Could not score strangers: {e}")
 

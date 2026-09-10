@@ -935,6 +935,11 @@ def _summarize_fingerprint(fp: dict) -> dict:
     hd = fp.get("hold_duration", {})
 
     return {
+        # Carried so a stored scan can be compared on order habits without
+        # re-fetching. The backtest needs strangers to have the same dimensions
+        # the target has, or the self-match is scored on a dimension nobody else
+        # could earn.
+        "order_profile": fp.get("order_profile", {}),
         "asset_preferences": {
             "coins_traded": ap.get("coins_traded", []),
             "coin_frequency": ap.get("coin_frequency", {}),
