@@ -27,6 +27,29 @@ def main() -> int:
         print(f"[gcr] target state unreadable: {type(exc).__name__}: {exc}")
         return 0
 
+    # The HIP-3 books are separate deployments and do NOT appear in the main
+    # clearinghouseState. Leaving them out read the wallet as 52-of-52 short
+    # when it also held long SP500 and XYZ100 against short MU and SKHX — two
+    # memory-chip competitors, which is a sector pair trade, not a directional
+    # bet. Judging his book while blind to a two-sided part of it is exactly the
+    # kind of quiet mis-read this module is supposed to avoid.
+    #
+    # A dex that cannot be read is reported, never silently skipped: "we could
+    # not tell" and "there was nothing there" are different answers.
+    positions = list((state or {}).get("assetPositions") or [])
+    for dex in config.get("hip3_dexes", []):
+        try:
+            dex_state = hl_post({"type": "clearinghouseState", "user": target,
+                                 "dex": dex})
+        except Exception as exc:                      # noqa: BLE001 - transport
+            print(f"[gcr] hip3 dex {dex!r} unreadable: {type(exc).__name__}: {exc}")
+            continue
+        extra = (dex_state or {}).get("assetPositions") or []
+        if extra:
+            print(f"[gcr] + {len(extra)} position(s) from hip3 dex {dex!r}")
+        positions.extend(extra)
+    state = dict(state or {}, assetPositions=positions)
+
     amounts = [float(r["amount_usd"]) for r in records_for(target)
                if (r.get("src") or "").lower() == target and r.get("amount_usd")]
     report = evaluate(state, freq=calibration.load_market_frequencies(),

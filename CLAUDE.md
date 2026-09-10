@@ -197,16 +197,55 @@ tuned on three light blotters missed img335 entirely. Use
 `scripts/contact_sheets.py` (Pillow, lazily imported, not a CI dependency) and
 read the grids; then open only the tables at full size.
 
-**32 of 406 reviewed, 8 blotters found.** Set `reviewed`/`content`/`notes` in
-`trade_review_index.json`; `scripts/extract_trade_reviews.py` preserves them.
+**The check was reading only part of his book.** `clearinghouseState` does not
+include the HIP-3 `xyz:` deployments, so the wallet scored 52-of-52 short while
+it also held **long SP500 and XYZ100 against short MU and SKHX** — two
+memory-chip competitors, an equity sector pair trade, and two-sided. The runner
+now merges every dex in `hip3_dexes`, and reports a dex it cannot read rather
+than skipping it. Including them moved `liquidation_distance` from CONSISTENT to
+UNTESTABLE, which is the honest reading: the crypto book is all cross and 100%+
+from liquidation, but `xyz:XYZ100` sits **22%** away and `xyz:SP500` 40%, both
+LONG indices on **isolated** 4x. GCR ran cross throughout.
 
-Live: net-short bias CONSISTENT (52/52), liquidation distance CONSISTENT (closest
-103% away, median 6652%), broad short basket CONSISTENT (52 markets), small-cap
-shorts UNTESTABLE, round numbers CONSISTENT but weak. Nothing contradicts — but
-only one check can, so read `falsifiability`, not the tally.
+**133 of 406 reviewed; 15 blotters, 1 order-history table, 1 BetFair slip.**
+Set `reviewed`/`content`/`notes` in `trade_review_index.json`;
+`scripts/extract_trade_reviews.py` preserves them.
+
+**An open on-chain lead, not yet pursued.** img163/img164: he sold his SAD DOGE
+[KABOSU] NFT for **2,000,000 USDC** on or about **2021-08-27** to
+@TwoDollaHotDoge, contract prefix `0xabefb...`, and the OpenSea screenshot says
+"From: **you**" — taken inside his own logged-in session. The seller is a
+GCR-controlled Ethereum address. Everything else in this corpus is style, which
+can only nudge a prior; this is the one item that could move it on **flow**.
+Weigh it honestly before spending Etherscan budget: it is L1 in 2021 and the
+target's history starts 2026-02-05 on Hyperliquid, so no connection would prove
+little — but a connection would be very strong.
+
+Live: net-short bias CONSISTENT (54/56), liquidation distance UNTESTABLE
+(closest 22%, the isolated index long), broad short basket CONSISTENT (54
+markets), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak.
+Nothing contradicts — but only one check can, so read `falsifiability`, not the
+tally.
+
+Other things the images settled, all in `trade_review_index.json`:
+
+- **He is not crypto-native**: "Traded political prediction markets as a full
+  time job for years before getting into crypto" (img186), with a BetFair slip
+  staking £49,000 at 65:1 (img185). The target's non-crypto `xyz:` book rhymes.
+- **Stops are mental, never resting** — "-1% mental stop" (img182), which is why
+  img032 and img059 both show `Trigger Orders (0)` beside 35 and 40 positions.
+- **Blotters understate him**: "most of my position was actually spot and not
+  reflected here" (img144).
+- **A fourth handle**: he posted as `trueshiba` before @GiganticRebirth and said
+  so himself (img034). He rotates identities and discloses them late.
+- **img128 is the only order-history table** — 5 ACH/USDT limit buys in 98
+  seconds, 2 cancelled, round prices against unround amounts. Do NOT build a
+  check on it: the target's 0% cancels are an artifact of `Ioc` orders being
+  auto-cancelled by the venue, and this is spot, another exchange, five years
+  earlier.
 
 The corpus spans THREE platforms: Twitter, Discord (img251, img282) and Telegram
-(img219, img220, img318), and some images are redacted by the compiler.
+(img219, img220, img318), and some images are redacted by whoever compiled it.
 
 ## Not detection
 
