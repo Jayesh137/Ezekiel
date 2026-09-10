@@ -1,14 +1,14 @@
 {
-  "computed_at": "2026-09-10T08:45:53.873315+00:00",
+  "computed_at": "2026-09-10T08:57:12.695270+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 167,
   "behavioural_counts_as_a_vector": false,
   "tier_counts": {
     "CONFIRMED": 1,
     "PROBABLE": 1,
-    "POSSIBLE": 50,
+    "POSSIBLE": 49,
     "WATCH": 49,
-    "INFRASTRUCTURE": 66
+    "INFRASTRUCTURE": 67
   },
   "wallets": [
     {
@@ -1104,35 +1104,6 @@
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
           "edge_count": 103
-        },
-        "depth": 2,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.045,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (49 separate movements)",
-        "Last movement 695 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 2 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 49
         },
         "depth": 2,
         "chains": [
@@ -3400,6 +3371,33 @@
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
           "edge_count": 35
+        },
+        "depth": 2,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": true,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "INFRASTRUCTURE"
+    },
+    {
+      "wallet": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "SERVICE",
+      "reasons": [
+        "Excluded: configured service address (exchange/bridge/contract)"
+      ],
+      "evidence": {
+        "service_reason": "configured service address (exchange/bridge/contract)",
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 49
         },
         "depth": 2,
         "chains": [
