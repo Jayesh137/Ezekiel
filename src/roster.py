@@ -215,6 +215,25 @@ def build_roster(config: dict | None = None) -> dict:
         e["vectors"].add(VECTOR_AGENT)
         e["evidence"]["shared_agents"] = agents
 
+    # Portfolio overlap is recorded but is NOT a vector. A copy-trader holds the
+    # same basket in the same direction at the same time by definition, and this
+    # project exists because its owner copies this trader by hand — so a high
+    # score is exactly as consistent with a copycat as with him. It informs a
+    # human reading a lead; it must not promote one.
+    try:
+        with open(DATA_DIR / "portfolio_overlap" / "latest.json") as f:
+            overlaps = json.load(f).get("overlaps") or {}
+    except (OSError, ValueError, AttributeError):
+        overlaps = {}
+    for addr, detail in overlaps.items():
+        a = (addr or "").lower()
+        if not a or a == target:
+            continue
+        e = entry(a)
+        e["evidence"]["portfolio_overlap"] = detail.get("score")
+        e["evidence"]["shared_rare_markets"] = [
+            s.get("market") for s in (detail.get("shared_rare") or [])][:5]
+
     for acct in _read(DATA_DIR / "hyperevm" / "latest.json", "wallets"):
         a = (acct.get("address") or "").lower()
         if not a or a == target:

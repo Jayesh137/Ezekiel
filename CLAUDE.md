@@ -80,9 +80,13 @@ Think about these; none is implemented:
   alerts: an unusual/unprecedented silence, and a wallet whose FIRST activity
   lands inside one. Live: silent 4d (normal), 7 anomalous gaps in his history,
   no handoffs among 13 candidates.
-- **Portfolio correlation** — returns or position-basket correlation between the
-  target and a candidate over the same window. Two wallets holding the same
-  unusual basket at the same time is hard to fake.
+- ~~Portfolio correlation~~ — **built 2026-09-10** (`src/portfolio_overlap.py`).
+  Rarity-weighted via `calibration.market_frequency`, so the majors count for
+  nothing: BTC is held by 37% of wallets, HYPE 36%, and even FARTCOIN clears the
+  common threshold. **Recorded as EVIDENCE, never a tiering vector** — a
+  copy-trader holds the same basket in the same direction at the same time by
+  definition, and this project exists because its owner does exactly that. Live:
+  only 4 of 34 candidates hold an open book; best score 0.079.
 - **Amount signatures** — he moves amounts like `8999999.00021` and
   `5005314.50`. Exact repeated fractional amounts are a habit, and habits travel.
 - **Approval fingerprints** — which routers/contracts a wallet approves, in what

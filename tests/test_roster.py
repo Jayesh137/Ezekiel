@@ -194,3 +194,23 @@ def test_agent_links_reach_the_roster(tmp_path, monkeypatch):
     assert roster.VECTOR_AGENT in row["vectors"]
     assert row["tier"] == roster.TIER_CONFIRMED
     assert row["evidence"]["shared_agents"] == ["0xagent"]
+
+
+def test_portfolio_overlap_is_evidence_and_never_a_vector(tmp_path, monkeypatch):
+    """A copy-trader holds the same basket in the same direction at the same
+    time by definition — and this project exists because its owner copies this
+    trader by hand. A high score is exactly as consistent with a copycat as with
+    him, so it must inform a human without promoting a wallet."""
+    _setup(tmp_path, monkeypatch, transfer_graph=("nodes", [_node()]))
+    d = tmp_path / "portfolio_overlap"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "latest.json").write_text(json.dumps({"overlaps": {W: {
+        "score": 0.95,
+        "shared_rare": [{"market": "RARE1", "rarity": 0.9}]}}}))
+
+    row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
+    assert row["evidence"]["portfolio_overlap"] == 0.95
+    assert row["evidence"]["shared_rare_markets"] == ["RARE1"]
+    # Recorded, but it buys no tier.
+    assert "portfolio" not in row["vectors"]
+    assert row["tier"] != roster.TIER_CONFIRMED

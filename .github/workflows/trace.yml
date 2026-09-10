@@ -128,6 +128,11 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_dormancy.py
+      # One free call per wallet. Rarity-weighted, so the majors count nothing.
+      # Writes evidence and raises no alert: a copy-trader holds the same basket
+      # by definition, which is indistinguishable here from being the same person.
+      - name: Score portfolio overlap
+        run: python scripts/check_portfolio_overlap.py
       - name: Build wallet roster
         run: python src/roster.py
       # After the roster, because it classifies each destination using the tiers
