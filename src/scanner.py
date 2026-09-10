@@ -33,7 +33,6 @@ from src.thresholds import VETO_BONUS_CEILING, VETO_SCORE_CAP
 from src.utils import (
     DATA_DIR,
     append_records,
-    etherscan_get,
     hl_post,
     load_config,
     read_cursor,
@@ -1065,43 +1064,30 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
 
 
 def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30) -> list[str]:
-    """Return wallet addresses that recently made large deposits to the HL bridge on Arbitrum."""
-    import os
-    api_key = os.environ.get("ETHERSCAN_API_KEY", "")
-    if not api_key:
+    """Wallets that made large deposits to the HL bridge on Arbitrum in the window.
+
+    This used to be one `offset=1000, sort=desc` call. The bridge is among the
+    busiest contracts on Arbitrum, so the newest thousand USDC transfers cover
+    hours, not the thirty days the signature claims — the same defect the
+    correlator's pool had, fixed there and not here. It now reads the whole
+    window through the correlator's paginated, time-bounded walk.
+    """
+    from src.correlator import get_recent_bridge_deposits
+
+    deposits, error = get_recent_bridge_deposits(window_days=days, min_amount=min_usdc)
+    if error == "skipped_no_api_key":
         print("[scanner] Etherscan API key missing, skipping bridge depositor scan")
         return []
-
-    config = load_config()
-    result = etherscan_get({
-        "module": "account",
-        "action": "tokentx",
-        "address": config["hl_bridge_contract"],
-        "contractaddress": config["usdc_contract_arbitrum"],
-        "page": 1,
-        "offset": 1000,
-        "sort": "desc",
-    })
-
-    transfers = result.get("result", []) if result.get("status") == "1" else []
-    if not isinstance(transfers, list):
-        return []
-
-    cutoff_ts = int(time.time()) - (days * 86400)
-    target = config["target_wallet"].lower()
-    bridge = config["hl_bridge_contract"].lower()
+    if error:
+        # Partial is still worth scanning, but a reader must not take the
+        # count as the whole window.
+        print(f"[scanner] Bridge depositor scan INCOMPLETE: {error}")
 
     depositors: dict[str, float] = {}
-    for t in transfers:
-        if int(t.get("timeStamp", 0)) < cutoff_ts:
-            continue
-        to_addr = t.get("to", "").lower()
-        from_addr = t.get("from", "").lower()
-        if to_addr != bridge or from_addr in (target, bridge):
-            continue
-        amount = int(t.get("value", 0)) / 1e6
-        if amount >= min_usdc:
-            depositors[from_addr] = max(depositors.get(from_addr, 0), amount)
+    for d in deposits:
+        w = (d.get("wallet") or "").lower()
+        if w:
+            depositors[w] = max(depositors.get(w, 0.0), float(d.get("amount") or 0))
 
     print(f"[scanner] Bridge depositor scan: {len(depositors)} wallets >= ${min_usdc:,.0f} in last {days}d")
     return list(depositors.keys())

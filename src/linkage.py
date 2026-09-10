@@ -360,6 +360,62 @@ def high_fanin_addresses(threshold: int = 25) -> set:
     return {a for a, s in senders.items() if len(s) >= threshold}
 
 
+def activity_cache(max_lookups: int = 0):
+    """The global-activity cache, resolved against DATA_DIR at call time."""
+    from src.chain.activity import ActivityCache
+    return ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                         max_lookups=max_lookups)
+
+
+def outbound_chains(wallet: str) -> dict:
+    """Destination -> the chain the wallet was last seen sending to it on."""
+    from src.chain.collect import records_for
+    wl = (wallet or "").lower()
+    out: dict[str, str] = {}
+    for rec in records_for(wl):
+        if (rec.get("src") or "").lower() != wl:
+            continue
+        dst = (rec.get("dst") or "").lower()
+        if dst and rec.get("chain"):
+            out[dst] = rec["chain"]
+    return out
+
+
+def activity_exclusions(addresses, chain_of: dict, cache) -> tuple[set, list]:
+    """Destinations that cannot be ownership evidence, and the ones not yet measured.
+
+    A shared destination proves common ownership only if it belongs to one
+    account. Fan-in inside the substrate cannot establish that: it counts only
+    wallets we swept, so SocketGateway (2.19M transactions) showed five senders
+    and was counted as a private deposit address shared by the target and his
+    treasury. The whole-chain reading from src/chain/activity.py can.
+
+    An address with no reading is excluded too, and reported as pending, so a
+    link is delayed rather than asserted on a destination nobody has measured.
+    """
+    from src.chain.activity import is_busy
+
+    excluded: set = set()
+    pending: list = []
+    for a in addresses:
+        a = (a or "").lower()
+        if not a:
+            continue
+        reading = cache.get(a, chain_of.get(a) or "arbitrum") if cache else None
+        busy = is_busy(reading)
+        if busy is None:
+            excluded.add(a)
+            pending.append(a)
+        elif busy:
+            excluded.add(a)
+    return excluded, sorted(pending)
+
+
+# Readings per run for the target's own destinations. They are the only
+# addresses a shared destination can ever be, so the cache converges fast.
+ACTIVITY_LOOKUPS_PER_RUN = 20
+
+
 def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     """Linkage for wallets the substrate already covers. No network calls.
 
@@ -399,6 +455,23 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     # excluded even when nothing has NAMED them as infrastructure.
     excluded = excluded | high_fanin_addresses()
 
+    # And measured against the whole chain, not just our substrate: a router
+    # or exchange contract is excluded however few of OUR wallets touched it,
+    # and a destination nobody has measured yet is excluded until it is.
+    try:
+        busy, pending = activity_exclusions(
+            target_out, outbound_chains(target),
+            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN))
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[linkage] activity readings unavailable ({type(exc).__name__}: "
+              f"{exc}) — every shared destination treated as unmeasured")
+        busy, pending = set(target_out), sorted(target_out)
+    excluded = excluded | busy
+    if pending:
+        print(f"[linkage] {len(pending)} of the target's destinations have no "
+              f"global-activity reading yet; they cannot count as shared "
+              f"deposit addresses until measured")
+
     out: dict[str, dict] = {}
     for wallet in wallets:
         w = (wallet or "").lower()
@@ -422,12 +495,20 @@ def check_candidate(wallet: str, target: str, profile: dict) -> dict:
     """Run both heuristics against one candidate and return linkage evidence."""
     config = load_config()
     excluded = set(config.get("excluded_addresses", [])) | set(config.get("known_self_wallets", []))
+    target_out = profile.get("out_addrs", set())
+    # Cached readings only: the graph job measures the target's destinations,
+    # and an unmeasured destination is no evidence here either.
+    try:
+        busy, _pending = activity_exclusions(target_out, outbound_chains(target),
+                                             activity_cache(max_lookups=0))
+    except Exception:                                 # noqa: BLE001
+        busy = set(target_out)
     return compute_linkage(
         wallet,
         get_first_funder(wallet),
         get_outbound_usdc_addresses(wallet),
         target,
         profile.get("first_funder"),
-        profile.get("out_addrs", set()),
-        excluded,
+        target_out,
+        excluded | busy,
     )

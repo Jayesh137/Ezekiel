@@ -39,6 +39,7 @@ from src import continuity as ct
 from src import thresholds as th
 from src.utils import (
     DATA_DIR,
+    atomic_write_json,
     candidate_current_score,
     load_all_records,
     load_config,
@@ -258,13 +259,34 @@ def normalise_hl_ledger_entry(entry: dict) -> dict | None:
     ref = entry.get("hash", "")
 
     def _usd() -> float:
-        for key in ("usdc", "usdcValue", "amount"):
+        """Dollar value of the delta. A token QUANTITY is never a dollar figure.
+
+        This used to fall through to `amount` when `usdcValue` was "0.0", so a
+        spotTransfer of 1,030,689,918 MAX — a token Hyperliquid itself values at
+        nothing — entered the graph as $1,030,689,918 received from
+        0x207700bd..., which made that wallet a POSSIBLE lead on money that
+        does not exist. `usdcValue` is the venue's own valuation; zero is a
+        real answer. Only USDC's own quantity may stand in for its value.
+        """
+        seen_value = False
+        for key in ("usdc", "usdcValue"):
             v = delta.get(key)
-            if v not in (None, "", "0", "0.0"):
-                try:
-                    return abs(float(v))
-                except (TypeError, ValueError):
-                    continue
+            if v in (None, ""):
+                continue
+            try:
+                f = abs(float(v))
+            except (TypeError, ValueError):
+                continue
+            seen_value = True
+            if f > 0:
+                return f
+        if seen_value:
+            return 0.0
+        if (delta.get("token") or "").strip().upper() == "USDC":
+            try:
+                return abs(float(delta.get("amount") or 0))
+            except (TypeError, ValueError):
+                return 0.0
         return 0.0
 
     if dtype in ("send", "internalTransfer", "spotTransfer"):
@@ -355,32 +377,56 @@ def dedupe_edges(edges: list[dict]) -> list[dict]:
 def detect_services(edges: list[dict], known_services: set,
                     fanout: int = DEFAULTS["service_fanout"],
                     fanin: int = DEFAULTS["service_fanin"],
-                    reasons: dict | None = None) -> dict:
+                    reasons: dict | None = None,
+                    never_services: set | None = None) -> dict:
     """Identify addresses that behave like infrastructure rather than wallets.
 
     Two sources: explicitly configured addresses (bridge, known CEX deposit
     addresses), and observed many-to-many behaviour. An exchange receives from
     hundreds of unrelated wallets; treating one as a "linked wallet" because the
     target withdrew to it is the classic false positive this guards against.
+
+    Fan degree counts only counterparties that are NOT already known
+    infrastructure. A personal wallet that uses Aave, Paraswap, Socket and CCTP
+    has dozens of contract counterparties and none of them make it a hub;
+    measured 2026-09-10, `0xf078969e...` (an EOA, 35 Arbitrum transactions)
+    was graded a service on 84 senders / 130 recipients that were mostly
+    protocols, and so the wallet sharing the target's real Binance deposit
+    address scored 0.0 and was never traversed.
+
+    `never_services` are addresses measured to be quiet EOAs on the whole
+    chain (src/chain/activity.py). Fan degree inside our substrate cannot
+    overrule that measurement; only a configured or globally-busy address is a
+    service.
     """
+    known = {(a or "").lower() for a in (known_services or set())}
+    never = {(a or "").lower() for a in (never_services or set())}
     out_deg: dict[str, set] = {}
     in_deg: dict[str, set] = {}
     for e in edges:
         if e.get("bridge_event"):
             continue
-        out_deg.setdefault(e["src"], set()).add(e["dst"])
-        in_deg.setdefault(e["dst"], set()).add(e["src"])
+        src, dst = e["src"].lower(), e["dst"].lower()
+        if dst not in known:
+            out_deg.setdefault(src, set()).add(dst)
+        if src not in known:
+            in_deg.setdefault(dst, set()).add(src)
+        # A known service still needs an entry so it is reported below.
+        out_deg.setdefault(src, set())
+        in_deg.setdefault(dst, set())
 
     services = {}
     for addr in set(out_deg) | set(in_deg):
         a = addr.lower()
-        if a in known_services:
+        if a in known:
             # A measured reason beats the generic label. An address detected by
             # HL fan-out arrives here indistinguishable from one typed into
             # config, and "configured service address" would hide the evidence
             # that actually excluded it.
             services[a] = (reasons or {}).get(a) or \
                 "configured service address (exchange/bridge/contract)"
+            continue
+        if a in never:
             continue
         o, i = len(out_deg.get(addr, ())), len(in_deg.get(addr, ()))
         if o >= fanout and i >= fanin:
@@ -807,12 +853,15 @@ def build_graph(edges: list[dict], target: str, *,
                 dust_usd: float = DEFAULTS["dust_usd"],
                 now_ts: float | None = None,
                 expansion: dict | None = None,
-                thresholds: dict | None = None) -> dict:
+                thresholds: dict | None = None,
+                never_services: set | None = None) -> dict:
     """Walk outward from the target, classifying and scoring every wallet reached.
 
     Pure function — every external input is passed in, so traversal and scoring
     are fully testable offline. `thresholds` is resolved once here and handed to
-    every node rather than re-read per wallet.
+    every node rather than re-read per wallet. `never_services` are addresses
+    measured to be quiet EOAs on the whole chain, which fan degree may not
+    overrule (see detect_services).
     """
     target = target.lower()
     thresholds = thresholds if thresholds is not None else _resolved_thresholds()
@@ -825,7 +874,8 @@ def build_graph(edges: list[dict], target: str, *,
     correlations = {k.lower(): v for k, v in (correlations or {}).items()}
 
     edges = dedupe_edges(edges)
-    services = detect_services(edges, known_services, reasons=service_reasons)
+    services = detect_services(edges, known_services, reasons=service_reasons,
+                               never_services=never_services)
 
     # Money in transit is not a destination. Conduits are found AFTER services,
     # because "forwards to infrastructure" is only meaningful once we know what
@@ -1776,7 +1826,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     resume: list | None = None,
                     now_ts: float | None = None,
                     known_services: set | None = None,
-                    already_expanded: list | None = None) -> tuple[list[dict], dict]:
+                    already_expanded: list | None = None,
+                    never_services: set | None = None) -> tuple[list[dict], dict]:
     """Iteratively widen the graph, level by level, under a hard budget.
 
     Replaces a single round that only looked up the target's DIRECT recipients:
@@ -1894,7 +1945,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     queue.extend((1, e["dst"]) for e in walkable if e["src"] == target)
 
     services = detect_services(edges, {(a or "").lower()
-                                       for a in (known_services or set())})
+                                       for a in (known_services or set())},
+                               never_services=never_services)
 
     expanded_now = set()
     try:
@@ -2015,7 +2067,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             # A wallet that just turned into a high-fan-degree hub must be
             # suppressed before its recipients are walked, not after.
             services = detect_services(edges, {(a or "").lower()
-                                               for a in (known_services or set())})
+                                               for a in (known_services or set())},
+                                       never_services=never_services)
             depth += 1
     except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
@@ -2213,6 +2266,126 @@ def label_contracts(edges: list[dict], known_services: set, config: dict,
     return found
 
 
+def fan_verdicts(fan_services: dict, readings: dict) -> tuple[dict, set]:
+    """Judge fan-detected services against whole-chain activity. Pure.
+
+    `fan_services` maps address -> the fan reason detect_services gave.
+    `readings` maps address -> an activity reading (or None when unavailable).
+
+    Returns (busy, persons): `busy` carries the measured reason for addresses
+    the chain confirms are shared infrastructure; `persons` are quiet EOAs the
+    fan rule must not mark. An address with no reading keeps the fan verdict
+    — unmeasured is not evidence of a person, and traversal stays conservative.
+    """
+    from src.chain.activity import is_busy
+
+    busy: dict[str, str] = {}
+    persons: set = set()
+    for addr in (fan_services or {}):
+        reading = readings.get(addr)
+        verdict = is_busy(reading)
+        if verdict is None:
+            continue
+        if verdict:
+            busy[addr] = (f"global activity: {int(reading.get('txs') or 0):,} txs, "
+                          f"{int(reading.get('token_transfers') or 0):,} token transfers")
+        elif not reading.get("is_contract"):
+            persons.add(addr)
+    return busy, persons
+
+
+# Whole-chain activity readings per run. Cached forever once taken, so the
+# backlog drains over a few runs and the steady state costs nothing.
+ACTIVITY_LOOKUPS_PER_RUN = 30
+
+
+def persons_on_record() -> set:
+    """Addresses already measured as quiet EOAs, from the activity cache."""
+    from src.chain.activity import ActivityCache, is_busy
+    try:
+        cache = ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                              max_lookups=0)
+    except Exception:                                 # noqa: BLE001
+        return set()
+    out: set = set()
+    for key, reading in (cache._table or {}).items():
+        if is_busy(reading) is False and not reading.get("is_contract"):
+            out.add(key.split(":", 1)[-1].lower())
+    return out
+
+
+def busy_on_record() -> dict:
+    """Addresses already measured as globally busy -> the measured reason.
+
+    Fan degree only sees our substrate, so an exchange hot wallet the target
+    used twice never trips it — measured 2026-09-10, three unlabelled EOAs
+    with 0.8M–2.8M transactions each graded OPERATIONAL_COUNTERPARTY. A busy
+    reading is a service verdict whatever the substrate shows.
+    """
+    from src.chain.activity import ActivityCache, is_busy
+    try:
+        cache = ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                              max_lookups=0)
+    except Exception:                                 # noqa: BLE001
+        return {}
+    out: dict[str, str] = {}
+    for key, reading in (cache._table or {}).items():
+        if is_busy(reading):
+            addr = key.split(":", 1)[-1].lower()
+            out[addr] = (f"global activity: {int(reading.get('txs') or 0):,} txs, "
+                         f"{int(reading.get('token_transfers') or 0):,} token transfers"
+                         + (f" ({reading['name']})" if reading.get("name") else ""))
+    return out
+
+
+def verify_fan_services(edges: list[dict], known_services: set, cfg: dict,
+                        cache=None) -> tuple[dict, set]:
+    """Measure every fan-detected service against the chain it was seen on.
+
+    Returns (busy, persons). `busy` also carries every address already on
+    record as globally busy, fan-flagged or not.
+    """
+    from src.chain.activity import ActivityCache
+    from src.chain.chains import enabled_chains
+
+    on_record = busy_on_record()
+    fan = {a: r for a, r in detect_services(
+        edges, known_services, fanout=cfg["service_fanout"],
+        fanin=cfg["service_fanin"]).items() if a not in known_services}
+    if not fan:
+        return on_record, persons_on_record()
+
+    chains = {c["name"] for c in enabled_chains(load_config())}
+    # The chain each address moved the most value on decides where to ask.
+    best: dict[str, tuple[float, str]] = {}
+    for e in edges:
+        if e.get("bridge_event") or e.get("inferred"):
+            continue
+        chain = e.get("chain") or CHAIN_ARBITRUM
+        if chain not in chains:
+            continue
+        usd = float(e.get("amount_usd", 0) or 0)
+        for side in ("src", "dst"):
+            a = (e.get(side) or "").lower()
+            if a in fan and (a not in best or usd > best[a][0]):
+                best[a] = (usd, chain)
+
+    cache = cache or ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                                   max_lookups=ACTIVITY_LOOKUPS_PER_RUN)
+    readings = {a: cache.get(a, best[a][1]) for a in fan if a in best}
+    busy, persons = fan_verdicts(fan, readings)
+    unmeasured = [a for a in fan if readings.get(a) is None]
+    if busy:
+        print(f"[graph] {len(busy)} fan-detected address(es) confirmed busy on-chain")
+    if persons:
+        print(f"[graph] {len(persons)} fan-detected address(es) are quiet EOAs — "
+              f"people, not services: {sorted(persons)[:3]}")
+    if unmeasured:
+        print(f"[graph] {len(unmeasured)} fan-detected address(es) still unmeasured "
+              f"— kept as services until the chain says otherwise")
+    return {**on_record, **busy}, persons | persons_on_record()
+
+
 def run_transfer_graph(expand: bool = True) -> dict:
     """Full pipeline: gather edges, traverse, score, persist, alert."""
     config = load_config()
@@ -2259,7 +2432,8 @@ def run_transfer_graph(expand: bool = True) -> dict:
                   f"earlier run — not repeating")
         edges, expansion = expand_frontier(
             edges, target, cfg, resume=resume,
-            known_services=known_services, already_expanded=already)
+            known_services=known_services, already_expanded=already,
+            never_services=persons_on_record())
         write_cursor("transfer_graph_last_expansion_ms", now_ms())
     else:
         from src.chain.chains import enabled_chains
@@ -2275,6 +2449,43 @@ def run_transfer_graph(expand: bool = True) -> dict:
         label_contracts(edges, known_services, config, cfg["dust_usd"])
     except Exception as exc:  # noqa: BLE001 - labelling must never break the graph
         print(f"[graph] bytecode labelling failed: {type(exc).__name__}: {exc}")
+
+    # Whole-chain activity decides what fan degree may not: an address our
+    # substrate shows as a hub is a service only if the chain agrees it is
+    # busy, and a quiet EOA is a person however many protocols it touches.
+    never_services: set = set()
+    try:
+        busy_reasons, never_services = verify_fan_services(edges, known_services, cfg)
+        known_services |= set(busy_reasons)
+        hl_services.update(busy_reasons)
+    except Exception as exc:  # noqa: BLE001 - verification must never break the graph
+        print(f"[graph] activity verification failed: {type(exc).__name__}: {exc}")
+
+    # Exchange deposit addresses inferred from behaviour: receive, then forward
+    # nearly everything to a known hot wallet. Specified and implemented long
+    # ago, never called. They stop traversal (money entering an exchange cannot
+    # be followed) and are the destinations whose co-senders share an account.
+    try:
+        from src.chain.labels import infer_deposit_addresses
+        # Named hot wallets plus every address measured busy on the whole
+        # chain: an exchange's sweep contracts are rarely labelled, and a
+        # deposit address forwarding into one is the same signature.
+        hot = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"),
+                                categories={"cex_hot"}) | set(busy_on_record())
+        inferred_deposits = infer_deposit_addresses(edges, hot)
+        for addr, info in inferred_deposits.items():
+            if addr not in known_services:
+                known_services.add(addr)
+                hl_services[addr] = (f"inferred exchange deposit address: forwards "
+                                     f"{info.get('forward_ratio', 0):.0%} to "
+                                     f"{str(info.get('forwarded_to'))[:12]}...")
+        atomic_write_json(DATA_DIR / "labels" / "inferred_deposits.json", {
+            "computed_at": utc_now(), "count": len(inferred_deposits),
+            "addresses": inferred_deposits})
+        if inferred_deposits:
+            print(f"[graph] {len(inferred_deposits)} inferred exchange deposit address(es)")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[graph] deposit-address inference failed: {type(exc).__name__}: {exc}")
 
     # Carry the previous successful expansion forward so the dashboard can show
     # "last successful L1 expansion" even on a run where it was skipped.
@@ -2339,6 +2550,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
         max_nodes=cfg["max_nodes"],
         dust_usd=cfg["dust_usd"],
         expansion=expansion,
+        never_services=never_services,
     )
 
     previous = previous_graph or None

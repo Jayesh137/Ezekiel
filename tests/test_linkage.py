@@ -50,6 +50,9 @@ def test_substrate_linkage_skips_wallets_that_were_never_swept(monkeypatch):
                         lambda t: {"first_funder": None, "out_addrs": {"0xdeposit"}})
     monkeypatch.setattr(lk, "get_outbound_addresses",
                         lambda w, cfg=None, limit=300: {"0xdeposit"})
+    # Measured quiet on the whole chain; an unmeasured destination is excluded
+    # (see test_service_verification), which is not what this test is about.
+    monkeypatch.setattr(lk, "activity_exclusions", lambda addrs, chains, cache: (set(), []))
 
     got = lk.substrate_linkage("0xtarget", ["0xswept", "0xunswept"],
                                config={"excluded_addresses": [],
@@ -83,6 +86,7 @@ def test_substrate_linkage_never_claims_a_shared_funder(monkeypatch):
                         lambda t: {"first_funder": "0xfunder", "out_addrs": {"0xdep"}})
     monkeypatch.setattr(lk, "get_outbound_addresses",
                         lambda w, cfg=None, limit=300: {"0xdep"})
+    monkeypatch.setattr(lk, "activity_exclusions", lambda addrs, chains, cache: (set(), []))
 
     got = lk.substrate_linkage("0xtarget", ["0xswept"],
                                config={"excluded_addresses": [],

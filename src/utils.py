@@ -233,19 +233,67 @@ def save_latest(directory: str, data: dict | list) -> str:
     atomic_write_json(filepath, data)
     return str(filepath)
 
-def load_all_records(directory: str) -> list[dict]:
-    """Load and merge all JSON files in a directory (daily files)."""
+def record_key(directory_name: str, rec: dict):
+    """The identity of one stored record, by data type. None when unkeyed.
+
+    `append_records` dedupes only within the day file it writes, and it files a
+    record under the COLLECTION date, not the record's own date. A record
+    re-fetched on a later day (after a cursor reset, a backfill, or an outage
+    catch-up) therefore lands in a second file carrying a key the first file
+    already holds, and nothing downstream could tell. Measured 2026-09-10:
+    data/ledger held 1,430 rows for 500 unique (hash, time) pairs — every entry
+    stored three times — and data/fills held 188,299 rows for 162,818 unique
+    tids. Every HL-native counterparty total was triple the truth, every exit
+    was offered to the correlator three times, and the two backtest windows
+    were duplicated unevenly.
+
+    Funding is keyed on (time, coin), never on `hash`: Hyperliquid reports the
+    zero hash on every funding row, so a hash key collapses the whole history
+    to one record.
+    """
+    if not isinstance(rec, dict):
+        return None
+    if directory_name == "fills":
+        return rec.get("tid")
+    if directory_name == "ledger":
+        return (rec.get("hash"), rec.get("time"))
+    if directory_name == "funding":
+        return (rec.get("time"), (rec.get("delta") or {}).get("coin"))
+    if directory_name == "orders":
+        return rec.get("oid")
+    return None
+
+
+def load_all_records(directory: str, *, dedupe: bool = True) -> list[dict]:
+    """Load and merge all JSON files in a directory (daily files).
+
+    Deduplicated across files by `record_key` for the data types that carry
+    one, keeping the earliest copy. Lossless: only an exact key match is
+    dropped, and a record with no key is always kept.
+    """
     dir_path = Path(directory)
     if not dir_path.exists():
         return []
+    name = dir_path.name
     all_records = []
+    seen: set = set()
     for filepath in sorted(dir_path.glob("*.json")):
         if filepath.name == "latest.json":
             continue
         with open(filepath) as f:
             data = json.load(f)
-            if isinstance(data, list):
-                all_records.extend(data)
+        if not isinstance(data, list):
+            continue
+        if not dedupe:
+            all_records.extend(data)
+            continue
+        for rec in data:
+            key = record_key(name, rec)
+            if key is not None and None not in (key if isinstance(key, tuple) else (key,)):
+                if key in seen:
+                    continue
+                seen.add(key)
+            all_records.append(rec)
     return all_records
 
 def update_index() -> None:

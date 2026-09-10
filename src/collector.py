@@ -123,7 +123,16 @@ def collect_funding(wallet: str) -> int:
     if not funding:
         return 0
 
-    added = append_records(str(DATA_DIR / "funding"), funding, key_field="hash")
+    # Hyperliquid reports the ZERO hash on every funding row, so keying the
+    # per-file dedupe on `hash` kept one funding payment per file and silently
+    # dropped the rest: measured 2026-09-10, 12,132 rows collected over 203
+    # days against ~1,200 payments a day for a book this size. (time, coin)
+    # identifies a funding payment; the composite is stored so append_records
+    # can key on it, and utils.record_key reads the same pair back.
+    for f in funding:
+        if isinstance(f, dict):
+            f["_key"] = f"{f.get('time')}:{(f.get('delta') or {}).get('coin')}"
+    added = append_records(str(DATA_DIR / "funding"), funding, key_field="_key")
 
     max_ts = max(f["time"] for f in funding)
     write_cursor("last_funding_time", max_ts)
