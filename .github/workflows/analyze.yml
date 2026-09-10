@@ -56,6 +56,14 @@ jobs:
       # Runs the self-match backtest, which is the only thing that can tell the
       # operator the behavioural scorer cannot identify the target. Needs the
       # alert credentials for that: without them the finding stays in a CI log.
+      # Two of the five corroboration vectors depend on knowing who first funded
+      # a wallet, and nothing populated that for graph wallets. Runs on the daily
+      # job because a first funder never changes: each wallet costs at most one
+      # lookup ever, and the cache converges over a few runs.
+      - name: Resolve first funders
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: python scripts/resolve_first_funders.py 40
       - name: Rebuild fingerprint
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}

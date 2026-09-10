@@ -103,3 +103,87 @@ def test_substrate_linkage_excludes_the_target_itself(monkeypatch):
     assert lk.substrate_linkage("0xtarget", ["0xtarget"],
                                 config={"excluded_addresses": [],
                                         "known_self_wallets": []}) == {}
+
+
+def test_first_funder_does_not_cap_the_block_range(monkeypatch):
+    """endblock was 99999999 while Arbitrum is past 501,000,000, so the search
+    covered only the chain's first fifth and any wallet first funded after that
+    returned no funder. That is why shared_funder was false for every wallet in
+    the graph despite being one of five accepted corroboration vectors."""
+    import src.linkage as lk
+
+    seen = []
+
+    def fake_get(params, **kw):
+        seen.append(dict(params))
+        return {"status": "1", "result": [
+            {"from": "0xfunder", "value": "1000000000000000000"}]}
+
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "k")
+    monkeypatch.setattr(lk, "etherscan_get", fake_get)
+
+    assert lk.get_first_funder("0xWALLET") == "0xfunder"
+    assert seen[0]["endblock"] == "latest"
+    assert 99999999 not in seen[0].values()
+
+
+def test_no_api_key_yields_no_funder_rather_than_a_wrong_one(monkeypatch):
+    import src.linkage as lk
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
+    assert lk.get_first_funder("0xWALLET") is None
+
+
+def test_a_found_funder_is_cached_permanently(monkeypatch, tmp_path):
+    """A first funder is a fact about a transaction that already happened, so
+    one lookup per wallet is all this should ever cost."""
+    import src.linkage as lk
+    cache, spent = lk.resolve_first_funders(
+        ["0xAAA", "0xBBB"], cache={}, lookup=lambda w: "0xFUNDER")
+    assert cache == {"0xaaa": "0xfunder", "0xbbb": "0xfunder"}
+    assert spent == 2
+
+
+def test_an_unresolved_funder_is_not_cached(monkeypatch):
+    """Caching a miss makes a transient outage permanent, and a wallet with no
+    inbound history yet may well acquire one later."""
+    import src.linkage as lk
+    cache, spent = lk.resolve_first_funders(["0xAAA"], cache={}, lookup=lambda w: None)
+    assert cache == {}
+    assert spent == 1
+
+
+def test_already_cached_wallets_cost_nothing(monkeypatch):
+    import src.linkage as lk
+    calls = []
+    cache, spent = lk.resolve_first_funders(
+        ["0xAAA"], cache={"0xaaa": "0xf"},
+        lookup=lambda w: calls.append(w) or "0xf")
+    assert spent == 0 and calls == []
+
+
+def test_the_lookup_budget_is_respected(monkeypatch):
+    import src.linkage as lk
+    calls = []
+    _, spent = lk.resolve_first_funders(
+        [f"0x{i:040x}" for i in range(50)], cache={}, max_lookups=4,
+        lookup=lambda w: calls.append(w) or "0xf")
+    assert spent == 4 and len(calls) == 4
+
+
+def test_shared_funder_fires_once_the_cache_is_populated(monkeypatch, tmp_path):
+    """The whole point of the cache: with a funder known for both sides,
+    compute_linkage can finally assert shared_funder."""
+    import src.linkage as lk
+    link = lk.compute_linkage("0xcand", "0xshared", set(), "0xtarget",
+                              "0xshared", set(), excluded=set())
+    assert link["shared_funder"] is True
+    assert link["linkage_bonus"] > 0
+
+
+def test_first_funded_by_the_target_is_the_stronger_claim():
+    import src.linkage as lk
+    direct = lk.compute_linkage("0xcand", "0xtarget", set(), "0xtarget",
+                                "0xother", set(), excluded=set())
+    shared = lk.compute_linkage("0xcand", "0xshared", set(), "0xtarget",
+                                "0xshared", set(), excluded=set())
+    assert direct["linkage_bonus"] > shared["linkage_bonus"]

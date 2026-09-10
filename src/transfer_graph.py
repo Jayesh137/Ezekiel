@@ -1444,6 +1444,30 @@ def _hl_native_services(known_services: set, cfg: dict) -> set:
     return services
 
 
+def gas_funding_edges(target: str, funders: dict) -> list[dict]:
+    """Edges for wallets whose FIRST funder was the target.
+
+    `normalise_gas_funding` has existed and been unit-tested since the graph was
+    written, and nothing in production ever called it — so `gas_funded_by_target`,
+    one of the five vectors `classify_node` accepts as corroboration and worth
+    0.15 of confidence, could never be true. Measured 2026-09-10: zero
+    gas_funding edges in a 100,000-edge graph.
+
+    Whoever paid a fresh wallet's very first gas is strong ownership evidence:
+    the wallet could not transact at all before it, so the funder was there at
+    its creation. Kept as an edge rather than a bare flag so it appears in the
+    path a conclusion was drawn from.
+    """
+    src = (target or "").lower()
+    out = []
+    for wallet, funder in (funders or {}).items():
+        w = (wallet or "").lower()
+        if not w or w == src or (funder or "").lower() != src:
+            continue
+        out.append(normalise_gas_funding(w, src, 0))
+    return out
+
+
 def correlation_edges(target: str, correlations: dict) -> list[dict]:
     """Synthetic edges for wallets re-linked across a CEX gap.
 
@@ -2149,6 +2173,16 @@ def run_transfer_graph(expand: bool = True) -> dict:
     # was built for. Appended after collect_known_edges so an observed transfer
     # always wins the dedupe on a shared id.
     inferred = correlation_edges(target, correlations)
+
+    # Wallets the target paid the first gas for. Read from the same permanent
+    # first-funder cache the linkage pass uses, so one bounded set of lookups
+    # feeds both vectors.
+    from src.linkage import load_first_funders
+    gas = gas_funding_edges(target, load_first_funders())
+    if gas:
+        edges = edges + gas
+        print(f"[graph] {len(gas)} wallet(s) first funded by the target")
+
     if inferred:
         edges = edges + inferred
         print(f"[graph] {len(inferred)} correlation-derived node(s) admitted "

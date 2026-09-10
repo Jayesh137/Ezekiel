@@ -152,3 +152,31 @@ def test_substrate_linkage_failure_does_not_lose_the_graph(monkeypatch):
     monkeypatch.setattr("src.linkage.substrate_linkage", boom)
     edges = [{"src": TARGET, "dst": WALLET}]
     assert tg._substrate_linkage(TARGET, edges, {}) == {}
+
+
+def test_gas_funding_edges_are_created_for_wallets_the_target_first_funded():
+    """normalise_gas_funding existed and was unit-tested since the graph was
+    written, and nothing in production ever called it — so gas_funded_by_target,
+    worth 0.15 of confidence, could never be true. Zero such edges existed in a
+    100,000-edge graph."""
+    import src.transfer_graph as tg
+    edges = tg.gas_funding_edges(TARGET, {WALLET: TARGET, "0xother": "0xstranger"})
+    assert len(edges) == 1
+    assert edges[0]["src"] == TARGET and edges[0]["dst"] == WALLET
+    assert edges[0]["discovery_source"] == tg.SRC_GAS_FUNDING
+
+
+def test_a_wallet_funded_by_a_stranger_gets_no_gas_edge():
+    import src.transfer_graph as tg
+    assert tg.gas_funding_edges(TARGET, {WALLET: "0xstranger"}) == []
+
+
+def test_the_target_never_gas_funds_itself():
+    import src.transfer_graph as tg
+    assert tg.gas_funding_edges(TARGET, {TARGET: TARGET}) == []
+
+
+def test_no_funders_means_no_gas_edges():
+    import src.transfer_graph as tg
+    assert tg.gas_funding_edges(TARGET, {}) == []
+    assert tg.gas_funding_edges(TARGET, None) == []

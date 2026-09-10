@@ -212,7 +212,12 @@ def get_usdc_transfers(address: str, start_block: int = 0) -> list[dict]:
         "address": address,
         "contractaddress": config["usdc_contract_arbitrum"],
         "startblock": start_block,
-        "endblock": 99999999,
+        # "latest", not 99999999. With sort=desc a literal ceiling does not just
+        # truncate the tail — it returns the newest rows BELOW that block, so on
+        # Arbitrum (past 501,000,000) this asked for recent activity and got
+        # years-old history instead, with no error to notice. Same class of bug
+        # as src/chain/client.py's ENDBLOCK and linkage.get_first_funder's.
+        "endblock": "latest",
         "page": 1,
         "offset": 1000,
         "sort": "desc",
@@ -289,7 +294,7 @@ def get_normal_transactions(address: str, start_block: int = 0) -> list[dict]:
         "action": "txlist",
         "address": address,
         "startblock": start_block,
-        "endblock": 99999999,
+        "endblock": "latest",
         "page": 1,
         "offset": 1000,
         "sort": "desc",

@@ -83,7 +83,19 @@ def compute_linkage(candidate: str, candidate_first_funder: str | None,
 
 
 def get_first_funder(wallet: str) -> str | None:
-    """Earliest external address to send this wallet ETH or USDC on Arbitrum."""
+    """Earliest external address to send this wallet ETH or USDC on Arbitrum.
+
+    `endblock` is "latest", not a hardcoded ceiling. It was 99999999 while
+    Arbitrum is past block 501,000,000, so the search covered only the chain's
+    first fifth: any wallet first funded after block 99,999,999 — which is most
+    of them — returned no rows and therefore no funder. That is why
+    `shared_funder` was false for every wallet in the graph despite being one of
+    the five vectors `classify_node` accepts as corroboration.
+
+    Identical in kind to the ceiling that stopped an Arbitrum sweep 220 million
+    blocks early (see src/chain/client.py's ENDBLOCK), and worth stating twice:
+    a literal block ceiling is a silent walk-stopper on any chain taller than it.
+    """
     if not os.environ.get("ETHERSCAN_API_KEY"):
         return None
     wl = wallet.lower()
@@ -91,7 +103,7 @@ def get_first_funder(wallet: str) -> str | None:
     # Earliest normal (ETH) inbound tx — funds gas.
     normal = etherscan_get({
         "module": "account", "action": "txlist", "address": wallet,
-        "startblock": 0, "endblock": 99999999, "page": 1, "offset": 20, "sort": "asc",
+        "startblock": 0, "endblock": "latest", "page": 1, "offset": 20, "sort": "asc",
     })
     for t in normal.get("result", []) if normal.get("status") == "1" else []:
         frm = (t.get("from", "") or "").lower()
@@ -111,6 +123,56 @@ def get_first_funder(wallet: str) -> str | None:
         if to == wl and frm and frm != wl:
             return frm
     return None
+
+
+FIRST_FUNDER_PATH = DATA_DIR / "labels" / "first_funders.json"
+
+
+def load_first_funders() -> dict:
+    """Cached wallet -> first funder. Empty on any read failure."""
+    try:
+        import json
+        with open(FIRST_FUNDER_PATH) as f:
+            data = json.load(f)
+        return {k.lower(): v for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def save_first_funders(funders: dict) -> None:
+    import json
+    FIRST_FUNDER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FIRST_FUNDER_PATH.write_text(json.dumps(funders, indent=2, sort_keys=True))
+
+
+def resolve_first_funders(wallets, *, max_lookups: int = 12,
+                          cache: dict | None = None,
+                          lookup=None) -> tuple[dict, int]:
+    """Fill in first funders for wallets missing one. Returns (cache, spent).
+
+    Cached permanently once found, because a wallet's first funder is a fact
+    about a transaction that already happened and cannot change. A wallet we
+    looked up and found nothing for is NOT cached: that is either a wallet with
+    no inbound history yet — which a later run may find — or a failed read, and
+    writing it down as "has no funder" would make a transient outage permanent.
+
+    Bounded by `max_lookups` because each miss costs up to two Etherscan calls
+    from a free-tier budget shared with the sweep.
+    """
+    cache = dict(cache if cache is not None else load_first_funders())
+    lookup = lookup or get_first_funder
+    spent = 0
+    for wallet in wallets:
+        w = (wallet or "").lower()
+        if not w or w in cache:
+            continue
+        if spent >= max_lookups:
+            break
+        spent += 1
+        funder = lookup(w)
+        if funder:
+            cache[w] = funder.lower()
+    return cache, spent
 
 
 def swept_wallets(config: dict) -> set:
@@ -284,6 +346,13 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     profile = target_l1_profile(target)
     target_out = profile.get("out_addrs") or set()
 
+    # First funders come from a permanent cache, topped up a few wallets per
+    # run. Reading them here is what lets `shared_funder` ever be true for a
+    # wallet the graph found itself: the scanner only ever populated
+    # leaderboard candidates, and 0 of 50 of those carried a linkage block.
+    funders = load_first_funders()
+    target_funder = funders.get(target) or profile.get("first_funder")
+
     out: dict[str, dict] = {}
     for wallet in wallets:
         w = (wallet or "").lower()
@@ -291,14 +360,10 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
             continue
         link = compute_linkage(
             w,
-            # First-funder needs a live lookup, so it is deliberately not
-            # asserted here: a False `shared_funder` from this pass means "not
-            # established offline", and the scanner's live path remains the
-            # only thing that can turn it on.
-            None,
+            funders.get(w),
             get_outbound_addresses(w, config),
             target,
-            profile.get("first_funder"),
+            target_funder,
             target_out,
             excluded,
         )
