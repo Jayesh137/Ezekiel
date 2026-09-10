@@ -1,5 +1,6 @@
 # tests/test_dedup_and_alerts.py
 """Targeted tests for changed critical behavior: batch dedup and alert cooldowns."""
+import json
 import tempfile
 
 from src import alerts, tracer
@@ -138,3 +139,57 @@ def test_send_alert_short_circuits_after_failure(monkeypatch):
     assert alerts.send_alert("s1", "b1") is False   # attempts a real connect, fails
     assert alerts.send_alert("s2", "b2") is False   # short-circuits, no connect
     assert len(attempts) == 1
+
+
+# --- instant channels ---------------------------------------------------------
+
+def test_webhook_delivery_counts_even_when_email_is_unconfigured(monkeypatch, tmp_path):
+    """Email has never delivered on this deployment; Telegram must not be
+    marked undelivered because of it."""
+    import src.alerts as alerts_mod
+
+    posted = []
+
+    class R:
+        status_code = 200
+
+    def fake_post(url, **kw):
+        posted.append((url, kw))
+        return R()
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
+    monkeypatch.setenv("NTFY_TOPIC", "ezekiel-test")
+    monkeypatch.delenv("BREVO_SMTP_LOGIN", raising=False)
+    monkeypatch.delenv("BREVO_SMTP_KEY", raising=False)
+    monkeypatch.delenv("ALERT_EMAIL", raising=False)
+    monkeypatch.setattr(alerts_mod, "_smtp_disabled_this_run", False)
+    import requests
+    monkeypatch.setattr(requests, "post", fake_post)
+
+    assert alerts_mod.send_alert("[EZEKIEL] CRITICAL: x", "body") is True
+    urls = [u for u, _ in posted]
+    assert any("api.telegram.org/bottok/sendMessage" in u for u in urls)
+    assert any(u.endswith("/ezekiel-test") for u in urls)
+    ntfy_kw = next(kw for u, kw in posted if u.endswith("/ezekiel-test"))
+    assert ntfy_kw["headers"]["Priority"] == "high"
+    health = json.load(open(alerts_mod.DATA_DIR / "alerts" / "latest.json"))
+    assert health["healthy"] is True
+    assert "telegram" in health["recent"][-1]["reason"]
+    assert "email" in health["recent"][-1]["reason"]     # the email failure is still named
+
+
+def test_a_rejected_webhook_does_not_count(monkeypatch):
+    import src.alerts as alerts_mod
+
+    class R:
+        status_code = 403
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
+    monkeypatch.delenv("NTFY_TOPIC", raising=False)
+    monkeypatch.delenv("BREVO_SMTP_LOGIN", raising=False)
+    monkeypatch.setattr(alerts_mod, "_smtp_disabled_this_run", False)
+    import requests
+    monkeypatch.setattr(requests, "post", lambda url, **kw: R())
+    assert alerts_mod.send_alert("[EZEKIEL] INFO: x", "body") is False

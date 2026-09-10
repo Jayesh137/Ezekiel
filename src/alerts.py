@@ -186,14 +186,13 @@ def _send_with_cooldown(key: str, hours: float, subject: str, body: str) -> bool
     return False
 
 
-def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
-    """Send an email alert. Returns True if sent, False if skipped/failed."""
+def _send_email(subject: str, body: str, html_body: str | None = None) -> tuple[bool, str | None]:
+    """Send by SMTP. Returns (delivered, reason) and records nothing itself."""
     global _smtp_disabled_this_run
 
     if _smtp_disabled_this_run:
         print(f"[alerts] SMTP disabled after earlier failure this run, skipping: {subject}")
-        _record_delivery(subject, False, "skipped: SMTP disabled after an earlier failure this run")
-        return False
+        return False, "skipped: SMTP disabled after an earlier failure this run"
 
     smtp_login = os.environ.get("BREVO_SMTP_LOGIN")
     smtp_key = os.environ.get("BREVO_SMTP_KEY")
@@ -214,8 +213,7 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
                   "email and not an API key.")
         print(f"[alerts] {body[:200]}")
         # Unconfigured is a delivery outage too. Name the variables, never values.
-        _record_delivery(subject, False, f"not configured: missing {', '.join(missing)}")
-        return False
+        return False, f"not configured: missing {', '.join(missing)}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -235,8 +233,7 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
             server.login(smtp_login, smtp_key)
             server.sendmail(msg["From"], [alert_email], msg.as_string())
         print(f"[alerts] Sent: {subject}")
-        _record_delivery(subject, True)
-        return True
+        return True, None
     except smtplib.SMTPAuthenticationError as e:
         # Credentials were rejected. Report the server's code and the variable
         # names involved — never the values.
@@ -247,25 +244,90 @@ def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
               f"account password and v3 API keys are not accepted.")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
-        _record_delivery(subject, False,
-                         f"SMTP authentication rejected (code {e.smtp_code}) - check "
-                         f"BREVO_SMTP_LOGIN and BREVO_SMTP_KEY")
-        return False
+        return False, (f"SMTP authentication rejected (code {e.smtp_code}) - check "
+                       f"BREVO_SMTP_LOGIN and BREVO_SMTP_KEY")
     except smtplib.SMTPSenderRefused as e:
         print(f"[alerts] Sender address refused (code {e.smtp_code}). ALERT_EMAIL "
               f"must be a verified sender on the Brevo account.")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
-        _record_delivery(subject, False,
-                         f"sender address refused (code {e.smtp_code}) - ALERT_EMAIL must be "
-                         f"a verified sender on the Brevo account")
-        return False
+        return False, (f"sender address refused (code {e.smtp_code}) - ALERT_EMAIL must be "
+                       f"a verified sender on the Brevo account")
     except Exception as e:
         print(f"[alerts] Failed to send ({type(e).__name__}): {e}")
         _smtp_disabled_this_run = True
         print("[alerts] Disabling further sends for this run.")
-        _record_delivery(subject, False, f"{type(e).__name__}: {e}")
-        return False
+        return False, f"{type(e).__name__}: {e}"
+
+
+def _send_webhooks(subject: str, body: str) -> list[str]:
+    """Deliver through the instant channels, if configured. Returns the ones that took it.
+
+    Email through Brevo has never once delivered on this deployment (the
+    account was never activated), and the GitHub-issue fallback carries only
+    CRITICAL and HIGH. A Telegram bot or an ntfy topic is free, needs no
+    activation, and arrives in seconds. Configure either or both:
+
+        TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID   a bot token from @BotFather and
+                                                 the chat it should post to
+        NTFY_TOPIC                               a topic name on ntfy.sh
+
+    Never raises: a dead channel is reported, and the others still run.
+    """
+    delivered: list[str] = []
+    text = subject + "\n\n" + body
+    severity = _severity_of(subject)
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat = os.environ.get("TELEGRAM_CHAT_ID")
+    if token and chat:
+        try:
+            import requests
+            r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                              json={"chat_id": chat, "text": text[:4000],
+                                    "disable_web_page_preview": True}, timeout=20)
+            if r.status_code == 200:
+                delivered.append("telegram")
+            else:
+                print(f"[alerts] Telegram rejected the message (HTTP {r.status_code})")
+        except Exception as exc:                      # noqa: BLE001 - transport
+            print(f"[alerts] Telegram send failed ({type(exc).__name__}): {exc}")
+    topic = os.environ.get("NTFY_TOPIC")
+    if topic:
+        try:
+            import requests
+            title = subject.encode("ascii", "ignore").decode()
+            r = requests.post(f"https://ntfy.sh/{topic}", data=body.encode("utf-8"),
+                              headers={"Title": title,
+                                       "Priority": "high" if severity in ESCALATING_SEVERITIES
+                                       else "default"}, timeout=20)
+            if r.status_code == 200:
+                delivered.append("ntfy")
+            else:
+                print(f"[alerts] ntfy rejected the message (HTTP {r.status_code})")
+        except Exception as exc:                      # noqa: BLE001 - transport
+            print(f"[alerts] ntfy send failed ({type(exc).__name__}): {exc}")
+    return delivered
+
+
+def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
+    """Deliver an alert on every configured channel. True if any took it.
+
+    Webhooks first (instant, never needed activation), then email. Delivery
+    on any channel counts: an operator who reads Telegram must not have the
+    alert marked undelivered because Brevo is still unactivated. Health is
+    recorded once, naming the channel that delivered and the email reason
+    when it did not.
+    """
+    via = _send_webhooks(subject, body)
+    smtp_ok, reason = _send_email(subject, body, html_body)
+    if via:
+        note = f"delivered via {', '.join(via)}"
+        if not smtp_ok and reason:
+            note += f"; email: {reason}"
+        _record_delivery(subject, True, note)
+        return True
+    _record_delivery(subject, smtp_ok, reason)
+    return smtp_ok
 
 
 def alert_fund_movement(wallet: str, amount: str, destination: str, tx_hash: str,
@@ -570,11 +632,18 @@ def alert_foreign_destination(wallet: str, kind: str, destination: str,
     Arbitrum address, a `usdSend` to an unknown account, a new agent or a new
     sub-account are each the first observable step of a migration.
     """
-    subject = f"[EZEKIEL] CRITICAL: {kind} to an address outside the cluster"
+    if kind == "approveAgent":
+        subject = "[EZEKIEL] HIGH: New Agent Approved by a Cluster Wallet"
+        lead = ("A cluster wallet approved a new agent — a fresh address that now\n"
+                "signs for the account. Any other account approving the same one is\n"
+                "the same person.\n\n")
+    else:
+        subject = f"[EZEKIEL] CRITICAL: {kind} to an address outside the cluster"
+        lead = (f"A cluster wallet performed `{kind}` towards an address the roster does\n"
+                f"not know as his.\n\n")
     body = (
-        f"A cluster wallet performed `{kind}` towards an address the roster does\n"
-        f"not know as his.\n\n"
-        f"{address_line(wallet, 'Wallet')}\n"
+        lead
+        + f"{address_line(wallet, 'Wallet')}\n"
         f"{address_line(destination, 'Destination')}\n"
         f"Amount: {amount if amount is not None else 'n/a'} {token or ''}\n"
         f"When: {when or 'unknown'}\n"

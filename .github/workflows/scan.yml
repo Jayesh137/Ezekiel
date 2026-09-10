@@ -15,6 +15,12 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    # Instant alert channels (see src/alerts._send_webhooks). Optional: an
+    # unset secret is an empty string, and the channel is simply skipped.
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

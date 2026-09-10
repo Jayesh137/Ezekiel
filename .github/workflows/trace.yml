@@ -20,6 +20,12 @@ concurrency:
 jobs:
   trace:
     runs-on: ubuntu-latest
+    # Instant alert channels (see src/alerts._send_webhooks). Optional: an
+    # unset secret is an empty string, and the channel is simply skipped.
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     # 600s, and every budget inside this job has to fit within it. A job that
     # is CANCELLED never reaches "Commit and push", so the cursors written to
     # the runner's working tree are discarded and the next run starts from

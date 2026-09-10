@@ -20,7 +20,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.portfolio_overlap import basket, build_report, save
-from src.utils import DATA_DIR, hl_post, load_config
+from src.scanner import merged_clearinghouse_state
+from src.utils import DATA_DIR, load_config
 
 MAX_CANDIDATES = 40
 
@@ -45,8 +46,8 @@ def candidate_wallets(config: dict) -> list[str]:
 def main() -> int:
     config = load_config()
     try:
-        target_state = hl_post({"type": "clearinghouseState",
-                                "user": config["target_wallet"]})
+        # HIP-3 books included: the rarest positions live there.
+        target_state = merged_clearinghouse_state(config["target_wallet"])
     except Exception as exc:                          # noqa: BLE001 - transport
         print(f"[portfolio] target state unreadable: {type(exc).__name__}: {exc}")
         return 0
@@ -54,7 +55,7 @@ def main() -> int:
     states = {}
     for wallet in candidate_wallets(config):
         try:
-            st = hl_post({"type": "clearinghouseState", "user": wallet})
+            st = merged_clearinghouse_state(wallet)
         except Exception:                             # noqa: BLE001 - transport
             continue
         # Only wallets actually holding something. A closed book is not evidence

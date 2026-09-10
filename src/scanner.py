@@ -223,12 +223,46 @@ def get_candidate_orders(wallet: str) -> list[dict]:
     return [r for r in resp if isinstance(r, dict) and isinstance(r.get("order"), dict)]         if isinstance(resp, list) else []
 
 
-def get_candidate_state(wallet: str) -> dict:
-    """Get current clearinghouse state for a candidate wallet."""
+def merged_clearinghouse_state(wallet: str, dexes=None, fetch=None) -> dict:
+    """Perp state across the default dex AND every HIP-3 dex, as one document.
+
+    `clearinghouseState` without `dex` omits the HIP-3 books entirely. The
+    target's rarest, most informative positions are `xyz:` equities and
+    indices, and those were absent from every candidate comparison and from
+    the rarity-weighted portfolio overlap on both sides. A dex that cannot be
+    read is named in `unreadable_dexes` rather than silently left out.
+    """
+    fetch = fetch or hl_post
+    if dexes is None:
+        dexes = load_config().get("hip3_dexes", [])
     try:
-        return hl_post({"type": "clearinghouseState", "user": wallet})
-    except Exception:
+        state = fetch({"type": "clearinghouseState", "user": wallet})
+    except Exception:                                 # noqa: BLE001 - transport
         return {}
+    if not isinstance(state, dict):
+        return {}
+    merged = dict(state)
+    positions = list(state.get("assetPositions") or [])
+    unreadable = []
+    for dex in dexes or []:
+        try:
+            extra = fetch({"type": "clearinghouseState", "user": wallet, "dex": dex})
+        except Exception:                             # noqa: BLE001 - transport
+            unreadable.append(dex)
+            continue
+        if not isinstance(extra, dict):
+            unreadable.append(dex)
+            continue
+        positions.extend(extra.get("assetPositions") or [])
+    merged["assetPositions"] = positions
+    if unreadable:
+        merged["unreadable_dexes"] = unreadable
+    return merged
+
+
+def get_candidate_state(wallet: str) -> dict:
+    """Current perp state for a candidate wallet, HIP-3 books included."""
+    return merged_clearinghouse_state(wallet)
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
