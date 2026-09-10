@@ -133,7 +133,8 @@
       "name": "Bear at heart",
       "claim": "Self-described bear; did his best work in the 2018-2019 bear market.",
       "testable": true,
-      "predicate": "net_short_bias"
+      "predicate": "net_short_bias",
+      "caveat": "DIRECTION IS REGIME, NOT IDENTITY. img007 is an FTX grouped-positions panel with BTC, ETH and SUSHI all LONG and $2.19M open. He wrote 'Remember to never short in a bull market' (img020), 'Ok, back to degen longing' (img022) and 'Exceptionally rare I'll short alts in THESE CONDITIONS' (img011). A long book is NOT evidence against him — check_net_short_bias no longer returns CONTRADICTS."
     },
     {
       "name": "Broad simultaneous short basket",
@@ -148,6 +149,34 @@
       "testable": false,
       "evidence": "img150 (IOTX/TRU/CLV/MNGO/AXS listings), img226 (dYdX airdrop: 'going to close here for pennies... don't love the rr of holding this open too long')",
       "note": "Not yet implemented — would need entry timing against listing dates."
+    },
+    {
+      "name": "Nearly unliquidatable",
+      "testable": true,
+      "predicate": "liquidation_distance",
+      "claim": "Runs low leverage on cross margin so positions cannot be liquidated out of him; willing to sit through large drawdowns.",
+      "evidence": "img013 ('Nearly impossible to liquidate me... ready to hold this open for months'); blotters at 1x-5x cross (img049/089/096/097); img012 -> img017 shows the same 8,346,280 CHZ short carried from -$470k to +$2.1M.",
+      "note": "THE disconfirming check. Tests how he carries risk, which survives the regime, rather than which way he points, which does not."
+    },
+    {
+      "name": "Uses exchange subaccounts",
+      "testable": false,
+      "claim": "Ran multiple FTX subaccounts and viewed them aggregated.",
+      "evidence": "img007 — 'Show positions on all subaccounts' and 'Group positions across accounts' both enabled.",
+      "note": "Off-chain and not directly testable, but it is a documented habit of splitting activity across accounts, which is the behaviour this project exists to detect on-chain."
+    },
+    {
+      "name": "Trades basket instruments",
+      "testable": false,
+      "claim": "Traded FTX's ALTPERP altcoin index, not only single names.",
+      "evidence": "img175 — ALTPERP 2h chart annotated 'Take profit on SHORTS'."
+    },
+    {
+      "name": "Conviction is not position",
+      "testable": false,
+      "claim": "Holds long-term conviction in coins he is simultaneously short.",
+      "evidence": "img219 (Telegram: 'doge is forever, an original classic like bitcoin') against DOGE -19,401,834 short in img089/img096.",
+      "note": "A warning against inferring belief from a position, or the reverse."
     }
   ],
   "observed_trades": [
@@ -197,12 +226,56 @@
       ],
       "reading": "No longs at all. Two sizes sit one unit off a round number.",
       "era": "2022"
+    },
+    {
+      "evidence": "img007.jpg",
+      "asset": "BTC / ETH / SUSHI perps, FTX",
+      "annotations": [
+        "all LONG",
+        "subaccounts aggregated",
+        "+$2,188,194.23 net"
+      ],
+      "reading": "An all-long book. Direction tracks the regime.",
+      "era": "2021"
+    },
+    {
+      "evidence": "img012.jpg -> img017.jpg",
+      "asset": "CHZ-PERP short, 8,346,280 CHZ",
+      "annotations": [
+        "-$469,516 at mark 0.846642",
+        "+$2,109,384 at mark 0.538181"
+      ],
+      "reading": "Same size carried through a drawdown into profit — the risk posture behind 'nearly impossible to liquidate me'.",
+      "era": "2021-2022"
+    },
+    {
+      "evidence": "img335.jpg",
+      "asset": "PEOPLE-PERP short, 82,444,880 PEOPLE",
+      "annotations": [
+        "notional $6,037,438.56",
+        "+$1,517,940.33"
+      ],
+      "reading": "Small-cap short on FTX; liquidation price redacted.",
+      "era": "2022"
+    },
+    {
+      "evidence": "img049.jpg",
+      "asset": "BTCUSDT perp short, -885.000 BTC",
+      "annotations": [
+        "5x cross",
+        "entry 54,954.30",
+        "+$2,503,599.63 (27.04%)"
+      ],
+      "reading": "BTC as a standing 5x cross short, round size.",
+      "era": "2021-2022"
     }
   ],
   "review_state": {
     "images_total": 406,
-    "images_reviewed": 10,
-    "note": "Reviewing 406 images costs more context than one session has. They are extracted, classified and committed so review continues incrementally — set reviewed=true and fill notes in trade_review_index.json. Reviewing just 10 already overturned one check (hedged_book), so the remaining 396 are worth real time.",
-    "highest_value_next": "Remaining blotter screenshots — they carry positions, sizes and leverage, which is the only material here that compares directly against on-chain data."
+    "images_reviewed": 32,
+    "blotters_found": 8,
+    "note": "Two review passes have now each overturned a check: the first removed hedged_book, the second stopped net_short_bias disconfirming and added liquidation_distance. Continue incrementally.",
+    "how_to_find_blotters": "Pixel heuristics FAIL — blotters run 1 row to 9, light (Binance) and dark (FTX); a filter tuned on three light blotters missed img335. Use scripts/contact_sheets.py and look at the grids.",
+    "highest_value_next": "Remaining blotters. Positions, sizes and leverage are the only material that compares directly against on-chain data."
   }
 }

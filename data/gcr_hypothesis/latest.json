@@ -1,10 +1,14 @@
 {
-  "computed_at": "2026-09-10T11:51:15.950156+00:00",
+  "computed_at": "2026-09-10T12:22:45.847769+00:00",
   "open_positions": 52,
   "results": {
     "net_short_bias": {
       "verdict": "consistent",
       "detail": "52 of 52 positions short (100%)"
+    },
+    "liquidation_distance": {
+      "verdict": "consistent",
+      "detail": "closest position is 103% from liquidation; none within 25%"
     },
     "broad_short_basket": {
       "verdict": "consistent",
@@ -20,17 +24,17 @@
     }
   },
   "tally": {
-    "consistent": 3,
+    "consistent": 4,
     "contradicts": 0,
     "untestable": 1
   },
   "reading": "Testable traits are consistent. Weak support \u2014 style traits are shared by many traders, and most of these checks cannot disconfirm even in principle (see falsifiability).",
   "falsifiability": {
     "checks_that_can_disconfirm": [
-      "net_short_bias"
+      "liquidation_distance"
     ],
-    "of_total": 4,
-    "note": "Only 1 of 4 checks can return CONTRADICTS. A high consistent count is therefore weaker than it looks; the others can only agree or abstain."
+    "of_total": 5,
+    "note": "Only 1 of 5 checks can return CONTRADICTS. A high consistent count is therefore weaker than it looks; the others can only agree or abstain."
   },
   "prior_note": "Operator's prior is 55-75%. These are style traits from 2021-2023 writing against on-chain behaviour from 2026 \u2014 they should nudge that estimate, never replace it."
 }

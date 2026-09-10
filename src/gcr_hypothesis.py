@@ -51,6 +51,14 @@ SMALL_CAP_FREQUENCY = 0.02
 # contradiction, since a smaller account simply cannot run that many.
 BROAD_BASKET_MARKETS = 7
 
+# "Nearly impossible to liquidate me" (img013), on blotters running 1x-5x cross.
+# Derived from HIS leverage, not from the tracked wallet: at 1x-5x a liquidation
+# price sits far away by construction. A book with a meaningful share of
+# positions inside LIQUIDATION_NEAR is running risk he says he does not run.
+LIQUIDATION_NEAR = 0.25
+LIQUIDATION_NEAR_SHARE = 0.3
+LIQUIDATION_SAFE = 0.5
+
 
 def load_reference(path: Path | None = None) -> dict:
     try:
@@ -73,21 +81,50 @@ def positions_from(state: dict) -> list[dict]:
             continue
         if not pos.get("coin") or szi == 0:
             continue
+        # Distance to liquidation as a share of entry. None, never 0.0 — a
+        # missing liquidation price means "we could not tell", and zero would
+        # read as "about to be liquidated" to every threshold below.
+        liq_distance = None
+        try:
+            entry = float(pos.get("entryPx") or 0)
+            raw = pos.get("liquidationPx")
+            if entry > 0 and raw not in (None, ""):
+                liq_distance = abs(float(raw) - entry) / entry
+        except (TypeError, ValueError):
+            liq_distance = None
         out.append({"coin": pos["coin"], "direction": "long" if szi > 0 else "short",
-                    "notional": ntl, "size": szi})
+                    "notional": ntl, "size": szi, "liq_distance": liq_distance})
     return out
 
 
 def check_net_short_bias(positions: list[dict], **_) -> dict:
-    """'Bear at heart' — is the book net short?"""
+    """'Bear at heart' — is the book net short?
+
+    This USED to return CONTRADICTS for a long book. It no longer can, and the
+    reason is img007: an FTX "grouped positions" panel showing BTC-PERP,
+    ETH-PERP and SUSHI-PERP all LONG, $2.19M of open profit, with nothing short.
+    His own words agree — "Remember to never short in a bull market" (img020),
+    "Ok, back to degen longing" (img022), "Exceptionally rare I'll short alts in
+    THESE CONDITIONS" (img011, emphasis on the conditions).
+
+    So direction is a read on the regime, not a fixed trait of the man. A long
+    book in a bull market is exactly what he says he does, and scoring it as
+    evidence against him would fire hardest precisely when he is behaving most
+    like himself. Contrast check_liquidation_distance, which tests how he runs
+    risk rather than which way he is pointing — that survives the regime.
+    """
     if not positions:
         return {"verdict": UNTESTABLE, "detail": "no open positions to judge"}
     shorts = sum(1 for p in positions if p["direction"] == "short")
     share = shorts / len(positions)
+    if share >= 0.7:
+        return {"verdict": CONSISTENT,
+                "detail": f"{shorts} of {len(positions)} positions short ({share:.0%})"}
     return {
-        "verdict": CONSISTENT if share >= 0.7 else
-                   CONTRADICTS if share <= 0.3 else UNTESTABLE,
-        "detail": f"{shorts} of {len(positions)} positions short ({share:.0%})",
+        "verdict": UNTESTABLE,
+        "detail": f"{shorts} of {len(positions)} positions short ({share:.0%}). "
+                  f"A long book is not a contradiction — he longs bull regimes "
+                  f"(img007 is an all-long book) and shorts bear ones.",
     }
 
 
@@ -161,6 +198,44 @@ def _is_round(value: float, places: int) -> bool:
     return value > 0 and abs(value - round(value, -places)) < 1e-9
 
 
+def check_liquidation_distance(positions: list[dict], **_) -> dict:
+    """'Nearly impossible to liquidate me' (img013) — does the book run safe?
+
+    This is the disconfirming check, and it is deliberately about HOW he carries
+    risk rather than which way he points, because direction turned out to track
+    the regime (see check_net_short_bias) while this does not. He said it
+    outright while sitting on an 8.3M CHZ short he was willing to hold "for
+    months if necessary", and every blotter agrees: 1x-5x, cross margin, on
+    books worth tens of millions.
+
+    The thresholds come from HIS leverage, not from the tracked wallet's
+    numbers — at 1x-5x cross a liquidation sits far away by construction. A
+    wallet running positions near liquidation is doing something he says he does
+    not do, and that is a real contradiction.
+    """
+    priced = [p for p in positions if p.get("liq_distance") is not None]
+    if not priced:
+        return {"verdict": UNTESTABLE,
+                "detail": "no liquidation prices available"}
+    near = [p for p in priced if p["liq_distance"] < LIQUIDATION_NEAR]
+    share = len(near) / len(priced)
+    closest = min(p["liq_distance"] for p in priced)
+    if share >= LIQUIDATION_NEAR_SHARE:
+        names = ", ".join(p["coin"] for p in sorted(near, key=lambda q: q["liq_distance"])[:5])
+        return {"verdict": CONTRADICTS,
+                "detail": f"{len(near)} of {len(priced)} positions sit within "
+                          f"{LIQUIDATION_NEAR:.0%} of liquidation ({names}). He "
+                          f"runs 1x-5x cross and calls himself nearly "
+                          f"unliquidatable."}
+    if closest >= LIQUIDATION_SAFE:
+        return {"verdict": CONSISTENT,
+                "detail": f"closest position is {closest:.0%} from liquidation; "
+                          f"none within {LIQUIDATION_NEAR:.0%}"}
+    return {"verdict": UNTESTABLE,
+            "detail": f"closest position is {closest:.0%} from liquidation — "
+                      f"neither clearly safe nor clearly stretched"}
+
+
 def check_round_number_affinity(positions=None, amounts: list | None = None,
                                **__) -> dict:
     """'Round numbers are Schelling points' — in transfers AND position sizes.
@@ -206,10 +281,11 @@ def check_round_number_affinity(positions=None, amounts: list | None = None,
 # mixed to unanimous. A suite that can only agree with itself is the failure this
 # module exists to prevent, so the capability is tracked and reported rather than
 # left to be rediscovered.
-CAN_DISCONFIRM = {"net_short_bias"}
+CAN_DISCONFIRM = {"liquidation_distance"}
 
 CHECKS = {
     "net_short_bias": check_net_short_bias,
+    "liquidation_distance": check_liquidation_distance,
     "broad_short_basket": check_broad_short_basket,
     "shorts_small_caps": check_shorts_small_caps,
     "round_number_affinity": check_round_number_affinity,

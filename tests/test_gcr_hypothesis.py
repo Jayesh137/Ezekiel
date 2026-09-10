@@ -20,6 +20,7 @@ from src.gcr_hypothesis import (
     CONTRADICTS,
     UNTESTABLE,
     check_broad_short_basket,
+    check_liquidation_distance,
     check_net_short_bias,
     check_round_number_affinity,
     check_shorts_small_caps,
@@ -32,8 +33,12 @@ FREQ = {"eligible_wallets": 1000,
         "market_counts": {"BTC": 400, "ETH": 380, "TINY": 0}}
 
 
-def pos(coin, direction, notional=1000.0):
-    return {"coin": coin, "direction": direction, "notional": notional}
+def pos(coin, direction, notional=1000.0, liq_distance=5.0):
+    """A position far from liquidation by default, so tests aimed at other
+    traits do not trip the liquidation check by accident."""
+    return {"coin": coin, "direction": direction, "notional": notional,
+            "size": -1000.0 if direction == "short" else 1000.0,
+            "liq_distance": liq_distance}
 
 
 def test_positions_carry_signed_size_for_the_sizing_test():
@@ -63,15 +68,72 @@ def test_a_short_book_is_consistent_with_bear_at_heart():
                                 pos("C", "short")])["verdict"] == CONSISTENT
 
 
-def test_a_long_book_contradicts_bear_at_heart():
-    """The test must be able to point AWAY from the hypothesis."""
-    assert check_net_short_bias([pos("A", "long"), pos("B", "long"),
-                                pos("C", "long")])["verdict"] == CONTRADICTS
+def test_a_long_book_no_longer_contradicts_bear_at_heart():
+    """The second correction the images forced. img007 is an FTX grouped-
+    positions panel with BTC, ETH and SUSHI all LONG and $2.19M open — and he
+    wrote "never short in a bull market" and "back to degen longing". Direction
+    tracks the regime, so scoring a long book as evidence against him would fire
+    hardest exactly when he is behaving most like himself."""
+    got = check_net_short_bias([pos("A", "long"), pos("B", "long"),
+                                pos("C", "long")])
+    assert got["verdict"] == UNTESTABLE
+    assert "not a contradiction" in got["detail"]
 
 
 def test_a_balanced_book_resolves_nothing():
     got = check_net_short_bias([pos("A", "long"), pos("B", "short")])
     assert got["verdict"] == UNTESTABLE
+
+
+def liq(coin, distance):
+    return {"coin": coin, "direction": "short", "notional": 1000.0,
+            "size": -1000.0, "liq_distance": distance}
+
+
+def test_a_book_run_near_liquidation_contradicts_him():
+    """The disconfirming check. He called himself "nearly impossible to
+    liquidate" while holding an 8.3M CHZ short he would carry for months, and
+    every blotter runs 1x-5x cross."""
+    got = check_liquidation_distance([liq("A", 0.05), liq("B", 0.10),
+                                      liq("C", 8.0)])
+    assert got["verdict"] == CONTRADICTS
+    assert "of 3 positions sit within" in got["detail"]
+
+
+def test_a_book_far_from_liquidation_is_consistent():
+    got = check_liquidation_distance([liq("A", 1.0), liq("B", 6.0)])
+    assert got["verdict"] == CONSISTENT
+
+
+def test_one_stretched_position_in_a_safe_book_is_not_a_contradiction():
+    """A single tight position is a trade, not a way of carrying risk."""
+    got = check_liquidation_distance([liq("A", 0.05)] + [liq(f"B{i}", 5.0)
+                                                         for i in range(9)])
+    assert got["verdict"] != CONTRADICTS
+
+
+def test_missing_liquidation_prices_are_untestable_not_safe():
+    """A position with no liquidation price must not read as a distant one."""
+    assert check_liquidation_distance(
+        [liq("A", None), liq("B", None)])["verdict"] == UNTESTABLE
+    assert check_liquidation_distance([])["verdict"] == UNTESTABLE
+
+
+def test_liquidation_distance_is_none_not_zero_when_unreadable():
+    """Zero would read as 'about to be liquidated' to every threshold above."""
+    state = {"assetPositions": [
+        {"position": {"coin": "A", "szi": "-1", "positionValue": "10",
+                      "entryPx": "100", "liquidationPx": None}},
+        {"position": {"coin": "B", "szi": "-1", "positionValue": "10",
+                      "entryPx": "0", "liquidationPx": "50"}}]}
+    assert [p["liq_distance"] for p in positions_from(state)] == [None, None]
+
+
+def test_liquidation_distance_is_read_from_entry_and_liq_price():
+    state = {"assetPositions": [
+        {"position": {"coin": "A", "szi": "-1", "positionValue": "10",
+                      "entryPx": "100", "liquidationPx": "150"}}]}
+    assert positions_from(state)[0]["liq_distance"] == 0.5
 
 
 def test_a_one_sided_short_book_is_not_a_contradiction():
@@ -166,10 +228,12 @@ def test_no_data_never_counts_as_agreement():
 
 
 def test_a_wholly_contradicting_wallet_reads_as_evidence_against():
+    """A book run right up against liquidation — the thing he says he never
+    does. Note it is the RISK, not the direction, that disconfirms now."""
     state = {"assetPositions": [
-        {"position": {"coin": "BTC", "szi": "1", "positionValue": "100"}},
-        {"position": {"coin": "ETH", "szi": "2", "positionValue": "100"}},
-        {"position": {"coin": "SOL", "szi": "3", "positionValue": "100"}}]}
+        {"position": {"coin": c, "szi": "1", "positionValue": "100",
+                      "entryPx": "100", "liquidationPx": "105"}}
+        for c in ("BTC", "ETH", "SOL")]}
     out = evaluate(state, freq=FREQ, amounts=None)
     assert out["tally"][CONTRADICTS] >= 1
     assert "AWAY" in out["reading"]
@@ -204,10 +268,11 @@ def test_the_suite_can_still_disconfirm_at_all():
     assert CAN_DISCONFIRM, "no check can disconfirm — the suite cannot be wrong"
     assert CAN_DISCONFIRM <= set(CHECKS), "CAN_DISCONFIRM names a check that is gone"
 
-    long_book = {"assetPositions": [
-        {"position": {"coin": c, "szi": "1", "positionValue": "100"}}
+    stretched = {"assetPositions": [
+        {"position": {"coin": c, "szi": "1", "positionValue": "100",
+                      "entryPx": "100", "liquidationPx": "105"}}
         for c in ("BTC", "ETH", "SOL")]}
-    assert evaluate(long_book, freq=FREQ, amounts=None)["tally"][CONTRADICTS] >= 1
+    assert evaluate(stretched, freq=FREQ, amounts=None)["tally"][CONTRADICTS] >= 1
 
 
 def test_the_report_admits_how_little_of_it_could_go_the_other_way():
@@ -220,10 +285,15 @@ def test_the_report_admits_how_little_of_it_could_go_the_other_way():
 def test_a_check_named_as_disconfirming_actually_can():
     """CAN_DISCONFIRM is hand-maintained, so it can drift from the code. Every
     check it names must have a real input that makes it return CONTRADICTS."""
-    longs = [pos(c, "long") for c in ("A", "B", "C")]
-    shorts = [pos(c, "short") for c in ("A", "B", "C")]
+    books = [
+        [pos(c, "long") for c in ("A", "B", "C")],
+        [pos(c, "short") for c in ("A", "B", "C")],
+        [pos(c, "short", liq_distance=0.02) for c in ("A", "B", "C")],
+        [pos(c, "long", liq_distance=0.02) for c in ("A", "B", "C")],
+        [],
+    ]
     for name in CAN_DISCONFIRM:
         fn = CHECKS[name]
         verdicts = {fn(book, freq=FREQ, amounts=[1234.56])["verdict"]
-                    for book in (longs, shorts, [])}
+                    for book in books}
         assert CONTRADICTS in verdicts, f"{name} cannot return CONTRADICTS"

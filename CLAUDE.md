@@ -167,36 +167,46 @@ trade reviews (`Trade Reviews.pdf`, 406 images extracted to
   style crosses that gap, and people change.
 
 **Read the sources before trusting the summaries — his words describe him worse
-than his blotters do.** This has now cost two checks:
+than his blotters do.** Two review passes, two checks overturned:
 
 - "Never short small caps" is contradicted by his own posts fading listing pumps
   on IOTX/TRU/CLV/MNGO/AXS, and by blotters holding RLC, GRT, EGLD, BAKE, SRM,
-  GTC and BAND shorts at once. That tweet is ONLY in the PDF images.
+  GTC, BAND and PEOPLE shorts. That tweet is ONLY in the PDF images.
 - `hedged_book` scored a book with no longs as CONTRADICTS, built on his Dec 2021
-  writing about being "delta neutral". His actual blotters are 8-of-9, 7-of-7 and
-  6-of-7 short — img097's single long is circled "long?" by whoever compiled the
-  review, because it stood out. Delta-neutral is a phase he rotates into after
-  booking profits, not his standing structure. Replaced by `broad_short_basket`
-  (7-9 simultaneous alt shorts), which is what the blotters actually show.
+  "delta neutral" writing. His blotters are 8-of-9, 7-of-7 and 6-of-7 short —
+  img097's single long is circled "long?" by the compiler because it stood out.
+  Replaced by `broad_short_basket`.
+- `net_short_bias` scored a LONG book as CONTRADICTS. **img007 is an all-long FTX
+  book** (+$2.19M), and he wrote "never short in a bull market" and "back to
+  degen longing". Direction is regime, not identity — it can no longer disconfirm.
 
-Only **10 of 406 images** are reviewed, and those 10 overturned a check — the
-remaining 396 are worth real time. Blotter screenshots first: positions, sizes
-and leverage are the only material that compares directly against on-chain data.
-Set `reviewed`/`notes` in `trade_review_index.json`; re-running
-`scripts/extract_trade_reviews.py` preserves them.
+**The disconfirming check is now `liquidation_distance`**, because how he carries
+risk survives the regime while direction does not. He claimed "nearly impossible
+to liquidate me" (img013) on 1x-5x cross blotters, and carried one 8,346,280 CHZ
+short from -$470k to +$2.1M (img012 → img017). Thresholds come from HIS leverage,
+never from the target's numbers. `CAN_DISCONFIRM` plus three tests guard the fact
+that something can still return CONTRADICTS; never let the last one go.
 
-**Watch the falsifiability, not the tally.** Only `net_short_bias` can return
-CONTRADICTS — removing `hedged_book` alone flipped the live reading from mixed to
-unanimous, with no change in the wallet's behaviour. `CAN_DISCONFIRM` and a test
-guard this; never let the last disconfirming check go.
+**img007 also shows "Show positions on all subaccounts" enabled** — he split
+activity across subaccounts and viewed them aggregated. Off-chain, but it is the
+documented habit this project exists to catch on-chain.
 
-Live: net-short bias CONSISTENT (52/52), broad short basket CONSISTENT (52
-markets), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak (48% of
-transfers, 54% of position sizes). Nothing contradicts — but read the paragraph
-above before treating that as support.
+**Finding blotters: look, do not filter.** They are the highest-value images and
+pixel heuristics fail — 1 row to 9, light (Binance) and dark (FTX). A filter
+tuned on three light blotters missed img335 entirely. Use
+`scripts/contact_sheets.py` (Pillow, lazily imported, not a CI dependency) and
+read the grids; then open only the tables at full size.
 
-The corpus is not only Twitter: img251 and img282 are DISCORD posts from a
-private group, absent from the tweet archive.
+**32 of 406 reviewed, 8 blotters found.** Set `reviewed`/`content`/`notes` in
+`trade_review_index.json`; `scripts/extract_trade_reviews.py` preserves them.
+
+Live: net-short bias CONSISTENT (52/52), liquidation distance CONSISTENT (closest
+103% away, median 6652%), broad short basket CONSISTENT (52 markets), small-cap
+shorts UNTESTABLE, round numbers CONSISTENT but weak. Nothing contradicts — but
+only one check can, so read `falsifiability`, not the tally.
+
+The corpus spans THREE platforms: Twitter, Discord (img251, img282) and Telegram
+(img219, img220, img318), and some images are redacted by the compiler.
 
 ## Not detection
 
