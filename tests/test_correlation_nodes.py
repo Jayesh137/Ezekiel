@@ -305,3 +305,23 @@ def test_a_wallet_that_trades_is_never_a_conduit():
     edges = [_e(TARGET, trader, 58_000_000.0), _e(trader, exch, 57_000_000.0)]
     assert trader in tg.detect_conduits(edges, {exch})
     assert tg.detect_conduits(edges, {exch}, never=frozenset({trader})) == {}
+
+
+def test_conduit_detection_is_deliberately_one_pass():
+    """Cascading conduit detection resolves chains — the head of a three-link
+    chain stays an unexplained lead otherwise — but marking a conduit as a
+    service stops the frontier traversing it, and cascading cost a whole hop of
+    reachability in the L1 expansion test. Losing depth to tidy a row is a bad
+    trade for a system whose job is to follow money, so the middle link resolves
+    and the head deliberately does not."""
+    import src.transfer_graph as tg
+    exch = "0x" + "ee" * 20
+    head = "0x" + "11" * 20
+    mid = "0x" + "22" * 20
+    edges = [_e(TARGET, head, 100_000_000.0),
+             _e(head, mid, 100_000_000.0),
+             _e(mid, exch, 100_000_000.0)]
+    got = tg.detect_conduits(edges, {exch})
+    assert mid in got
+    assert head not in got
+

@@ -831,6 +831,13 @@ def build_graph(edges: list[dict], target: str, *,
     # because "forwards to infrastructure" is only meaningful once we know what
     # infrastructure is, and they are folded in so a wallet downstream of a
     # conduit is not scored as though the target had paid it directly.
+    # ONE pass, deliberately. Iterating to a fixed point does resolve conduit
+    # chains — the head of a three-link chain stays an unexplained lead
+    # otherwise — but it also swallows legitimate intermediaries: marking a
+    # conduit as a service stops the frontier traversing it, and cascading the
+    # rule cost a whole hop of reachability in
+    # test_l1_expansion_runs_from_fixtures_and_reaches_depth_two. Losing depth
+    # to tidy a row is a bad trade for a system whose job is to follow money.
     conduits = detect_conduits(
         edges, set(services),
         # Depositing to the Hyperliquid bridge is entering the arena, not
