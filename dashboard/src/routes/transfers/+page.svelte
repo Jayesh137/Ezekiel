@@ -39,6 +39,7 @@
 		POSSIBLE_LINKED_WALLET: 'Possible linked wallet',
 		OPERATIONAL_COUNTERPARTY: 'Operational counterparty',
 		DIRECT_RECIPIENT: 'Direct recipient',
+		CORRELATION_LEAD: 'Correlation lead (no transfer seen)',
 		SERVICE: 'Exchange / bridge / service'
 	};
 
@@ -47,6 +48,7 @@
 		POSSIBLE_LINKED_WALLET: 'badge-yellow',
 		OPERATIONAL_COUNTERPARTY: 'badge-cyan',
 		DIRECT_RECIPIENT: 'badge-grey',
+		CORRELATION_LEAD: 'badge-grey',
 		SERVICE: 'badge-grey'
 	};
 
@@ -616,7 +618,13 @@
 						{#if edgesFor(n).length > 40}
 							<p class="text-muted">Showing 40 of {edgesFor(n).length} transfers.</p>
 						{/if}
-						{#if n.classification === 'DIRECT_RECIPIENT' || n.classification === 'OPERATIONAL_COUNTERPARTY'}
+						{#if n.classification === 'CORRELATION_LEAD'}
+							<p class="caveat">
+								No transfer between this wallet and the target was observed. The link
+								is an amount-and-timing match across a gap — a lead to review, and
+								much weaker than an observed transfer.
+							</p>
+						{:else if n.classification === 'DIRECT_RECIPIENT' || n.classification === 'OPERATIONAL_COUNTERPARTY'}
 							<p class="caveat">
 								A transfer relationship is not proof of common ownership. This wallet
 								is a lead for review, not an identification.

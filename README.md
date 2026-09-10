@@ -244,8 +244,14 @@ silently start dropping leads.
 `data/transfer_graph/latest.json`, shown on the **/transfers** page. Wallets are
 graded, never asserted:
 
-`SERVICE` → `DIRECT_RECIPIENT` → `OPERATIONAL_COUNTERPARTY` →
-`POSSIBLE_LINKED_WALLET` → `MIGRATION_CANDIDATE`
+`SERVICE` → `DIRECT_RECIPIENT` / `CORRELATION_LEAD` → `OPERATIONAL_COUNTERPARTY`
+→ `POSSIBLE_LINKED_WALLET` → `MIGRATION_CANDIDATE`
+
+`CORRELATION_LEAD` is the CEX-gap case: no transfer between the wallet and the
+target was ever observed, and the wallet is in the graph only because an exit
+re-appeared as a same-size deposit soon after. It is deliberately separate from
+`DIRECT_RECIPIENT`, which asserts a receipt that, for these wallets, never
+happened.
 
 **A transfer is not ownership.** The top two tiers require corroboration from an
 independent vector (behavioural similarity, amount correlation, address reuse, gas

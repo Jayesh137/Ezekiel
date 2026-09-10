@@ -67,11 +67,22 @@ SRC_HL_LEDGER = "hl_ledger"
 SRC_BRIDGE_DEPOSIT = "bridge_deposit"
 SRC_BRIDGE_WITHDRAW = "bridge_withdraw"
 SRC_GAS_FUNDING = "gas_funding"
+SRC_CORRELATION = "amount_correlation"
+
+# Not a chain. A correlation edge records that an exit and a later deposit
+# matched in amount and time, which is a relationship inferred from two
+# observations rather than a transfer anyone made.
+CHAIN_INFERRED = "inferred"
 
 # --- classifications (ordered weakest -> strongest) -----------------------------
 
 CLASS_SERVICE = "SERVICE"                      # exchange / bridge / contract / mixer
 CLASS_DIRECT_RECIPIENT = "DIRECT_RECIPIENT"    # received funds, nothing more known
+# No transfer between this wallet and the target was ever observed. It is here
+# because an exit re-appeared as a same-size deposit — the CEX-gap case, where
+# an on-chain link is not merely missing but expected to be missing. Kept
+# distinct from DIRECT_RECIPIENT, which asserts a receipt that did not happen.
+CLASS_CORRELATION_LEAD = "CORRELATION_LEAD"
 CLASS_OPERATIONAL = "OPERATIONAL_COUNTERPARTY"  # repeated/two-way relationship
 CLASS_POSSIBLE_LINKED = "POSSIBLE_LINKED_WALLET"
 CLASS_MIGRATION_CANDIDATE = "MIGRATION_CANDIDATE"
@@ -79,6 +90,7 @@ CLASS_MIGRATION_CANDIDATE = "MIGRATION_CANDIDATE"
 CLASS_ORDER = {
     CLASS_SERVICE: 0,
     CLASS_DIRECT_RECIPIENT: 1,
+    CLASS_CORRELATION_LEAD: 1,
     CLASS_OPERATIONAL: 2,
     CLASS_POSSIBLE_LINKED: 3,
     CLASS_MIGRATION_CANDIDATE: 4,
@@ -413,6 +425,10 @@ def score_confidence(ev: dict, thresholds: dict | None = None) -> tuple[float, l
     relationship = 0.0
     corroboration = 0.0
 
+    if ev.get("correlation_only"):
+        reasons.append("No transfer to or from the target was ever observed "
+                       "(re-linked across a gap by amount and timing alone)")
+
     if ev.get("direct_from_target"):
         relationship += 0.15
         reasons.append("Received funds directly from the target wallet")
@@ -519,6 +535,10 @@ def classify_node(ev: dict, confidence: float, thresholds: dict | None = None) -
         return CLASS_POSSIBLE_LINKED
     if ev.get("bidirectional") or int(ev.get("transfer_count", 0) or 0) >= REPEATED_TRANSFER_MIN:
         return CLASS_OPERATIONAL
+    if ev.get("correlation_only"):
+        # Nothing was received, so "recipient" would be a claim about a transfer
+        # that does not exist.
+        return CLASS_CORRELATION_LEAD
     return CLASS_DIRECT_RECIPIENT
 
 
@@ -852,14 +872,22 @@ def build_graph(edges: list[dict], target: str, *,
     nodes = []
     for addr in order:
         incident = [e for e in wallet_edges if e["src"] == addr or e["dst"] == addr]
-        from_target = [e for e in incident if e["src"] == target and e["dst"] == addr]
-        to_target = [e for e in incident if e["src"] == addr and e["dst"] == target]
+        # A correlation edge exists to make the wallet a node and to carry its
+        # evidence; it is not money anyone moved. Every fact below that means
+        # "a transfer happened" — direct receipt, volume, counts, timestamps —
+        # reads observed edges only. Counting an inference among them made a
+        # wallet with NO on-chain link to the target report "Received funds
+        # directly from the target wallet", which is simply false, and would
+        # have added its inferred amount to the target's outbound volume.
+        observed = [e for e in incident if not e.get("inferred")]
+        from_target = [e for e in observed if e["src"] == target and e["dst"] == addr]
+        to_target = [e for e in observed if e["src"] == addr and e["dst"] == target]
         gas = [e for e in incident
                if e["discovery_source"] == SRC_GAS_FUNDING and e["dst"] == addr]
 
         out_usd = round(sum(float(e["amount_usd"]) for e in from_target), 2)
         in_usd = round(sum(float(e["amount_usd"]) for e in to_target), 2)
-        stamps = [e["ts"] for e in incident if e["ts"]]
+        stamps = [e["ts"] for e in observed if e["ts"]]
         link = linkage.get(addr, {})
         corr = correlations.get(addr, {})
         age_days = ((now_ts - max(stamps)) / 86400.0) if stamps else None
@@ -871,9 +899,13 @@ def build_graph(edges: list[dict], target: str, *,
             "direct_from_target": bool(from_target),
             "funded_target": bool(to_target),
             "bidirectional": bool(from_target and to_target),
-            "transfer_count": len(incident),
-            "only_single_transfer": len(incident) == 1,
-            "hl_native": any(e["chain"] == CHAIN_HYPERLIQUID for e in incident),
+            "transfer_count": len(observed),
+            "only_single_transfer": len(observed) == 1,
+            "hl_native": any(e["chain"] == CHAIN_HYPERLIQUID for e in observed),
+            # No observed transfer at all: this wallet is here purely because an
+            # exit re-appeared as a deposit. Says so plainly rather than letting
+            # a reader infer a link that was never seen on-chain.
+            "correlation_only": not observed,
             "shared_funder": bool(link.get("shared_funder")),
             "shared_deposit_address": bool(link.get("shared_deposit_addresses")),
             "gas_funded_by_target": any(e["src"] == target for e in gas),
@@ -1252,8 +1284,17 @@ def _load_correlations() -> dict:
                 for m in json.load(f).get("matches", []):
                     w = (m.get("wallet") or "").lower()
                     if w:
+                        # Keep the strongest match per wallet: a wallet can
+                        # correlate several times and the best one is what the
+                        # evidence is worth.
+                        prev = out.get(w)
+                        if prev and (prev.get("confidence") or 0) >= (m.get("confidence") or 0):
+                            continue
                         out[w] = {"confidence": m.get("confidence"),
                                   "gap_hours": m.get("gap_hours"),
+                                  "deposit_amount_usd": m.get("deposit_amount_usd"),
+                                  "deposit_ts": m.get("deposit_ts"),
+                                  "competing_deposits": m.get("competing_deposits"),
                                   "split": False}
         except (OSError, ValueError):
             pass
@@ -1330,6 +1371,53 @@ def collect_known_edges() -> list[dict]:
             print(f"[graph] could not read fund_flows: {e}")
 
     return edges
+
+
+def correlation_edges(target: str, correlations: dict) -> list[dict]:
+    """Synthetic edges for wallets re-linked across a CEX gap.
+
+    The correlator exists precisely for the case where there IS no on-chain
+    link: the target exits to an exchange and a fresh wallet re-enters with the
+    same amount. But build_graph attaches correlation evidence to NODES, and
+    nodes come from edges — so a wallet with no on-chain edge never became a
+    node, and its correlation evidence was loaded and then silently dropped.
+
+    The two vectors built to defeat an on-chain break therefore could not
+    combine, because combining happened in a structure made of on-chain links.
+    Measured on live data: a wallet with three correlation matches AND a 0.6867
+    behavioural score was absent from a 59-node graph entirely.
+
+    These edges carry `inferred: True` and a chain of "inferred" so nothing can
+    mistake them for an observed transfer. They are excluded from traversal —
+    there is no money to follow through an inference — and they change no
+    threshold. They only let evidence reach rules that already know what to do
+    with it: `classify_node` still requires independent corroboration for the
+    top tiers, so a correlation alone cannot promote a wallet.
+    """
+    src = (target or "").lower()
+    out = []
+    for wallet, corr in (correlations or {}).items():
+        dst = (wallet or "").lower()
+        if not dst or dst == src:
+            continue
+        ts = int(corr.get("deposit_ts") or 0)
+        out.append({
+            "id": edge_id(src, dst, CHAIN_INFERRED, f"corr:{dst}", ts),
+            "src": src,
+            "dst": dst,
+            "chain": CHAIN_INFERRED,
+            "asset": "USD",
+            "amount_usd": round(float(corr.get("deposit_amount_usd") or 0), 2),
+            "ref": f"corr:{dst}",
+            "ts": ts,
+            "timestamp": _iso(ts) if ts else None,
+            "discovery_source": SRC_CORRELATION,
+            # Never an observed transfer. Read by _expandable_edges to keep the
+            # frontier from walking through an inference, and by anything else
+            # that must not treat this as money having moved.
+            "inferred": True,
+        })
+    return out
 
 
 def _positive_int(value: object, fallback: int) -> int:
@@ -1453,6 +1541,11 @@ def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
     keep = []
     for e in edges:
         if e.get("bridge_event"):
+            continue
+        if e.get("inferred"):
+            # A correlation is a relationship, not a transfer. There is no money
+            # to follow through it, and spending lookups on its far side would
+            # chase a wallet we reached by inference as though it had been paid.
             continue
         if (float(e.get("amount_usd", 0) or 0) < dust_usd
                 and e.get("discovery_source") != SRC_GAS_FUNDING):
@@ -1966,6 +2059,18 @@ def run_transfer_graph(expand: bool = True) -> dict:
         expansion.setdefault("expanded_ledger", prev_health.get("expanded_ledger") or [])
         expansion.setdefault("frontier_queue", prev_health.get("frontier_queue") or [])
 
+    correlations = _load_correlations()
+    # Correlation-derived nodes. Without these a wallet re-linked across a CEX
+    # gap never enters the graph at all, so its correlation evidence and its
+    # behavioural score can never meet — which is the exact case the correlator
+    # was built for. Appended after collect_known_edges so an observed transfer
+    # always wins the dedupe on a shared id.
+    inferred = correlation_edges(target, correlations)
+    if inferred:
+        edges = edges + inferred
+        print(f"[graph] {len(inferred)} correlation-derived node(s) admitted "
+              f"(inferred, never traversed)")
+
     behavioural, hl_active = _load_behavioural_scores()
     graph = build_graph(
         edges, target,
@@ -1973,7 +2078,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
         behavioural=behavioural,
         hl_active=hl_active,
         linkage=_load_linkage_evidence(),
-        correlations=_load_correlations(),
+        correlations=correlations,
         max_depth=cfg["max_depth"],
         max_nodes=cfg["max_nodes"],
         dust_usd=cfg["dust_usd"],
