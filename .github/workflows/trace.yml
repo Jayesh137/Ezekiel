@@ -108,6 +108,10 @@ jobs:
       # file reads, no network, no budget.
       - name: Build wallet roster
         run: python src/roster.py
+      # After the roster, because it classifies each destination using the tiers
+      # the roster just assigned. Pure file reads.
+      - name: Reconcile outbound funds
+        run: python src/accounting.py
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"

@@ -287,6 +287,23 @@ no vote at all — a scorer that cannot pick the target out of a lineup cannot b
 evidence that some other wallet is him. `behavioural_counts_as_a_vector` in the
 output says which regime produced the roster.
 
+### Fund accounting
+
+`src/accounting.py` answers the question underneath the whole project: of
+everything that left the target, how much do we know the destination of? Without
+it, "follow every dollar" is unfalsifiable — the graph can look healthy while
+most of the money went somewhere nothing here mentions.
+
+Each destination is bucketed by what the roster says about it: `known_self`,
+`identified` (CONFIRMED/PROBABLE), `infrastructure`, `lead` (POSSIBLE/WATCH) and
+`unknown`. **Leads are deliberately excluded from the traced figure** — a
+POSSIBLE wallet is a question, and counting questions as answers is how a
+reconciliation flatters itself.
+
+Unpriced outflows are counted as a COUNT and never valued. Folding a missing
+price in as $0 would report a tidy total that quietly omits real money, the same
+failure as a missing price becoming a $0 transfer.
+
 ### HyperEVM watch
 
 HyperEVM is reachable from Hyperliquid without any L1 footprint, and its public
