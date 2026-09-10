@@ -253,6 +253,31 @@ re-appeared as a same-size deposit soon after. It is deliberately separate from
 `DIRECT_RECIPIENT`, which asserts a receipt that, for these wallets, never
 happened.
 
+### The roster
+
+`src/roster.py` merges what all five detectors wrote — transfer graph, HL-native
+ledger, deposit/withdrawal correlator, behavioural scanner, HyperEVM watch — into
+one ranked list at `data/roster/latest.json`, and tiers each wallet on **how many
+independent vectors support it**, not on any single score:
+
+`CONFIRMED` → `PROBABLE` → `POSSIBLE` → `WATCH`, with services as
+`INFRASTRUCTURE`.
+
+Independent agreement is the strongest evidence this project can produce,
+because the ways the vectors can be fooled do not overlap: an amount coincidence
+does not also fake a shared deposit address, and a shared deposit address does
+not also fake a trading style. So `CONFIRMED` needs **two** vectors plus
+confidence — each vector alone has a known failure mode. Measured live: three
+wallets matched the target on amount, and every one was style-vetoed as a
+different trader.
+
+Two guards keep a single detector from casting two votes. A correlation edge is
+inferred, not observed, so it never counts as the transfer vector. And while the
+self-match backtest fails, the behavioural score is recorded as context but casts
+no vote at all — a scorer that cannot pick the target out of a lineup cannot be
+evidence that some other wallet is him. `behavioural_counts_as_a_vector` in the
+output says which regime produced the roster.
+
 ### HyperEVM watch
 
 HyperEVM is reachable from Hyperliquid without any L1 footprint, and its public

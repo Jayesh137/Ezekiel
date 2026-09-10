@@ -104,6 +104,10 @@ jobs:
           # Lets a failed email fall back to a GitHub issue.
           GITHUB_TOKEN: ${{ github.token }}
         run: python src/transfer_graph.py
+      # Last, because it only merges what the detectors above just wrote. Pure
+      # file reads, no network, no budget.
+      - name: Build wallet roster
+        run: python src/roster.py
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
