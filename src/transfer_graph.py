@@ -353,7 +353,8 @@ def dedupe_edges(edges: list[dict]) -> list[dict]:
 
 def detect_services(edges: list[dict], known_services: set,
                     fanout: int = DEFAULTS["service_fanout"],
-                    fanin: int = DEFAULTS["service_fanin"]) -> dict:
+                    fanin: int = DEFAULTS["service_fanin"],
+                    reasons: dict | None = None) -> dict:
     """Identify addresses that behave like infrastructure rather than wallets.
 
     Two sources: explicitly configured addresses (bridge, known CEX deposit
@@ -373,7 +374,12 @@ def detect_services(edges: list[dict], known_services: set,
     for addr in set(out_deg) | set(in_deg):
         a = addr.lower()
         if a in known_services:
-            services[a] = "configured service address (exchange/bridge/contract)"
+            # A measured reason beats the generic label. An address detected by
+            # HL fan-out arrives here indistinguishable from one typed into
+            # config, and "configured service address" would hide the evidence
+            # that actually excluded it.
+            services[a] = (reasons or {}).get(a) or \
+                "configured service address (exchange/bridge/contract)"
             continue
         o, i = len(out_deg.get(addr, ())), len(in_deg.get(addr, ()))
         if o >= fanout and i >= fanin:
@@ -789,6 +795,7 @@ def _continuity_for(node: dict, chain: dict | None, evidence: dict,
 
 def build_graph(edges: list[dict], target: str, *,
                 known_services: set | None = None,
+                service_reasons: dict | None = None,
                 behavioural: dict | None = None,
                 hl_active: set | None = None,
                 linkage: dict | None = None,
@@ -815,7 +822,7 @@ def build_graph(edges: list[dict], target: str, *,
     correlations = {k.lower(): v for k, v in (correlations or {}).items()}
 
     edges = dedupe_edges(edges)
-    services = detect_services(edges, known_services)
+    services = detect_services(edges, known_services, reasons=service_reasons)
 
     # Adjacency over real wallet-to-wallet movement only.
     adj: dict[str, list[dict]] = {}
@@ -1371,6 +1378,45 @@ def collect_known_edges() -> list[dict]:
             print(f"[graph] could not read fund_flows: {e}")
 
     return edges
+
+
+def _hl_native_services(known_services: set, cfg: dict) -> set:
+    """Probe the target's ranked HL counterparties for infrastructure behaviour.
+
+    Reads the counterparties src/ledger_analyzer.py already ranked, skips the ones
+    we can name from config or labels, and asks HL about the rest, highest
+    relevance first — those are the addresses a mislabel would hurt most.
+    """
+    path = DATA_DIR / "hl_transfers" / "latest.json"
+    if not path.exists():
+        return set()
+    try:
+        with open(path) as f:
+            parties = json.load(f).get("counterparties", [])
+    except (OSError, ValueError):
+        return set()
+
+    todo = [p["wallet"].lower() for p in parties
+            if p.get("wallet") and p["wallet"].lower() not in known_services]
+    if not todo:
+        return set()
+
+    from src.ledger_analyzer import probe_hl_services
+    services, errors = probe_hl_services(
+        todo,
+        fanout=cfg["service_fanout"],
+        fanin=cfg["service_fanin"],
+        max_probes=int(cfg.get("hl_service_probes", 25)),
+    )
+    for addr, reason in services.items():
+        print(f"[graph] HL infrastructure: {addr[:12]}... {reason}")
+    if errors:
+        # Named, not swallowed: these addresses stay eligible as leads, which is
+        # the safe direction, but a run where every probe failed must not look
+        # like a run that found no services.
+        print(f"[graph] {len(errors)} HL service probe(s) failed — "
+              f"those addresses remain unclassified this run")
+    return services
 
 
 def correlation_edges(target: str, correlations: dict) -> list[dict]:
@@ -2008,6 +2054,18 @@ def run_transfer_graph(expand: bool = True) -> dict:
     from src.chain.labels import load_registry, service_addresses
     known_services |= service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"))
 
+    # detect_services counts degrees among edges we have already collected, so an
+    # address reads as infrastructure only after it has been swept. The target's
+    # HL-native counterparties are exactly the population where that fails: money
+    # arrives from an exchange we never swept, and it grades as a wallet.
+    #
+    # Live case: 0x6b9e7731... sent the target ~$45M over five weeks and graded
+    # OPERATIONAL_COUNTERPARTY at 35%. Its own ledger shows 583 destinations and
+    # no trades. One free HL call per address settles it, and costs no Etherscan
+    # budget. Probes that fail are reported, never treated as "ordinary wallet".
+    hl_services = _hl_native_services(known_services, cfg)
+    known_services |= set(hl_services)
+
     # Loaded ONCE, before expansion, and migrated to the current schema: it
     # carries the unfinished frontier, the ledger of finished expansions and the
     # delivered-alert state that the whole run depends on.
@@ -2075,6 +2133,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
     graph = build_graph(
         edges, target,
         known_services=known_services,
+        service_reasons=hl_services,
         behavioural=behavioural,
         hl_active=hl_active,
         linkage=_load_linkage_evidence(),

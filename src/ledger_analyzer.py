@@ -44,6 +44,97 @@ def _delta_usd(delta: dict) -> float:
     return 0.0
 
 
+def counterparty_spread(ledger: list[dict], wallet: str) -> tuple[int, int]:
+    """How many distinct wallets this one sends to, and receives from.
+
+    Reads a wallet's OWN ledger, which is the point: the graph's `detect_services`
+    can only count degrees among edges already collected, so a service looks like
+    a service only after it has been swept. An exchange the target used once
+    therefore reads as an ordinary counterparty.
+
+    Measured on live data: `0x6b9e7731...` sent the target ~$45M across 5 weeks
+    and graded OPERATIONAL_COUNTERPARTY at 35%, because our edge set held its
+    transfers with the target and nothing else. Its own ledger shows 583 distinct
+    destinations and no trading history at all — infrastructure, and one free HL
+    call away from being obvious.
+    """
+    wallet = (wallet or "").lower()
+    out_to: set[str] = set()
+    in_from: set[str] = set()
+    for entry in ledger or []:
+        delta = entry.get("delta", {})
+        if delta.get("type") not in COUNTERPARTY_TYPES:
+            continue
+        sender = (delta.get("user") or "").lower()
+        receiver = (delta.get("destination") or "").lower()
+        if not sender or not receiver or sender == receiver:
+            continue
+        if sender == wallet:
+            out_to.add(receiver)
+        elif receiver == wallet:
+            in_from.add(sender)
+    return len(out_to), len(in_from)
+
+
+def hl_service_reason(out_degree: int, in_degree: int,
+                      fanout: int = 25, fanin: int = 25) -> str | None:
+    """Why this address is infrastructure, or None if it looks like a wallet.
+
+    Mirrors transfer_graph.detect_services so the two cannot drift into
+    disagreeing about the same address on different evidence.
+    """
+    if out_degree >= fanout and in_degree >= fanin:
+        return f"many-to-many HL flow ({in_degree} senders, {out_degree} recipients)"
+    if in_degree >= fanin * 2:
+        return f"high HL fan-in ({in_degree} distinct senders)"
+    if out_degree >= fanout * 2:
+        return f"high HL fan-out ({out_degree} distinct recipients)"
+    return None
+
+
+def probe_hl_services(addresses, *, fanout: int = 25, fanin: int = 25,
+                      max_probes: int = 25, lookback_days: int = 365,
+                      fetch=None) -> tuple[dict, dict]:
+    """Ask HL which of these addresses are infrastructure. Returns (services, errors).
+
+    One free `userNonFundingLedgerUpdates` call each, so this spends no Etherscan
+    budget. `fetch` is injectable to keep the tests network-free.
+
+    A probe that fails lands in `errors`, never in `services`: "we could not tell"
+    and "we checked and it is a wallet" must not collapse into the same silence,
+    or a rate-limited run quietly promotes an exchange to a migration lead.
+    """
+    if fetch is None:
+        from src.utils import hl_post
+
+        def fetch(addr):
+            return hl_post({
+                "type": "userNonFundingLedgerUpdates",
+                "user": addr,
+                "startTime": now_ms() - lookback_days * 86_400_000,
+            })
+
+    services: dict[str, str] = {}
+    errors: dict[str, str] = {}
+    for addr in list(addresses)[:max_probes]:
+        a = (addr or "").lower()
+        if not a:
+            continue
+        try:
+            ledger = fetch(a)
+        except Exception as exc:                      # noqa: BLE001 - any transport failure
+            errors[a] = f"probe failed: {type(exc).__name__}: {exc}"
+            continue
+        if not isinstance(ledger, list):
+            errors[a] = f"unexpected ledger payload: {type(ledger).__name__}"
+            continue
+        out_deg, in_deg = counterparty_spread(ledger, a)
+        reason = hl_service_reason(out_deg, in_deg, fanout, fanin)
+        if reason:
+            services[a] = reason
+    return services, errors
+
+
 def build_counterparties(ledger: list[dict], target: str, excluded: set,
                          known_self: set, min_track: float = 1000) -> list[dict]:
     """Pure aggregation: turn ledger records into ranked HL-native counterparties.
