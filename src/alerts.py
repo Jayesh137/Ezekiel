@@ -429,7 +429,11 @@ def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
         f"  Transfers observed:   {totals.get('edge_count', 0)}\n\n"
         f"TRANSFERS\n{edges_txt}{more}\n\n"
     )
-    if cls in ("DIRECT_RECIPIENT", "OPERATIONAL_COUNTERPARTY"):
+    if cls == "CORRELATION_LEAD":
+        body += ("NOTE: no transfer between this wallet and the target was observed. The\n"
+                 "link is an amount-and-timing match across a gap, which is a lead to\n"
+                 "review and much weaker than an observed transfer.\n\n")
+    elif cls in ("DIRECT_RECIPIENT", "OPERATIONAL_COUNTERPARTY"):
         body += ("NOTE: a transfer relationship is NOT proof of common ownership. This\n"
                  "wallet is recorded as a lead for review, not identified as the target.\n\n")
     body += "Full graph and paths: Recovery page -> Transfer Graph.\n"

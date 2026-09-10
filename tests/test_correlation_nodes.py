@@ -99,3 +99,28 @@ def test_correlation_alone_cannot_reach_migration_candidate():
     conf, _ = tg.score_confidence(ev)
     assert conf < 0.60
     assert tg.classify_node(ev, conf) != tg.CLASS_MIGRATION_CANDIDATE
+
+
+def test_alert_for_a_correlation_lead_states_no_transfer_was_seen(monkeypatch):
+    """The email must not let a reader assume a transfer was observed. The
+    generic 'a transfer relationship is not proof of ownership' caveat would do
+    exactly that, because for these wallets there is no transfer relationship
+    at all."""
+    import src.alerts as alerts
+
+    captured = {}
+
+    def fake_send(key, hours, subject, body):
+        captured["body"] = body
+        return True
+
+    monkeypatch.setattr(alerts, "_send_with_cooldown", fake_send)
+    node = {"wallet": WALLET, "classification": "CORRELATION_LEAD",
+            "confidence": 0.2996, "path": [TARGET, WALLET],
+            "confidence_reasons": ["Exit amount re-appears as a deposit"],
+            "totals": {}}
+    alerts.alert_transfer_graph_discovery(node, ["correlation"], [])
+
+    assert "no transfer between this wallet and the target was observed" \
+        in captured["body"].lower()
+    assert "a transfer relationship is NOT proof" not in captured["body"]
