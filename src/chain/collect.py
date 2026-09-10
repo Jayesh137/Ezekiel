@@ -163,12 +163,24 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
     Parsed files are cached by (path, mtime, size) — see _FILE_CACHE. A sweep
     that appends changes today's file's mtime, so the next read of it re-parses
     while every untouched historical file stays a hit.
+
+    Deduplicated by `id` ACROSS files. `append_records` dedupes within the file
+    it writes, so a record re-fetched by a later sweep lands in that day's file
+    carrying an id the earlier day's file already holds, and nothing downstream
+    could tell. Measured on live data: the target held 4 such pairs, one of them
+    a $5,999,988 USDC transfer counted twice.
+
+    That is not merely cosmetic double-counting. Amount matching is the entire
+    basis of the correlator, so a duplicated exit is an exit that can be matched
+    twice — the second match against a deposit that never had a real exit behind
+    it.
     """
     wl = (wallet or "").lower()
     root = Path(TRANSFERS_DIR)
     if not root.exists():
         return []
     out = []
+    seen: set[str] = set()
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         for path in sorted(chain_dir.glob("*.json")):
             for rec in _load_cached(path):
@@ -176,9 +188,18 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
                     continue
                 if rec.get("spam") and not include_spam:
                     continue
-                if wl in ((rec.get("src") or "").lower(),
-                          (rec.get("dst") or "").lower()):
-                    out.append(rec)
+                if wl not in ((rec.get("src") or "").lower(),
+                              (rec.get("dst") or "").lower()):
+                    continue
+                rid = rec.get("id")
+                if rid:
+                    if rid in seen:
+                        continue
+                    seen.add(rid)
+                # A record with no id cannot be judged a duplicate of anything,
+                # so it is kept: dropping it would silently lose real history to
+                # a missing field.
+                out.append(rec)
     return out
 
 

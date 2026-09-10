@@ -811,3 +811,59 @@ def test_the_cache_is_bounded_and_evicts_least_recently_used(tmp_path, monkeypat
     assert len(collect._FILE_CACHE) >= 1, "evicted everything, including the newest"
     assert held <= 200 or len(collect._FILE_CACHE) == 1, (
         f"cache holds {held} bytes against a 200-byte ceiling")
+
+
+def test_records_for_dedupes_the_same_id_across_files(tmp_path, monkeypatch):
+    """append_records dedupes within one file, so a record re-fetched by a later
+    sweep lands in a second day's file carrying an id the first already holds.
+    Live data had 4 such pairs, one a $5,999,988 USDC transfer counted twice —
+    and a duplicated exit can be matched twice by the correlator."""
+    import src.chain.collect as collect
+
+    root = tmp_path / "transfers" / "arbitrum"
+    root.mkdir(parents=True)
+    rec = {"id": "arbitrum:0xabc:erc20:0", "src": "0xaaa", "dst": "0xbbb",
+           "asset": "USDC", "amount": 5999988.003998, "amount_usd": 5999988.0}
+    (root / "2026-09-01.json").write_text(json.dumps([rec]))
+    (root / "2026-09-02.json").write_text(json.dumps([dict(rec)]))
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", str(tmp_path / "transfers"))
+    collect.clear_record_cache()
+
+    got = collect.records_for("0xaaa")
+    assert len(got) == 1
+    assert sum(r["amount_usd"] for r in got) == 5999988.0
+
+
+def test_records_for_keeps_distinct_ids_in_one_file(tmp_path, monkeypatch):
+    """The dedupe must key on id, not on shape — two genuine transfers of the
+    same size are not one transfer."""
+    import src.chain.collect as collect
+
+    root = tmp_path / "transfers" / "arbitrum"
+    root.mkdir(parents=True)
+    recs = [{"id": "arbitrum:0xabc:erc20:0", "src": "0xaaa", "dst": "0xbbb",
+             "asset": "USDC", "amount": 100.0, "amount_usd": 100.0},
+            {"id": "arbitrum:0xdef:erc20:0", "src": "0xaaa", "dst": "0xbbb",
+             "asset": "USDC", "amount": 100.0, "amount_usd": 100.0}]
+    (root / "2026-09-01.json").write_text(json.dumps(recs))
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", str(tmp_path / "transfers"))
+    collect.clear_record_cache()
+    assert len(collect.records_for("0xaaa")) == 2
+
+
+def test_records_for_keeps_records_that_have_no_id(tmp_path, monkeypatch):
+    """A record with no id cannot be judged a duplicate of anything; dropping it
+    would lose real history to a missing field."""
+    import src.chain.collect as collect
+
+    root = tmp_path / "transfers" / "arbitrum"
+    root.mkdir(parents=True)
+    recs = [{"src": "0xaaa", "dst": "0xbbb", "asset": "USDC", "amount_usd": 1.0},
+            {"src": "0xaaa", "dst": "0xbbb", "asset": "USDC", "amount_usd": 2.0}]
+    (root / "2026-09-01.json").write_text(json.dumps(recs))
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", str(tmp_path / "transfers"))
+    collect.clear_record_cache()
+    assert len(collect.records_for("0xaaa")) == 2
