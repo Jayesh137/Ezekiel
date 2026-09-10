@@ -319,6 +319,47 @@ def target_l1_profile(target: str) -> dict:
     }
 
 
+def high_fanin_addresses(threshold: int = 25) -> set:
+    """Addresses many unrelated wallets send to, measured from the substrate.
+
+    The address-reuse heuristic rests on a deposit address belonging to exactly
+    ONE account, so two wallets funding the same one are the same customer. That
+    holds for a private deposit address and collapses for a shared one.
+
+    Measured 2026-09-10: the target and two other wallets shared
+    `0xf078969e...f19e`, which has 84 distinct senders and 130 recipients — the
+    graph already grades it INFRASTRUCTURE. It was still counted as address
+    reuse, because get_outbound_addresses excludes only addresses NAMED in the
+    label registry or config, and this one was detected by fan rather than
+    named. The same three wallets also shared `0xf076c336...f19e`, which has
+    exactly 3 senders and is genuine — so the conclusion survived, by luck.
+
+    Counting distinct senders costs nothing: the substrate is already in memory.
+    """
+    import collections
+    import json as _json
+
+    senders: dict[str, set] = collections.defaultdict(set)
+    root = DATA_DIR / "transfers"
+    if not root.exists():
+        return set()
+    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in sorted(chain_dir.glob("*.json")):
+            try:
+                with open(path) as f:
+                    rows = _json.load(f)
+            except (OSError, ValueError):
+                continue
+            for rec in rows if isinstance(rows, list) else []:
+                if not isinstance(rec, dict) or rec.get("spam"):
+                    continue
+                dst = (rec.get("dst") or "").lower()
+                src = (rec.get("src") or "").lower()
+                if dst and src:
+                    senders[dst].add(src)
+    return {a for a, s in senders.items() if len(s) >= threshold}
+
+
 def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     """Linkage for wallets the substrate already covers. No network calls.
 
@@ -352,6 +393,11 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     # leaderboard candidates, and 0 of 50 of those carried a linkage block.
     funders = load_first_funders()
     target_funder = funders.get(target) or profile.get("first_funder")
+
+    # A shared destination is ownership evidence only when the destination
+    # belongs to one account. Addresses many unrelated wallets send to are
+    # excluded even when nothing has NAMED them as infrastructure.
+    excluded = excluded | high_fanin_addresses()
 
     out: dict[str, dict] = {}
     for wallet in wallets:

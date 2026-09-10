@@ -187,3 +187,51 @@ def test_first_funded_by_the_target_is_the_stronger_claim():
     shared = lk.compute_linkage("0xcand", "0xshared", set(), "0xtarget",
                                 "0xshared", set(), excluded=set())
     assert direct["linkage_bonus"] > shared["linkage_bonus"]
+
+
+def test_high_fanin_addresses_are_detected_from_the_substrate(tmp_path, monkeypatch):
+    """The address-reuse heuristic rests on a deposit address belonging to ONE
+    account. That holds for a private address and collapses for a shared one."""
+    import json
+
+    import src.linkage as lk
+
+    root = tmp_path / "transfers" / "ethereum"
+    root.mkdir(parents=True)
+    shared = "0x" + "ee" * 20
+    private = "0x" + "dd" * 20
+    rows = [{"src": f"0x{i:040x}", "dst": shared, "amount_usd": 1.0}
+            for i in range(30)]
+    rows += [{"src": f"0x{i:040x}", "dst": private, "amount_usd": 1.0}
+             for i in range(3)]
+    (root / "f.json").write_text(json.dumps(rows))
+
+    monkeypatch.setattr(lk, "DATA_DIR", tmp_path)
+    hot = lk.high_fanin_addresses(threshold=25)
+    assert shared in hot
+    assert private not in hot
+
+
+def test_spam_rows_do_not_inflate_fan_in(tmp_path, monkeypatch):
+    """Address poisoning sprays dust from many addresses. Counting it would make
+    a poisoned wallet look like a shared service and silently drop a real
+    linkage."""
+    import json
+
+    import src.linkage as lk
+
+    root = tmp_path / "transfers" / "ethereum"
+    root.mkdir(parents=True)
+    victim = "0x" + "cc" * 20
+    rows = [{"src": f"0x{i:040x}", "dst": victim, "amount_usd": 0.0, "spam": True}
+            for i in range(40)]
+    (root / "f.json").write_text(json.dumps(rows))
+
+    monkeypatch.setattr(lk, "DATA_DIR", tmp_path)
+    assert victim not in lk.high_fanin_addresses(threshold=25)
+
+
+def test_a_missing_substrate_yields_no_exclusions(tmp_path, monkeypatch):
+    import src.linkage as lk
+    monkeypatch.setattr(lk, "DATA_DIR", tmp_path)
+    assert lk.high_fanin_addresses() == set()
