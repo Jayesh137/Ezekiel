@@ -70,7 +70,9 @@ Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 
 ## Vectors worth inventing
 
-Think about these; none is implemented:
+Think about these. Two were measured and rejected on evidence rather than left
+as open ideas — that record is worth as much as a built vector, because it stops
+the next session rebuilding them:
 
 - **Naming schemes beyond agents** — vault names and referral codes are also
   human-chosen. `naming_families` handles agents; the same idea applies there.
@@ -87,10 +89,19 @@ Think about these; none is implemented:
   copy-trader holds the same basket in the same direction at the same time by
   definition, and this project exists because its owner does exactly that. Live:
   only 4 of 34 candidates hold an open book; best score 0.079.
-- **Amount signatures** — he moves amounts like `8999999.00021` and
-  `5005314.50`. Exact repeated fractional amounts are a habit, and habits travel.
-- **Approval fingerprints** — which routers/contracts a wallet approves, in what
-  order, is a durable behavioural trace on L1.
+- ~~Amount signatures~~ — **measured 2026-09-10 and rejected.** His genuine
+  outbound amounts are overwhelmingly ROUND: `1,000,000` appears 285 times,
+  `999,999` 57 times. Round millions are what every whale sends, so they
+  identify nobody. The distinctive-looking `8999999.00021` that motivated this
+  idea occurs genuinely only twice — three further occurrences were counterfeit
+  tokens, now quarantined. Cheap to revisit if his habits change, but there is
+  no signature here today.
+- ~~Approval fingerprints~~ — **measured 2026-09-10 and rejected FOR THIS
+  TARGET.** He has 32 outbound L1 destinations and 25 are infrastructure: his
+  entire footprint is stablecoin transfers to exchange deposit addresses and the
+  HL bridge. **He does no DeFi**, so there are no approvals to fingerprint, and
+  collecting them would spend scarce Etherscan budget on a signal he does not
+  emit. Worth building the day he starts interacting with protocols.
 - **Gas and fee habits** — priority-fee setting is a per-human default.
 - **Counterparty-set overlap** — Jaccard over the full counterparty set, not just
   deposit addresses.
@@ -132,6 +143,13 @@ Think about these; none is implemented:
 8. **A transfer is not ownership.** Surface leads; never assert identity.
 
 ---
+
+## Not detection
+
+`profile_builder.py` ingests research documents into `trader_profile.json`, which
+nothing in `src/`, `scripts/` or the dashboard reads. It is a human-facing
+artifact, not part of any vector — do not wire it into scoring on the assumption
+that it is.
 
 ## Operating facts
 
