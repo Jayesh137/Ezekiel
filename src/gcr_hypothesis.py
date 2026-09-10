@@ -25,6 +25,7 @@ proof.
 """
 
 import json
+import math
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -81,15 +82,29 @@ def positions_from(state: dict) -> list[dict]:
             continue
         if not pos.get("coin") or szi == 0:
             continue
-        # Distance to liquidation as a share of entry. None, never 0.0 — a
-        # missing liquidation price means "we could not tell", and zero would
-        # read as "about to be liquidated" to every threshold below.
+        # Distance to liquidation as a share of entry, with three distinct
+        # states, because collapsing them loses the finding:
+        #
+        #   float  a real distance
+        #   inf    NO liquidation price exists — the position cannot be
+        #          liquidated. FTX printed this as "Infinity" (img113) or "N/A"
+        #          (img007, img032, img059, img060, img123), and it is the
+        #          BEST possible state for this trait, not a missing reading.
+        #          "I have unlimited collateral, you don't" (img125).
+        #   None   we could not tell. Never 0.0 — zero would read as "about to
+        #          be liquidated" to every threshold below.
+        #
+        # The key being present and null is a real answer from the venue; the
+        # key being absent is a failed read. Those are not the same thing.
         liq_distance = None
         try:
             entry = float(pos.get("entryPx") or 0)
-            raw = pos.get("liquidationPx")
-            if entry > 0 and raw not in (None, ""):
-                liq_distance = abs(float(raw) - entry) / entry
+            if "liquidationPx" not in pos:
+                liq_distance = None
+            elif pos["liquidationPx"] in (None, ""):
+                liq_distance = math.inf
+            elif entry > 0:
+                liq_distance = abs(float(pos["liquidationPx"]) - entry) / entry
         except (TypeError, ValueError):
             liq_distance = None
         out.append({"coin": pos["coin"], "direction": "long" if szi > 0 else "short",
@@ -228,9 +243,13 @@ def check_liquidation_distance(positions: list[dict], **_) -> dict:
                           f"runs 1x-5x cross and calls himself nearly "
                           f"unliquidatable."}
     if closest >= LIQUIDATION_SAFE:
+        unliquidatable = sum(1 for p in priced if p["liq_distance"] == math.inf)
+        where = ("every position is unliquidatable" if closest == math.inf
+                 else f"closest position is {closest:.0%} from liquidation")
+        extra = (f"; {unliquidatable} of {len(priced)} cannot be liquidated at all"
+                 if unliquidatable and closest != math.inf else "")
         return {"verdict": CONSISTENT,
-                "detail": f"closest position is {closest:.0%} from liquidation; "
-                          f"none within {LIQUIDATION_NEAR:.0%}"}
+                "detail": f"{where}{extra}; none within {LIQUIDATION_NEAR:.0%}"}
     return {"verdict": UNTESTABLE,
             "detail": f"closest position is {closest:.0%} from liquidation — "
                       f"neither clearly safe nor clearly stretched"}

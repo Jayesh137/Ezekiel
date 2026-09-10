@@ -119,13 +119,15 @@ def test_missing_liquidation_prices_are_untestable_not_safe():
     assert check_liquidation_distance([])["verdict"] == UNTESTABLE
 
 
-def test_liquidation_distance_is_none_not_zero_when_unreadable():
-    """Zero would read as 'about to be liquidated' to every threshold above."""
+def test_liquidation_distance_is_never_zero_when_unreadable():
+    """Zero would read as 'about to be liquidated' to every threshold above.
+    An unreadable entry price yields None; a null liquidation price is a
+    different thing entirely and is covered by the unliquidatable test below."""
     state = {"assetPositions": [
-        {"position": {"coin": "A", "szi": "-1", "positionValue": "10",
-                      "entryPx": "100", "liquidationPx": None}},
         {"position": {"coin": "B", "szi": "-1", "positionValue": "10",
-                      "entryPx": "0", "liquidationPx": "50"}}]}
+                      "entryPx": "0", "liquidationPx": "50"}},
+        {"position": {"coin": "C", "szi": "-1", "positionValue": "10",
+                      "entryPx": "abc", "liquidationPx": "50"}}]}
     assert [p["liq_distance"] for p in positions_from(state)] == [None, None]
 
 
@@ -297,3 +299,33 @@ def test_a_check_named_as_disconfirming_actually_can():
         verdicts = {fn(book, freq=FREQ, amounts=[1234.56])["verdict"]
                     for book in books}
         assert CONTRADICTS in verdicts, f"{name} cannot return CONTRADICTS"
+
+
+def test_an_absent_liquidation_price_means_unliquidatable_not_unknown():
+    """FTX printed his liquidation price as "Infinity" (img113) and "N/A"
+    (img007/032/059/060/123) — the BEST possible state for this trait, and the
+    literal form of "I have unlimited collateral, you don't" (img125). A venue
+    answering null is not a failed read, and collapsing the two would score his
+    strongest evidence as no evidence."""
+    state = {"assetPositions": [
+        {"position": {"coin": "AXS", "szi": "-1", "positionValue": "10",
+                      "entryPx": "47.699", "liquidationPx": None}}]}
+    got = positions_from(state)[0]
+    assert got["liq_distance"] == float("inf")
+    verdict = check_liquidation_distance([got])
+    assert verdict["verdict"] == CONSISTENT
+    assert "unliquidatable" in verdict["detail"]
+
+
+def test_a_missing_liquidation_field_is_still_unknown():
+    """Key absent is a failed read; key present and null is an answer."""
+    state = {"assetPositions": [
+        {"position": {"coin": "A", "szi": "-1", "positionValue": "10",
+                      "entryPx": "100"}}]}
+    assert positions_from(state)[0]["liq_distance"] is None
+
+
+def test_an_unliquidatable_position_never_counts_as_near():
+    mixed = [{"coin": "A", "direction": "short", "notional": 1.0, "size": -1.0,
+              "liq_distance": float("inf")} for _ in range(5)]
+    assert check_liquidation_distance(mixed)["verdict"] == CONSISTENT
