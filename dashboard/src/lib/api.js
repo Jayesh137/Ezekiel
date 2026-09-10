@@ -100,6 +100,14 @@ export async function fetchTransferGraph() {
 }
 
 /**
+ * Fetch the wallet roster: every detector's output merged into one ranked list,
+ * tiered on how many INDEPENDENT vectors support each wallet.
+ */
+export async function fetchRoster() {
+	return fetchJSON('data/roster/latest.json');
+}
+
+/**
  * Fetch the unified migration risk score (0-100 with contributing factors).
  */
 export async function fetchRisk() {
