@@ -29,10 +29,14 @@ DATA = {
 }
 
 
-def test_only_actionable_tiers_are_watched():
+def test_every_cluster_tier_is_watched():
+    """Leads are watched too. They are weaker attributions and the tier travels
+    with every hit so a human can weigh it — but watching four more addresses
+    costs a few API calls, while missing the one he actually reuses costs the
+    project."""
     got = watched(DATA)
-    assert set(got) == {"0xaaa", "0xbbb", "0xccc"}
-    assert "0xddd" not in got, "a bare lead must not raise alarms"
+    assert set(got) == {"0xaaa", "0xbbb", "0xccc", "0xddd"}
+    assert all(got[a].get("tier") for a in got), "every hit must carry its tier"
 
 
 def test_exchange_deposit_addresses_are_watched():
@@ -200,3 +204,39 @@ def test_the_bridge_address_is_the_real_one():
     from src.gcr_wallets import HL_BRIDGE
     from src.utils import load_config
     assert HL_BRIDGE == (load_config().get("hl_bridge_contract") or "").lower()
+
+
+def test_a_spot_only_or_vault_account_still_counts_as_presence():
+    """An account can exist without a perp position — spot only, in a vault,
+    under a subaccount, or having authorised an agent. A check that asked only
+    for perp state, fills and ledger would miss every one of those."""
+    for key in ("vaults", "subaccounts", "agents", "open_orders",
+                "historical_orders"):
+        states = {a: {"read_ok": True, "fills": 0, "outbound_ledger": 0,
+                      "account_value": "0"} for a in watched(DATA)}
+        states["0xaaa"] = {"read_ok": True, "fills": 0, "outbound_ledger": 0,
+                           "account_value": "0", key: 1}
+        live = [h for h in check_hyperliquid(states, DATA)
+                if h["status"] == "ACTIVE"]
+        assert live and live[0]["address"] == "0xaaa", f"{key} was ignored"
+
+
+def test_traded_volume_alone_counts_as_presence():
+    """A wallet that traded and withdrew everything has value 0 and no open
+    positions, but its volume is not zero."""
+    states = {a: {"read_ok": True, "fills": 0, "outbound_ledger": 0,
+                  "account_value": "0"} for a in watched(DATA)}
+    states["0xbbb"] = {"read_ok": True, "fills": 0, "outbound_ledger": 0,
+                       "account_value": "0", "user_volume": 12345.6}
+    live = [h for h in check_hyperliquid(states, DATA) if h["status"] == "ACTIVE"]
+    assert live and live[0]["address"] == "0xbbb"
+
+
+def test_the_venues_own_volume_is_not_the_users():
+    """userFees returns a 16-entry array whose `exchange` field is the WHOLE
+    venue's volume. Measuring that flagged every address in the cluster as
+    active, including ones that have plainly never touched Hyperliquid."""
+    states = {a: {"read_ok": True, "fills": 0, "outbound_ledger": 0,
+                  "account_value": "0", "user_volume": 0.0}
+              for a in watched(DATA)}
+    assert check_hyperliquid(states, DATA) == []

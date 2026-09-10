@@ -41,10 +41,16 @@ LABELS_PATH = DATA_DIR / "labels" / "gcr_addresses.json"
 WATCH_DIR = DATA_DIR / "gcr_wallets"
 
 # Tiers whose appearance anywhere near the target is worth waking someone for.
+#
 # 'exchange_deposit' is included deliberately: a CEX deposit address belongs to
 # ONE account, so the target sending to GCR's deposit address would be a direct
 # link between the tracked wallet and GCR's exchange account.
-ACTIONABLE_TIERS = {"confirmed", "linked", "exchange_deposit"}
+#
+# 'lead' is included too. These are weaker attributions and the alert says so,
+# but the cost of watching four more addresses is a few API calls, while the
+# cost of not watching the one he actually reuses is the whole project. The tier
+# travels with every hit so a human can weigh it.
+ACTIONABLE_TIERS = {"confirmed", "linked", "exchange_deposit", "lead"}
 
 # Hyperliquid deposits arrive through this Arbitrum contract. Watching it is not
 # redundant with asking Hyperliquid about an address: the bridge credits whatever
@@ -120,16 +126,30 @@ def check_hyperliquid(states: dict, data: dict | None = None) -> list[dict]:
             out.append({"address": addr, "tier": rec.get("tier"),
                         "status": "unknown", "why": "Hyperliquid read failed"})
             continue
+        # An account can exist without holding a perp position: spot-only, in a
+        # vault, under a subaccount, or having authorised an agent. A sweep of
+        # the full endpoint surface on 2026-09-10 found none of those for any
+        # cluster address, but the shallow check would not have seen them, so
+        # the daily watch asks the same wider set.
         traded = int(st.get("fills") or 0) > 0
         moved = int(st.get("outbound_ledger") or 0) > 0
+        structural = any(int(st.get(k) or 0) > 0
+                         for k in ("vaults", "subaccounts", "agents",
+                                   "open_orders", "historical_orders"))
         try:
             value = float(st.get("account_value") or 0)
         except (TypeError, ValueError):
             value = 0.0
-        if traded or moved or value > 0:
+        try:
+            volume = float(st.get("user_volume") or 0)
+        except (TypeError, ValueError):
+            volume = 0.0
+        if traded or moved or structural or value > 0 or volume > 0:
             out.append({"address": addr, "tier": rec.get("tier"),
                         "status": "ACTIVE", "account_value": value,
                         "fills": st.get("fills"),
+                        "volume": volume,
+                        "structural": structural,
                         "why": "watched GCR address is live on Hyperliquid"})
     return out
 

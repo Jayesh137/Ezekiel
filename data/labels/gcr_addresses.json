@@ -14,7 +14,8 @@
     "finding: their value is entirely in the future, if one of them ever moves.",
     "",
     "Rule 8 applies throughout: a transfer is not ownership. Only the 'confirmed'",
-    "tier is asserted as GCR's; everything below it is a lead."
+    "tier is asserted as GCR's; everything below it is a lead.",
+    "The watch now covers ALL NINE cluster addresses, leads included, and asks the full endpoint surface rather than perp-state-and-fills. The tier travels with every hit so a human can weigh a lead differently from the confirmed wallet."
   ],
   "provenance": {
     "source_image": "research/trade_review_images/img163.jpg + img164.jpg",
@@ -141,5 +142,23 @@
       "them."
     ],
     "capability_note": "CLAUDE.md records that Etherscan's free tier will not serve account endpoints for base, bsc and optimism. Blockscout's public API does, with no key, and was used for all of this -- so those chains are readable after all, just not through Etherscan."
+  },
+  "deep_hyperliquid_sweep_2026_09_10": {
+    "question": "Does ANY cluster address have a Hyperliquid account, on any part of the venue?",
+    "answer": "No. Zero of ten addresses shows real use.",
+    "method": "Ten addresses (the nine cluster members plus @TwoDollaHotDoge, the NFT buyer) against twelve endpoints each: clearinghouseState, spotClearinghouseState, userVaultEquities, subAccounts, extraAgents, openOrders, historicalOrders, userFills, userFunding, userNonFundingLedgerUpdates, userFees, referral. 120 calls, 0 unreadable — every one of these is an answer, not a failed read.",
+    "why_the_wider_sweep": "The earlier check asked only for perp state, fills and ledger. An account can exist without holding a perp position: spot-only, sitting in a vault, trading under a subaccount, or having authorised an agent and nothing else. None of those exists here — but the shallow check could not have seen them, so scripts/check_gcr_wallets.py now asks the wider set daily.",
+    "result": "Nine of ten return nothing on every endpoint. The tenth, 0x398d2824..., holds 2 spot balances, 1 fill and 3 ledger rows — all inbound, zero outbound, and the fill is an automatic Spot Dust Conversion. Airdrop spam, not use.",
+    "no_subaccounts_no_agents": "Worth stating separately: subAccounts and extraAgents are empty for every address. So no cluster address is the parent of a Hyperliquid subaccount, and none has authorised an agent — two ways a GCR address could have traded while looking idle itself.",
+    "two_measurement_traps_found_and_fixed": [
+      "userFees ALWAYS returns a 16-entry dailyUserVlm array, and each entry's",
+      "`exchange` field is the WHOLE VENUE's daily volume. A naive measure flagged",
+      "all ten addresses as active, including @TwoDollaHotDoge. Only userCross and",
+      "userAdd belong to the account being asked about.",
+      "",
+      "A fill with dir 'Spot Dust Conversion' is the venue sweeping worthless",
+      "balances automatically. Counting it as a trade marked 0x398d2824... as REAL",
+      "USE on the first pass."
+    ]
   }
 }

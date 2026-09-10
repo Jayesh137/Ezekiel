@@ -31,28 +31,71 @@ from src.utils import hl_post, load_config
 
 
 def hl_state(addr: str) -> dict:
-    """Ask Hyperliquid about one address.
+    """Ask Hyperliquid about one address, across its whole surface.
+
+    An account can exist without holding a perp position — spot only, sitting in
+    a vault, trading under a subaccount, or having authorised an agent and
+    nothing else. A check that only asked for perp state, fills and ledger would
+    miss every one of those, so it asks for all of them.
+
+    Two things are deliberately NOT treated as presence, because both flagged
+    every address in the cluster when measured naively:
+
+      userFees always returns a 16-entry dailyUserVlm array whose `exchange`
+      field is the WHOLE VENUE's volume. Only userCross and userAdd belong to
+      the account being asked about.
+
+      A fill with dir "Spot Dust Conversion" is the venue sweeping worthless
+      balances automatically, not the account trading.
 
     Every failure is recorded as a failure. An exception here must never
     serialise as "this address is clean" — that is the difference between
     "we could not tell" and "there is nothing there".
     """
     out = {"read_ok": True, "fills": 0, "ledger": 0, "outbound_ledger": 0,
-           "account_value": "0"}
+           "account_value": "0", "spot": 0, "vaults": 0, "subaccounts": 0,
+           "agents": 0, "open_orders": 0, "historical_orders": 0,
+           "user_volume": 0.0}
     try:
         st = hl_post({"type": "clearinghouseState", "user": addr}) or {}
         out["account_value"] = (st.get("marginSummary") or {}).get(
             "accountValue", "0")
+
+        spot = hl_post({"type": "spotClearinghouseState", "user": addr}) or {}
+        out["spot"] = len(spot.get("balances") or [])
+
+        for key, req in (("vaults", "userVaultEquities"),
+                         ("subaccounts", "subAccounts"),
+                         ("agents", "extraAgents"),
+                         ("open_orders", "openOrders"),
+                         ("historical_orders", "historicalOrders")):
+            out[key] = len(hl_post({"type": req, "user": addr}) or [])
+            time.sleep(0.15)
+
         fills = hl_post({"type": "userFills", "user": addr}) or []
+        # Dust conversions are the venue acting, not the account.
+        out["fills"] = sum(
+            1 for f in fills
+            if "dust conversion" not in str(f.get("dir", "")).lower())
+
         ledger = hl_post({"type": "userNonFundingLedgerUpdates",
                           "user": addr, "startTime": 0}) or []
-        out["fills"] = len(fills)
         out["ledger"] = len(ledger)
         # Inbound-only ledger rows are airdrop spam, not the address acting.
         # 0x398d2824... looks "active" on that basis alone and is not.
         out["outbound_ledger"] = sum(
             1 for e in ledger
             if ((e.get("delta") or {}).get("user") or "").lower() == addr.lower())
+
+        fees = hl_post({"type": "userFees", "user": addr}) or {}
+        total = 0.0
+        for row in fees.get("dailyUserVlm") or []:
+            for k in ("userCross", "userAdd"):
+                try:
+                    total += float(row.get(k) or 0)
+                except (TypeError, ValueError):
+                    pass
+        out["user_volume"] = total
     except Exception as exc:                          # noqa: BLE001 - transport
         out["read_ok"] = False
         out["error"] = f"{type(exc).__name__}: {exc}"
@@ -133,7 +176,8 @@ def main() -> int:
               f"{hit['role']}")
     for hit in report["hyperliquid_hits"]:
         print(f"[gcr-eth]   HL ACTIVE  {hit['address']}  ({hit['tier']}) "
-              f"value={hit['account_value']} fills={hit['fills']}")
+              f"value={hit['account_value']} fills={hit['fills']} "
+              f"volume={hit.get('volume')} structural={hit.get('structural')}")
     for hit in report["bridge_hits"]:
         print(f"[gcr-eth]   BRIDGE     {hit['address']}  ({hit['tier']}) "
               f"funded the Hyperliquid bridge on {hit.get('chain')}")

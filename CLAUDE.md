@@ -276,6 +276,20 @@ against the hypothesis**: the confirmed wallet went quiet in 2022 and the
 treasury in Dec 2024, while the target's history starts 2026-02-05, so there is
 nothing to connect yet.
 
+**Nor is he on Hyperliquid, checked properly.** Ten addresses (the nine cluster
+members plus the NFT buyer) against twelve endpoints each — perp state, spot,
+vault equities, subaccounts, agents, open and historical orders, fills, funding,
+ledger, fee volume, referral. **120 calls, 0 unreadable, 0 with real use.**
+Subaccounts and agents are empty everywhere, which closes two ways a GCR address
+could have traded while looking idle. The one address returning anything holds
+inbound-only airdrop spam.
+
+Two measurement traps found doing it, both of which flagged *every* address on
+the first pass: `userFees` always returns a 16-entry `dailyUserVlm` array whose
+`exchange` field is the **whole venue's** volume (only `userCross`/`userAdd` are
+the user's), and a fill with dir `Spot Dust Conversion` is the venue sweeping
+dust, not a trade. Both are now handled in `check_gcr_wallets.py`.
+
 **He never bridged.** Surveyed 2026-09-10 across Arbitrum, Optimism and Base:
 the treasury `0xd7d8f266...` has **no Arbitrum history at all**, and no cluster
 address has ever touched the Hyperliquid bridge on any chain. Every read
