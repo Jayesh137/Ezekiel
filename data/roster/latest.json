@@ -1,11 +1,11 @@
 {
-  "computed_at": "2026-09-10T07:11:47.085607+00:00",
+  "computed_at": "2026-09-10T07:21:20.917507+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 188,
+  "wallet_count": 189,
   "behavioural_counts_as_a_vector": false,
   "tier_counts": {
     "CONFIRMED": 1,
-    "PROBABLE": 3,
+    "PROBABLE": 4,
     "POSSIBLE": 72,
     "WATCH": 49,
     "INFRASTRUCTURE": 63
@@ -133,6 +133,38 @@
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
           "edge_count": 190
+        },
+        "depth": 2,
+        "chains": [
+          "ethereum",
+          "polygon"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 2,
+      "tier": "PROBABLE"
+    },
+    {
+      "wallet": "0xffd62ae3f497135f3d04e6c94c78d391f9391636",
+      "vectors": [
+        "linkage",
+        "transfer"
+      ],
+      "confidence": 0.18,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (12 separate movements)",
+        "Sends to the same deposit address as the target (address reuse)",
+        "Last movement 405 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 2 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 12
         },
         "depth": 2,
         "chains": [
@@ -1615,35 +1647,6 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xffd62ae3f497135f3d04e6c94c78d391f9391636",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.045,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (9 separate movements)",
-        "Last movement 405 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 2 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 9
-        },
-        "depth": 2,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
       "wallet": "0x141315da4df881f828d1e4d72dec7e84c5412d5f",
       "vectors": [
         "transfer"
@@ -1709,7 +1712,7 @@
       "confidence": 0.03,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (4 separate movements)",
+        "Repeated transfers (6 separate movements)",
         "Last movement 410 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
@@ -1718,7 +1721,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 4
+          "edge_count": 6
         },
         "depth": 3,
         "chains": [
@@ -1977,6 +1980,35 @@
           "edge_count": 1
         },
         "depth": 2,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x7eb59373d63627be64b42406b108b602174b4ccc",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 405 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 3 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 3,
         "chains": [
           "ethereum"
         ]
