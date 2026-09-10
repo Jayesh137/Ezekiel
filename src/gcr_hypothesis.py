@@ -46,6 +46,11 @@ UNTESTABLE = "untestable"
 # Findings that lean on it must say so.
 SMALL_CAP_FREQUENCY = 0.02
 
+# His blotters (img089, img096, img097) carry seven to nine simultaneous alt
+# shorts. Below seven we cannot call a book broad; we also do not call it a
+# contradiction, since a smaller account simply cannot run that many.
+BROAD_BASKET_MARKETS = 7
+
 
 def load_reference(path: Path | None = None) -> dict:
     try:
@@ -69,7 +74,7 @@ def positions_from(state: dict) -> list[dict]:
         if not pos.get("coin") or szi == 0:
             continue
         out.append({"coin": pos["coin"], "direction": "long" if szi > 0 else "short",
-                    "notional": ntl})
+                    "notional": ntl, "size": szi})
     return out
 
 
@@ -86,22 +91,36 @@ def check_net_short_bias(positions: list[dict], **_) -> dict:
     }
 
 
-def check_hedged_book(positions: list[dict], **_) -> dict:
-    """'Short weaker alts against your favourite plays' — a two-sided book.
+def check_broad_short_basket(positions: list[dict], **_) -> dict:
+    """Does the book spread across many simultaneous short markets?
 
-    A book with no longs at all is directional, not hedged, and that is a real
-    difference from the structure he described.
+    This replaced a `hedged_book` check that asked whether the book was
+    two-sided, on the strength of his writing about shorting weaker alts
+    "against your favourite plays" and being delta neutral. His actual position
+    blotters refute that reading: img089 is 8 shorts against one $1k SUSHI long,
+    img096 is 7 shorts and nothing else, img097 is 6 shorts and a single long
+    that whoever compiled the review circled with "long?" because it stood out.
+    A one-sided short book is his normal shape, so scoring one as a
+    CONTRADICTION was reading his words over his behaviour — the same mistake
+    the small-cap slogan already caused once.
+
+    What the blotters do show, and what direction alone misses, is BREADTH:
+    seven to nine alt markets shorted at once rather than one concentrated bet.
     """
     if not positions:
         return {"verdict": UNTESTABLE, "detail": "no open positions to judge"}
-    longs = sum(1 for p in positions if p["direction"] == "long")
-    shorts = len(positions) - longs
-    if longs and shorts:
+    shorts = [p for p in positions if p["direction"] == "short"]
+    if len(shorts) < 2:
+        return {"verdict": UNTESTABLE,
+                "detail": f"{len(shorts)} short position(s) — too few to show breadth"}
+    if len(shorts) >= BROAD_BASKET_MARKETS:
         return {"verdict": CONSISTENT,
-                "detail": f"two-sided: {longs} long, {shorts} short"}
-    return {"verdict": CONTRADICTS,
-            "detail": f"one-sided: {longs} long, {shorts} short — "
-                      f"directional rather than the hedged structure described"}
+                "detail": f"shorts {len(shorts)} markets at once; his blotters run "
+                          f"{BROAD_BASKET_MARKETS}-9 simultaneous alt shorts"}
+    return {"verdict": UNTESTABLE,
+            "detail": f"shorts {len(shorts)} markets — narrower than the "
+                      f"{BROAD_BASKET_MARKETS}-9 his blotters show, but not a "
+                      f"contradiction"}
 
 
 def check_shorts_small_caps(positions: list[dict], freq: dict | None = None,
@@ -138,26 +157,60 @@ def check_shorts_small_caps(positions: list[dict], freq: dict | None = None,
     }
 
 
-def check_round_number_affinity(_positions=None, amounts: list | None = None,
+def _is_round(value: float, places: int) -> bool:
+    return value > 0 and abs(value - round(value, -places)) < 1e-9
+
+
+def check_round_number_affinity(positions=None, amounts: list | None = None,
                                **__) -> dict:
-    """'Round numbers are Schelling points' — does he move round amounts?"""
-    if not amounts:
-        return {"verdict": UNTESTABLE, "detail": "no transfer amounts available"}
-    round_ = sum(1 for a in amounts if a >= 1000 and abs(a - round(a, -5)) < 1)
-    share = round_ / len(amounts)
+    """'Round numbers are Schelling points' — in transfers AND position sizes.
+
+    Originally this looked only at transfer amounts. The blotters show the habit
+    lives in the SIZES he trades: -280,000 RLC, -47,000 GTC, -27,000 AVAX,
+    -90,000 BAND, -233,000 BAKE, -12,000 ETC, -4,800 EGLD. Sizing is the closer
+    analogue of a trading fingerprint than treasury movements are, so it is
+    measured too.
+
+    Never a contradiction either way: round sizes are far too common among large
+    traders to disconfirm anything. It can only ever add weak support.
+    """
+    signals = []
+    if amounts:
+        hits = sum(1 for a in amounts if a >= 1000 and _is_round(a, 5))
+        signals.append(("transfers", hits, len(amounts), hits / len(amounts),
+                        "round 100k"))
+    sizes = [abs(p["size"]) for p in (positions or [])
+             if p.get("size") and abs(p["size"]) >= 1000]
+    if sizes:
+        hits = sum(1 for v in sizes if _is_round(v, 3))
+        signals.append(("position sizes", hits, len(sizes), hits / len(sizes),
+                        "round 1k"))
+    if not signals:
+        return {"verdict": UNTESTABLE,
+                "detail": "no transfer amounts or sizeable positions to judge"}
+
+    detail = "; ".join(f"{h} of {n} {what} land on a {unit} ({share:.0%})"
+                       for what, h, n, share, unit in signals)
+    strong = any(share >= 0.3 for _, _, _, share, _ in signals)
     return {
-        "verdict": CONSISTENT if share >= 0.3 else UNTESTABLE,
-        "detail": f"{round_} of {len(amounts)} transfers land on a round 100k "
-                  f"({share:.0%}). Weak on its own — most large traders send "
-                  f"round numbers.",
+        "verdict": CONSISTENT if strong else UNTESTABLE,
+        "detail": f"{detail}. Weak on its own — most large traders round.",
     }
 
 
 # Named check_* rather than test_*: pytest collects anything called test_* from
 # an imported module, and production helpers are not tests.
+# Which checks are even CAPABLE of returning CONTRADICTS. Removing
+# check_hedged_book was correct on the evidence, but it was the second of only
+# two checks that could disconfirm — and its removal alone moved the tally from
+# mixed to unanimous. A suite that can only agree with itself is the failure this
+# module exists to prevent, so the capability is tracked and reported rather than
+# left to be rediscovered.
+CAN_DISCONFIRM = {"net_short_bias"}
+
 CHECKS = {
     "net_short_bias": check_net_short_bias,
-    "hedged_book": check_hedged_book,
+    "broad_short_basket": check_broad_short_basket,
     "shorts_small_caps": check_shorts_small_caps,
     "round_number_affinity": check_round_number_affinity,
 }
@@ -183,6 +236,15 @@ def evaluate(state: dict, freq: dict | None = None,
         # combined into a number that means anything, and printing one would
         # invite exactly the false precision this module exists to avoid.
         "reading": _reading(tallies),
+        # Reported so a reader can weigh the tally against how much of it could
+        # ever have gone the other way.
+        "falsifiability": {
+            "checks_that_can_disconfirm": sorted(CAN_DISCONFIRM),
+            "of_total": len(CHECKS),
+            "note": f"Only {len(CAN_DISCONFIRM)} of {len(CHECKS)} checks can return "
+                    f"CONTRADICTS. A high consistent count is therefore weaker than "
+                    f"it looks; the others can only agree or abstain.",
+        },
         "prior_note": "Operator's prior is 55-75%. These are style traits from "
                       "2021-2023 writing against on-chain behaviour from 2026 — "
                       "they should nudge that estimate, never replace it.",
@@ -195,7 +257,8 @@ def _reading(tallies: dict) -> str:
                 "evidence against the hypothesis.")
     if tallies[CONSISTENT] and not tallies[CONTRADICTS]:
         return ("Testable traits are consistent. Weak support — style traits are "
-                "shared by many traders.")
+                "shared by many traders, and most of these checks cannot "
+                "disconfirm even in principle (see falsifiability).")
     if tallies[CONSISTENT] and tallies[CONTRADICTS]:
         return ("Mixed: some traits fit and some do not. Read the individual "
                 "verdicts rather than the count.")

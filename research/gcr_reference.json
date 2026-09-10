@@ -2,8 +2,11 @@
   "schema_version": 1,
   "updated": "2026-09-10",
   "subject": "GCR",
-  "handles": ["@GiganticRebirth", "@GCRClassic", "@MingXMecca"],
-
+  "handles": [
+    "@GiganticRebirth",
+    "@GCRClassic",
+    "@MingXMecca"
+  ],
   "_epistemic_status": [
     "THIS IS A HYPOTHESIS ABOUT THE TARGET, NOT A FACT ABOUT HIM.",
     "The operator puts the probability that the tracked wallet is GCR's at 55-75%.",
@@ -21,7 +24,6 @@
     "matched across that gap; only enduring style can. People also change, so a",
     "contradiction is evidence, not proof."
   ],
-
   "sources": [
     {
       "file": "research/GCR_tweet_archive.docx",
@@ -35,48 +37,172 @@
       "index": "research/trade_review_index.json",
       "content": "119 pages: 245 tweet screenshots, 85 annotated charts, 76 mixed",
       "note": "Almost no text layer (137 chars) - the content IS the images. Contains tweets ABSENT from the docx, e.g. fading listing pumps on IOTX/TRU/CLV/MNGO/AXS."
+    },
+    {
+      "note": "The corpus is not only Twitter: img251 and img282 are DISCORD posts from a private group, with content absent from the tweet archive."
     }
   ],
-
   "principles": [
-    {"name": "Low unit bias", "claim": "Retail is magnetically drawn to low-unit-price coins.", "testable": false},
-    {"name": "Schelling points", "claim": "Round numbers act as support/resistance, especially absent any valuation rationale.", "testable": true, "predicate": "round_number_affinity"},
-    {"name": "Never short small caps", "claim": "Do not short micro/small caps; supply can be cornered after seller exhaustion.", "testable": true, "predicate": "shorts_small_caps", "caveat": "CONTRADICTED BY HIS OWN POSTS. A screenshot-only tweet describes fading listing pumps on IOTX, TRU, CLV, MNGO, AXS - all small caps. The rule appears to mean 'do not short cornered, exhausted small caps', not 'never short anything small'. Do not treat a small-cap short as a contradiction on its own."},
-    {"name": "Momentum persistence", "claim": "Strong stays strong; cutting winners to add to losers is backwards.", "testable": true, "predicate": "adds_to_losers"},
-    {"name": "Fading DOGE pumps", "claim": "Fading DOGE pumps was among the highest hit-rate trades post-SNL.", "testable": false},
-    {"name": "Intuition over analysis", "claim": "Edge is intuition, not chart-drawing or complex strategy.", "testable": false},
-    {"name": "New vs old coins", "claim": "New coins beat old ones: hope, no bagholders, motivated teams.", "testable": false},
-    {"name": "News reaction trading", "claim": "How the market reacts to news matters more than whether the news is true.", "testable": false},
-    {"name": "Risk timing", "claim": "Maximise risk early in an alt cycle and reduce over time.", "testable": false},
-    {"name": "Long-term conviction", "claim": "Most with long horizons should hold BTC and ETH rather than trade.", "testable": false},
-    {"name": "Hedged alt book", "claim": "Short weaker alts against favoured longs to mitigate broad market risk.", "testable": true, "predicate": "hedged_book"},
-    {"name": "Funding arbitrage", "claim": "Prefers funding-rate arbitrage over smart-contract yield farming.", "testable": true, "predicate": "funding_arbitrage"},
-    {"name": "Alt/BTC ratio framing", "claim": "Analyses alts denominated in BTC, not only USD.", "testable": false, "evidence": "img292.jpg - six-panel SOLBTC/ADABTC/DOTBTC/AVAXBTC/FTMBTC/ALGOBTC chart marking an alt top"},
-    {"name": "Fade listing pumps", "claim": "Shorts newly listed futures into the listing pump.", "testable": true, "predicate": "shorts_new_listings", "evidence": "img150.jpg - tweet naming IOTX, TRU, CLV, MNGO, AXS"},
-    {"name": "Long panic sells", "claim": "Buys panic sells from DeFi exploits; the market forgets within hours.", "testable": false},
-    {"name": "Bear at heart", "claim": "Self-described bear; did his best work in the 2018-2019 bear market.", "testable": true, "predicate": "net_short_bias"}
+    {
+      "name": "Low unit bias",
+      "claim": "Retail is magnetically drawn to low-unit-price coins.",
+      "testable": false
+    },
+    {
+      "name": "Schelling points",
+      "claim": "Round numbers act as support/resistance, especially absent any valuation rationale.",
+      "testable": true,
+      "predicate": "round_number_affinity",
+      "evidence": "Blotter sizes: -280,000 RLC, -47,000 GTC, -27,000 AVAX, -90,000 BAND, -233,000 BAKE, -12,000 ETC (img089/096/097). Also two deliberately off-round sizes, -999,999 ADA and -19,001 ETC."
+    },
+    {
+      "name": "Never short small caps",
+      "claim": "Do not short micro/small caps; supply can be cornered after seller exhaustion.",
+      "testable": true,
+      "predicate": "shorts_small_caps",
+      "caveat": "CONTRADICTED BY HIS OWN POSTS. A screenshot-only tweet describes fading listing pumps on IOTX, TRU, CLV, MNGO, AXS - all small caps. The rule appears to mean 'do not short cornered, exhausted small caps', not 'never short anything small'. Do not treat a small-cap short as a contradiction on its own. CORROBORATED BY THE BLOTTERS: he simultaneously held shorts in RLC, GRT, EGLD, BAKE, SRM, GTC and BAND."
+    },
+    {
+      "name": "Momentum persistence",
+      "claim": "Strong stays strong; cutting winners to add to losers is backwards.",
+      "testable": true,
+      "predicate": "adds_to_losers"
+    },
+    {
+      "name": "Fading DOGE pumps",
+      "claim": "Fading DOGE pumps was among the highest hit-rate trades post-SNL.",
+      "testable": false
+    },
+    {
+      "name": "Intuition over analysis",
+      "claim": "Edge is intuition, not chart-drawing or complex strategy.",
+      "testable": false
+    },
+    {
+      "name": "New vs old coins",
+      "claim": "New coins beat old ones: hope, no bagholders, motivated teams.",
+      "testable": false
+    },
+    {
+      "name": "News reaction trading",
+      "claim": "How the market reacts to news matters more than whether the news is true.",
+      "testable": false
+    },
+    {
+      "name": "Risk timing",
+      "claim": "Maximise risk early in an alt cycle and reduce over time.",
+      "testable": false
+    },
+    {
+      "name": "Long-term conviction",
+      "claim": "Most with long horizons should hold BTC and ETH rather than trade.",
+      "testable": false
+    },
+    {
+      "name": "Hedged alt book",
+      "claim": "Wrote about shorting weaker alts against favoured longs and being 'delta neutral' (img282, Dec 2021).",
+      "testable": false,
+      "predicate": null,
+      "caveat": "CONTRADICTED BY HIS OWN BLOTTERS. img089 is 8 shorts against one ~$1k SUSHI long; img096 is 7 shorts and nothing else; img097 is 6 shorts and a single long the review's compiler circled 'long?' because it stood out. Delta-neutral is a phase he rotates into after booking profits, not his standing structure. A one-sided short book is NOT evidence against him — an earlier check_hedged_book scored it CONTRADICTS and was removed for exactly that."
+    },
+    {
+      "name": "Funding arbitrage",
+      "claim": "Prefers funding-rate arbitrage over smart-contract yield farming.",
+      "testable": true,
+      "predicate": "funding_arbitrage"
+    },
+    {
+      "name": "Alt/BTC ratio framing",
+      "claim": "Analyses alts denominated in BTC, not only USD.",
+      "testable": false,
+      "evidence": "img292.jpg - six-panel SOLBTC/ADABTC/DOTBTC/AVAXBTC/FTMBTC/ALGOBTC chart marking an alt top"
+    },
+    {
+      "name": "Fade listing pumps",
+      "claim": "Shorts newly listed futures into the listing pump.",
+      "testable": true,
+      "predicate": "shorts_new_listings",
+      "evidence": "img150.jpg - tweet naming IOTX, TRU, CLV, MNGO, AXS"
+    },
+    {
+      "name": "Long panic sells",
+      "claim": "Buys panic sells from DeFi exploits; the market forgets within hours.",
+      "testable": false
+    },
+    {
+      "name": "Bear at heart",
+      "claim": "Self-described bear; did his best work in the 2018-2019 bear market.",
+      "testable": true,
+      "predicate": "net_short_bias"
+    },
+    {
+      "name": "Broad simultaneous short basket",
+      "claim": "Runs seven to nine alt shorts at once, cross-margined at 1x-5x, rather than one concentrated bet.",
+      "testable": true,
+      "predicate": "broad_short_basket",
+      "evidence": "img089 (9 positions), img096 (7), img097 (7)"
+    },
+    {
+      "name": "Short supply-unlock events",
+      "claim": "Shorts into listing pumps and airdrop unlocks, and exits fast.",
+      "testable": false,
+      "evidence": "img150 (IOTX/TRU/CLV/MNGO/AXS listings), img226 (dYdX airdrop: 'going to close here for pennies... don't love the rr of holding this open too long')",
+      "note": "Not yet implemented — would need entry timing against listing dates."
+    }
   ],
-
   "observed_trades": [
     {
       "evidence": "img008.jpg",
       "asset": "BTC",
-      "annotations": ["OI + funding at unsustainable levels, spot buyers exhausted", "Tweet posted @ 51,193", "20% crash (std BTC crash distance)", "Long @ 45,000"],
+      "annotations": [
+        "OI + funding at unsustainable levels, spot buyers exhausted",
+        "Tweet posted @ 51,193",
+        "20% crash (std BTC crash distance)",
+        "Long @ 45,000"
+      ],
       "reading": "Called a top on unsustainable open interest and funding, then bought the ~20% flush.",
       "era": "2021"
     },
     {
       "evidence": "img292.jpg",
       "asset": "SOL/ADA/DOT/AVAX/FTM/ALGO, all vs BTC",
-      "annotations": ["down arrows marking a September top on every pair"],
+      "annotations": [
+        "down arrows marking a September top on every pair"
+      ],
       "reading": "Called an alt-season top in BTC-denominated terms across six majors at once.",
       "era": "2021"
+    },
+    {
+      "evidence": "img089.jpg",
+      "asset": "9-position Binance perp book, ~Jan 2022",
+      "annotations": [
+        "BTC -149.861 @ 38,831 (5x)",
+        "DOGE -19,401,834",
+        "1000SHIB -174,489,342",
+        "RLC -280,000",
+        "GRT -1,200,000",
+        "sole long: 58 SUSHI"
+      ],
+      "reading": "One-sided short book across majors and small caps. 1000SHIB here vs the target's kSHIB is the same instrument family.",
+      "era": "2022"
+    },
+    {
+      "evidence": "img096.jpg",
+      "asset": "7-position book, all short",
+      "annotations": [
+        "ADA -999,999",
+        "ETC -19,001.00",
+        "BAKE -233,000",
+        "GRT -2,048,794"
+      ],
+      "reading": "No longs at all. Two sizes sit one unit off a round number.",
+      "era": "2022"
     }
   ],
-
   "review_state": {
     "images_total": 406,
-    "images_reviewed": 4,
-    "note": "Reviewing 406 images costs more context than one session has. They are extracted, classified and committed so review can continue incrementally - set reviewed=true in trade_review_index.json as they are read."
+    "images_reviewed": 10,
+    "note": "Reviewing 406 images costs more context than one session has. They are extracted, classified and committed so review continues incrementally — set reviewed=true and fill notes in trade_review_index.json. Reviewing just 10 already overturned one check (hedged_book), so the remaining 396 are worth real time.",
+    "highest_value_next": "Remaining blotter screenshots — they carry positions, sizes and leverage, which is the only material here that compares directly against on-chain data."
   }
 }

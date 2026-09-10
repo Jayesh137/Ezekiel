@@ -166,15 +166,37 @@ trade reviews (`Trade Reviews.pdf`, 406 images extracted to
 - The writing is 2021-2023; on-chain history starts 2026-02-05. Only enduring
   style crosses that gap, and people change.
 
-**Read the sources before trusting the summaries.** The distilled slogan "never
-short small caps" is contradicted by GCR's own posts, which fade listing pumps on
-IOTX/TRU/CLV/MNGO/AXS — all small caps. Reading the slogan literally would have
-manufactured a false contradiction about the target. That tweet exists ONLY in
-the PDF images, not in the tweet archive.
+**Read the sources before trusting the summaries — his words describe him worse
+than his blotters do.** This has now cost two checks:
 
-Live: net-short bias CONSISTENT (52/52 short), hedged book CONTRADICTS (0 longs
-against the "short weaker alts against your favourite plays" structure he
-described), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak.
+- "Never short small caps" is contradicted by his own posts fading listing pumps
+  on IOTX/TRU/CLV/MNGO/AXS, and by blotters holding RLC, GRT, EGLD, BAKE, SRM,
+  GTC and BAND shorts at once. That tweet is ONLY in the PDF images.
+- `hedged_book` scored a book with no longs as CONTRADICTS, built on his Dec 2021
+  writing about being "delta neutral". His actual blotters are 8-of-9, 7-of-7 and
+  6-of-7 short — img097's single long is circled "long?" by whoever compiled the
+  review, because it stood out. Delta-neutral is a phase he rotates into after
+  booking profits, not his standing structure. Replaced by `broad_short_basket`
+  (7-9 simultaneous alt shorts), which is what the blotters actually show.
+
+Only **10 of 406 images** are reviewed, and those 10 overturned a check — the
+remaining 396 are worth real time. Blotter screenshots first: positions, sizes
+and leverage are the only material that compares directly against on-chain data.
+Set `reviewed`/`notes` in `trade_review_index.json`; re-running
+`scripts/extract_trade_reviews.py` preserves them.
+
+**Watch the falsifiability, not the tally.** Only `net_short_bias` can return
+CONTRADICTS — removing `hedged_book` alone flipped the live reading from mixed to
+unanimous, with no change in the wallet's behaviour. `CAN_DISCONFIRM` and a test
+guard this; never let the last disconfirming check go.
+
+Live: net-short bias CONSISTENT (52/52), broad short basket CONSISTENT (52
+markets), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak (48% of
+transfers, 54% of position sizes). Nothing contradicts — but read the paragraph
+above before treating that as support.
+
+The corpus is not only Twitter: img251 and img282 are DISCORD posts from a
+private group, absent from the tweet archive.
 
 ## Not detection
 

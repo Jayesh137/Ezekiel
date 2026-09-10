@@ -7,7 +7,8 @@
     "The PDF has almost no text layer (137 chars), so the content IS the images.",
     "Tweet screenshots here are NOT all present in gcr_archive.txt - spot-checked",
     "'fade listing pumps' (IOTX/TRU/CLV/MNGO/AXS) appears only in the images.",
-    "Review is incremental: set reviewed=true and fill notes as images are read."
+    "Review is incremental: set reviewed=true and fill notes as images are read.",
+    "'kind' is aspect-ratio guesswork; 'content' on a reviewed image is the truth (img001 is a header painting the ratio called a tweet)."
   ],
   "counts": {
     "tweet_screenshot": 245,
@@ -21,8 +22,9 @@
       "height": 500,
       "bytes": 285760,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "NOT a tweet — a Twitter header painting (1500x500 is the 3:1 header ratio). No trading content. Shows the aspect-ratio classifier cannot separate headers from tweet screenshots; treat 'tweet_screenshot' as a hint, not a fact.",
+      "content": "banner"
     },
     {
       "file": "img002.jpg",
@@ -84,8 +86,9 @@
       "height": 2048,
       "bytes": 257884,
       "kind": "chart",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Annotated BTC chart, 2021: called a top on unsustainable OI and funding with spot buyers exhausted (tweeted @ 51,193), then bought the ~20% flush at 45,000. Reaction-to-positioning, not chart pattern.",
+      "content": "chart"
     },
     {
       "file": "img009.jpg",
@@ -813,8 +816,9 @@
       "height": 544,
       "bytes": 106805,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Binance USDT-perp blotter, ~Jan 2022 (BTC entry 38,831 / mark 33,505). NINE positions, EIGHT short: BTC -149.861 (5x), ETC -12,000, DOGE -19,401,834, RLC -280,000, EGLD -4,800, AVAX -57,000, GRT -1,200,000, 1000SHIB -174,489,342; the lone long is 58 SUSHI (~$1k, noise beside millions). Cross margin, 1x-5x. Two things follow: (1) a one-sided short book is normal for him, which is why check_hedged_book was replaced; (2) he shorts small and mid caps (RLC, GRT, EGLD, ETC), confirming 'never short small caps' is not literal. Note 1000SHIB — the target shorts kSHIB, the same instrument family.",
+      "content": "blotter"
     },
     {
       "file": "img090.jpg",
@@ -876,8 +880,9 @@
       "height": 389,
       "bytes": 92109,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Blotter, SEVEN positions, ALL SHORT: ADA -999,999 (4x), ETC -19,001, DOGE -19,401,834, RLC -280,000, EGLD -10,504.5, BAKE -233,000, GRT -2,048,794. Cross, mostly 1x. Note the deliberately off-round sizes: 999,999 and 19,001 sit one unit either side of a round number — a possible sizing tell, though two instances is not a pattern yet.",
+      "content": "blotter"
     },
     {
       "file": "img097.jpg",
@@ -885,8 +890,9 @@
       "height": 391,
       "bytes": 88717,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Blotter, seven positions, six short: SRM -321,111, GTC -47,000, AVAX -27,000, DEFI -427.000, BTC -149.861 (5x), BAND -90,000, plus ONE long that the compiler of the review circled in yellow and annotated 'long?' — third-party corroboration that a long in his book was the exception. SRM -321,111 is another patterned size.",
+      "content": "blotter"
     },
     {
       "file": "img098.jpg",
@@ -1362,8 +1368,9 @@
       "height": 377,
       "bytes": 60649,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "The tweet that is in the images but NOT in the docx: fading listing pumps on IOTX, TRU, CLV, MNGO, AXS. Sole basis for the caveat on 'never short small caps'; without it check_shorts_small_caps would return false CONTRADICTS.",
+      "content": "tweet"
     },
     {
       "file": "img151.jpg",
@@ -2046,8 +2053,9 @@
       "height": 604,
       "bytes": 87076,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Twitter @GiganticRebirth, Sep 8. Shorting dYdX into the airdrop unlock: 'what happens to the price of dydx when everyone claims their free tokens and TPs', then 'going to close here for pennies... don't love the rr of holding this open too long'. Same family as fading listing pumps: he shorts SUPPLY events (listings, airdrop unlocks) and exits fast. Suggests a testable trait — short-dated shorts around new listings — not yet implemented.",
+      "content": "tweet"
     },
     {
       "file": "img227.jpg",
@@ -2271,8 +2279,9 @@
       "height": 596,
       "bytes": 123024,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "DISCORD, not Twitter — the corpus includes private-group posts absent from the tweet archive. Late 2021, on psychology: letting go of 'peak net worth', protecting capital, 'easy mode is over', 2022 will be more hostile terrain. Character, not a testable trait.",
+      "content": "discord"
     },
     {
       "file": "img252.jpg",
@@ -2550,8 +2559,9 @@
       "height": 628,
       "bytes": 122496,
       "kind": "tweet_screenshot",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Discord, Dec 2021. LOAD-BEARING: 'i was max bearish when market was peak bullish'; 'holding open shorts on select projects into 2022 [most inflationary assets], long on some ponzis with hidden catalysts, but booked profits on majority of my positions and delta neutral'. This is the source of the 'hedged/delta-neutral' reading — but see img089/096/097, where his actual blotters are one-sided short. Delta-neutral is a phase he rotates INTO after booking profits, not his standing book structure.",
+      "content": "discord"
     },
     {
       "file": "img283.jpg",
@@ -2640,8 +2650,9 @@
       "height": 2048,
       "bytes": 265203,
       "kind": "chart",
-      "reviewed": false,
-      "notes": null
+      "reviewed": true,
+      "notes": "Six-panel SOLBTC / ADABTC / DOTBTC / AVAXBTC / FTMBTC / ALGOBTC, down arrows marking a September 2021 top on every pair. He frames alts in BTC terms, not only USD.",
+      "content": "chart"
     },
     {
       "file": "img293.jpg",
@@ -3669,5 +3680,6 @@
       "reviewed": false,
       "notes": null
     }
-  ]
+  ],
+  "reviewed_count": 10
 }
