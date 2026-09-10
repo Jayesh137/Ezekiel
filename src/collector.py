@@ -205,21 +205,39 @@ def collect_referral(wallet: str) -> None:
 
 
 def collect_agents(wallet: str) -> None:
-    """Best-effort collection of approved API/agent wallets — a DIRECT ownership
-    link (an account authorizes agents to trade on its behalf). The exact info
-    endpoint isn't guaranteed across API versions, so try a couple and store
-    whatever returns; failures are harmless."""
-    agents = None
+    """Approved API/agent wallets — a DIRECT ownership link.
+
+    An agent is an address the account EXPLICITLY authorised to trade on its
+    behalf, so two accounts authorising the same agent are controlled by the
+    same person. That makes this one of the strongest signals available, and it
+    is worth recording even when the answer is "none".
+
+    This used to `break` on the first truthy response and save nothing
+    otherwise. `extraAgents` returns `[]` for an account with no agents — falsy
+    — so a real answer of "he has none" was discarded, leaving data/agents/
+    empty and indistinguishable from the endpoint being broken. Now every
+    endpoint is queried and the outcome recorded either way: `agents: []` means
+    we asked and he has none, and a later non-empty list is a NEW address he
+    controls.
+    """
+    out = {"wallet": wallet.lower(), "agents": [], "sources": {}, "errors": []}
     for req_type in ("extraAgents", "userToMultiSigSigners"):
         try:
             resp = hl_post({"type": req_type, "user": wallet})
-            if resp:
-                agents = {"type": req_type, "data": resp}
-                break
-        except Exception:
+        except Exception as exc:                      # noqa: BLE001 - transport
+            out["errors"].append(f"{req_type}: {type(exc).__name__}: {exc}")
             continue
-    if agents:
-        save_latest(str(DATA_DIR / "agents"), agents)
+        out["sources"][req_type] = resp
+        for entry in resp if isinstance(resp, list) else []:
+            addr = (entry.get("address") if isinstance(entry, dict) else entry)
+            if isinstance(addr, str) and addr.startswith("0x"):
+                out["agents"].append({
+                    "address": addr.lower(),
+                    "name": entry.get("name") if isinstance(entry, dict) else None,
+                    "valid_until": entry.get("validUntil") if isinstance(entry, dict) else None,
+                    "source": req_type,
+                })
+    save_latest(str(DATA_DIR / "agents"), out)
 
 
 def collect_portfolio(wallet: str) -> None:

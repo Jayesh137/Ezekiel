@@ -106,6 +106,17 @@ jobs:
         run: python src/transfer_graph.py
       # Last, because it only merges what the detectors above just wrote. Pure
       # file reads, no network, no budget.
+      # One free HL call per wallet, no key and no Etherscan budget. An agent is
+      # an address an account EXPLICITLY authorised to trade for it, so two
+      # accounts sharing one are the same operator - the strongest single signal
+      # here. Runs before the roster so a shared agent lands in the same run.
+      - name: Check authorised agents
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_agents.py
       - name: Build wallet roster
         run: python src/roster.py
       # After the roster, because it classifies each destination using the tiers

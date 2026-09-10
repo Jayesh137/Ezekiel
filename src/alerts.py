@@ -448,6 +448,54 @@ WHAT THIS MEANS
     return _send_with_cooldown("scorer_unreliable", 168, subject, body)
 
 
+def alert_shared_agent(agent: str, accounts: list) -> bool:
+    """Fire when two accounts authorise the same Hyperliquid agent.
+
+    An agent is an address an account EXPLICITLY approved to trade on its
+    behalf. A transfer can be a payment to a stranger and an amount match can be
+    coincidence, but authorising an agent is a deliberate act of control - so two
+    accounts sharing one are operated by the same person. This is the strongest
+    single signal this system can produce.
+    """
+    subject = "[EZEKIEL] CRITICAL: Shared Agent - Accounts Under Common Control"
+    listed = chr(10).join(address_line(a, "Account") for a in accounts)
+    body = (
+        f"Two or more Hyperliquid accounts have authorised the SAME agent "
+        f"address.{chr(10)}{chr(10)}"
+        f"{address_line(agent, 'Agent')}{chr(10)}{chr(10)}"
+        f"AUTHORISED BY{chr(10)}{listed}{chr(10)}{chr(10)}"
+        f"An agent is an address an account explicitly approved to trade on its "
+        f"behalf.{chr(10)}"
+        f"Sharing one is a deliberate act of control by the same operator, not a "
+        f"coincidence{chr(10)}of flow or of style.{chr(10)}{chr(10)}"
+        f"Action: treat these accounts as the same person unless there is a "
+        f"specific reason not to.{chr(10)}"
+    )
+    return _send_with_cooldown(f"shared_agent_{agent.lower()}", 168, subject, body)
+
+
+def alert_target_gained_agent(agent: str, name: str | None) -> bool:
+    """Fire when the target authorises an agent he did not have before.
+
+    An agent is a new address he controls. Measured 2026-09-10 he had none, so
+    the first one appearing is worth knowing about immediately - it is both a new
+    address to watch and a possible precursor to moving accounts.
+    """
+    subject = "[EZEKIEL] CRITICAL: Target Authorised A New Agent Wallet"
+    body = (
+        f"The target has authorised an agent address he did not have before."
+        f"{chr(10)}{chr(10)}"
+        f"{address_line(agent, 'Agent')}{chr(10)}"
+        f"Label: {name or '(none)'}{chr(10)}{chr(10)}"
+        f"An agent trades on the account's behalf, so this is a NEW address under "
+        f"his control.{chr(10)}"
+        f"If any other account authorises the same agent, those accounts are the "
+        f"same person.{chr(10)}"
+    )
+    return _send_with_cooldown(f"target_agent_{agent.lower()}", 168, subject, body)
+
+
+
 def alert_hyperevm_activation(wallet: str, label: str, nonce: int,
                               previous_nonce: int) -> bool:
     """Fire when a wallet that had never transacted on HyperEVM starts to.

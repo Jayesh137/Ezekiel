@@ -167,3 +167,30 @@ def test_known_self_wallets_are_confirmed_from_config(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch, transfer_graph=("nodes", [_node(confidence=0.0)]))
     out = roster.build_roster({"target_wallet": TARGET, "known_self_wallets": [W]})
     assert out["wallets"][0]["tier"] == roster.TIER_CONFIRMED
+
+
+def test_a_shared_agent_alone_confirms():
+    """An agent is an address an account EXPLICITLY authorised to trade for it.
+    Two accounts sharing one is a deliberate act of control by the same
+    operator, not an inference from flow or style — the one signal strong
+    enough to stand alone."""
+    assert roster.assign_tier({roster.VECTOR_AGENT}, 0.0, False, False) \
+        == roster.TIER_CONFIRMED
+
+
+def test_a_shared_agent_does_not_override_infrastructure():
+    """An exchange authorising agents says nothing about him."""
+    assert roster.assign_tier({roster.VECTOR_AGENT}, 0.9, True, False) \
+        == roster.TIER_INFRASTRUCTURE
+
+
+def test_agent_links_reach_the_roster(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch, transfer_graph=("nodes", [_node()]))
+    d = tmp_path / "agent_links"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "latest.json").write_text(json.dumps(
+        {"linked_to_target": {W: ["0xagent"]}}))
+    row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
+    assert roster.VECTOR_AGENT in row["vectors"]
+    assert row["tier"] == roster.TIER_CONFIRMED
+    assert row["evidence"]["shared_agents"] == ["0xagent"]

@@ -37,6 +37,10 @@ VECTOR_LINKAGE = "linkage"          # shared funder or shared deposit address
 VECTOR_CORRELATION = "correlation"  # exit amount re-appeared as a deposit
 VECTOR_BEHAVIOURAL = "behavioural"  # trades like the target
 VECTOR_HL_NATIVE = "hl_native"      # two-way flow entirely inside Hyperliquid
+# Strongest of all: an agent is an address an account EXPLICITLY authorised to
+# trade for it, so two accounts sharing one are the same operator. Not a
+# coincidence of flow or of style but a deliberate act of control.
+VECTOR_AGENT = "shared_agent"
 
 TIER_CONFIRMED = "CONFIRMED"
 TIER_PROBABLE = "PROBABLE"
@@ -77,6 +81,10 @@ def assign_tier(vectors: set, confidence: float, is_service: bool,
     if is_service:
         return TIER_INFRASTRUCTURE
     if known_self:
+        return TIER_CONFIRMED
+    # A shared agent is a deliberate act of control by the account owner, not an
+    # inference from flow. It is the one signal strong enough to stand alone.
+    if VECTOR_AGENT in vectors:
         return TIER_CONFIRMED
     if len(vectors) >= 2 and confidence >= 0.60:
         return TIER_CONFIRMED
@@ -192,6 +200,20 @@ def build_roster(config: dict | None = None) -> dict:
         # same one.
         if score >= 0.65 and not vetoes and trust_behavioural:
             e["vectors"].add(VECTOR_BEHAVIOURAL)
+
+    # Wallets sharing an authorised agent with the target.
+    try:
+        with open(DATA_DIR / "agent_links" / "latest.json") as f:
+            linked = json.load(f).get("linked_to_target") or {}
+    except (OSError, ValueError, AttributeError):
+        linked = {}
+    for addr, agents in linked.items():
+        a = (addr or "").lower()
+        if not a or a == target:
+            continue
+        e = entry(a)
+        e["vectors"].add(VECTOR_AGENT)
+        e["evidence"]["shared_agents"] = agents
 
     for acct in _read(DATA_DIR / "hyperevm" / "latest.json", "wallets"):
         a = (acct.get("address") or "").lower()
