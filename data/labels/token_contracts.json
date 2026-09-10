@@ -7,29 +7,50 @@
     "deploy a token called USDC for a few cents. Entries here are what makes a",
     "counterfeit detectable.",
     "",
-    "ONLY add a contract confirmed against a block explorer. A wrong entry",
-    "quarantines real money, which is worse than the bug this fixes. Anything",
-    "not listed is still priced by symbol and is still vulnerable.",
+    "ONLY add a contract confirmed against a block explorer or read on-chain.",
+    "A wrong entry quarantines real money, which is worse than the bug this",
+    "fixes. Anything not listed is still priced by symbol and still vulnerable.",
     "",
-    "Bridged USDC.e on Polygon is a DIFFERENT token at a different address and",
-    "carries the symbol USDC.E, so it does not collide with the native USDC",
-    "entry below. It is deliberately absent: the substrate holds no USDC.E",
-    "records, and an unverified entry could only do harm."
+    "Deliberately ABSENT, and why:",
+    "  polygon USDT - no canonical contract could be established. The only",
+    "    polygon USDT contract in the substrate (0x26c68e12..., 6 records / 3",
+    "    addresses) reads name 'Tether USD' symbol 'USDT' on-chain but declares",
+    "    a supply of 1,000,000,000,000, which is the counterfeit signature. The",
+    "    commonly cited 0xc2132D05... is NOT polygon USDT: read on-chain it is",
+    "    name 'USDT0' symbol 'USDT0', a different token. Mapping it to USDT",
+    "    would have quarantined every genuine polygon USDT record.",
+    "  bridged USDC.e - a different token at a different address carrying the",
+    "    symbol USDC.E, so it cannot collide with the native USDC entry. The",
+    "    substrate holds no USDC.E records; an unverified entry could only harm."
   ],
   "tokens": [
     {
       "chain": "ethereum",
       "symbol": "USDC",
       "contract": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-      "verified": "etherscan.io — label \"Circle\", source code verified, exact match",
+      "verified": "etherscan.io \u2014 label \"Circle\", source code verified, exact match",
       "substrate_support": "25314 records across 5288 distinct addresses"
     },
     {
       "chain": "polygon",
       "symbol": "USDC",
       "contract": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
-      "verified": "polygonscan.com / blockscan.com — label \"Circle: USDC Token\", native USDC issued by Circle",
+      "verified": "polygonscan.com / blockscan.com \u2014 label \"Circle: USDC Token\", native USDC issued by Circle",
       "substrate_support": "20434 records across 644 distinct addresses; no other polygon USDC contract appears at all"
+    },
+    {
+      "chain": "ethereum",
+      "symbol": "USDT",
+      "contract": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "verified": "etherscan.io - label \"Tether\", name \"Tether USD\", source verified exact match, 15,932,070 holders",
+      "substrate_support": "485 records across 122 distinct addresses; next contract has 8"
+    },
+    {
+      "chain": "polygon",
+      "symbol": "USDT0",
+      "contract": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+      "verified": "read on-chain via polygon.drpc.org - name() 'USDT0', symbol() 'USDT0', supply 771,730,187.78",
+      "substrate_support": "none yet - protective entry, so a counterfeit USDT0 cannot be priced at par"
     }
   ]
 }
