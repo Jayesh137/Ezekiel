@@ -1664,6 +1664,15 @@ def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
     return keep
 
 
+
+def _canonical(config: dict) -> dict:
+    """Canonical token contracts, so a token merely CALLED "USDC" is not priced
+    as USDC. See src/chain/assets.is_impostor."""
+    from src.chain.assets import load_canonical_contracts
+    return load_canonical_contracts(
+        config, DATA_DIR / "labels" / "token_contracts.json")
+
+
 def expand_frontier(edges: list[dict], target: str, budget: dict,
                     resume: list | None = None,
                     now_ts: float | None = None,
@@ -1840,6 +1849,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     # for the full arithmetic and the repricing-pass gap this
                     # leaves (out of scope here; recorded as a follow-up).
                     sweep = sweep_wallet(wallet, sweep_chains, sweep_budget,
+                                         canonical=_canonical(load_config()),
                                          cluster=False)
                     rows = records_for(wallet)
                 except Exception as exc:

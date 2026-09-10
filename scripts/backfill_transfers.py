@@ -120,11 +120,18 @@ def main(argv=None) -> int:
         max_requests=BACKFILL_PRICE_MAX_REQUESTS,
         max_seconds=BACKFILL_PRICE_MAX_SECONDS)
 
+    # Canonical token contracts, so a token merely CALLED "USDC" is not priced
+    # as USDC. See src/chain/assets.is_impostor.
+    from src.chain.assets import load_canonical_contracts
+    canonical = load_canonical_contracts(
+        config, Path(DATA_DIR) / "labels" / "token_contracts.json")
+
     results = []
     for wallet in wallets:
         print(f"[backfill] sweeping {wallet} across "
               f"{len(enabled_chains(config))} chain(s)")
         results.append(sweep_wallet(wallet, enabled_chains(config), budget,
+                                    canonical=canonical,
                                     cluster=True, price_lookup=price_lookup))
 
     # Merging rather than clobbering: the trace job writes this same file every

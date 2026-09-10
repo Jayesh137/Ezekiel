@@ -52,7 +52,8 @@ def write_cursors(cursors: dict) -> None:
     path.write_text(json.dumps(cursors, indent=2, sort_keys=True))
 
 
-def normalise_row(row: dict, chain: dict, kind: str, price_lookup) -> dict | None:
+def normalise_row(row: dict, chain: dict, kind: str, price_lookup,
+                  canonical: dict | None = None) -> dict | None:
     """One raw Etherscan row into the Phase 1 normalised record."""
     src = (row.get("from") or "").lower()
     dst = (row.get("to") or "").lower()
@@ -69,7 +70,14 @@ def normalise_row(row: dict, chain: dict, kind: str, price_lookup) -> dict | Non
     amount = raw / (10 ** decimals)
     symbol = row.get("tokenSymbol") or (chain["native"] if kind != "erc20" else "")
     date_str = (_iso(ts) or "")[:10]
-    amount_usd, basis = value_usd(symbol, amount, date_str, price_lookup)
+    # The token's own contract, not just the ticker it claims. Anyone can deploy
+    # a token called USDC; only one contract IS USDC on a given chain. Stored as
+    # `token_address` below, which this file has always recorded and nothing
+    # ever checked.
+    contract = (row.get("contractAddress") or "").lower() or None
+    amount_usd, basis = value_usd(symbol, amount, date_str, price_lookup,
+                                  contract=contract, chain=chain["name"],
+                                  canonical=canonical)
 
     index = str(row.get("logIndex") or row.get("traceId") or "0")
     tx_hash = row.get("hash", "")
@@ -223,10 +231,16 @@ def _blank_chain_result() -> dict:
 
 
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
-                 price_lookup=None,
+                 price_lookup=None, canonical: dict | None = None,
                  dust_usd: float = 1.0, page_size: int = 1000,
                  max_pages: int = 50) -> dict:
     """Collect every transfer for one wallet across `chains`.
+
+    `canonical` maps (chain, SYMBOL) to the one contract that really is that
+    token, so a token merely CALLED "USDC" is not priced as USDC. Injected
+    rather than loaded here, like every other dependency in this module: reading
+    config inside the sweep would make a test's result depend on the repository
+    it runs in. None means "judge nothing", which is the pre-existing behaviour.
 
     `cluster` wallets (the target and its confirmed wallets) are swept
     unconditionally. Everything else is probed first: one call establishes
@@ -287,7 +301,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 chain_result["errors_by_kind"][kind] = error
 
             for row in walk.rows:
-                rec = normalise_row(row, chain, kind, price_lookup)
+                rec = normalise_row(row, chain, kind, price_lookup,
+                                    canonical=canonical)
                 if rec is not None:
                     collected.append(rec)
 

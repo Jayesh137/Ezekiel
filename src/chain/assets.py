@@ -66,8 +66,64 @@ def decimals_of(row: dict, kind: str) -> int:
         return DEFAULT_DECIMALS
 
 
+# (chain, SYMBOL) -> the one contract that really is that token there.
+#
+# A transfer is priced from its `tokenSymbol`, which the sender chooses. Anyone
+# can deploy a token called "USDC" for a few cents, and address-poisoning kits
+# do exactly that: measured 2026-09-10, 236 transfers of a token symboled USDC
+# from contract 0xa38ae1ea... (unverified, flagged "poor reputation" by
+# Arbiscan, 599 transfers in a single transaction) were booked at face value as
+# $986,395,888 of real money, because nothing compared the contract.
+#
+# Deliberately small and only what can be verified from config. An entry that is
+# WRONG would quarantine a real stablecoin transfer, which is worse than the bug
+# it fixes, so unknown (chain, symbol) pairs stay unverified rather than guessed.
+# Extend via data/labels/token_contracts.json.
+CANONICAL_CONTRACTS: dict[tuple[str, str], str] = {}
+
+
+def load_canonical_contracts(config: dict | None = None,
+                             registry_path=None) -> dict:
+    """Canonical token contracts, from config plus an optional label file."""
+    import json as _json
+
+    out = dict(CANONICAL_CONTRACTS)
+    config = config or {}
+    arb_usdc = (config.get("usdc_contract_arbitrum") or "").lower()
+    if arb_usdc:
+        out[("arbitrum", "USDC")] = arb_usdc
+    if registry_path is not None:
+        try:
+            with open(registry_path) as f:
+                for row in _json.load(f).get("tokens", []):
+                    chain = (row.get("chain") or "").lower()
+                    sym = (row.get("symbol") or "").strip().upper()
+                    addr = (row.get("contract") or "").lower()
+                    if chain and sym and addr:
+                        out[(chain, sym)] = addr
+        except (OSError, ValueError, AttributeError):
+            pass
+    return out
+
+
+def is_impostor(symbol: str, contract: str | None, chain: str | None,
+                canonical: dict | None) -> bool:
+    """True only when we KNOW this token's real contract and this is not it.
+
+    Silent about everything else. Without a canonical entry we cannot tell a
+    counterfeit from a token we simply have not catalogued, and guessing in that
+    direction discards real transfers.
+    """
+    if not canonical or not contract or not chain:
+        return False
+    known = canonical.get((chain.lower(), (symbol or "").strip().upper()))
+    return bool(known and known != contract.lower())
+
+
 def value_usd(symbol: str, amount: float, date_str: str,
-              price_lookup) -> tuple[float | None, str]:
+              price_lookup, *, contract: str | None = None,
+              chain: str | None = None,
+              canonical: dict | None = None) -> tuple[float | None, str]:
     """USD value of `amount` of `symbol` on `date_str`, and the basis used.
 
     Returns (None, "unpriced") for a token we do not price at all, and
@@ -80,6 +136,11 @@ def value_usd(symbol: str, amount: float, date_str: str,
     could not tell "worthless" from "worth unknown right now."
     """
     sym = (symbol or "").strip().upper()
+    if is_impostor(sym, contract, chain, canonical):
+        # A token wearing a stablecoin's ticker from the wrong contract. Not
+        # "unpriced" (that means we do not price this token) and never a dollar
+        # figure: it is a forgery, and saying so is the point.
+        return None, "impostor_token"
     if sym in STABLES:
         return round(float(amount), 2), "stable_par"
     if sym in MAJORS:

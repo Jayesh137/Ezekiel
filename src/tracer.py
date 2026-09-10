@@ -66,6 +66,15 @@ _transfer_cache: dict[tuple[str, int], list[dict]] = {}
 TRACED_MARKER = "traced_outbound.json"
 
 
+
+def _canonical(config: dict) -> dict:
+    """Canonical token contracts, so a token merely CALLED "USDC" is not priced
+    as USDC. See src/chain/assets.is_impostor."""
+    from src.chain.assets import load_canonical_contracts
+    return load_canonical_contracts(
+        config, DATA_DIR / "labels" / "token_contracts.json")
+
+
 def _traced_path() -> Path:
     return Path(DATA_DIR) / "state" / TRACED_MARKER
 
@@ -338,6 +347,7 @@ def trace_outbound_transfers(wallet: str) -> list[dict]:
     # too -- the same convention _traced_path() already follows.
     price_lookup = coingecko_price_lookup(Path(DATA_DIR) / "prices")
     result = sweep_wallet(wallet, enabled_chains(config), budget, cluster=True,
+                          canonical=_canonical(config),
                           price_lookup=price_lookup)
     # data/transfers/latest.json is the only place a chain outage is reported —
     # spec section 4's storage record, section 10's degradation record, and the
