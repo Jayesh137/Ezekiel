@@ -75,9 +75,30 @@ trading style. Never promote a wallet on one vector alone.
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
 | Dormancy handoff | `dormancy.py` | One wallet goes quiet, another is born. The only vector needing NO connection between them |
 | HyperEVM watch | `scripts/check_hyperevm.py` | Nonce tripwire; history there cannot be reconstructed after the fact |
+| Identity | `hl_identity.py`, `scripts/check_identity.py` | `userRole` (agent → owner, sub-account → master), `webData2` (frontend agent), `stakingLink`, delegations, `portfolio` birth. An explicit link CONFIRMs alone |
+| Own actions | `hl_actions.py` (collector step) | The explorer's last 300 L1 actions: `withdraw3` destinations, agent approvals, vault transfers, sub-accounts. A foreign destination alerts |
+| Bridge destinations | `chain/bridges.py`, `scripts/check_bridge_destinations.py` | CCTP/Socket calldata names the destination chain and recipient; Hyperliquid's CCTP extension names the HL account. A non-cluster recipient alerts |
+| Withdrawal pairing | `withdrawals.py`, `scripts/check_withdrawals.py` | Each HL withdrawal paired with the bridge payout at his own address; an unpaired one is resolved and alerted |
+| Newborn accounts | `newborn.py`, `scripts/check_newborn.py` | Birth from the leaderboard's window volumes, no per-wallet calls; the youngest large accounts become priority scans |
+| Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
+| Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
+| Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
+
+**Where his money actually goes (decoded 2026-09-10, not inferred):** $66.5M
+"to infrastructure" at the CCTP extension was him depositing into his own HL
+account through Circle (the hook data names him); $22.75M went to a Solana
+wallet of his (`2xm4bb8K…`); $10M by CCTP and $320M through Socket went to
+himself on other chains; $152.6M sits in Aave on Arbitrum and he also uses
+Pendle, Morpho and Paraswap. **He does DeFi**, so the approval-fingerprint
+rejection below rested on a false premise and is reopened. The genuine shared
+exchange deposit address is `0x8570c2ae…` (an EOA forwarding 100% to Binance),
+shared with `0xf078969e…`, which is a personal wallet two-way with the target
+at $135M/$148M and now grades MIGRATION_CANDIDATE; `0x160f6ef9…` sent him
+$100.56M and is a person too. Both were INFRASTRUCTURE on fan degree before
+whole-chain activity was measured.
 
 ## Vectors collected but NOT wired into detection — pursue these
 
@@ -175,6 +196,22 @@ the next session rebuilding them:
    up a report if it costs graph depth. Conduit detection is deliberately a
    single pass for this reason.
 8. **A transfer is not ownership.** Surface leads; never assert identity.
+9. **A shared destination is evidence only once the whole chain says it is
+   quiet.** Fan-in inside the substrate counts only wallets we swept, so
+   SocketGateway (2.19M transactions) looked like a five-sender private
+   deposit address and the treasury was "confirmed" on shared routers.
+   `chain/activity.py` measures the real count; unmeasured means excluded.
+10. **Stored records are read deduplicated.** The ledger was on disk three
+    times and fills 13.5% duplicated, so every HL-native total was triple and
+    every exit reached the correlator three times. `load_all_records` dedupes
+    by `record_key`; funding is keyed on (time, coin) because its hash is
+    always zero.
+11. **A token quantity is never a dollar value.** 1.03 billion MAX with
+    `usdcValue "0.0"` was booked as $1.03B. Only USDC's own quantity may
+    stand in for its value.
+12. **`userFillsByTime` returns the OLDEST 2,000 fills after its start;
+    `userFills` the newest.** A busy wallet's "first fill" is last week.
+    Birth comes from `portfolio`; recent behaviour from `userFills`.
 
 ---
 
@@ -197,8 +234,10 @@ trade reviews (`Trade Reviews.pdf`, 406 images extracted to
   flow cannot reach.
 - Unmeasurable traits return UNTESTABLE, never "consistent". Counting absent
   evidence as agreement is how a profile confirms itself.
-- The writing is 2021-2023; on-chain history starts 2026-02-05. Only enduring
-  style crosses that gap, and people change.
+- The writing is 2021-2023; the Hyperliquid account dates from 2024-01 (first
+  deposit 2024-02-29, first perp activity 2024-05) and this project's
+  collection from 2026-02-20. Only enduring style crosses that gap, and people
+  change.
 
 **Read the sources before trusting the summaries — his words describe him worse
 than his blotters do.** Two review passes, two checks overturned:
@@ -273,10 +312,12 @@ alias `Gigantic-Cassocked-Rebirth`. The recurring token is **Rebirth**. Searched
 2026-09-10: **zero hits**. Cheap — re-run it whenever new agent or vault names
 are collected.
 
-**`data/agents/` now has a baseline.** It sat empty because the fixed collector
-had not been run against the target since the empty-vs-blind fix. Run: `agents:
-[]` with `errors: []` — we asked, he has none. Any later non-empty list is a new
-address he controls.
+**`data/agents/` has a baseline, and it is not empty.** `extraAgents` lists only
+NAMED extra agents and returns `[]` for him; `webData2` shows the frontend agent
+that actually signs his orders (`0x98cf3fee…`, approved 2026-08-31,
+`signatureChainId 0xa4b1`), and `userRole` on it answers agent → owner = him.
+The collector and `check_agents.py` read both. A new agent address is a new
+address he controls; the treasury has approved eighteen of them since 2024-11.
 
 **The most specific claim in the whole corpus is not a style trait.** He selects
 shorts on **tokenomics — low float with large scheduled unlocks** — run as an
@@ -399,6 +440,18 @@ that it is.
 
 - **Alerts arrive as GitHub Issues, not email.** Brevo SMTP has never once
   delivered (account unactivated). `_github_issue_fallback` in `alerts.py`.
+  `send_alert` also delivers through Telegram (`TELEGRAM_BOT_TOKEN` +
+  `TELEGRAM_CHAT_ID`) and ntfy (`NTFY_TOPIC`) when those secrets exist; set
+  one of them and every severity arrives in seconds.
+- **Blockscout reads arbitrum/ethereum/base/optimism/polygon with no key**:
+  address counters and labels (`chain/activity.py`), decoded transaction
+  inputs (`chain/bridges.py`). The Hyperliquid explorer
+  (`rpc.hyperliquid.xyz/explorer`, `userDetails`) returns the last 300
+  actions with payloads and cannot be paged. `vaultSummaries` answered `[]`;
+  vault leadership comes from `webData2.leadingVaults`.
+- Nothing here has been pushed by the session that built it; the workflows
+  run these steps once `main` is pushed. Set `TELEGRAM_*` or `NTFY_TOPIC`
+  first so the first run's findings reach a phone.
 - Free tiers only. Etherscan free does not serve account endpoints for
   **base, bsc, optimism** — those chains are unreadable, not empty.
 - HyperEVM public RPC caps `eth_getLogs` at 1000 blocks against ~1s blocks:

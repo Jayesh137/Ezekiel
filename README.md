@@ -113,8 +113,33 @@ never once a 5-minute gap). See *Monitoring limits* for the measurement and
 | `BREVO_SMTP_LOGIN` | all alerting jobs | Brevo SMTP login (`<id>@smtp-brevo.com`), not the account email |
 | `BREVO_SMTP_KEY` | all alerting jobs | Email alerts (free tier) |
 | `ALERT_EMAIL` | all alerting jobs | Recipient address, and the From address |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | all alerting jobs | Instant delivery to a Telegram chat (a bot from @BotFather). Optional, recommended |
+| `NTFY_TOPIC` | all alerting jobs | Instant delivery to an ntfy.sh topic. Optional |
 
 Everything degrades gracefully without them — modules log and continue.
+Delivery on any channel counts as delivered; `data/alerts/latest.json` names
+the channel that took each alert.
+
+### Sight lines added 2026-09-10
+
+Each is one script, one data directory, and a step in the workflow named.
+
+| Script | Job | Writes | Catches |
+|---|---|---|---|
+| `scripts/check_identity.py` | trace | `data/identity/` | `userRole` (agent → owner, sub-account → master), the frontend agent from `webData2`, staking links, validators, real birth dates. An explicit link to the cluster confirms alone |
+| collector `actions` step | collect | `data/actions/` | The cluster's own explorer actions: withdrawal destinations, agent approvals, vault transfers, sub-accounts. A foreign destination alerts |
+| `scripts/check_bridge_destinations.py` | trace | `data/bridge_destinations/`, `data/labels/bridge_decodes.json` | CCTP and Socket calldata decoded to chain and recipient; Hyperliquid's CCTP extension to the HL account credited |
+| `scripts/check_withdrawals.py` | trace | `data/withdrawals/` | Each HL withdrawal paired with the bridge payout at his own address; unpaired ones resolved with Etherscan |
+| `scripts/check_newborn.py` | scan | `data/newborn/` | Accounts born within a month, from the leaderboard's window volumes; the youngest large ones are scanned first |
+| `scripts/check_names.py` | scan | `data/names/` | Leaderboard display names and vault names matching the naming family |
+| `scripts/check_solana.py` | trace | `data/solana/` | New signatures on the cluster's Solana address (`data/labels/solana_addresses.json`) |
+| `scripts/check_comovement.py` | trace | `data/comovement/` | Who moves first: a copier follows the target, a second hand leads. Decisions are kept per candidate across runs |
+| `scripts/check_vaults.py` | trace | `data/vault_watch/` | A vault led by a cluster wallet |
+| `scripts/probe_hyperevm_index.py` | trace | `data/hyperevm/etherscan_probe/` | Whether the Etherscan key serves HyperEVM (chain 999) |
+
+Two label caches back them: `data/labels/address_activity.json` (whole-chain
+transaction counts from Blockscout, which decide what is infrastructure) and
+`data/labels/bridge_decodes.json` (one decode per transaction, permanent).
 
 **Email delivery has never succeeded on this deployment.** Brevo answers
 `502 5.7.0 Your SMTP account is not yet activated`, which no code change can fix
