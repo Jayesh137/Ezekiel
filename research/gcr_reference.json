@@ -4,12 +4,15 @@
   "subject": "GCR",
   "handles": [
     "@GiganticRebirth",
-    "@GCRClassic",
+    "@GCRClassic (display name 'Ezekiel X')",
     "@MingXMecca",
-    "trueshiba (Discord, Aug 2020)"
+    "@rebirthdao",
+    "trueshiba (Discord, Aug 2020)",
+    "Gigantic-Cassocked-Rebirth (FTX leaderboard alias, likely generated)"
   ],
   "_epistemic_status": [
     "PRIOR MONIKER: he states outright (img034) that he posted as 'trueshiba' in August 2020, before @GiganticRebirth. He rotates handles and later self-discloses them.",
+    "NAMING FAMILY: the token 'Rebirth' recurs across @GiganticRebirth, @rebirthdao and the FTX alias Gigantic-Cassocked-Rebirth. Searched against data/agents, data/vaults, data/referral and data/subaccounts on 2026-09-10 for rebirth|gigantic|gcr|ezekiel|ming|mecca|trueshiba|kabosu|goblin|stonehenge - ZERO hits. Re-run that search whenever new agent or vault names are collected; it is cheap and it is the free equivalent of the human-chosen-label idea in agent_links.naming_families.",
     "THIS IS A HYPOTHESIS ABOUT THE TARGET, NOT A FACT ABOUT HIM.",
     "The operator puts the probability that the tracked wallet is GCR's at 55-75%.",
     "So this profile must be able to move that estimate DOWN as well as up. Any use",
@@ -55,7 +58,7 @@
       "claim": "Round numbers act as support/resistance, especially absent any valuation rationale.",
       "testable": true,
       "predicate": "round_number_affinity",
-      "evidence": "Blotter sizes: -280,000 RLC, -47,000 GTC, -27,000 AVAX, -90,000 BAND, -233,000 BAKE, -12,000 ETC (img089/096/097). Also two deliberately off-round sizes, -999,999 ADA and -19,001 ETC. img112 names it as the trade reason outright: round schelling point number plus thick sells above was 'a bit too tempting'."
+      "evidence": "Blotter sizes: -280,000 RLC, -47,000 GTC, -27,000 AVAX, -90,000 BAND, -233,000 BAKE, -12,000 ETC (img089/096/097). Also two deliberately off-round sizes, -999,999 ADA and -19,001 ETC. img112 names it as the trade reason outright: round schelling point number plus thick sells above was 'a bit too tempting'.; used as an EXIT rule too - img336 ('8 cents is a nice round number to take profit') and img369 ('$10 schelling point support')."
     },
     {
       "name": "Never short small caps",
@@ -68,7 +71,8 @@
       "name": "Momentum persistence",
       "claim": "Strong stays strong; cutting winners to add to losers is backwards.",
       "testable": true,
-      "predicate": "adds_to_losers"
+      "predicate": "adds_to_losers",
+      "caveat": "IN TENSION WITH img200, where he DOUBLED a losing SHIB short from 30,872,000,000 to 61,509,800,000 and let the loss run from -$8,789 to -$637,069 on purpose ('Going to leave room to add to this if it keeps running'). The reconciliation is that he sizes small enough to add, so the scale-in is planned rather than a bagholder's average-down - which is also why his liquidation prices sit so far away. Do NOT implement adds_to_losers as a contradiction without resolving this."
     },
     {
       "name": "Fading DOGE pumps",
@@ -143,7 +147,7 @@
       "claim": "Runs seven to nine alt shorts at once, cross-margined at 1x-5x, rather than one concentrated bet.",
       "testable": true,
       "predicate": "broad_short_basket",
-      "evidence": "img089 (9 positions), img096 (7), img097 (7)"
+      "evidence": "img089 (9 positions), img096 (7), img097 (7); img320 is TWENTY-TWO simultaneous shorts on FTX with $17,079,515.12 of open profit (20 of 22 in the green), and img321 says there were 'plenty more on Binance' - so the real book spanned venues."
     },
     {
       "name": "Short supply-unlock events",
@@ -200,6 +204,55 @@
       "claim": "Structures trades so the loss is small and known while the upside is many multiples: a -1% mental stop, or a bet whose liability is the stake.",
       "evidence": "img182 (-1% mental stop on announcement trades), img185 (liability = stake), img178 (cuts small losses regardless of his own bias).",
       "note": "Explains 'Trigger Orders (0)' in img032/img059 - the stop is MENTAL, so it never appears as a resting order."
+    },
+    {
+      "name": "Relative-value pairs",
+      "testable": false,
+      "claim": "Expresses views as one leg against another rather than as a directional bet: long DOGE against short SHIB on marketcap convergence.",
+      "evidence": "img199 (the thesis), img200 (the SHIB leg), img201 ('the long DOGE, short SHIB on flippening trade satisfied profit target').; img310: 'some have been confused why i've been advocating so hard for pair trades - pretty nice feel when the coins you're longing still pump on idiosyncratic strength while the ones you're short are bleeding out'.; img388 is the fullest statement: 'the key was to focus on PAIR TRADING, and to stay DELTA NEUTRAL TO NET SHORT on the general market, while being able to pick the winners'.",
+      "note": "Beside the target's xyz: book - long SP500 and XYZ100 against short MU and SKHX, two memory-chip competitors - this is a genuine structural rhyme. Recorded as evidence only; pairs trading is common among large traders."
+    },
+    {
+      "name": "Scales out to a dust residual",
+      "testable": false,
+      "claim": "Says 'fully out' while a token residual remains, rather than closing flat. He calls them MOONBAGS (img218).",
+      "evidence": "img203 (145 1INCH, $1,044, while declaring 'fully out'), img059 (214,168 DOGE after 'sold most of my DOGE'), img113 (224.7 AXS with a break-even of 1,006 against a 44 mark).; img218 states the strategy outright: 'get in early, take some healthy profits on parabolic moves, and hold moonbags'.",
+      "note": "The target shows the same shape - 7 positions under $10k, the smallest TIA at $1,559, against a largest of $36.1M. NOT built as a check: any wallet with 56 positions has a wide size distribution, so it cannot discriminate, and the suite already has too few checks that can disconfirm."
+    },
+    {
+      "name": "Shorts low float, high emissions",
+      "testable": true,
+      "predicate": "shorts_high_emission_tokens",
+      "claim": "Selects shorts on tokenomics - low float with large scheduled unlocks and fading narratives - not on price action.",
+      "evidence": "img242 ('focus of my DAO has been researching/shorting the most inflationary alts with low float and mammoth 2022 emissions'), img239, img281 ('getting precision information on distributions', in a Discord channel called #the-big-short), img303, img324.",
+      "note": "NOT IMPLEMENTED. It would need a float and unlock-schedule source per market, which this project does not have. Recorded because it is the most specific and most testable claim in the entire corpus - far better than any style trait - if such a source is ever added."
+    },
+    {
+      "name": "Risks 1-2% of net worth per position",
+      "testable": false,
+      "claim": "Explicit sizing rule: do not risk more than 1-2% of net worth.",
+      "evidence": "img213. Consistent with liquidation prices 80-690% away and with img142's 'NFT exposure is 7 figures, but constitutes less than 1% of my net worth'."
+    },
+    {
+      "name": "Goes quiet by choice",
+      "testable": false,
+      "claim": "Announces deliberate breaks after big trades resolve.",
+      "evidence": "img322 - 'TP on majority of [liquid] shorts, and taking my first trading sabbatical in a half decade... will reassess after pilgrimage'.",
+      "note": "Relevant to src/dormancy.py: a silence can be a sabbatical rather than a migration, and this is a documented instance of exactly that."
+    },
+    {
+      "name": "Treats visibility as a cost",
+      "testable": false,
+      "claim": "Removed himself from a public P&L leaderboard, blurred position names before posting, and warned people not to copytrade him.",
+      "evidence": "img337 ('going disable my account being visible on this; visibility is -ev'), img320/img321 (positions blurred 'to save you from copytrading'), img307, img170, img176, img144.",
+      "note": "OPERATIONAL. Hyperliquid's leaderboard is computed from public state and has no opt-out, so he could not hide there the way he did on FTX - but a new wallet is small and outside any top-N for a long time regardless. src/scanner.py draws candidates from the leaderboard, so it finds a fresh wallet late or not at all; flow, linkage and dormancy are what find one early. Do not let the behavioural vector become the primary net."
+    },
+    {
+      "name": "Most profit is off-perp",
+      "testable": false,
+      "claim": "About 75% of net profit came from spot, other exchanges, IEOs/IDOs, DeFi, NFTs and on-chain activity rather than the perp account.",
+      "evidence": "img337; img144 ('most of my position was actually spot and not reflected here'); img163 (a 2,000,000 USDC NFT sale).",
+      "note": "Every blotter in this corpus is a partial view, and so is any read of a single Hyperliquid perp account."
     }
   ],
   "observed_trades": [
@@ -295,11 +348,13 @@
   ],
   "review_state": {
     "images_total": 406,
-    "images_reviewed": 133,
-    "blotters_found": 16,
-    "note": "Two review passes have now each overturned a check: the first removed hedged_book, the second stopped net_short_bias disconfirming and added liquidation_distance. Continue incrementally.",
+    "images_reviewed": 217,
+    "blotters_found": 20,
+    "note": "All 406 images triaged via scripts/contact_sheets.py; everything with notes was then read at full resolution. Three review passes each overturned or corrected a check: hedged_book removed, net_short_bias stopped disconfirming, and the runner was found blind to the HIP-3 xyz: book. Remaining unreviewed entries are charts and duplicates the sheets showed carried nothing new.",
     "how_to_find_blotters": "Pixel heuristics FAIL — blotters run 1 row to 9, light (Binance) and dark (FTX); a filter tuned on three light blotters missed img335. Use scripts/contact_sheets.py and look at the grids.",
     "highest_value_next": "Remaining blotters. Positions, sizes and leverage are the only material that compares directly against on-chain data.",
-    "open_lead": "img163/img164: GCR sold his SAD DOGE [KABOSU] NFT for 2,000,000 USDC on or about 2021-08-27 to @TwoDollaHotDoge, contract prefix 0xabefb..., screenshot taken from inside his own logged-in OpenSea session ('From: you'). The seller side is a GCR-controlled Ethereum address. This is the ONLY thing in the corpus that could move the hypothesis on flow rather than style. Not yet pursued."
+    "open_lead": "img163/img164: GCR sold his SAD DOGE [KABOSU] NFT for 2,000,000 USDC on or about 2021-08-27 to @TwoDollaHotDoge, contract prefix 0xabefb..., screenshot taken from inside his own logged-in OpenSea session ('From: you'). The seller side is a GCR-controlled Ethereum address. This is the ONLY thing in the corpus that could move the hypothesis on flow rather than style. Not yet pursued.",
+    "compiler_redactions": "Redactions come from TWO sources. GCR himself blurred market names and sizes before posting, to stop copytrading (img320, explained in img321). Whoever assembled the PDF additionally whites out liquidation prices (img012, img036, img200 x2, img335), position sizes (img007, img032) and third-party handles (img203, img219). Liquidation distance is therefore only partly measurable from this corpus, which matters because it is the one disconfirming check.",
+    "images_triaged": 406
   }
 }

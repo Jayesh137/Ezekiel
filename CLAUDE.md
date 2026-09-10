@@ -207,45 +207,75 @@ UNTESTABLE, which is the honest reading: the crypto book is all cross and 100%+
 from liquidation, but `xyz:XYZ100` sits **22%** away and `xyz:SP500` 40%, both
 LONG indices on **isolated** 4x. GCR ran cross throughout.
 
-**133 of 406 reviewed; 15 blotters, 1 order-history table, 1 BetFair slip.**
-Set `reviewed`/`content`/`notes` in `trade_review_index.json`;
+**All 406 images triaged; 217 carry notes; 19 blotters, 1 order table, 1 BetFair
+slip, 1 leaderboard.** `scripts/contact_sheets.py` tiles them into grids — that
+is what works, because blotters run 1 row to 22, light Binance and dark FTX, and
+a pixel filter tuned on three light blotters missed a dark one entirely. Set
+`reviewed`/`content`/`notes` in `trade_review_index.json`;
 `scripts/extract_trade_reviews.py` preserves them.
 
-**An open on-chain lead, not yet pursued.** img163/img164: he sold his SAD DOGE
+**Two things make every blotter a partial view.** He blurred market names and
+sizes himself before posting, "to save you from copytrading" (img320/img321),
+and the PDF's compiler whited out more. More importantly img337: **"75% of net
+profit made on spot, other exchanges, ieos/idos, defi, nft, on chain"** — the
+perp account is about a quarter of him. Any read of a single Hyperliquid perp
+account inherits that limit.
+
+**He treats visibility as a cost** — "going disable my account being visible on
+this; visibility is -ev" (img337), positions blurred, repeated "do not copytrade
+me". HL's leaderboard is computed from public state and has no opt-out, so he
+could not hide there as he did on FTX — but a fresh wallet is small and outside
+any top-N for a long time anyway. `scanner.py` draws candidates from the
+leaderboard, so it finds a new wallet **late or never**. Flow, linkage and
+dormancy are what find one early; never let the behavioural vector become the
+primary net.
+
+**Naming family.** His identities are @GiganticRebirth, @GCRClassic (display
+name **"Ezekiel X"** — what this project is named after), @MingXMecca,
+@rebirthdao, `trueshiba` (Discord, 2020, self-disclosed in img034), and the FTX
+alias `Gigantic-Cassocked-Rebirth`. The recurring token is **Rebirth**. Searched
+`data/agents`, `data/vaults`, `data/referral`, `data/subaccounts` for
+`rebirth|gigantic|gcr|ezekiel|ming|mecca|trueshiba|kabosu|goblin|stonehenge` on
+2026-09-10: **zero hits**. Cheap — re-run it whenever new agent or vault names
+are collected.
+
+**`data/agents/` now has a baseline.** It sat empty because the fixed collector
+had not been run against the target since the empty-vs-blind fix. Run: `agents:
+[]` with `errors: []` — we asked, he has none. Any later non-empty list is a new
+address he controls.
+
+**The most specific claim in the whole corpus is not a style trait.** He selects
+shorts on **tokenomics — low float with large scheduled unlocks** — run as an
+operation out of a Discord channel called `#the-big-short`, "getting precision
+information on distributions" (img242, img239, img281, img303, img324). Recorded
+as `shorts_high_emission_tokens` and **not implemented**: it needs a float and
+unlock-schedule source this project does not have. If one is ever added, it beats
+every behavioural dimension here.
+
+**An open on-chain lead, not pursued.** img163/img164: he sold his SAD DOGE
 [KABOSU] NFT for **2,000,000 USDC** on or about **2021-08-27** to
-@TwoDollaHotDoge, contract prefix `0xabefb...`, and the OpenSea screenshot says
-"From: **you**" — taken inside his own logged-in session. The seller is a
-GCR-controlled Ethereum address. Everything else in this corpus is style, which
-can only nudge a prior; this is the one item that could move it on **flow**.
-Weigh it honestly before spending Etherscan budget: it is L1 in 2021 and the
-target's history starts 2026-02-05 on Hyperliquid, so no connection would prove
-little — but a connection would be very strong.
+@TwoDollaHotDoge, contract prefix `0xabefb...`, in a screenshot whose From column
+reads "you" — his own logged-in OpenSea session. The seller is a GCR-controlled
+Ethereum address. Everything else here is style, which can only nudge a prior;
+this is the one item that could move it on **flow**. It is L1 in 2021 against a
+target whose history starts 2026-02-05 on Hyperliquid, so no connection would
+prove little — but a connection would be very strong.
 
-Live: net-short bias CONSISTENT (54/56), liquidation distance UNTESTABLE
-(closest 22%, the isolated index long), broad short basket CONSISTENT (54
-markets), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak.
-Nothing contradicts — but only one check can, so read `falsifiability`, not the
-tally.
+Live: net-short bias CONSISTENT (54/56), liquidation distance UNTESTABLE (closest
+22%, the isolated `xyz:XYZ100` index long), broad short basket CONSISTENT (54
+markets), small-cap shorts UNTESTABLE, round numbers CONSISTENT but weak. Nothing
+contradicts — but only one check can, so read `falsifiability`, not the tally.
 
-Other things the images settled, all in `trade_review_index.json`:
+His method, in his own words (img388): *"the key was to focus on pair trading,
+and to stay delta neutral to net short on the general market, while being able to
+pick the winners."* The target is net short 54 of 56 with a two-sided equity pair
+book — long SP500 and XYZ100 against short MU and SKHX, two memory-chip
+competitors. A real structural rhyme, and still only evidence.
 
-- **He is not crypto-native**: "Traded political prediction markets as a full
-  time job for years before getting into crypto" (img186), with a BetFair slip
-  staking £49,000 at 65:1 (img185). The target's non-crypto `xyz:` book rhymes.
-- **Stops are mental, never resting** — "-1% mental stop" (img182), which is why
-  img032 and img059 both show `Trigger Orders (0)` beside 35 and 40 positions.
-- **Blotters understate him**: "most of my position was actually spot and not
-  reflected here" (img144).
-- **A fourth handle**: he posted as `trueshiba` before @GiganticRebirth and said
-  so himself (img034). He rotates identities and discloses them late.
-- **img128 is the only order-history table** — 5 ACH/USDT limit buys in 98
-  seconds, 2 cancelled, round prices against unround amounts. Do NOT build a
-  check on it: the target's 0% cancels are an artifact of `Ioc` orders being
-  auto-cancelled by the venue, and this is spot, another exchange, five years
-  earlier.
-
-The corpus spans THREE platforms: Twitter, Discord (img251, img282) and Telegram
-(img219, img220, img318), and some images are redacted by whoever compiled it.
+The corpus spans FOUR platforms: Twitter, Discord (`#alpha-discussions`,
+`#the-big-short`), Telegram, and a BetFair slip — he traded political prediction
+markets full time for years before crypto (img185, img186), and was still trading
+Supreme Court and French-election markets in 2022.
 
 ## Not detection
 
