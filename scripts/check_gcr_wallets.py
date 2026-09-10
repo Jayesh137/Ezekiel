@@ -14,11 +14,19 @@ import sys
 import time
 from pathlib import Path
 
+import requests
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.alerts import send_alert
 from src.chain.collect import records_for
-from src.gcr_wallets import build_report, load_addresses, save, watched
+from src.gcr_wallets import (
+    HL_BRIDGE,
+    build_report,
+    load_addresses,
+    save,
+    watched,
+)
 from src.utils import hl_post, load_config
 
 
@@ -51,6 +59,44 @@ def hl_state(addr: str) -> dict:
     return out
 
 
+# Blockscout serves Arbitrum without an API key. Etherscan's free tier will not
+# serve account endpoints for several chains, which is why this does not reuse
+# src/utils.etherscan_get.
+ARBITRUM_API = "https://arbitrum.blockscout.com/api/v2"
+
+
+def bridge_state(addr: str) -> dict:
+    """Has this address ever touched the Hyperliquid bridge on Arbitrum?
+
+    The bridge lives only on Arbitrum, so Arbitrum is the whole question. A
+    404 is a real answer -- the address has no history there. Anything else
+    that goes wrong is recorded as unreadable, never as clean.
+    """
+    out = {"read_ok": True, "touched": False, "chain": "arbitrum"}
+    try:
+        for path in (f"/addresses/{addr}/transactions",
+                     f"/addresses/{addr}/token-transfers"):
+            r = requests.get(f"{ARBITRUM_API}{path}", timeout=45,
+                             headers={"accept": "application/json"})
+            if r.status_code == 404:
+                continue
+            if r.status_code != 200:
+                out["read_ok"] = False
+                out["error"] = f"HTTP {r.status_code}"
+                return out
+            for item in r.json().get("items") or []:
+                for side in ("from", "to"):
+                    who = ((item.get(side) or {}).get("hash") or "").lower()
+                    if who == HL_BRIDGE:
+                        out["touched"] = True
+                        return out
+            time.sleep(0.25)
+    except Exception as exc:                          # noqa: BLE001 - transport
+        out["read_ok"] = False
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 def main() -> int:
     data = load_addresses()
     if not data:
@@ -70,12 +116,14 @@ def main() -> int:
     except Exception as exc:                          # noqa: BLE001
         print(f"[gcr-eth] graph unreadable: {type(exc).__name__}: {exc}")
 
-    states = {}
+    states, bridges = {}, {}
     for addr in watched(data):
         states[addr] = hl_state(addr)
+        bridges[addr] = bridge_state(addr)
         time.sleep(0.3)
 
-    report = build_report(graph_addresses=graph, hl_states=states, data=data)
+    report = build_report(graph_addresses=graph, hl_states=states,
+                          bridge_states=bridges, data=data)
     save(report)
 
     print(f"[gcr-eth] watching {report['watched']} address(es) against "
@@ -86,11 +134,14 @@ def main() -> int:
     for hit in report["hyperliquid_hits"]:
         print(f"[gcr-eth]   HL ACTIVE  {hit['address']}  ({hit['tier']}) "
               f"value={hit['account_value']} fills={hit['fills']}")
+    for hit in report["bridge_hits"]:
+        print(f"[gcr-eth]   BRIDGE     {hit['address']}  ({hit['tier']}) "
+              f"funded the Hyperliquid bridge on {hit.get('chain')}")
     for u in report["unreadable"]:
         print(f"[gcr-eth]   UNREADABLE {u['address']}  {u['why']}")
     print(f"[gcr-eth] {report['reading']}")
 
-    if report["graph_hits"] or report["hyperliquid_hits"]:
+    if report["graph_hits"] or report["hyperliquid_hits"] or report["bridge_hits"]:
         lines = [
             "An Ethereum address confirmed or strongly linked to GCR has moved "
             "into range of the tracked wallet.",
@@ -104,6 +155,10 @@ def main() -> int:
         lines.extend(f"HYPERLIQUID: {h['address']} ({h['tier']}) — "
                      f"value {h['account_value']}, {h['fills']} fill(s)"
                      for h in report["hyperliquid_hits"])
+        lines.extend(f"BRIDGE: {h['address']} ({h['tier']}) — funded the "
+                     f"Hyperliquid bridge on {h.get('chain')}. The deposit may "
+                     f"credit an account other than this address."
+                     for h in report["bridge_hits"])
         lines += [
             "",
             "Provenance is in data/labels/gcr_addresses.json. Verify by hand "

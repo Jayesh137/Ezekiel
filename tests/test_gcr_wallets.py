@@ -93,8 +93,11 @@ def test_a_failed_read_is_unknown_not_clean():
 
 
 def test_a_missing_address_is_unknown_rather_than_absent():
+    """With no states supplied at all, every watched address is unknown on BOTH
+    counts — Hyperliquid and the bridge — and none of it reads as clean."""
     report = build_report(graph_addresses=[], hl_states={}, data=DATA)
-    assert len(report["unreadable"]) == len(watched(DATA))
+    assert len(report["unreadable"]) == 2 * len(watched(DATA))
+    assert "not a clean result" in report["reading"]
 
 
 def test_a_clean_sweep_says_so_without_claiming_evidence_against():
@@ -104,7 +107,9 @@ def test_a_clean_sweep_says_so_without_claiming_evidence_against():
     states = {a: {"read_ok": True, "fills": 0, "ledger": 0,
                   "outbound_ledger": 0, "account_value": "0"}
               for a in watched(DATA)}
-    report = build_report(graph_addresses=["0xHOT"], hl_states=states, data=DATA)
+    bridges = {a: {"read_ok": True, "touched": False} for a in watched(DATA)}
+    report = build_report(graph_addresses=["0xHOT"], hl_states=states,
+                          bridge_states=bridges, data=DATA)
     assert report["clean"]
     assert "not evidence against" in report["reading"]
 
@@ -113,7 +118,9 @@ def test_a_hit_reads_as_flow_not_resemblance():
     states = {a: {"read_ok": True, "fills": 0, "ledger": 0,
                   "outbound_ledger": 0, "account_value": "0"}
               for a in watched(DATA)}
-    report = build_report(graph_addresses=["0xBBB"], hl_states=states, data=DATA)
+    bridges = {a: {"read_ok": True, "touched": False} for a in watched(DATA)}
+    report = build_report(graph_addresses=["0xBBB"], hl_states=states,
+                          bridge_states=bridges, data=DATA)
     assert not report["clean"]
     assert "flow, not style" in report["reading"]
 
@@ -147,3 +154,49 @@ def test_unreadable_labels_do_not_crash_the_watch():
     assert watched({}) == {}
     assert check_against_graph(["0xAAA"], {}) == []
     assert build_report(graph_addresses=["0xAAA"], hl_states={}, data={})["clean"]
+
+
+def test_a_bridge_touch_is_reported():
+    """The blind spot this closes: a Hyperliquid deposit credits whatever ACCOUNT
+    it names, which need not be the address that funded it. So a GCR wallet could
+    open a brand-new HL account and every HL endpoint for that wallet would still
+    answer 'nothing here'. The bridge touch is the only place it shows."""
+    from src.gcr_wallets import check_bridge
+    states = {"0xaaa": {"read_ok": True, "touched": True, "chain": "arbitrum"}}
+    got = check_bridge(states, DATA)
+    live = [h for h in got if h["status"] == "ACTIVE"]
+    assert live and live[0]["address"] == "0xaaa"
+    assert live[0]["chain"] == "arbitrum"
+
+
+def test_no_bridge_touch_is_silent():
+    from src.gcr_wallets import check_bridge
+    states = {a: {"read_ok": True, "touched": False} for a in watched(DATA)}
+    assert check_bridge(states, DATA) == []
+
+
+def test_an_unreadable_bridge_history_is_unknown_not_clean():
+    from src.gcr_wallets import check_bridge
+    states = {a: {"read_ok": False} for a in watched(DATA)}
+    got = check_bridge(states, DATA)
+    assert got and all(h["status"] == "unknown" for h in got)
+
+
+def test_a_bridge_hit_alone_breaks_the_clean_flag():
+    """It must not need a graph or HL hit to raise the alarm."""
+    hl = {a: {"read_ok": True, "fills": 0, "ledger": 0, "outbound_ledger": 0,
+              "account_value": "0"} for a in watched(DATA)}
+    br = {a: {"read_ok": True, "touched": False} for a in watched(DATA)}
+    br["0xaaa"] = {"read_ok": True, "touched": True, "chain": "arbitrum"}
+    report = build_report(graph_addresses=[], hl_states=hl, bridge_states=br,
+                          data=DATA)
+    assert report["bridge_hits"]
+    assert not report["clean"]
+    assert "flow, not style" in report["reading"]
+
+
+def test_the_bridge_address_is_the_real_one():
+    """A typo here silently disarms the tripwire."""
+    from src.gcr_wallets import HL_BRIDGE
+    from src.utils import load_config
+    assert HL_BRIDGE == (load_config().get("hl_bridge_contract") or "").lower()

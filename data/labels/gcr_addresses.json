@@ -16,14 +16,12 @@
     "Rule 8 applies throughout: a transfer is not ownership. Only the 'confirmed'",
     "tier is asserted as GCR's; everything below it is a lead."
   ],
-
   "provenance": {
     "source_image": "research/trade_review_images/img163.jpg + img164.jpg",
     "claim": "GCR, 2021-08-27: 'Sold my SAD DOGE [KABOSU] NFT for 2 million USDC. Purchase price was 15 ETH in June. Hope this nice doggo finds a comfortable home to rest with @TwoDollaHotDoge', linking opensea.io/assets/0xabefb...",
     "resolution": "0xabefb... resolves to Zora: Media 0xabEFBc9fD2F806065b4f3C237d4b59D9A97Bcac7. very.auction/doge/sad-doge gives token id 3372.",
     "verification": "Every ERC-721 Transfer of token 3372 was read from chain (Blockscout, keyless). The June winning bid and the August sale both resolve to one address, and the sale transaction carries exactly 2,000,000 USDC to it."
   },
-
   "addresses": {
     "0x246ea68f4516f2d09de8754708255d567477ec21": {
       "tier": "confirmed",
@@ -38,9 +36,9 @@
       "funded_by": "676.7963 ETH from Binance hot wallet 0x21a31ee1afc51d94c2efccaa2092ad1028285549 on 2021-06-11, three days before the auction. An exchange hot wallet, so the funder gives no further linkage.",
       "active": "2021-06-11 .. 2022-12-16",
       "eth_balance_2026_09_10": 0.0226,
-      "hyperliquid": "never used"
+      "hyperliquid": "never used",
+      "l2": "No Arbitrum or Base activity. Two dust tokens on Optimism; nothing signed."
     },
-
     "0xd7d8f266c637948846bd2fdc4d906f6ba112de39": {
       "tier": "linked",
       "role": "where the money went; probable treasury",
@@ -51,57 +49,57 @@
         "Active 2021-07-09 .. 2024-12-21, the most recent of anything in this cluster."
       ],
       "caution": "A transfer is not ownership. $21.6M between two low-fan-in addresses is a strong ownership inference, not a proof -- it could be a counterparty, an OTC desk, or a partner.",
-      "hyperliquid": "never used"
+      "hyperliquid": "never used",
+      "l2": "NO Arbitrum activity; never bridged. One dust token on Optimism (TWT from the zero address, 2026-08-16) and nothing signed."
     },
-
     "0x507dbd9f3ebdcc8b885bda73f45f0e20f8ae5b56": {
       "tier": "linked",
       "role": "took $23.2M from the treasury and sends back to it",
-      "evidence": ["Two-way flow with 0xd7d8f266..., plus onward to a Binance deposit address."],
+      "evidence": [
+        "Two-way flow with 0xd7d8f266..., plus onward to a Binance deposit address."
+      ],
       "hyperliquid": "never used"
     },
-
     "0xa8fdf6b23da4e56bc2f5d198d751b3c4c13179f0": {
       "tier": "exchange_deposit",
       "role": "GCR's Binance deposit address",
-      "evidence": ["Took $12.4M from the treasury and forwards only to Binance 14 (0x28c6c06298d514db089934071355e5743bf21d60, 30.5M transactions)."],
+      "evidence": [
+        "Took $12.4M from the treasury and forwards only to Binance 14 (0x28c6c06298d514db089934071355e5743bf21d60, 30.5M transactions)."
+      ],
       "why_it_matters": "A CEX deposit address belongs to ONE account, which makes it the strongest single linkage signal this project has. If the target ever sends to this address, that is a direct link between the tracked wallet and GCR's Binance account.",
       "hyperliquid": "never used"
     },
-
     "0xef4d4d9706f8deccf9d41c7e58c5606f46b10220": {
       "tier": "exchange_deposit",
       "role": "GCR's MEXC-side deposit address",
-      "evidence": ["Took $1.1M from the treasury and forwards to 0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88 (9.1M transactions)."],
+      "evidence": [
+        "Took $1.1M from the treasury and forwards to 0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88 (9.1M transactions)."
+      ],
       "hyperliquid": "never used"
     },
-
     "0x0e869a01b4cd302a07d37171f19ce7f60a11dd34": {
       "tier": "lead",
       "role": "took $648,871 from the treasury; no onward transfers sampled",
       "hyperliquid": "never used"
     },
-
     "0x398d282487b44b6e53ce0aebca3cb60c3b6325e9": {
       "tier": "lead",
       "role": "took $4.7M from the treasury and $1.0M from the confirmed wallet",
       "hyperliquid": "airdrop spam only -- three unsolicited inbound spotTransfers (LADY, OMNIX) from unrelated addresses and one automatic Spot Dust Conversion. It has never traded. Do not read this as GCR using Hyperliquid.",
-      "caution": "The 'has HL activity' flag on this address is a false positive of exactly the kind src/chain/spam.py exists to catch."
+      "caution": "The 'has HL activity' flag on this address is a false positive of exactly the kind src/chain/spam.py exists to catch.",
+      "l2": "The only cluster address with meaningful L2 presence, and it is all inbound: 574 spam transfers on Base, NFT-raffle 'Rarity Pass' and 'Ticket' tokens on Arbitrum. No signed transaction on either chain."
     },
-
     "0x2536e296ce51e9239a21fd5c8c9c029de33f88e9": {
       "tier": "lead",
       "role": "took $664,250 from the treasury",
       "hyperliquid": "never used"
     },
-
     "0x3ad721278d361c20a22fa33f45ce893781c12030": {
       "tier": "lead",
       "role": "sent the confirmed wallet 1.5 ETH in June 2021; frequent counterparty",
       "hyperliquid": "never used"
     }
   },
-
   "not_gcr": {
     "_note": "Recorded so a future session does not mistake these for linkage. All are shared infrastructure with millions of users; two of them ARE counterparties of the target, and mean nothing.",
     "0x7d01dd0c1c293c73500d00d649516161cee3e387": "@TwoDollaHotDoge, the NFT buyer -- a counterparty, not GCR",
@@ -112,5 +110,36 @@
     "0xe468ce99444174bd3bbbed09209577d25d1ad673": "Zora AuctionHouse escrow",
     "0x337071a7e907f5a599747a2c9baf6efdf7eb4bcc": "the NFT creator (Atsuko Sato / Zora mint)",
     "0x5b3256965e7c3cf26e11fcaf296dfc8807c01073": "OpenSea marketplace fee wallet"
+  },
+  "multichain_survey_2026_09_10": {
+    "question": "Did the treasury 0xd7d8f266... bridge to Arbitrum, and from there reach Hyperliquid?",
+    "answer": "No. It has NO Arbitrum activity at all -- not a transaction, not a token transfer. It never bridged.",
+    "scope": "All nine cluster addresses checked on Arbitrum, Optimism and Base via Blockscout. Every read succeeded, so these are real answers rather than failed reads.",
+    "hl_bridge": "ZERO cluster addresses have ever touched the Hyperliquid bridge 0x2df1c51e09aecf9cacb7bc98cb1742757f163df7 on any of the three chains. This is the path GCR would have to take to appear on Hyperliquid, and he has not taken it.",
+    "IMPORTANT_the_2026_activity_is_dust": [
+      "The survey first appeared to show the cluster ALIVE IN 2026, contemporary",
+      "with the target: the confirmed GCR wallet dated 2026-08-14 on Optimism, the",
+      "treasury 2026-08-16, another peer 2026-09-05. Every one of those is AIRDROP",
+      "DUST and none of it is the owner.",
+      "",
+      "No cluster address has signed a single transaction on ANY L2. They are",
+      "inbound-only. What arrived: TWT minted straight from the zero address, a",
+      "token whose symbol is literally '1', and a phishing token named",
+      "'www.resemion.top (checkmark) claim'. On Base 0x398d2824... has taken 574",
+      "inbound transfers and signed nothing.",
+      "",
+      "So the mainnet dormancy stands: the confirmed wallet stopped in Dec 2022 and",
+      "the treasury in Dec 2024. Do NOT let a dust timestamp resurrect them, and do",
+      "not feed these dates to src/dormancy.py as activity."
+    ],
+    "a_token_called_GCR_is_not_GCR": [
+      "0x398d2824... received tokens with the SYMBOL 'GCR' on Base (2026-07-06,",
+      "from 0x0C5b9E3b2aC45D405fD0894a65C5e9B463D3Ec91). Anyone can deploy a token",
+      "called GCR, and someone did. This is the same trap that booked $3.07B of",
+      "counterfeit stablecoins as real: a token is its CONTRACT, not its ticker.",
+      "A future session searching token symbols for 'GCR' will hit these. Ignore",
+      "them."
+    ],
+    "capability_note": "CLAUDE.md records that Etherscan's free tier will not serve account endpoints for base, bsc and optimism. Blockscout's public API does, with no key, and was used for all of this -- so those chains are readable after all, just not through Etherscan."
   }
 }

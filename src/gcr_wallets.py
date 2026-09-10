@@ -46,6 +46,17 @@ WATCH_DIR = DATA_DIR / "gcr_wallets"
 # link between the tracked wallet and GCR's exchange account.
 ACTIONABLE_TIERS = {"confirmed", "linked", "exchange_deposit"}
 
+# Hyperliquid deposits arrive through this Arbitrum contract. Watching it is not
+# redundant with asking Hyperliquid about an address: the bridge credits whatever
+# ACCOUNT the deposit names, which need not be the address that sent the funds.
+# So a GCR wallet could fund a brand-new Hyperliquid account and the HL endpoints
+# for that wallet would still answer "nothing here" — the bridge touch is the
+# only place that shows.
+#
+# Surveyed 2026-09-10 across Arbitrum, Optimism and Base: no cluster address has
+# ever touched it, and the treasury has no Arbitrum history at all.
+HL_BRIDGE = "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7"
+
 
 def load_addresses(path: Path | None = None) -> dict:
     try:
@@ -123,18 +134,44 @@ def check_hyperliquid(states: dict, data: dict | None = None) -> list[dict]:
     return out
 
 
-def build_report(graph_addresses=None, hl_states=None,
+def check_bridge(bridge_states: dict, data: dict | None = None) -> list[dict]:
+    """Which watched addresses have touched the Hyperliquid bridge.
+
+    `bridge_states` maps address -> {"touched": bool, "read_ok": bool,
+    "chain": str}. As everywhere else, a failed read is reported as unknown
+    rather than counted as clean.
+    """
+    data = data if data is not None else load_addresses()
+    out = []
+    for addr, rec in watched(data).items():
+        st = (bridge_states or {}).get(addr)
+        if st is None or not st.get("read_ok", True):
+            out.append({"address": addr, "tier": rec.get("tier"),
+                        "status": "unknown",
+                        "why": "bridge history unreadable"})
+        elif st.get("touched"):
+            out.append({"address": addr, "tier": rec.get("tier"),
+                        "status": "ACTIVE", "chain": st.get("chain"),
+                        "why": "watched GCR address funded the Hyperliquid bridge"})
+    return out
+
+
+def build_report(graph_addresses=None, hl_states=None, bridge_states=None,
                  data: dict | None = None) -> dict:
     data = data if data is not None else load_addresses()
     graph_hits = check_against_graph(graph_addresses or [], data)
     hl_hits = check_hyperliquid(hl_states or {}, data)
-    live = [h for h in hl_hits if h["status"] == "ACTIVE"]
-    unknown = [h for h in hl_hits if h["status"] == "unknown"]
+    br_hits = check_bridge(bridge_states or {}, data)
+    live = ([h for h in hl_hits if h["status"] == "ACTIVE"]
+            + [h for h in br_hits if h["status"] == "ACTIVE"])
+    unknown = ([h for h in hl_hits if h["status"] == "unknown"]
+               + [h for h in br_hits if h["status"] == "unknown"])
     return {
         "computed_at": datetime.now(UTC).isoformat(),
         "watched": len(watched(data)),
         "graph_hits": graph_hits,
-        "hyperliquid_hits": live,
+        "hyperliquid_hits": [h for h in hl_hits if h["status"] == "ACTIVE"],
+        "bridge_hits": [h for h in br_hits if h["status"] == "ACTIVE"],
         "unreadable": unknown,
         "clean": not graph_hits and not live,
         "reading": _reading(graph_hits, live, unknown),
@@ -149,7 +186,8 @@ def _reading(graph_hits, live, unknown) -> str:
     if unknown:
         return (f"Nothing found, but {len(unknown)} address(es) could not be "
                 f"read — this is not a clean result.")
-    return ("No GCR address touches the target or Hyperliquid. Expected, and "
+    return ("No GCR address touches the target, Hyperliquid, or the bridge. "
+            "Expected, and "
             "not evidence against the hypothesis: the confirmed wallet went "
             "quiet in 2022 and the treasury in Dec 2024, while the target's "
             "history starts 2026-02-05, so there is nothing to connect yet.")

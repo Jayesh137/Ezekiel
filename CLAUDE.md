@@ -276,10 +276,32 @@ against the hypothesis**: the confirmed wallet went quiet in 2022 and the
 treasury in Dec 2024, while the target's history starts 2026-02-05, so there is
 nothing to connect yet.
 
+**He never bridged.** Surveyed 2026-09-10 across Arbitrum, Optimism and Base:
+the treasury `0xd7d8f266...` has **no Arbitrum history at all**, and no cluster
+address has ever touched the Hyperliquid bridge on any chain. Every read
+succeeded, so that is a real no.
+
+**Watch out — the cluster looks alive in 2026 and is not.** The survey first
+showed the confirmed GCR wallet dated 2026-08-14 on Optimism and the treasury
+2026-08-16, contemporaneous with the target. It is all **airdrop dust**: no
+cluster address has signed a single transaction on any L2. What arrived was TWT
+minted from the zero address, a token whose symbol is literally `1`, and a
+phishing token named `www.resemion.top ✅ claim`. The mainnet dormancy stands —
+Dec 2022 and Dec 2024. **Do not feed these dates to `dormancy.py` as activity.**
+One address also received tokens with the symbol **`GCR`** on Base; anyone can
+deploy that, and someone did. A token is its contract, not its ticker.
+
+Blockscout's public API reads base/optimism/arbitrum with no key, which is how
+all of this was done — those chains are unreadable *through Etherscan's free
+tier*, not unreadable.
+
 So it is wired as a **tripwire**, not a finding: `src/gcr_wallets.py` +
-`scripts/check_gcr_wallets.py`, in the daily workflow, and it **does** alert. If
-a confirmed GCR address ever appears in the target's graph or trades on
-Hyperliquid, that is flow rather than resemblance — the strongest evidence this
+`scripts/check_gcr_wallets.py`, in the daily workflow, and it **does** alert. It
+watches three things: the target's graph, Hyperliquid itself, and **the Arbitrum
+bridge** — that last one because a deposit credits whatever ACCOUNT it names, so
+a GCR wallet could fund a brand-new HL account while every HL endpoint for that
+wallet still answered "nothing here". If any of the three fires, that is flow
+rather than resemblance — the strongest evidence this
 project can produce, in either direction. Watch out for two traps the tests pin:
 matching on shared exchange infrastructure, and reading inbound airdrop spam as
 activity (`0x398d2824...` looks live and is not).
