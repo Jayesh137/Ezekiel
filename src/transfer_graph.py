@@ -27,6 +27,7 @@ correlator.py, so the traversal and scoring are unit-testable without network.
 
 import hashlib
 import json
+import math
 import sys
 import time
 from datetime import UTC, datetime
@@ -1602,6 +1603,12 @@ def _frontier_rank_key(wallet: str, depth: int, priority: float,
     )
 
 
+# Where the value signal stops distinguishing. A billion, not a million: the
+# point is to keep ranking meaningful across the whole range the target actually
+# moves, and he has sent half a billion dollars to a single address.
+VALUE_SATURATION_USD = 1_000_000_000.0
+
+
 def _frontier_priority(wallet: str, depth: int, edges: "list[dict] | EdgeIndex",
                        now_ts: float) -> tuple:
     """Rank a candidate by traced value x relay likelihood x recency.
@@ -1613,7 +1620,15 @@ def _frontier_priority(wallet: str, depth: int, edges: "list[dict] | EdgeIndex",
     """
     prof = _relay_profile(wallet, edges)
     value = prof["received_usd"]
-    value_score = min(1.0, value / 1_000_000.0) if value > 0 else 0.0
+    # Log scale, not a linear cap at $1M. Traced value spans orders of
+    # magnitude, and the cap made every destination above $1,000,000 score
+    # exactly 1.0 — so the largest single outflow this project has ever seen,
+    # $509,366,847 to 0xf076c336..., ranked identically to a $1,000,000 one and
+    # lost the remaining budget on tie-breaks. It was never expanded, and its
+    # 109 records showed one sender and no recipients: not a dead end, just a
+    # wallet nobody had looked at.
+    value_score = (min(1.0, math.log10(1.0 + value) / math.log10(1.0 + VALUE_SATURATION_USD))
+                   if value > 0 else 0.0)
     age_days = ((now_ts - prof["last_seen_ts"]) / 86400.0
                 if prof["last_seen_ts"] else 999.0)
     recency = ct.age_decay(age_days)

@@ -180,3 +180,40 @@ def test_no_funders_means_no_gas_edges():
     import src.transfer_graph as tg
     assert tg.gas_funding_edges(TARGET, {}) == []
     assert tg.gas_funding_edges(TARGET, None) == []
+
+
+def test_frontier_value_score_still_separates_above_a_million():
+    """The value signal used to be min(1.0, value / 1_000_000), so every
+    destination above $1M scored exactly 1.0. The largest single outflow this
+    project has seen — $509,366,847 to one address — therefore ranked
+    identically to a $1,000,000 one, lost the remaining budget on tie-breaks and
+    was never expanded. Its stored records showed one sender and no recipients:
+    not a dead end, just a wallet nobody had looked at."""
+    import math
+
+    import src.transfer_graph as tg
+
+    def score(v):
+        return min(1.0, math.log10(1.0 + v) / math.log10(1.0 + tg.VALUE_SATURATION_USD))
+
+    small, mid, huge = score(1_000_000), score(58_000_000), score(509_000_000)
+    assert small < mid < huge
+    assert huge < 1.0            # still bounded
+    assert score(0.0) < small
+
+
+def test_frontier_priority_prefers_the_larger_destination():
+    """End to end through the real ranking function."""
+    import src.transfer_graph as tg
+
+    now = 1_760_000_000
+    def edge(dst, usd):
+        return {"src": TARGET, "dst": dst, "amount_usd": usd, "ts": now - 3600,
+                "chain": "arbitrum", "asset": "USDC",
+                "discovery_source": tg.SRC_L1, "bridge_event": False}
+
+    big, small = "0x" + "aa" * 20, "0x" + "bb" * 20
+    edges = [edge(big, 509_000_000.0), edge(small, 1_000_000.0)]
+    pr_big, _ = tg._frontier_priority(big, 1, edges, now)
+    pr_small, _ = tg._frontier_priority(small, 1, edges, now)
+    assert pr_big > pr_small
