@@ -20,8 +20,11 @@ The chain, each step read from the chain rather than from an article:
 Four public claims -- purchase month, purchase price, sale price, buyer -- land
 on one address. That is the confirmation; no single claim would have been enough.
 
-**None of these has ever touched Hyperliquid, and none is a counterparty of the
-target.** Checked 2026-09-10, with every endpoint answering rather than failing.
+**None of these has ever touched Hyperliquid or the Arbitrum bridge, and none is
+a counterparty of the target.** The trail forward ends on 2025-01-19 at an
+exchange deposit address, where 363.2 ETH from two cluster wallets was
+consolidated inside eighty minutes — thirteen months before the target appears,
+and unfollowable once it enters the exchange. Checked 2026-09-10, with every endpoint answering rather than failing.
 So this module is a tripwire, not a finding: its whole value is the day one of
 them moves. If a confirmed GCR address ever appears on Hyperliquid, or in the
 target's transfer graph, that is the strongest evidence this project could get
@@ -207,10 +210,12 @@ def _reading(graph_hits, live, unknown) -> str:
         return (f"Nothing found, but {len(unknown)} address(es) could not be "
                 f"read — this is not a clean result.")
     return ("No GCR address touches the target, Hyperliquid, or the bridge. "
-            "Expected, and "
-            "not evidence against the hypothesis: the confirmed wallet went "
-            "quiet in 2022 and the treasury in Dec 2024, while the target's "
-            "history starts 2026-02-05, so there is nothing to connect yet.")
+            "Expected, and not evidence against the hypothesis. The cluster's "
+            "money moved in a two-week window in 2021 and its last real "
+            "movement was 2025-01-19, when 363.2 ETH from two wallets went "
+            "into one exchange deposit address. Money entering an exchange "
+            "cannot be followed, and the target's history only starts "
+            "2026-02-05 — so there is nothing to connect yet.")
 
 
 def save(report: dict) -> None:

@@ -263,9 +263,27 @@ be enough; four are. Funded on 2021-06-11 with 676.8 ETH straight out of Binance
 
 Following the money: **$21.6M (84% of its outflow) went to
 `0xd7d8f266c637948846bd2fdc4d906f6ba112de39`** — 75 transactions, $66.6M through
-it, **active until 2024-12-21** — and on into Binance and MEXC deposit
-addresses. All of it is in `data/labels/gcr_addresses.json` with per-address
-evidence and confidence tiers.
+it — and on into Binance and MEXC deposit addresses. **Correction:** that address
+was described here as a treasury "active until 2024-12-21". It is neither. Its
+entire $66.6M moved in a **two-week window, 2021-07-28 to 2021-08-10** — a
+conduit, not a treasury — and the Dec 2024 date is a single inbound WOWLABS
+airdrop. Its last deliberate act is seven 0.01 ETH NFT mints in Feb 2023. The
+dust-is-not-activity rule was applied to the L2s and should have been applied to
+this mainnet timestamp at the same time.
+
+**The trail forward ends on 2025-01-19, at an exchange.** Two cluster wallets
+consolidated into one deposit address inside eighty minutes: `0x398d2824...` sent
+**197.0000 ETH** (after unwrapping WETH), then `0xc70a4ddd...` sent **166.20
+ETH**, both to `0x7502aafc...`, which forwarded each within two minutes to a hot
+wallet with 6,024,489 transactions. **363.2 ETH, roughly $1.2M, into one exchange
+account** — thirteen months before the target appears. A closing-out pattern, and
+*not* evidence of a migration: money entering an exchange cannot be followed.
+
+That shared deposit address is itself the find. A CEX deposit address belongs to
+one account, so `0xc70a4ddd...` — funded from the same two Binance hot wallets as
+the confirmed wallet, and a Blur NFT trader — is the **same exchange account** as
+`0x398d2824...`. It is linked to a *lead*, not to the confirmed wallet, so do not
+call it GCR's.
 
 **None of it connects to the target.** No GCR-side address has ever touched
 Hyperliquid (all four HL endpoints answered, all empty — a real "no"), and none

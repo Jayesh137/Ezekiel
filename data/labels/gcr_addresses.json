@@ -42,7 +42,7 @@
     },
     "0xd7d8f266c637948846bd2fdc4d906f6ba112de39": {
       "tier": "linked",
-      "role": "where the money went; probable treasury",
+      "role": "short-lived conduit (previously mislabelled 'treasury')",
       "evidence": [
         "Received $21,596,915.19 of stablecoins from the confirmed address -- 84% of everything that left it.",
         "Only 75 transactions, far too low a fan-in to be exchange infrastructure.",
@@ -51,7 +51,10 @@
       ],
       "caution": "A transfer is not ownership. $21.6M between two low-fan-in addresses is a strong ownership inference, not a proof -- it could be a counterparty, an OTC desk, or a partner.",
       "hyperliquid": "never used",
-      "l2": "NO Arbitrum activity; never bridged. One dust token on Optimism (TWT from the zero address, 2026-08-16) and nothing signed."
+      "l2": "NO Arbitrum activity; never bridged. One dust token on Optimism (TWT from the zero address, 2026-08-16) and nothing signed.",
+      "CORRECTION_2026_09_10": "Two things were wrong here. It was called a treasury 'active until 2024-12-21'. It is neither. Its ENTIRE $66.6M of stablecoin flow happened between 2021-07-28 and 2021-08-10 -- about two weeks -- so it is a conduit, not a treasury. The 2024-12-21 date is a single INBOUND WOWLABS airdrop, and the only later deliberate act is seven 0.01 ETH NFT mints on 2023-02-10. The dust-is-not-activity rule was applied to the L2 survey and should have been applied to this mainnet timestamp at the same time.",
+      "last_money_movement": "2021-08-10 ($2,793,333 USDC out)",
+      "last_deliberate_act": "2023-02-10 (seven 0.01 ETH NFT mints)"
     },
     "0x507dbd9f3ebdcc8b885bda73f45f0e20f8ae5b56": {
       "tier": "linked",
@@ -88,7 +91,7 @@
       "role": "took $4.7M from the treasury and $1.0M from the confirmed wallet",
       "hyperliquid": "airdrop spam only -- three unsolicited inbound spotTransfers (LADY, OMNIX) from unrelated addresses and one automatic Spot Dust Conversion. It has never traded. Do not read this as GCR using Hyperliquid.",
       "caution": "The 'has HL activity' flag on this address is a false positive of exactly the kind src/chain/spam.py exists to catch.",
-      "l2": "The only cluster address with meaningful L2 presence, and it is all inbound: 574 spam transfers on Base, NFT-raffle 'Rarity Pass' and 'Ticket' tokens on Arbitrum. No signed transaction on either chain."
+      "l2": "The only cluster address with meaningful L2 presence, and it is all inbound: 574 spam transfers on Base, NFT-raffle 'Rarity Pass' and 'Ticket' tokens on Arbitrum. No signed transaction on either chain. ON MAINNET IT IS THE LIVE ONE: it moved 197.0000 ETH on 2025-01-19 after unwrapping WETH, and last acted 2025-04-17. This is the cluster member that carried value furthest forward in time."
     },
     "0x2536e296ce51e9239a21fd5c8c9c029de33f88e9": {
       "tier": "lead",
@@ -98,6 +101,30 @@
     "0x3ad721278d361c20a22fa33f45ce893781c12030": {
       "tier": "lead",
       "role": "sent the confirmed wallet 1.5 ETH in June 2021; frequent counterparty",
+      "hyperliquid": "never used"
+    },
+    "0xc70a4ddda17da2a897a827cebb725a89ae6a7278": {
+      "tier": "lead",
+      "role": "sibling wallet, sweeps into the same exchange deposit address",
+      "evidence": [
+        "On 2025-01-19 it sent 166.20 ETH to 0x7502aafC50fB35D44F885500c50852C5BB36051D, the SAME deposit address that 0x398d2824... had sent 197.0000 ETH to eighty minutes earlier.",
+        "A CEX deposit address belongs to one account, so both wallets are funding the same exchange account -- this project's strongest single linkage signal.",
+        "Funded from the SAME two Binance hot wallets that funded the confirmed GCR wallet: 0x21a31ee1... (49.69 ETH, 2023-05-16) and 0x28c6c062... (20 ETH, 2023-08-25). Weak on its own -- millions of people withdraw from those.",
+        "Traded NFTs: 321 ETH to the Blur marketplace on 2023-06-27."
+      ],
+      "active": "2023-05-16 .. 2025-01-19",
+      "caution": "Linked to a LEAD, not to the confirmed wallet. 0x398d2824... took money from GCR's conduit, which makes it a lead rather than GCR; this address is one hop further out again. Do not describe it as GCR's.",
+      "hyperliquid": "never used"
+    },
+    "0x7502aafc50fb35d44f885500c50852c5bb36051d": {
+      "tier": "exchange_deposit",
+      "role": "Kraken deposit address -- where the trail ends",
+      "evidence": [
+        "Received 197.0000 ETH from 0x398d2824... at 2025-01-19T08:24:59 and forwarded 196.9994 ETH to 0x267be1c1d684f78cb4f6a176c4911b741e4ffdc0 two minutes later.",
+        "Received 166.20 ETH from 0xc70a4ddd... at 09:43:47 and forwarded 166.1989 ETH to the same place at 09:45:23.",
+        "0x267be1c1... has 6,024,489 transactions -- an exchange hot wallet."
+      ],
+      "why_it_matters": "363.2 ETH, roughly $1.2M at the time, consolidated from two wallets into one exchange account inside eighty minutes. That is a closing-out pattern, and it happens about thirteen months before the tracked wallet's first activity on 2026-02-05. Suggestive of a migration, and NOT evidence of one: the money goes into an exchange and cannot be followed further on-chain.",
       "hyperliquid": "never used"
     }
   },
@@ -160,5 +187,19 @@
       "balances automatically. Counting it as a trade marked 0x398d2824... as REAL",
       "USE on the first pass."
     ]
+  },
+  "forward_trail_2026_09_10": {
+    "question": "Where did the money go after Dec 2024?",
+    "answer": "Nothing moved after Dec 2024, because nothing was there to move -- the Dec 2024 date was an airdrop. The cluster's last real movement is 2025-01-19, and it went to Kraken.",
+    "the_actual_end": [
+      "2025-01-19 08:23  0x398d2824... unwraps WETH",
+      "2025-01-19 08:24  0x398d2824... -> 197.0000 ETH -> 0x7502aafc... (deposit)",
+      "2025-01-19 08:27  0x7502aafc... -> 196.9994 ETH -> exchange hot wallet",
+      "2025-01-19 09:43  0xc70a4ddd... -> 166.2000 ETH -> 0x7502aafc... (same deposit)",
+      "2025-01-19 09:45  0x7502aafc... -> 166.1989 ETH -> exchange hot wallet",
+      "",
+      "363.2 ETH into one exchange account in eighty minutes. The trail ends there."
+    ],
+    "what_it_does_not_show": "No cluster address, including the two new ones, has any Hyperliquid presence, has touched the Arbitrum bridge, or is a counterparty of the target. Money entering an exchange cannot be followed, so this neither supports nor refutes the hypothesis -- it just ends."
   }
 }
