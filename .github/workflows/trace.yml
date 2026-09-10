@@ -77,6 +77,18 @@ jobs:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+      # Three JSON-RPC calls per watched wallet against a free public endpoint:
+      # no Etherscan budget, no key, a couple of seconds. It runs on the 30-minute
+      # job rather than the daily one because HyperEVM history cannot be
+      # reconstructed after the fact — its public RPC caps log queries at 1000
+      # blocks against ~1s blocks — so the nonce leaving zero has to be caught
+      # near the time it happens or not at all.
+      - name: Watch HyperEVM for cluster activity
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: python scripts/check_hyperevm.py
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
       - name: Rebuild transfer graph

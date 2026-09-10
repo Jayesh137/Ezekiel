@@ -253,6 +253,25 @@ re-appeared as a same-size deposit soon after. It is deliberately separate from
 `DIRECT_RECIPIENT`, which asserts a receipt that, for these wallets, never
 happened.
 
+### HyperEVM watch
+
+HyperEVM is reachable from Hyperliquid without any L1 footprint, and its public
+RPC caps `eth_getLogs` at 1000 blocks against roughly one-second blocks — about
+7,800 rate-limited requests to cover ninety days. History there cannot be
+reconstructed after the fact, so `scripts/check_hyperevm.py` watches instead of
+sweeping: three JSON-RPC calls per cluster wallet, on the 30-minute job, no API
+key and no Etherscan budget.
+
+The signal is the account nonce. An address that has never sent a transaction on
+HyperEVM cannot have moved anything from itself to another wallet there, so
+nonce `0` is a real all-clear and nonce going above `0` is the moment to catch.
+A nonce that could not be read is recorded as unknown and alerts nothing — it is
+never treated as `0`.
+
+Context for why this exists: the target has sent **$23,000,000** to the HyperCore
+system address for USDC across five transfers (2026-06-12 to 2026-08-28) while
+his own HyperEVM nonce has stayed `0`.
+
 **A transfer is not ownership.** The top two tiers require corroboration from an
 independent vector (behavioural similarity, amount correlation, address reuse, gas
 funding, or two-way HL-native flow), so a large lone transfer can never reach

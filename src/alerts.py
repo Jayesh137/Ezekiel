@@ -310,6 +310,34 @@ def alert_hl_native_transfer(destination: str, out_usd: float, in_usd: float,
     return _send_with_cooldown(f"hl_transfer_{destination.lower()}", 72, subject, body)
 
 
+def alert_hyperevm_activation(wallet: str, label: str, nonce: int,
+                              previous_nonce: int) -> bool:
+    """Fire when a wallet that had never transacted on HyperEVM starts to.
+
+    HyperEVM is reachable from HyperCore without ever touching L1, and its public
+    RPC caps log queries at 1000 blocks against ~1s blocks — so once funds move
+    there, following them after the fact is not viable. The nonce going above
+    zero is the moment worth catching, and it costs one request to watch.
+
+    The target sent $23,000,000 to the USDC system address between 2026-06-12
+    and 2026-08-28 while his own HyperEVM nonce stayed 0. If that changes, he has
+    begun acting on a chain this project cannot reconstruct in arrears.
+    """
+    subject = "[EZEKIEL] CRITICAL: HyperEVM Activity Began"
+    body = (
+        f"{label} has sent its first transaction(s) on HyperEVM.\n\n"
+        f"{address_line(wallet, 'Wallet')}\n"
+        f"Transactions sent: {previous_nonce} -> {nonce}\n\n"
+        f"Why this matters: HyperEVM is reachable from Hyperliquid without any\n"
+        f"L1 footprint, and the public RPC limits log queries to 1000 blocks\n"
+        f"against roughly one-second blocks — history cannot be reconstructed\n"
+        f"after the fact. Funds moved there are followed from now, or not at all.\n\n"
+        f"Action: check this address on a HyperEVM explorer and identify where it\n"
+        f"sent funds.\n"
+    )
+    return _send_with_cooldown(f"hyperevm_active_{wallet.lower()}", 72, subject, body)
+
+
 def alert_deposit_correlation(candidate: str, confidence: float, deposit_usd: float,
                               exit_usd: float, gap_hours: float, exit_source: str) -> bool:
     """Fire when a target exit re-appears as a fresh HL bridge deposit (re-linked
