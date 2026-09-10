@@ -80,6 +80,7 @@ def test_verify_fan_services_asks_on_the_chain_the_value_moved_on(monkeypatch):
     senders = _wallets(60, "5")
     edges = [_edge(s, HUB, chain="ethereum") for s in senders] + [_edge(T, HUB, usd=1.0)]
     monkeypatch.setattr(tg, "persons_on_record", set)
+    monkeypatch.setattr(tg, "busy_on_record", dict)
     monkeypatch.setattr(tg, "load_config",
                         lambda: {"chains": [{"name": "arbitrum", "chain_id": 42161,
                                              "native": "ETH", "enabled": True, "priority": 0},

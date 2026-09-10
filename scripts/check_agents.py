@@ -74,6 +74,8 @@ def main() -> int:
     target = (config.get("target_wallet") or "").lower()
     wallets = wallets_to_check(config)[:DEFAULT_MAX_WALLETS]
 
+    from src.hl_identity import parse_web_data
+
     by_wallet: dict[str, list] = {}
     unreadable = 0
     for wallet in wallets:
@@ -89,6 +91,19 @@ def main() -> int:
             by_wallet[wallet] = normalise_agents(resp)
         else:
             unreadable += 1
+            time.sleep(0.15)
+            continue
+        # The frontend agent that actually signs orders is NOT in extraAgents;
+        # only webData2 reports it. Two accounts driven by the same one are the
+        # same browser session, which is the same person.
+        try:
+            web = parse_web_data(hl_post({"type": "webData2", "user": wallet}))
+            if web["agent_address"]:
+                by_wallet[wallet].append({"address": web["agent_address"],
+                                          "name": None,
+                                          "validUntil": web["agent_valid_until"]})
+        except Exception as exc:                      # noqa: BLE001 - transport
+            print(f"[agents] {wallet[:12]}... webData2 unreadable: {type(exc).__name__}")
         time.sleep(0.15)
 
     result = build_agent_links(by_wallet, target)

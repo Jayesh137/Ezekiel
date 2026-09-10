@@ -57,6 +57,9 @@ def main() -> int:
     fills = load_fills()
     wallets = candidate_wallets(config)
 
+    from src.hl_identity import parse_birth
+    from src.utils import hl_post
+
     candidates = {}
     for wallet in wallets:
         try:
@@ -64,6 +67,16 @@ def main() -> int:
         except Exception as exc:                      # noqa: BLE001 - transport
             print(f"[dormancy] {wallet[:12]}... unreadable: {type(exc).__name__}")
             continue
+        # userFillsByTime returns the OLDEST 2,000 of the ~10,000 fills the API
+        # retains, so a busy wallet's "first fill" is a few weeks ago and it
+        # would look newborn on every run. The all-time value series gives the
+        # real birth; it is folded in as the wallet's earliest active day.
+        try:
+            birth = parse_birth(hl_post({"type": "portfolio", "user": wallet}))
+        except Exception:                             # noqa: BLE001 - transport
+            birth = None
+        if birth:
+            got = list(got or []) + [{"time": birth}]
         if got:
             candidates[wallet] = got
         time.sleep(0.12)

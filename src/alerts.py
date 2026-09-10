@@ -537,6 +537,28 @@ def alert_shared_agent(agent: str, accounts: list) -> bool:
     return _send_with_cooldown(f"shared_agent_{agent.lower()}", 168, subject, body)
 
 
+def alert_explicit_link(kind: str, address: str, linked_to: str, why: str) -> bool:
+    """Fire when Hyperliquid itself declares two addresses under one control.
+
+    `userRole` answers that an address is somebody's AGENT or SUB-ACCOUNT, and
+    `userFees.stakingLink` declares a staking wallet paired with a trading
+    wallet. Each is an act the account owner performed, not an inference from
+    flow or style, so each is strong enough to confirm on its own.
+    """
+    subject = f"[EZEKIEL] CRITICAL: Explicit Hyperliquid Link ({kind})"
+    body = (
+        f"Hyperliquid reports a deliberate link between two addresses.\n\n"
+        f"{address_line(address, 'Address')}\n"
+        f"{address_line(linked_to, 'Linked to')}\n"
+        f"Kind: {kind}\n"
+        f"Why: {why}\n\n"
+        f"An agent, a sub-account or a staking link is set up by the account\n"
+        f"owner. Treat both addresses as the same person unless there is a\n"
+        f"specific reason not to.\n"
+    )
+    return _send_with_cooldown(f"explicit_{kind}_{address.lower()}", 168, subject, body)
+
+
 def alert_target_gained_agent(agent: str, name: str | None) -> bool:
     """Fire when the target authorises an agent he did not have before.
 

@@ -110,6 +110,18 @@ jobs:
       # an address an account EXPLICITLY authorised to trade for it, so two
       # accounts sharing one are the same operator - the strongest single signal
       # here. Runs before the roster so a shared agent lands in the same run.
+      # Five free calls per address: who it IS on Hyperliquid — user, vault,
+      # sub-account (and its master), agent (and its owner), or missing — plus
+      # its current frontend agent, staking link, validators and real birth.
+      # Runs before the agent check so the frontend agents are on record, and
+      # before the roster so an explicit link lands in the same run.
+      - name: Resolve Hyperliquid identities
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/check_identity.py
       - name: Check authorised agents
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}

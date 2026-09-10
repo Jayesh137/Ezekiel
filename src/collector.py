@@ -246,6 +246,21 @@ def collect_agents(wallet: str) -> None:
                     "valid_until": entry.get("validUntil") if isinstance(entry, dict) else None,
                     "source": req_type,
                 })
+    # `extraAgents` lists only NAMED extra agents. The frontend's own agent —
+    # the one that signs his orders — appears only in webData2. Measured
+    # 2026-09-10: extraAgents said [] while webData2 showed an agent approved
+    # four days earlier, so the "he has no agents" baseline was false.
+    try:
+        from src.hl_identity import parse_web_data
+        web = parse_web_data(hl_post({"type": "webData2", "user": wallet}))
+        out["sources"]["webData2"] = {"agentAddress": web["agent_address"],
+                                      "agentValidUntil": web["agent_valid_until"]}
+        if web["agent_address"]:
+            out["agents"].append({"address": web["agent_address"], "name": None,
+                                  "valid_until": web["agent_valid_until"],
+                                  "source": "webData2"})
+    except Exception as exc:                          # noqa: BLE001 - transport
+        out["errors"].append(f"webData2: {type(exc).__name__}: {exc}")
     save_latest(str(DATA_DIR / "agents"), out)
 
 

@@ -1337,6 +1337,20 @@ def _load_behavioural_scores() -> tuple[dict, set]:
                     active.add(w)
         except (OSError, ValueError) as e:
             print(f"[graph] could not read candidates: {e}")
+    # Wallets the graph found itself were never leaderboard candidates, so
+    # `trades_on_hl` could not be true for them. The identity pass asks
+    # Hyperliquid directly; an account holding value there is a participant.
+    ident = DATA_DIR / "identity" / "latest.json"
+    if ident.exists():
+        try:
+            with open(ident) as f:
+                for w, i in (json.load(f).get("identities") or {}).items():
+                    if not isinstance(i, dict) or not i.get("read_ok"):
+                        continue
+                    if i.get("role") == "user" and (i.get("account_value") or 0) > 0:
+                        active.add((w or "").lower())
+        except (OSError, ValueError, AttributeError) as e:
+            print(f"[graph] could not read identities: {e}")
     return scores, active
 
 

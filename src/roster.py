@@ -41,6 +41,10 @@ VECTOR_HL_NATIVE = "hl_native"      # two-way flow entirely inside Hyperliquid
 # trade for it, so two accounts sharing one are the same operator. Not a
 # coincidence of flow or of style but a deliberate act of control.
 VECTOR_AGENT = "shared_agent"
+# Hyperliquid itself declaring the relationship: an address that is a cluster
+# wallet's agent or sub-account, or its declared staking partner. Like a
+# shared agent, an act of control rather than an inference.
+VECTOR_EXPLICIT = "explicit_link"
 
 TIER_CONFIRMED = "CONFIRMED"
 TIER_PROBABLE = "PROBABLE"
@@ -84,7 +88,7 @@ def assign_tier(vectors: set, confidence: float, is_service: bool,
         return TIER_CONFIRMED
     # A shared agent is a deliberate act of control by the account owner, not an
     # inference from flow. It is the one signal strong enough to stand alone.
-    if VECTOR_AGENT in vectors:
+    if VECTOR_AGENT in vectors or VECTOR_EXPLICIT in vectors:
         return TIER_CONFIRMED
     if len(vectors) >= 2 and confidence >= 0.60:
         return TIER_CONFIRMED
@@ -233,6 +237,35 @@ def build_roster(config: dict | None = None) -> dict:
         e["evidence"]["portfolio_overlap"] = detail.get("score")
         e["evidence"]["shared_rare_markets"] = [
             s.get("market") for s in (detail.get("shared_rare") or [])][:5]
+
+    # Hyperliquid's own answers about who an address is: agent owners,
+    # sub-account masters, staking links, the current frontend agent, presence
+    # and birth. Links to the cluster confirm alone.
+    try:
+        with open(DATA_DIR / "identity" / "latest.json") as f:
+            ident_doc = json.load(f)
+    except (OSError, ValueError, AttributeError):
+        ident_doc = {}
+    for link in ident_doc.get("links") or []:
+        for side in ("address", "linked_to"):
+            a = (link.get(side) or "").lower()
+            if not a or a == target:
+                continue
+            e = entry(a)
+            e["vectors"].add(VECTOR_EXPLICIT)
+            e["evidence"].setdefault("explicit_links", []).append(
+                {"kind": link.get("kind"), "with": link.get("linked_to")
+                 if side == "address" else link.get("address")})
+    for a, ident in (ident_doc.get("identities") or {}).items():
+        a = (a or "").lower()
+        if not a or a == target or a not in wallets:
+            continue
+        e = entry(a)
+        e["evidence"]["hl_role"] = ident.get("role")
+        e["evidence"]["hl_account_value"] = ident.get("account_value")
+        e["evidence"]["hl_birth_ms"] = ident.get("birth_ms")
+        if ident.get("agent_address"):
+            e["evidence"]["frontend_agent"] = ident["agent_address"]
 
     for acct in _read(DATA_DIR / "hyperevm" / "latest.json", "wallets"):
         a = (acct.get("address") or "").lower()
