@@ -113,6 +113,63 @@ def now_ms() -> int:
 
 # --- Candidate records ---
 
+def account_value_components(latest: dict | None) -> dict:
+    """What the account is worth, split by where the value sits.
+
+    `data/account/latest.json` holds `{"perp": ..., "spot": ..., "hip3": ...}`
+    and the drawdown signal read only `perp.marginSummary.accountValue`. That
+    is not the account: on 2026-09-11 the perp value fell from $29.4M to
+    $14.2M and fired a "52% drop — possible liquidation" alert while the
+    total was flat, because he had moved the money to spot and bridged $7M to
+    HyperEVM. An alert that calls an internal transfer a liquidation is how an
+    operator learns to ignore the one that is real.
+
+    `total` is perp + every HIP-3 dex + spot USDC. Non-USDC spot tokens are
+    counted separately and NOT in the total: pricing them needs a source this
+    does not have, and a guess would move the number the drawdown threshold
+    reads. Returns None for a component that could not be read, never 0.0.
+    """
+    def _val(state) -> float | None:
+        if not isinstance(state, dict):
+            return None
+        try:
+            return float((state.get("marginSummary") or {}).get("accountValue"))
+        except (TypeError, ValueError):
+            return None
+
+    if not isinstance(latest, dict):
+        return {"perp": None, "hip3": None, "spot_usdc": None, "total": None,
+                "spot_other_tokens": 0}
+
+    perp = _val(latest.get("perp", latest))
+    hip3_states = latest.get("hip3") if isinstance(latest.get("hip3"), dict) else {}
+    hip3_values = [v for v in (_val(s) for s in hip3_states.values()) if v is not None]
+    hip3 = sum(hip3_values) if hip3_values else (0.0 if hip3_states == {} else None)
+
+    spot_usdc, others = None, 0
+    spot = latest.get("spot")
+    if isinstance(spot, dict) and isinstance(spot.get("balances"), list):
+        spot_usdc = 0.0
+        for b in spot["balances"]:
+            if not isinstance(b, dict):
+                continue
+            try:
+                total = float(b.get("total") or 0)
+            except (TypeError, ValueError):
+                continue
+            if total <= 0:
+                continue
+            if str(b.get("coin", "")).upper() == "USDC":
+                spot_usdc += total
+            else:
+                others += 1
+
+    parts = [p for p in (perp, hip3, spot_usdc) if p is not None]
+    return {"perp": perp, "hip3": hip3, "spot_usdc": spot_usdc,
+            "total": round(sum(parts), 2) if perp is not None else None,
+            "spot_other_tokens": others}
+
+
 def candidate_current_score(candidate: dict) -> float:
     """How well this candidate matches the target *now*.
 

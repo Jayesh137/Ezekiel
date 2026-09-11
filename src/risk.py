@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src import thresholds as th
 from src.utils import (
     DATA_DIR,
+    account_value_components,
     candidate_current_score,
     load_all_records,
     load_config,
@@ -167,8 +168,10 @@ def _gather_signals() -> dict:
             if not isinstance(data, dict):
                 raise TypeError(
                     f"expected an object with a 'perp' key, got {type(data).__name__}")
-            perp = data.get("perp", data) or {}
-            cur = float((perp.get("marginSummary") or {}).get("accountValue", 0) or 0)
+            # The whole account, for the same reason the drop alert reads it:
+            # perp alone reported a 52% collapse on 2026-09-11 when the money
+            # had moved to spot and the total was flat.
+            cur = account_value_components(data)["total"] or 0.0
         except Exception as e:
             print(f"[risk] WARNING: could not read account value from {acct_path}: {e}. "
                   f"Drawdown cannot be measured and is reported as 0.0 — this is a "

@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils import (
     DATA_DIR,
+    account_value_components,
     append_records,
     hl_post,
     load_config,
@@ -398,9 +399,13 @@ def check_account_value_drop() -> None:
         if not isinstance(latest, dict):
             raise TypeError(
                 f"expected an object with a 'perp' key, got {type(latest).__name__}")
-        perp = latest.get("perp", latest) or {}
-        ms_data = perp.get("marginSummary", {}) or {}
-        current_value = float(ms_data.get("accountValue", 0))
+        # The WHOLE account, not just the perp margin summary. Reading perp
+        # alone called an internal perp -> spot transfer a 52% liquidation on
+        # 2026-09-11 while the total was flat.
+        components = account_value_components(latest)
+        current_value = components["total"]
+        if current_value is None:
+            raise ValueError("no readable account value")
     except Exception as e:
         # Returning quietly here is how this alert stayed dead: the file held a
         # stale portfolio payload and every run bailed out before the comparison.
@@ -429,7 +434,8 @@ def check_account_value_drop() -> None:
             last_alert = read_cursor("last_drop_alert")
             if not last_alert or (now_ms() - last_alert) > 60 * 60 * 1000:
                 from src.alerts import alert_account_value_drop
-                if alert_account_value_drop(current_value, prev_value, drop_pct):
+                if alert_account_value_drop(current_value, prev_value, drop_pct,
+                                            components):
                     write_cursor("last_drop_alert", now_ms())
                     # Reset high-water mark so we don't re-alert hourly on the same drop;
                     # a further 40% drop from here will still trigger.

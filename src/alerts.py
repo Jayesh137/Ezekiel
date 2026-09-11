@@ -944,14 +944,36 @@ def alert_collection_stale(age_minutes: float | None, threshold_minutes: float) 
     return _send_with_cooldown("collection_stale", 24, subject, body)
 
 
-def alert_account_value_drop(current: float, previous: float, drop_pct: float) -> bool:
+def alert_account_value_drop(current: float, previous: float, drop_pct: float,
+                             components: dict | None = None) -> bool:
+    """Fire when the WHOLE account falls sharply.
+
+    The breakdown is in the body because the previous version of this alert
+    read the perp margin summary alone and announced a "52% drop — possible
+    liquidation" on 2026-09-11 when he had moved money from perp to spot and
+    bridged $7M to HyperEVM, with total equity flat. Naming where the value
+    sits is what separates a liquidation from a transfer at a glance.
+    """
     subject = f"[EZEKIEL] WARNING: Account Value Drop {drop_pct:.0%} — Possible Liquidation"
+    breakdown = ""
+    if components:
+        def _fmt(v):
+            return f"${v:,.2f}" if isinstance(v, (int, float)) else "unreadable"
+        breakdown = (
+            f"\nWhere the value sits now:\n"
+            f"  Perp:      {_fmt(components.get('perp'))}\n"
+            f"  HIP-3:     {_fmt(components.get('hip3'))}\n"
+            f"  Spot USDC: {_fmt(components.get('spot_usdc'))}\n"
+            f"  (plus {components.get('spot_other_tokens', 0)} non-USDC spot token(s), "
+            f"not valued)\n")
     body = (
-        f"The target wallet's account value has dropped significantly.\n\n"
+        f"The target wallet's total account value has dropped significantly.\n\n"
         f"Previous: ${previous:,.2f}\n"
         f"Current:  ${current:,.2f}\n"
-        f"Change:   -{drop_pct:.1%}\n\n"
-        f"This may indicate a large loss, liquidation, or withdrawal.\n"
+        f"Change:   -{drop_pct:.1%}\n"
+        f"{breakdown}\n"
+        f"This may indicate a large loss, liquidation, or withdrawal. Money moved\n"
+        f"between perp and spot is NOT a drop and no longer fires this alert.\n"
         f"A trader who has been wiped may migrate to a fresh wallet — monitor Recovery page.\n"
     )
     return send_alert(subject, body)

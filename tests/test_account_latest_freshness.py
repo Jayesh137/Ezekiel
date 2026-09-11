@@ -130,3 +130,76 @@ def test_unreadable_account_state_is_reported_not_swallowed(tmp_path, monkeypatc
     out = capsys.readouterr().out
     assert "account" in out.lower() and ("could not" in out.lower() or "warning" in out.lower()), \
         "an unreadable account state must be announced, not silently scored as no drawdown"
+
+
+# --- the whole account, not just the perp margin summary ----------------------
+
+def test_account_value_counts_perp_hip3_and_spot_usdc():
+    """Reading perp alone announced a 52% liquidation on 2026-09-11 when the
+    money had moved to spot and total equity was flat."""
+    from src.utils import account_value_components
+
+    latest = {
+        "perp": {"marginSummary": {"accountValue": "14419722.17"}},
+        "hip3": {"xyz": {"marginSummary": {"accountValue": "1000000.00"}}},
+        "spot": {"balances": [{"coin": "USDC", "total": "41681469.0"},
+                              {"coin": "PURR", "total": "361250.33"},
+                              {"coin": "HYPE", "total": "0"}]},
+    }
+    got = account_value_components(latest)
+    assert got["perp"] == 14419722.17
+    assert got["hip3"] == 1000000.0
+    assert got["spot_usdc"] == 41681469.0
+    assert got["total"] == 57101191.17
+    # PURR is counted but never valued: a guessed price would move the
+    # threshold the drawdown signal reads. HYPE at zero is not a holding.
+    assert got["spot_other_tokens"] == 1
+
+
+def test_an_unreadable_account_is_none_not_zero():
+    from src.utils import account_value_components
+
+    assert account_value_components(None)["total"] is None
+    assert account_value_components([])["total"] is None
+    assert account_value_components({"perp": "nonsense"})["total"] is None
+
+
+def test_a_bare_clearinghouse_state_still_reads_as_perp():
+    """Older snapshots stored the perp state at the top level."""
+    from src.utils import account_value_components
+
+    got = account_value_components({"marginSummary": {"accountValue": "100.0"}})
+    assert got["perp"] == 100.0 and got["total"] == 100.0
+
+
+def test_moving_money_from_perp_to_spot_is_not_a_drop(monkeypatch, tmp_path):
+    """The exact 2026-09-11 shape: perp halves, spot absorbs it, total flat."""
+    import json
+
+    from src import collector
+    from src.utils import account_value_components
+
+    before = account_value_components({
+        "perp": {"marginSummary": {"accountValue": "29398309.83"}},
+        "spot": {"balances": [{"coin": "USDC", "total": "27000000.0"}]}})
+    after = account_value_components({
+        "perp": {"marginSummary": {"accountValue": "14181171.30"}},
+        "spot": {"balances": [{"coin": "USDC", "total": "41681469.0"}]}})
+    assert before["perp"] - after["perp"] > 15_000_000          # perp fell by half
+    assert abs(after["total"] - before["total"]) / before["total"] < 0.05
+
+    sent = []
+    monkeypatch.setattr(collector, "DATA_DIR", tmp_path)
+    (tmp_path / "account").mkdir(parents=True)
+    (tmp_path / "account" / "latest.json").write_text(json.dumps({
+        "perp": {"marginSummary": {"accountValue": "14181171.30"}},
+        "spot": {"balances": [{"coin": "USDC", "total": "41681469.0"}]}}))
+    monkeypatch.setattr(collector, "read_cursor",
+                        lambda name, base=None: int(before["total"] * 100)
+                        if name == "prev_account_value_cents" else 0)
+    monkeypatch.setattr(collector, "write_cursor", lambda *a, **k: None)
+    import src.alerts as alerts_mod
+    monkeypatch.setattr(alerts_mod, "alert_account_value_drop",
+                        lambda *a, **k: sent.append(a) or True)
+    collector.check_account_value_drop()
+    assert sent == []
