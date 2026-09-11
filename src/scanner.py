@@ -223,6 +223,45 @@ def get_candidate_orders(wallet: str) -> list[dict]:
     return [r for r in resp if isinstance(r, dict) and isinstance(r.get("order"), dict)]         if isinstance(resp, list) else []
 
 
+_LIVE_DEXES: list | None = None
+
+
+def live_hip3_dexes(fetch=None, refresh: bool = False) -> list[str]:
+    """Every HIP-3 dex Hyperliquid currently lists, not just the configured one.
+
+    `config.hip3_dexes` names the dexes the target is KNOWN to trade, which is
+    `xyz` alone. Ten exist (xyz, flx, vntl, hyna, km, abcd, cash, para, mkts,
+    io, measured 2026-09-11), and a book on any of them would be invisible to
+    a check that only asks about the configured name — the same blindness that
+    once had the target scored 52-of-52 short while he held a two-sided equity
+    pair trade on `xyz`.
+
+    Cached for the process: this is for the cluster, where nine extra calls
+    are nothing. Candidates keep the configured list, because comparing a
+    stranger only needs the markets the target actually trades, and eleven
+    calls per wallet across a five-hundred-wallet sweep is not nothing.
+
+    Falls back to the configured list when the venue cannot be asked, and
+    unions the two so a configured dex is never dropped by an API hiccup.
+    """
+    global _LIVE_DEXES
+    if _LIVE_DEXES is not None and not refresh:
+        return _LIVE_DEXES
+    configured = [d for d in (load_config().get("hip3_dexes") or []) if d]
+    try:
+        raw = (fetch or hl_post)({"type": "perpDexs"})
+        names = [(d.get("name") if isinstance(d, dict) else d) for d in raw or []]
+        found = [n for n in names if isinstance(n, str) and n]
+    except Exception:                                 # noqa: BLE001 - transport
+        found = []
+    if not found:
+        print("[scanner] perpDexs unreadable — using the configured HIP-3 dexes only")
+        _LIVE_DEXES = list(configured)
+        return _LIVE_DEXES
+    _LIVE_DEXES = found + [d for d in configured if d not in found]
+    return _LIVE_DEXES
+
+
 def merged_clearinghouse_state(wallet: str, dexes=None, fetch=None) -> dict:
     """Perp state across the default dex AND every HIP-3 dex, as one document.
 

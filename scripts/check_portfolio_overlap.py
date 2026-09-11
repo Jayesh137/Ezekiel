@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.portfolio_overlap import basket, build_report, save
-from src.scanner import merged_clearinghouse_state
+from src.scanner import live_hip3_dexes, merged_clearinghouse_state
 from src.utils import DATA_DIR, load_config
 
 MAX_CANDIDATES = 40
@@ -46,8 +46,11 @@ def candidate_wallets(config: dict) -> list[str]:
 def main() -> int:
     config = load_config()
     try:
-        # HIP-3 books included: the rarest positions live there.
-        target_state = merged_clearinghouse_state(config["target_wallet"])
+        # HIP-3 books included, and EVERY live dex for the target rather than
+        # the one he is known to use: a book on another is exactly what a
+        # migration inside Hyperliquid would look like.
+        target_state = merged_clearinghouse_state(config["target_wallet"],
+                                                  dexes=live_hip3_dexes())
     except Exception as exc:                          # noqa: BLE001 - transport
         print(f"[portfolio] target state unreadable: {type(exc).__name__}: {exc}")
         return 0

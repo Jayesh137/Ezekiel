@@ -25,3 +25,43 @@ def test_an_unreadable_base_state_is_empty_not_partial():
     def fetch(body):
         raise RuntimeError("down")
     assert scanner.merged_clearinghouse_state("0xabc", dexes=["xyz"], fetch=fetch) == {}
+
+
+def test_live_dexes_prefer_the_venue_and_never_drop_a_configured_one(monkeypatch):
+    """config.hip3_dexes names the one dex he is known to trade; ten exist."""
+    from src import scanner
+
+    monkeypatch.setattr(scanner, "_LIVE_DEXES", None)
+    monkeypatch.setattr(scanner, "load_config", lambda: {"hip3_dexes": ["xyz", "private"]})
+    got = scanner.live_hip3_dexes(
+        fetch=lambda body: [{"name": "xyz"}, {"name": "flx"}, None, {"name": "io"}],
+        refresh=True)
+    assert got == ["xyz", "flx", "io", "private"]
+
+
+def test_an_unreadable_venue_falls_back_to_the_configured_list(monkeypatch):
+    from src import scanner
+
+    monkeypatch.setattr(scanner, "_LIVE_DEXES", None)
+    monkeypatch.setattr(scanner, "load_config", lambda: {"hip3_dexes": ["xyz"]})
+
+    def boom(body):
+        raise RuntimeError("down")
+
+    assert scanner.live_hip3_dexes(fetch=boom, refresh=True) == ["xyz"]
+
+
+def test_the_dex_list_is_cached_for_the_process(monkeypatch):
+    from src import scanner
+
+    calls = []
+    monkeypatch.setattr(scanner, "_LIVE_DEXES", None)
+    monkeypatch.setattr(scanner, "load_config", lambda: {"hip3_dexes": []})
+
+    def fetch(body):
+        calls.append(body)
+        return [{"name": "xyz"}]
+
+    scanner.live_hip3_dexes(fetch=fetch, refresh=True)
+    scanner.live_hip3_dexes(fetch=fetch)
+    assert len(calls) == 1

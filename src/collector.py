@@ -23,8 +23,6 @@ from src.utils import (
 
 def collect_positions(wallet: str) -> None:
     """Snapshot current positions and account state."""
-    config = load_config()
-
     state = hl_post({"type": "clearinghouseState", "user": wallet})
     save_snapshot(str(DATA_DIR / "positions"), state)
     save_latest(str(DATA_DIR / "positions"), state)
@@ -33,14 +31,26 @@ def collect_positions(wallet: str) -> None:
     save_snapshot(str(DATA_DIR / "spot"), spot)
     save_latest(str(DATA_DIR / "spot"), spot)
 
-    # Fetch HIP-3 dex positions (e.g. xyz:XYZ100, xyz:SILVER)
+    # Every HIP-3 dex the venue lists, not just the one he is known to use.
+    # Ten exist; a book opened on another would be a migration inside
+    # Hyperliquid that a configured list of one cannot see. Nine extra calls
+    # for the target alone is nothing, and the configured names are unioned in
+    # so an unreadable perpDexs cannot silently narrow the check.
+    from src.scanner import live_hip3_dexes
     hip3_positions = {}
-    for dex in config.get("hip3_dexes", []):
+    for dex in live_hip3_dexes():
         dex_state = hl_post({"type": "clearinghouseState", "user": wallet, "dex": dex})
-        if dex_state:
-            hip3_positions[dex] = dex_state
-            save_snapshot(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
-            save_latest(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
+        if not isinstance(dex_state, dict):
+            continue
+        value = float((dex_state.get("marginSummary") or {}).get("accountValue") or 0)
+        positions = dex_state.get("assetPositions") or []
+        # An empty dex is a real answer and a cheap one, but writing a snapshot
+        # per empty dex every run would add nine files a minute to the tree.
+        if not value and not positions:
+            continue
+        hip3_positions[dex] = dex_state
+        save_snapshot(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
+        save_latest(str(DATA_DIR / f"positions_hip3_{dex}"), dex_state)
 
     # Publish the composite as latest, not only as a dated snapshot. Without
     # this, account/latest.json was never written by this code at all — it still

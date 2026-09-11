@@ -74,7 +74,7 @@ trading style. Never promote a wallet on one vector alone.
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
 | Dormancy handoff | `dormancy.py` | One wallet goes quiet, another is born. The only vector needing NO connection between them |
-| HyperEVM watch | `scripts/check_hyperevm.py` | Nonce tripwire; history there cannot be reconstructed after the fact |
+| HyperEVM watch | `scripts/check_hyperevm.py`, `scripts/probe_hyperevm_index.py` | Nonce tripwire, plus a survey: chain 999 IS readable through the Etherscan key |
 | Identity | `hl_identity.py`, `scripts/check_identity.py` | `userRole` (agent → owner, sub-account → master), `webData2` (frontend agent), `stakingLink`, delegations, `portfolio` birth. An explicit link CONFIRMs alone |
 | Own actions | `hl_actions.py` (collector step) | The explorer's last 300 L1 actions: `withdraw3` destinations, agent approvals, vault transfers, sub-accounts. A foreign destination alerts |
 | Bridge destinations | `chain/bridges.py`, `scripts/check_bridge_destinations.py` | CCTP/Socket calldata names the destination chain and recipient; Hyperliquid's CCTP extension names the HL account. A non-cluster recipient alerts |
@@ -151,12 +151,13 @@ the next session rebuilding them:
   idea occurs genuinely only twice — three further occurrences were counterfeit
   tokens, now quarantined. Cheap to revisit if his habits change, but there is
   no signature here today.
-- ~~Approval fingerprints~~ — **measured 2026-09-10 and rejected FOR THIS
-  TARGET.** He has 32 outbound L1 destinations and 25 are infrastructure: his
-  entire footprint is stablecoin transfers to exchange deposit addresses and the
-  HL bridge. **He does no DeFi**, so there are no approvals to fingerprint, and
-  collecting them would spend scarce Etherscan budget on a signal he does not
-  emit. Worth building the day he starts interacting with protocols.
+- **Approval fingerprints — rejected 2026-09-10 on a premise that turned out
+  to be false, and REOPENED 2026-09-11.** The rejection said "he does no
+  DeFi". Decoding his bridge calldata and labelling his destinations showed
+  otherwise: $152.6M into the Aave aArbUSDC aToken across 67 transfers, plus
+  Paraswap, Pendle, Morpho and Socket. The protocols he approves, and the
+  order he approved them in, are a fingerprint he does emit. Nobody has built
+  it yet.
 - **Gas and fee habits** — priority-fee setting is a per-human default.
 - **Counterparty-set overlap** — Jaccard over the full counterparty set, not just
   deposit addresses.
@@ -275,8 +276,13 @@ read the grids; then open only the tables at full size.
 include the HIP-3 `xyz:` deployments, so the wallet scored 52-of-52 short while
 it also held **long SP500 and XYZ100 against short MU and SKHX** — two
 memory-chip competitors, an equity sector pair trade, and two-sided. The runner
-now merges every dex in `hip3_dexes`, and reports a dex it cannot read rather
-than skipping it. Including them moved `liquidation_distance` from CONSISTENT to
+now merges every dex, and reports a dex it cannot read rather than skipping it.
+For the CLUSTER that means every dex the venue lists (`scanner.live_hip3_dexes`,
+ten on 2026-09-11: xyz, flx, vntl, hyna, km, abcd, cash, para, mkts, io), not
+just the configured `hip3_dexes` — a book opened on another is what a migration
+inside Hyperliquid would look like, and he uses only `xyz` today ($6.76M, four
+positions). Candidates keep the configured list, because eleven calls per wallet
+across a five-hundred-wallet sweep is not free. Including them moved `liquidation_distance` from CONSISTENT to
 UNTESTABLE, which is the honest reading: the crypto book is all cross and 100%+
 from liquidation, but `xyz:XYZ100` sits **22%** away and `xyz:SP500` 40%, both
 LONG indices on **isolated** 4x. GCR ran cross throughout.
@@ -450,12 +456,23 @@ that it is.
   (`rpc.hyperliquid.xyz/explorer`, `userDetails`) returns the last 300
   actions with payloads and cannot be paged. `vaultSummaries` answered `[]`;
   vault leadership comes from `webData2.leadingVaults`.
-- Nothing here has been pushed by the session that built it; the workflows
-  run these steps once `main` is pushed. Set `TELEGRAM_*` or `NTFY_TOPIC`
-  first so the first run's findings reach a phone.
+- **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
+  collector run's silence and account-drop alerts arrived on the topic within
+  seconds while email failed as usual. Telegram is still unset.
 - Free tiers only. Etherscan free does not serve account endpoints for
   **base, bsc, optimism** — those chains are unreadable, not empty.
-- HyperEVM public RPC caps `eth_getLogs` at 1000 blocks against ~1s blocks:
-  history there is unreconstructable, so it must be *watched*, not swept.
+- **HyperEVM IS readable through the Etherscan key, at `chainid=999`.**
+  Measured 2026-09-11: `status: "1"`, real rows. What is unreconstructable is
+  the PUBLIC RPC, which caps `eth_getLogs` at 1000 blocks against ~1s blocks.
+  The surveyed answer for the cluster is **nothing**: the target has 8 ERC-20
+  transfers there, all inbound airdrop spam, 0 native and 0 internal
+  transactions, and has never sent anything; the treasury has 3, the same
+  shape. No USDC at either address.
+- **The $30,000,000 to `0x2000…0000` is still unaccounted for.** Six sends of
+  spot USDC to the HyperCore system address for token 0 (2026-06-12 to
+  2026-09-11), nothing returning that way, nonce 0, no ERC-20 on HyperEVM, no
+  balance on any of the ten HIP-3 dexes, and no Transfer log crediting him in
+  a window around the latest send. Every tool this project has says it is not
+  where it should be. The nonce tripwire remains the watch.
 - Tests must stay network-free and must never write to real `data/`.
 - Verify before claiming: run it, read the output, report what it actually says.
