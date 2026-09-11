@@ -1,12 +1,12 @@
 {
-  "computed_at": "2026-09-11T17:00:30.007805+00:00",
+  "computed_at": "2026-09-11T17:16:41.429590+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 293,
+  "wallet_count": 294,
   "behavioural_counts_as_a_vector": false,
   "tier_counts": {
     "CONFIRMED": 2,
     "PROBABLE": 1,
-    "POSSIBLE": 84,
+    "POSSIBLE": 85,
     "WATCH": 49,
     "INFRASTRUCTURE": 157
   },
@@ -94,12 +94,13 @@
       "wallet": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
       "vectors": [
         "correlation",
-        "dormancy_handoff"
+        "dormancy_handoff",
+        "transfer"
       ],
-      "confidence": 0.1767,
-      "classification": "CORRELATION_LEAD",
+      "confidence": 0.3267,
+      "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
+        "Repeated transfers (46 separate movements)",
         "Exit amount re-appears as a deposit (single amount, 64% match confidence)",
         "Behavioural similarity only 69% \u2014 weak on its own",
         "Actively trading on Hyperliquid after receiving funds"
@@ -109,10 +110,11 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 47
         },
         "depth": 1,
         "chains": [
+          "arbitrum",
           "inferred"
         ],
         "correlation_confidence": 0.6445,
@@ -138,7 +140,7 @@
       },
       "is_service": false,
       "known_self": false,
-      "vector_count": 2,
+      "vector_count": 3,
       "tier": "PROBABLE"
     },
     {
@@ -799,6 +801,34 @@
         "hl_role": "missing",
         "hl_account_value": 0.0,
         "hl_birth_ms": null
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xd7a827fbaf38c98e8336c5658e4bcbcd20a4fd2d",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.1125,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (14 separate movements)",
+        "Reached at 2 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 14
+        },
+        "depth": 2,
+        "chains": [
+          "arbitrum"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1560,7 +1590,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (3 separate movements)",
-        "Last movement 1268 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 1269 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3491,7 +3521,10 @@
         "behavioural_tier": "WEAK_LEAD",
         "style_vetoes": [
           "Decision frequency 9x apart (0.27 vs 2.47 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1772664480050
       },
       "is_service": false,
       "known_self": false,
@@ -3507,7 +3540,11 @@
       "evidence": {
         "behavioural_score": 0.6189,
         "behavioural_tier": "BACKGROUND",
-        "style_vetoes": []
+        "style_vetoes": [],
+        "hl_role": "user",
+        "hl_account_value": 3761375.580521,
+        "hl_birth_ms": 1747259760103,
+        "frontend_agent": "0x441c562f940dde602d0133bb6f750bcd41478d33"
       },
       "is_service": false,
       "known_self": false,
@@ -3525,7 +3562,11 @@
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
           "Decision frequency 5x apart (1.41 vs 7.09 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 413721.655988,
+        "hl_birth_ms": 1736985120135,
+        "frontend_agent": "0x74eaea6060314af60a288de52226c3f38769ce53"
       },
       "is_service": false,
       "known_self": false,
@@ -3543,7 +3584,11 @@
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
           "Decision frequency 27x apart (0.26 vs 6.96 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 48971.466356,
+        "hl_birth_ms": 1712187000059,
+        "frontend_agent": "0xdca13d1a52875c8da2de175381994169e370afb0"
       },
       "is_service": false,
       "known_self": false,
@@ -3561,7 +3606,11 @@
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
           "Decision frequency 6x apart (3.14 vs 0.50 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 502735.700546,
+        "hl_birth_ms": 1738797720069,
+        "frontend_agent": "0x3de807238238b93f0a5b2e747ab210ce9358a74a"
       },
       "is_service": false,
       "known_self": false,
@@ -3577,7 +3626,10 @@
       "evidence": {
         "behavioural_score": 0.6285,
         "behavioural_tier": "BACKGROUND",
-        "style_vetoes": []
+        "style_vetoes": [],
+        "hl_role": "user",
+        "hl_account_value": 2351913.065375,
+        "hl_birth_ms": 1753309200002
       },
       "is_service": false,
       "known_self": false,
@@ -3593,7 +3645,11 @@
       "evidence": {
         "behavioural_score": 0.6707,
         "behavioural_tier": "WEAK_LEAD",
-        "style_vetoes": []
+        "style_vetoes": [],
+        "hl_role": "user",
+        "hl_account_value": 101478.05773,
+        "hl_birth_ms": 1772057160069,
+        "frontend_agent": "0xe6e7d8514429ffd6284debeff35f7e8565103733"
       },
       "is_service": false,
       "known_self": false,
@@ -3609,7 +3665,11 @@
       "evidence": {
         "behavioural_score": 0.651,
         "behavioural_tier": "WEAK_LEAD",
-        "style_vetoes": []
+        "style_vetoes": [],
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1737589680018,
+        "frontend_agent": "0xd796b76881604d5bdb06ce7407405e31d230038f"
       },
       "is_service": false,
       "known_self": false,
@@ -3627,7 +3687,11 @@
         "behavioural_tier": "WEAK_LEAD",
         "style_vetoes": [
           "Decision frequency 11x apart (0.27 vs 3.11 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 191964.034787,
+        "hl_birth_ms": 1694043900022,
+        "frontend_agent": "0xd09dcef3fc6d9540d68f5713c7e7a8d818c6b2e7"
       },
       "is_service": false,
       "known_self": false,
@@ -3645,7 +3709,11 @@
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
           "Decision frequency 22x apart (3.50 vs 76.00 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 36000256.277378,
+        "hl_birth_ms": 1706139900027,
+        "frontend_agent": "0xdbd6cab82472d381229cfbba37fe0faad89ead33"
       },
       "is_service": false,
       "known_self": false,
@@ -3663,7 +3731,11 @@
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
           "Decision frequency 250x apart (0.26 vs 65.00 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 323759.428543,
+        "hl_birth_ms": 1715815800086,
+        "frontend_agent": "0xddf0cdd1ec3d9893db61b559b5a2590f41e841c4"
       },
       "is_service": false,
       "known_self": false,
@@ -3682,7 +3754,10 @@
         "style_vetoes": [
           "Decision frequency 31x apart (1.41 vs 44.00 position episodes/day)",
           "Incompatible hold style: 100% vs 0% of holds under 1h"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1714001400455
       },
       "is_service": false,
       "known_self": false,
@@ -3700,7 +3775,10 @@
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
           "Decision frequency 11x apart (3.50 vs 0.33 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 2293326.362649,
+        "hl_birth_ms": 1773268560088
       },
       "is_service": false,
       "known_self": false,
@@ -3718,7 +3796,11 @@
         "behavioural_tier": "WEAK_LEAD",
         "style_vetoes": [
           "Decision frequency 12x apart (0.80 vs 9.50 position episodes/day)"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 289208.242285,
+        "hl_birth_ms": 1706139900027,
+        "frontend_agent": "0x4f3ca0b8ee56c1328687cfb615b1ef2686f53bca"
       },
       "is_service": false,
       "known_self": false,
@@ -3734,7 +3816,11 @@
       "evidence": {
         "behavioural_score": 0.6704,
         "behavioural_tier": "WEAK_LEAD",
-        "style_vetoes": []
+        "style_vetoes": [],
+        "hl_role": "user",
+        "hl_account_value": 1054.918403,
+        "hl_birth_ms": 1733353428105,
+        "frontend_agent": "0xb3f8c1b35b6be2d33c36c6fdaefa72b311889756"
       },
       "is_service": false,
       "known_self": false,
@@ -4789,7 +4875,7 @@
         "totals": {
           "received_from_target_usd": 383447848.82,
           "sent_to_target_usd": 440899852.0,
-          "edge_count": 415
+          "edge_count": 438
         },
         "depth": 1,
         "chains": [
@@ -7859,7 +7945,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9308697.38,
-          "edge_count": 94
+          "edge_count": 103
         },
         "depth": 1,
         "chains": [
