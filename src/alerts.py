@@ -706,6 +706,49 @@ def alert_solana_activity(address: str, signatures: list, last_activity: str | N
     return _send_with_cooldown(f"solana_{address}", 24, subject, body)
 
 
+def alert_watchlist_contact(wallet: str, contact: str, what: str,
+                            why: str | None = None) -> bool:
+    """Fire when a wallet under close watch touches the target's world.
+
+    The watched wallet is there because two inferences agreed about it — an
+    amount coincidence and a birth inside his silence. This is not an
+    inference: it is a transfer or an action that happened, between it and
+    him, a wallet believed to be his, or one of his private deposit
+    addresses. That is the third vector, and the one that settles it.
+    """
+    subject = "[EZEKIEL] CRITICAL: Watched Wallet Touched The Target's World"
+    body = (
+        f"{address_line(wallet, 'Watched wallet')}\n"
+        f"{address_line(contact, 'Contact')}\n"
+        f"What the contact is: {what}\n"
+        f"Why this wallet is watched: {why or '(not recorded)'}\n\n"
+        f"This is an observed connection, not a coincidence of amount or of\n"
+        f"timing. Verify it by hand — a transfer is still not ownership — and\n"
+        f"if it holds, this wallet moves from a question to a finding.\n"
+    )
+    return _send_with_cooldown(f"watch_contact_{wallet.lower()}_{contact.lower()}",
+                               168, subject, body)
+
+
+def alert_watchlist_change(wallet: str, changes: list, why: str | None = None) -> bool:
+    """Fire when a watched wallet's state changes materially."""
+    kinds = ", ".join(sorted({c.get("kind", "?") for c in changes}))
+    subject = f"[EZEKIEL] HIGH: Watched Wallet Changed ({kinds})"
+    lines = "\n".join(f"  - {c.get('kind')}: {c.get('detail')}" for c in changes)
+    body = (
+        f"{address_line(wallet, 'Watched wallet')}\n"
+        f"Why it is watched: {why or '(not recorded)'}\n\n"
+        f"WHAT CHANGED\n{lines}\n\n"
+        f"A wallet emptying or going quiet is how a migration continues past\n"
+        f"the wallet you are watching; a new agent or sub-account is a new\n"
+        f"address it controls; a new withdrawal destination is an address to\n"
+        f"compare against his own.\n"
+    )
+    # Keyed on the kinds, so a different change re-alerts and the same one does
+    # not repeat every half hour.
+    return _send_with_cooldown(f"watch_change_{wallet.lower()}_{kinds}", 24, subject, body)
+
+
 def alert_same_hand(wallet: str, result: dict) -> bool:
     """Fire when a wallet's decisions lead or tie the target's too often to be a copier."""
     subject = "[EZEKIEL] HIGH: Wallet Moves With or Before the Target (not a copier)"

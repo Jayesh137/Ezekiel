@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+"""Follow the wallets under close watch, and say when they touch his world.
+
+`config.watch_wallets` holds wallets that are probably his and are not
+confirmed — today `0xdd53c529…`, which opened at zero two days into a six-day
+silence of the target's and ran to $51.3M in three weeks while matching his
+exits on amount and timing.
+
+Per wallet, per run: who Hyperliquid says it is, what it is worth across every
+dex, when it last traded, the agents and sub-accounts it has, where it has
+withdrawn to, its HyperEVM nonce, and a bounded L1 sweep so its on-chain
+destinations enter the substrate and can be compared with the target's own.
+
+Two outcomes, and they are not the same. A CONTACT — it touched the target, a
+wallet believed to be his, or one of his private deposit addresses — is an
+observed connection and the thing worth waking someone for. A CHANGE is
+evidence about what it is doing, reported once, on the transition.
+"""
+
+import json
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.alerts import alert_watchlist_change, alert_watchlist_contact
+from src.chain.budget import CallBudget
+from src.chain.chains import enabled_chains
+from src.chain.collect import records_for, sweep_wallet
+from src.chain.hyperevm import account_activity
+from src.hl_actions import fetch_actions, own_actions, record
+from src.hl_identity import probe
+from src.scanner import live_hip3_dexes, merged_clearinghouse_state
+from src.utils import DATA_DIR, hl_post, load_config
+from src.watchlist import WATCHLIST_DIR, build_report, changes, contacts, save, snapshot, watched
+
+# The trace job has a 15-minute ceiling and six other steps. A watched wallet
+# is swept incrementally from a stored cursor, so only the first run is deep.
+SWEEP_SECONDS = 45
+SWEEP_CALLS = 60
+
+
+def target_world(config: dict) -> dict:
+    """Every address whose appearance beside a watched wallet would matter."""
+    target = (config.get("target_wallet") or "").lower()
+    world = {target: "the target"}
+    for w in config.get("known_self_wallets", []) or []:
+        a = (w or "").lower()
+        if a:
+            world[a] = "a known wallet of his"
+
+    # His private deposit addresses: a destination he sends to that the whole
+    # chain says is quiet. Two wallets funding one are the same exchange
+    # customer, which is the strongest single signal this project has.
+    try:
+        from src.linkage import (
+            ACTIVITY_LOOKUPS_PER_RUN,
+            activity_cache,
+            activity_exclusions,
+            get_outbound_addresses,
+            outbound_chains,
+        )
+        destinations = get_outbound_addresses(target, config)
+        excluded, _pending = activity_exclusions(
+            destinations, outbound_chains(target),
+            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN))
+        for a in destinations - excluded:
+            world.setdefault(a, "a private deposit address of his")
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[watchlist] deposit addresses unavailable ({type(exc).__name__}) — "
+              f"a contact with one would not be recognised this run")
+
+    try:
+        with open(DATA_DIR / "roster" / "latest.json") as f:
+            rows = json.load(f).get("wallets") or []
+    except (OSError, ValueError, AttributeError):
+        rows = []
+    for row in rows:
+        a = (row.get("wallet") or "").lower()
+        tier = row.get("tier")
+        if a and tier in ("CONFIRMED", "PROBABLE", "POSSIBLE"):
+            world.setdefault(a, f"roster: {tier}")
+    return world
+
+
+def _previous() -> dict:
+    try:
+        with open(WATCHLIST_DIR / "latest.json") as f:
+            return {w["address"]: w for w in json.load(f).get("wallets", [])
+                    if w.get("address")}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def read_wallet(address: str, config: dict) -> tuple[dict, list]:
+    """One reading, plus every counterparty it has been seen with."""
+    errors, counterparties = [], set()
+
+    ident = probe(address, hl_post, sleep=time.sleep)
+    if not ident.get("read_ok"):
+        errors.extend(ident.get("errors") or [])
+
+    value = None
+    try:
+        state = merged_clearinghouse_state(address, dexes=live_hip3_dexes())
+        value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+        spot = hl_post({"type": "spotClearinghouseState", "user": address}) or {}
+        for b in spot.get("balances") or []:
+            if str(b.get("coin", "")).upper() == "USDC":
+                value += float(b.get("total") or 0)
+    except Exception as exc:                          # noqa: BLE001 - transport
+        errors.append(f"account value: {type(exc).__name__}: {exc}")
+
+    last_fill = None
+    try:
+        fills = hl_post({"type": "userFills", "user": address})
+        if isinstance(fills, list) and fills:
+            last_fill = max(int(f.get("time") or 0) for f in fills)
+    except Exception as exc:                          # noqa: BLE001 - transport
+        errors.append(f"fills: {type(exc).__name__}: {exc}")
+
+    subaccounts = []
+    try:
+        subs = hl_post({"type": "subAccounts", "user": address})
+        subaccounts = [(s.get("user") or s.get("address") or "") for s in subs or []
+                       if isinstance(s, dict)]
+    except Exception as exc:                          # noqa: BLE001 - transport
+        errors.append(f"subAccounts: {type(exc).__name__}: {exc}")
+
+    # Its own L1 actions: withdrawal destinations, agent approvals, sends.
+    withdrawals, agents = [], []
+    rows, err = fetch_actions(address)
+    if err:
+        errors.append(f"explorer: {err}")
+    else:
+        acts = own_actions(rows, address)
+        record(address, acts)
+        for a in acts:
+            dest = a.get("destination")
+            if dest:
+                counterparties.add(dest)
+                if a["type"] in ("withdraw3", "usdSend", "spotSend", "sendAsset"):
+                    withdrawals.append(dest)
+                elif a["type"] == "approveAgent":
+                    agents.append(dest)
+
+    activity = account_activity(address)
+    if activity.get("errors"):
+        errors.extend(activity["errors"])
+
+    # Its on-chain counterparties, from whatever the substrate holds. The sweep
+    # below is what puts them there.
+    for rec in records_for(address):
+        for side in ("src", "dst"):
+            other = (rec.get(side) or "").lower()
+            if other and other != address:
+                counterparties.add(other)
+
+    snap = snapshot(
+        address, account_value=value, last_fill_ms=last_fill,
+        agents=(agents + [ident.get("agent_address")] if ident.get("agent_address")
+                else agents),
+        subaccounts=subaccounts, withdrawal_destinations=withdrawals,
+        hyperevm_nonce=activity.get("nonce"), role=ident.get("role"),
+        read_ok=not errors, errors=errors)
+    return snap, sorted(counterparties)
+
+
+def sweep(address: str, config: dict) -> None:
+    """Bounded multi-chain sweep so its destinations reach the substrate."""
+    import os
+    if not os.environ.get("ETHERSCAN_API_KEY"):
+        print(f"[watchlist] no Etherscan key — {address[:12]}... not swept, so a "
+              f"shared deposit address cannot be seen")
+        return
+    from src.chain.assets import load_canonical_contracts
+    budget = CallBudget(max_calls=SWEEP_CALLS, seconds=SWEEP_SECONDS)
+    try:
+        result = sweep_wallet(address, enabled_chains(config), budget, cluster=True,
+                              canonical=load_canonical_contracts(
+                                  config, DATA_DIR / "labels" / "token_contracts.json"))
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[watchlist] sweep failed for {address[:12]}...: {type(exc).__name__}: {exc}")
+        return
+    degraded = (result or {}).get("degraded_sources") or []
+    records = sum(c.get("records", 0) for c in (result or {}).get("chains", {}).values())
+    print(f"[watchlist] swept {address[:12]}...: {records} record(s)"
+          + (f", could not read {degraded}" if degraded else ""))
+
+
+def main() -> int:
+    config = load_config()
+    wallets = watched(config)
+    if not wallets:
+        print("[watchlist] config.watch_wallets is empty — nothing under close watch")
+        return 0
+
+    world = target_world(config)
+    previous = _previous()
+    snapshots, found_changes, found_contacts = [], {}, {}
+
+    for entry in wallets:
+        address = entry["address"]
+        sweep(address, config)
+        snap, counterparties = read_wallet(address, config)
+        snap["why"] = entry.get("why")
+        snapshots.append(snap)
+
+        hits = contacts(counterparties, world)
+        if hits:
+            found_contacts[address] = hits
+        deltas = changes(previous.get(address), snap)
+        if deltas:
+            found_changes[address] = deltas
+
+        value = snap["account_value"]
+        print(f"[watchlist] {address} role={snap['role']} "
+              f"value={'unreadable' if value is None else f'${value:,.0f}'} "
+              f"agents={len(snap['agents'])} subaccounts={len(snap['subaccounts'])} "
+              f"withdrawals={len(snap['withdrawal_destinations'])} "
+              f"nonce={snap['hyperevm_nonce']} counterparties={len(counterparties)}")
+        if snap["errors"]:
+            print(f"[watchlist]   unreadable in part: {snap['errors'][:3]}")
+
+        for hit in hits:
+            print(f"[watchlist]   CONTACT {hit['address']} — {hit['is']}")
+            alert_watchlist_contact(address, hit["address"], hit["is"], entry.get("why"))
+        for d in deltas:
+            print(f"[watchlist]   CHANGE {d['kind']}: {d['detail']}")
+        if deltas:
+            alert_watchlist_change(address, deltas, entry.get("why"))
+        if not previous.get(address):
+            print("[watchlist]   first reading — baseline recorded, nothing alerted")
+
+    save(build_report(snapshots, {"changes": found_changes, "contacts": found_contacts}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
