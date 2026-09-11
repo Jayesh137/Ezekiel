@@ -113,3 +113,40 @@ def test_only_his_own_addresses_are_critical():
     assert wl.contact_severity("a private deposit address of his") == "CRITICAL"
     assert wl.contact_severity("roster: POSSIBLE") == "HIGH"
     assert wl.contact_severity(None) == "CRITICAL"
+
+
+def test_hyperliquid_naming_an_owner_is_reported_and_confirms_alone():
+    before = wl.snapshot(W, role="user")
+    after = wl.snapshot(W, role="agent", owner="0xOWNER")
+    got = wl.changes(before, after)
+    kinds = {c["kind"] for c in got}
+    assert kinds == {"explicit_link_owner", "role_change"}
+    link = wl.explicit_links(got)
+    assert [c["address"] for c in link] == ["0xowner"]
+    # A staking link and a master are the same class of evidence.
+    assert wl.explicit_links(wl.changes(
+        wl.snapshot(W), wl.snapshot(W, staking_link="0xSTAKE")))[0]["address"] == "0xstake"
+    assert wl.explicit_links(wl.changes(
+        wl.snapshot(W), wl.snapshot(W, master="0xMASTER")))[0]["kind"] == \
+        "explicit_link_master"
+    assert wl.explicit_links([]) == []
+
+
+def test_an_unchanged_link_is_not_re_reported():
+    steady = wl.snapshot(W, role="agent", owner="0xowner")
+    assert wl.changes(steady, steady) == []
+
+
+def test_a_book_on_a_new_dex_is_a_migration_inside_hyperliquid():
+    before = wl.snapshot(W, dexes=["perp", "xyz"])
+    after = wl.snapshot(W, dexes=["perp", "xyz", "FLX"])
+    assert [(c["kind"], c["address"]) for c in wl.changes(before, after)] == \
+        [("new_dex", "flx")]
+    # The first time the field is read at all is a baseline, not an event.
+    assert wl.changes(wl.snapshot(W, account_value=1.0), after) == []
+    assert wl.snapshot(W)["dexes"] is None and wl.snapshot(W)["vaults_led"] is None
+
+
+def test_leading_a_vault_is_reported():
+    got = wl.changes(wl.snapshot(W, vaults_led=[]), wl.snapshot(W, vaults_led=["0xV1"]))
+    assert [(c["kind"], c["address"]) for c in got] == [("new_vault_led", "0xv1")]

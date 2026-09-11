@@ -66,9 +66,17 @@ def watched(config: dict) -> list[dict]:
 
 def snapshot(address: str, *, account_value=None, last_fill_ms=None,
              agents=None, subaccounts=None, withdrawal_destinations=None,
-             hyperevm_nonce=None, role=None, read_ok: bool = True,
-             errors=None) -> dict:
-    """One reading of a watched wallet. Absent fields stay None, never 0."""
+             hyperevm_nonce=None, role=None, master=None, owner=None,
+             staking_link=None, vaults_led=None, dexes=None,
+             read_ok: bool = True, errors=None) -> dict:
+    """One reading of a watched wallet. Absent fields stay None, never 0.
+
+    `master`, `owner` and `staking_link` are the fields that can NAME another
+    account: Hyperliquid answering that this address is somebody's sub-account,
+    somebody's agent, or paired with a staking wallet. Each is an act its owner
+    performed, so each confirms on its own — and none of them was being stored,
+    let alone diffed, until 2026-09-11.
+    """
     return {
         "address": (address or "").lower(),
         "checked_at": datetime.now(UTC).isoformat(),
@@ -82,6 +90,15 @@ def snapshot(address: str, *, account_value=None, last_fill_ms=None,
         "withdrawal_destinations": sorted(
             {(d or "").lower() for d in (withdrawal_destinations or []) if d}),
         "hyperevm_nonce": hyperevm_nonce,
+        "master": (master or "").lower() or None,
+        "owner": (owner or "").lower() or None,
+        "staking_link": (staking_link or "").lower() or None,
+        # None, not [], when the field was not read: an empty list would say
+        # "it leads no vaults" and the next reading would look like news.
+        "vaults_led": None if vaults_led is None else sorted(
+            {(v or "").lower() for v in vaults_led if v}),
+        "dexes": None if dexes is None else sorted(
+            {str(d).lower() for d in dexes if d}),
     }
 
 
@@ -116,6 +133,34 @@ def changes(previous: dict | None, current: dict, now_ms: int | None = None) -> 
                                 "withdrew to a new destination")):
         fresh = [x for x in current.get(field) or [] if x not in (previous.get(field) or [])]
         out.extend({"kind": kind, "detail": f"{label}: {x}", "address": x} for x in fresh)
+
+    # The strongest thing that can happen to a watched wallet is Hyperliquid
+    # naming its owner. `userRole` answers agent -> owner and sub-account ->
+    # master; `userFees.stakingLink` pairs a staking wallet with a trading one.
+    # Each CONFIRMs alone, so each is reported the moment it appears or moves.
+    for field, kind in (("master", "explicit_link_master"),
+                        ("owner", "explicit_link_owner"),
+                        ("staking_link", "explicit_link_staking")):
+        before_link, after_link = previous.get(field), current.get(field)
+        if after_link and after_link != before_link:
+            out.append({"kind": kind, "address": after_link,
+                        "detail": f"Hyperliquid now reports {field} = {after_link}"
+                                  + (f" (was {before_link})" if before_link else "")})
+
+    # A role change is the same news arriving by another route: a wallet that
+    # was `user` and is now `agent` is being signed for by somebody else.
+    before_role, after_role = previous.get("role"), current.get("role")
+    if after_role and before_role and after_role != before_role:
+        out.append({"kind": "role_change",
+                    "detail": f"userRole changed: {before_role} -> {after_role}"})
+
+    for field, kind, label in (("vaults_led", "new_vault_led", "now leads a vault"),
+                               ("dexes", "new_dex", "opened a book on a new dex")):
+        fresh = [x for x in current.get(field) or [] if x not in (previous.get(field) or [])]
+        # A first reading of the field on an existing wallet is not an event.
+        if fresh and previous.get(field) is not None:
+            out.extend({"kind": kind, "detail": f"{label}: {x}", "address": x}
+                       for x in fresh)
 
     was, now = previous.get("hyperevm_nonce"), current.get("hyperevm_nonce")
     if was == 0 and isinstance(now, int) and now > 0:
@@ -171,6 +216,15 @@ def shared_infrastructure(hits: list[dict], busy: dict) -> tuple[list, list]:
     for hit in hits or []:
         (infra if busy.get(hit.get("address")) is True else people).append(hit)
     return people, infra
+
+
+CONFIRMING_KINDS = ("explicit_link_master", "explicit_link_owner",
+                    "explicit_link_staking")
+
+
+def explicit_links(deltas: list[dict]) -> list[dict]:
+    """The changes Hyperliquid itself declares — each CONFIRMs on its own."""
+    return [d for d in deltas or [] if d.get("kind") in CONFIRMING_KINDS]
 
 
 def contact_severity(what: str) -> str:

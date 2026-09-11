@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.alerts import alert_watchlist_change, alert_watchlist_contact
+from src.alerts import alert_explicit_link, alert_watchlist_change, alert_watchlist_contact
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
 from src.chain.collect import records_for, sweep_wallet
@@ -39,6 +39,7 @@ from src.watchlist import (
     changes,
     contact_severity,
     contacts,
+    explicit_links,
     save,
     shared_infrastructure,
     snapshot,
@@ -116,10 +117,16 @@ def read_wallet(address: str, config: dict) -> tuple[dict, list]:
     if not ident.get("read_ok"):
         errors.extend(ident.get("errors") or [])
 
-    value = None
+    value, dexes = None, []
     try:
         state = merged_clearinghouse_state(address, dexes=live_hip3_dexes())
         value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+        # Which venues it actually has a book on. A position opening on a dex
+        # it has never used is what a migration INSIDE Hyperliquid looks like,
+        # and the total account value alone cannot show it.
+        for pos in state.get("assetPositions") or []:
+            coin = str(((pos or {}).get("position") or {}).get("coin") or "")
+            dexes.append(coin.split(":", 1)[0].lower() if ":" in coin else "perp")
         spot = hl_post({"type": "spotClearinghouseState", "user": address}) or {}
         for b in spot.get("balances") or []:
             if str(b.get("coin", "")).upper() == "USDC":
@@ -178,6 +185,11 @@ def read_wallet(address: str, config: dict) -> tuple[dict, list]:
                 else agents),
         subaccounts=subaccounts, withdrawal_destinations=withdrawals,
         hyperevm_nonce=activity.get("nonce"), role=ident.get("role"),
+        master=ident.get("master"), owner=ident.get("owner"),
+        staking_link=ident.get("staking_link"),
+        vaults_led=[(v or {}).get("vaultAddress") if isinstance(v, dict) else v
+                    for v in (ident.get("leading_vaults") or [])],
+        dexes=dexes if value is not None else None,
         read_ok=not errors, errors=errors)
     return snap, sorted(counterparties)
 
@@ -284,6 +296,13 @@ def main() -> int:
                                     severity=severity)
         for d in deltas:
             print(f"[watchlist]   CHANGE {d['kind']}: {d['detail']}")
+        # Hyperliquid naming this wallet's owner is not a "change" among
+        # others — it is the deliverable, and it goes out on its own channel
+        # at CRITICAL as well as in the summary.
+        for d in explicit_links(deltas):
+            print(f"[watchlist]   EXPLICIT LINK {d['kind']}: {d['detail']}")
+            alert_explicit_link(d["kind"], address, d.get("address") or "?",
+                                f"watched wallet: {entry.get('why') or '(not recorded)'}")
         if deltas:
             alert_watchlist_change(address, deltas, entry.get("why"))
         if not previous.get(address):
