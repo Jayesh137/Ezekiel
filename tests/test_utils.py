@@ -112,8 +112,10 @@ def test_cursor_names_are_filesystem_safe(tmp_path):
     assert cursor_filename("plain_key-1.2") == "plain_key-1.2"
     assert cursor_filename("") == "cursor"
 
-    write_cursor(nasty, 1234, base=str(tmp_path))
-    written = [p.name for p in tmp_path.iterdir()]
+    # Its own directory: the sandbox fixture already made tmp_path/"data".
+    state = tmp_path / "state"
+    write_cursor(nasty, 1234, base=str(state))
+    written = [p.name for p in state.iterdir()]
     assert len(written) == 1
     assert not any(c in written[0] for c in ':*?|<>')
-    assert read_cursor(nasty, base=str(tmp_path)) == 1234
+    assert read_cursor(nasty, base=str(state)) == 1234
