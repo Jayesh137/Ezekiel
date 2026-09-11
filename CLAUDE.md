@@ -205,13 +205,30 @@ the next session rebuilding them:
    different token — Polygon's cited USDT is `USDT0`; Optimism has **two**
    legitimate contracts both reporting `USDC`.
 4. **Never tune the thing that validates you.** The self-match backtest still
-   FAILS, but on one condition rather than two: he is now **rank 1** (his own
-   best match) with a margin of **+0.0361** against a required **+0.05**. It got
-   there by adding independent signal — order-submission habits, windowed to
-   avoid leakage — not by moving weights or lowering the bar. Closing the last
-   0.0139 by reweighting, or by relaxing the 0.05, would fit the one measurement
-   that proves the scorer works. Treat any behavioural score as unvalidated until
+   FAILS, but on one condition rather than two: he is **rank 1** (his own best
+   match) and the margin is short of the required **+0.05**. It got there by
+   adding independent signal — order-submission habits, windowed to avoid
+   leakage — not by moving weights or lowering the bar. Closing the remainder by
+   reweighting, or by relaxing the 0.05, would fit the one measurement that
+   proves the scorer works. Treat any behavioural score as unvalidated until
    `profile/backtest.json` has `passed: true`.
+   **Read the margin from the file, not from here, and read it as a property of
+   the LINEUP.** Measured across three consecutive runs with the scorer
+   unchanged and his own windows identical (older 2026-05-25→08-04, recent
+   2026-08-05→09-06):
+
+   | run | self | best stranger | margin | top stranger |
+   |---|---|---|---|---|
+   | 2026-09-10 09:51 | 0.5864 | 0.5503 | +0.0361 | `0x5b5d5120…` |
+   | 2026-09-10 09:58 | 0.5864 | 0.5495 | +0.0369 | `0x5b5d5120…` |
+   | 2026-09-11 02:11 | 0.5880 | 0.5783 | **+0.0097** | `0x97cc9bb5…` |
+
+   His own score moved +0.0016. The margin fell by two thirds because a
+   **closer-matching stranger turned up in the lineup** — a different wallet
+   entirely. So a shrinking margin is not evidence the scorer got worse at
+   recognising him, and a single run's number is a snapshot of who happened to
+   be drawn that day, never a trend. That is exactly why chasing it with weights
+   would be fitting to the draw.
 5. **A failed read must never serialise as a clean result.** Distinguish
    "we could not tell" from "there is nothing there", everywhere.
 6. **Never price a missing value as `0.0`** — zero is invisible to every

@@ -111,10 +111,17 @@ def behavioural_is_trustworthy() -> bool:
     """Whether the behavioural scorer has proven it can identify the target.
 
     The self-match backtest scores the trader's own recent window against his
-    own fingerprint and ranks it among strangers. As of 2026-09-10 it FAILS:
-    self 0.5522 against a best stranger of 0.5571, rank 2 of 21. A scorer that
-    cannot pick the target out of a lineup cannot be evidence that some other
+    own fingerprint and ranks it among strangers. It FAILS today: he reaches
+    rank 1 but not by the required +0.05 margin. A scorer that cannot pick the
+    target out of a lineup by a clear margin cannot be evidence that some other
     wallet is him.
+
+    Deliberately no snapshot figures here. The margin is a property of the
+    LINEUP as much as of the scorer — measured over three consecutive runs with
+    the scorer unchanged it went +0.0361, +0.0369, +0.0097 while his own score
+    moved 0.0016, because a closer-matching stranger turned up. A number quoted
+    in a docstring goes stale within a day and invites exactly the reweighting
+    CLAUDE.md rule 4 forbids. Read `profile/backtest.json`.
 
     So while it fails, behavioural similarity is recorded as context but casts
     no vote. Counting it would be the roster's whole premise inverted: the tiers
