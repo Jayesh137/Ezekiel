@@ -27,6 +27,23 @@ BRIDGE_DIR = DATA_DIR / "bridge_destinations"
 MAX_LOOKUPS = 25
 
 
+def describe(destination: dict) -> str:
+    """One summary line for a decoded destination.
+
+    Every field is optional in practice and this is the only place that
+    formats them. A Socket route's destination chain is not in the calldata
+    the decoder reads, so `chain` is legitimately None there — formatting it
+    with a width raised TypeError and failed the whole trace job on the first
+    CI run, after the step had already done its work.
+    """
+    chain = destination.get("chain") or "unknown"
+    address = destination.get("address") or "(no recipient)"
+    usd = destination.get("usd") or 0
+    transfers = destination.get("transfers") or 0
+    tag = "FOREIGN" if destination.get("foreign") else "self"
+    return f"{chain:<9} {address} ${usd:,.0f} x{transfers} {tag}"
+
+
 def main() -> int:
     config = load_config()
     cluster = {(config.get("target_wallet") or "").lower()}
@@ -50,8 +67,7 @@ def main() -> int:
           f"{report['decoded']} decoded, {report['pending']} pending, "
           f"{report['unreadable']} unreadable, {report['undecoded']} undecodable")
     for d in report["destinations"][:8]:
-        print(f"[bridges]   {d['chain']:<9} {d['address']} ${d['usd']:,.0f} "
-              f"x{d['transfers']} {'FOREIGN' if d['foreign'] else 'self'}")
+        print(f"[bridges]   {describe(d)}")
     for f in report["foreign"]:
         print(f"[bridges] FOREIGN {f['protocol']} -> {f['destination_chain']} "
               f"{f.get('hl_account') or f.get('recipient')} ${f.get('amount_usd') or 0:,.0f}")

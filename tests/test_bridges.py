@@ -119,3 +119,31 @@ def test_lookup_budget_leaves_the_rest_pending(tmp_path):
                                       max_lookups=1)
     assert spent == 1
     assert sorted(r["status"] for r in rows) == ["pending", "pending", "unreadable"]
+
+
+# --- the summary line, which failed a whole CI job on a None chain ------------
+
+def test_a_destination_line_survives_every_missing_field():
+    """A Socket route carries no destination chain, so `chain` is None. The
+    first CI run formatted it with a width and raised TypeError AFTER the step
+    had decoded everything — the work was done and the job still failed."""
+    import scripts.check_bridge_destinations as check
+
+    socket_row = {"chain": None, "address": None, "usd": None, "transfers": 3,
+                  "foreign": False}
+    line = check.describe(socket_row)
+    assert "unknown" in line and "(no recipient)" in line and "$0" in line
+
+    full = {"chain": "hyperevm", "address": "0x" + "4" * 40, "usd": 66461024.0,
+            "transfers": 18, "foreign": True}
+    assert check.describe(full) == f"hyperevm  0x{'4' * 40} $66,461,024 x18 FOREIGN"
+    assert check.describe({}) == "unknown   (no recipient) $0 x0 self"
+
+
+def test_summarise_keeps_a_chainless_socket_destination():
+    rows = [{"status": "decoded", "protocol": "socket", "destination_chain": None,
+             "recipient": "0x" + "5" * 40, "hl_account": None, "amount_usd": 10.0,
+             "foreign": False}]
+    got = br.summarise(rows)
+    assert got["decoded"] == 1
+    assert got["destinations"][0]["chain"] is None
