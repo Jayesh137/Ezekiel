@@ -41,9 +41,28 @@ jobs:
           git add data/
           if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
           git commit -m "data: collect trading data [automated]"
-          for i in 1 2 3; do
+          # Generated data is rewritten whole by every run, so a conflict here
+          # has a right answer: the run that is pushing holds the newer reading.
+          # During a REBASE "theirs" is the commit being replayed — ours — so
+          # -X theirs keeps this run's files while leaving untouched every file
+          # only the other side changed.
+          #
+          # The loop this replaces could not settle a conflict at all. A bare
+          # `git pull --rebase` left the tree mid-rebase, so every later retry
+          # failed for the wrong reason; aborting back to our own commit just
+          # met the same deterministic conflict on the next attempt and the run
+          # ended by opening a failure issue with its reading thrown away.
+          # Measured: run 34630235534 on 2026-09-11 lost a whole watch reading
+          # to a conflict in three data/*/latest.json files.
+          for i in 1 2 3 4 5; do
             if git push origin main; then exit 0; fi
-            git pull --rebase origin main
+            git fetch origin main || true
+            if ! git rebase -X theirs FETCH_HEAD; then
+              git rebase --abort || true
+              echo "attempt $i: rebase could not be settled automatically"
+            fi
+            # Jitter, so two jobs racing do not retry in lockstep forever.
+            sleep $(( (RANDOM % 7) + 3 ))
           done
           git push origin main
       - name: Open failure issue

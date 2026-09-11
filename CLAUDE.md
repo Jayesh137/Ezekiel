@@ -481,6 +481,16 @@ that it is.
   (`rpc.hyperliquid.xyz/explorer`, `userDetails`) returns the last 300
   actions with payloads and cannot be paged. `vaultSummaries` answered `[]`;
   vault leadership comes from `webData2.leadingVaults`.
+- **A conflicted data push used to throw the run's reading away.** Every
+  committing workflow retried a failed push with `git pull --rebase`, which
+  cannot settle a content conflict: the bare form left the tree mid-rebase so
+  each later retry failed for the wrong reason, and the `|| git rebase --abort`
+  form met the same deterministic conflict again. The run then opened a failure
+  issue having lost what it read (measured: run 34630235534, 2026-09-11, three
+  `data/*/latest.json` files). All seven now rebase with **`-X theirs`** — in a
+  rebase that means the commit being replayed, i.e. this run's newer reading —
+  which keeps our files and leaves untouched every file only the other side
+  changed. Verified both ways against a simulated race before it was pushed.
 - **A cron in this repo is a wish, not a schedule.** `trace.yml` asks for
   every 30 minutes; measured over its last 73 scheduled runs (2026-09-01 to
   2026-09-11) GitHub actually started it a **median of 198 minutes apart,
