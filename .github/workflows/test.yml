@@ -54,6 +54,13 @@ jobs:
       - name: Install dependencies
         working-directory: dashboard
         run: npm ci
+      # node's built-in runner, so this costs no dependency. Only the pure
+      # functions in src/lib are covered — getAlertDelivery is the one that
+      # decides whether the operator is told alerting is dead, and email
+      # cannot report its own failure, so a wrong branch there is silent.
+      - name: Unit tests
+        working-directory: dashboard
+        run: npm test
       - name: Build
         working-directory: dashboard
         run: npm run build

@@ -345,13 +345,24 @@ export async function fetchAlertHealth() {
  */
 export function getAlertDelivery(health) {
 	if (!health) return null;
+	// Withheld is NOT a fault and never contributes to `down`: INFO is routed
+	// to no channel on purpose, so those alerts live here and on the dashboard
+	// by design. It is surfaced anyway, because a policy that withholds alerts
+	// should not also hide how much it is withholding. Absent (a health file
+	// written before the split) means we do not know, so it claims nothing.
+	const withheld = Number(health.suppressed) || 0;
 	if (health.healthy) {
-		return { down: false, msg: `Alerting healthy — last delivered ${health.last_success_at ?? 'unknown'}.` };
+		return {
+			down: false,
+			withheld,
+			msg: `Alerting healthy — last delivered ${health.last_success_at ?? 'unknown'}.`
+		};
 	}
 	const n = health.undelivered ?? health.consecutive_failures ?? 0;
 	return {
 		down: true,
 		undelivered: n,
+		withheld,
 		since: health.last_failure_at,
 		reason: health.last_failure_reason,
 		msg:

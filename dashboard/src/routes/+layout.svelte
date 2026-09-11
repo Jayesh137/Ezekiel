@@ -79,6 +79,16 @@
 					{freshnessStatus === 'stale' ? 'STALLED' : 'Data'}: {freshnessLabel}
 				</span>
 			{/if}
+			<!-- Deliberately muted, and deliberately NOT part of the ALERTING IS
+			     DOWN banner: these alerts were withheld on purpose, so this is
+			     information, not a fault. It is here at all because a policy that
+			     withholds alerts should not also hide how much it is withholding. -->
+			{#if alertDelivery?.withheld > 0}
+				<span class="withheld-pill"
+				      title="INFO-level alerts are recorded in the data and shown on this dashboard, but deliberately not pushed to ntfy, Telegram or GitHub issues — only CRITICAL and HIGH are, so low-confidence discoveries cannot bury the two that matter. Set NTFY_INCLUDE_INFO=1 to receive them.">
+					{alertDelivery.withheld} INFO withheld
+				</span>
+			{/if}
 		</div>
 	</nav>
 	<main class="main-content">
@@ -200,6 +210,19 @@
 	.freshness-ok { background: rgba(0,255,136,0.12); color: var(--accent-green); }
 	.freshness-warn { background: rgba(255,170,0,0.12); color: var(--accent-yellow); }
 	.freshness-stale { background: rgba(255,51,85,0.12); color: var(--accent-red); }
+	/* Same geometry as the freshness pill, no status colour: withheld is not a
+	   state of health, so it must not read as green, amber or red. */
+	.withheld-pill {
+		display: inline-block;
+		margin-top: 6px;
+		font-size: 0.65rem;
+		font-family: var(--font-mono);
+		padding: 2px 7px;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+		color: var(--text-muted);
+		cursor: help;
+	}
 	.alert-down {
 		background: rgba(255, 51, 85, 0.14);
 		border: 1px solid var(--accent-red);
