@@ -707,7 +707,8 @@ def alert_solana_activity(address: str, signatures: list, last_activity: str | N
 
 
 def alert_watchlist_contact(wallet: str, contact: str, what: str,
-                            why: str | None = None) -> bool:
+                            why: str | None = None,
+                            severity: str = "CRITICAL") -> bool:
     """Fire when a wallet under close watch touches the target's world.
 
     The watched wallet is there because two inferences agreed about it — an
@@ -716,7 +717,9 @@ def alert_watchlist_contact(wallet: str, contact: str, what: str,
     him, a wallet believed to be his, or one of his private deposit
     addresses. That is the third vector, and the one that settles it.
     """
-    subject = "[EZEKIEL] CRITICAL: Watched Wallet Touched The Target's World"
+    # A roster tier is an inference this system made; his own addresses are
+    # ground truth or measurement. Only the second kind is worth a CRITICAL.
+    subject = f"[EZEKIEL] {severity}: Watched Wallet Touched The Target's World"
     body = (
         f"{address_line(wallet, 'Watched wallet')}\n"
         f"{address_line(contact, 'Contact')}\n"

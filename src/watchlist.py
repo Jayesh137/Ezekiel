@@ -156,6 +156,28 @@ def contacts(counterparties, world: dict) -> list[dict]:
     return sorted(out, key=lambda c: c["address"])
 
 
+def shared_infrastructure(hits: list[dict], busy: dict) -> tuple[list, list]:
+    """Split contacts into (people, infrastructure) on whole-chain activity.
+
+    Two wallets both paying Binance are not connected, and the roster can be
+    wrong about that on its own: `0xd7a827fb…` funded the watched wallet with
+    $43.1M and sat at POSSIBLE while carrying 590,833 transactions on
+    Arbitrum, so the first CONTACT this vector ever fired was an exchange.
+    `busy` maps an address to True (busy anywhere it was measured), False, or
+    None. **None still alerts** — unmeasured is "we could not tell", and the
+    conservative direction for a wake-someone signal is to wake them.
+    """
+    people, infra = [], []
+    for hit in hits or []:
+        (infra if busy.get(hit.get("address")) is True else people).append(hit)
+    return people, infra
+
+
+def contact_severity(what: str) -> str:
+    """CRITICAL only for his own addresses; a roster tier is an inference."""
+    return "HIGH" if str(what or "").startswith("roster:") else "CRITICAL"
+
+
 def build_report(snapshots: list[dict], findings: dict) -> dict:
     return {
         "computed_at": datetime.now(UTC).isoformat(),

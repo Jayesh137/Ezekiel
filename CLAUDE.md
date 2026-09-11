@@ -83,6 +83,7 @@ trading style. Never promote a wallet on one vector alone.
 | Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
 | Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
 | Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
+| Close watch | `watchlist.py`, `scripts/check_watchlist.py` | `config.watch_wallets`: a wallet that is probably his and is not confirmed, read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -99,6 +100,28 @@ shared with `0xf078969e…`, which is a personal wallet two-way with the target
 at $135M/$148M and now grades MIGRATION_CANDIDATE; `0x160f6ef9…` sent him
 $100.56M and is a person too. Both were INFRASTRUCTURE on fan degree before
 whole-chain activity was measured.
+
+**Under close watch: `0xdd53c5297309130ab5fe5623dc905752e3342b13`.** It opened
+at zero on 2026-08-17, two days into a six-day silence of the target's (his p90
+gap is five days), ran $999 → $51.3M in three weeks, and matches his exits on
+amount and timing — two independent vectors, so PROBABLE, and deliberately *not*
+a `known_self_wallet`: that list is operator ground truth, this is a question
+under observation. Baseline 2026-09-11: role `user`, **$49.87M**, 0 agents, 0
+sub-accounts, **0 withdrawals ever**, HyperEVM nonce 0, 24 Arbitrum transactions.
+Every dollar it holds came from two addresses and every dollar it sends goes to
+the Hyperliquid bridge.
+
+**Its first CONTACT was an exchange, and that is rule 9 again.** The watch fired
+CRITICAL on `0xd7a827fb…` because the roster held it at POSSIBLE — while it
+carries **590,836 transactions and 489,454 token transfers on Arbitrum**. Fan
+degree never caught it because the cluster used it twice; it is now measured,
+cached and graded infrastructure. Two consequences, both built: `transfer_graph`
+now spends twelve whole-chain readings a run on the **highest-value unmeasured**
+addresses rather than only fan-flagged ones, and the watch measures every
+counterparty before alerting — busy is shared infrastructure and never a
+contact, unmeasured still alerts, and only his own addresses (target, known
+self, a private deposit address) rate CRITICAL; a roster tier is an inference,
+so it rates HIGH.
 
 ## Vectors collected but NOT wired into detection — pursue these
 

@@ -93,3 +93,23 @@ def test_the_report_names_what_could_not_be_read():
              wl.snapshot("0xbad", read_ok=False, errors=["boom"])]
     report = wl.build_report(snaps, {"changes": {}, "contacts": {}})
     assert report["watched"] == 2 and report["unreadable"] == ["0xbad"]
+
+
+def test_a_busy_contact_is_shared_infrastructure_not_a_connection():
+    hits = [{"address": "0xbusy", "is": "roster: POSSIBLE"},
+            {"address": "0xquiet", "is": "a private deposit address of his"},
+            {"address": "0xunknown", "is": "roster: POSSIBLE"}]
+    people, infra = wl.shared_infrastructure(
+        hits, {"0xbusy": True, "0xquiet": False, "0xunknown": None})
+    # Unmeasured still alerts: "we could not tell" is not "it is an exchange".
+    assert [h["address"] for h in people] == ["0xquiet", "0xunknown"]
+    assert [h["address"] for h in infra] == ["0xbusy"]
+    assert wl.shared_infrastructure([], {}) == ([], [])
+
+
+def test_only_his_own_addresses_are_critical():
+    assert wl.contact_severity("the target") == "CRITICAL"
+    assert wl.contact_severity("a known wallet of his") == "CRITICAL"
+    assert wl.contact_severity("a private deposit address of his") == "CRITICAL"
+    assert wl.contact_severity("roster: POSSIBLE") == "HIGH"
+    assert wl.contact_severity(None) == "CRITICAL"

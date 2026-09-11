@@ -33,12 +33,27 @@ from src.hl_actions import fetch_actions, own_actions, record
 from src.hl_identity import probe
 from src.scanner import live_hip3_dexes, merged_clearinghouse_state
 from src.utils import DATA_DIR, hl_post, load_config
-from src.watchlist import WATCHLIST_DIR, build_report, changes, contacts, save, snapshot, watched
+from src.watchlist import (
+    WATCHLIST_DIR,
+    build_report,
+    changes,
+    contact_severity,
+    contacts,
+    save,
+    shared_infrastructure,
+    snapshot,
+    watched,
+)
 
 # The trace job has a 15-minute ceiling and six other steps. A watched wallet
 # is swept incrementally from a stored cursor, so only the first run is deep.
 SWEEP_SECONDS = 45
 SWEEP_CALLS = 60
+
+# Whole-chain readings spent on the counterparties of a watched wallet. A
+# contact is the one finding here worth waking someone for, so it is worth a
+# call each to know whether the address is a person or an exchange.
+CONTACT_READINGS = 8
 
 
 def target_world(config: dict) -> dict:
@@ -167,6 +182,41 @@ def read_wallet(address: str, config: dict) -> tuple[dict, list]:
     return snap, sorted(counterparties)
 
 
+def busy_flags(hits: list[dict]) -> dict:
+    """True/False/None per contact: is this address busy anywhere we can read?
+
+    Measured on every readable chain until one says busy, because busy on one
+    chain is busy: `0xd7a827fb…` shows 2 transactions on Ethereum and 590,833
+    on Arbitrum. A chain that cannot be read leaves None, and None still
+    alerts.
+    """
+    from src.chain.activity import HOSTS, ActivityCache, is_busy
+
+    out: dict = {}
+    if not hits:
+        return out
+    try:
+        cache = ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                              max_lookups=CONTACT_READINGS)
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[watchlist] activity cache unavailable ({type(exc).__name__}) — "
+              f"contacts cannot be checked against the whole chain")
+        return out
+    for hit in hits:
+        address = hit.get("address")
+        verdict = None
+        for chain in HOSTS:
+            reading = cache.get(address, chain)
+            busy = is_busy(reading)
+            if busy:
+                verdict = True
+                break
+            if busy is False:
+                verdict = False
+        out[address] = verdict
+    return out
+
+
 def sweep(address: str, config: dict) -> None:
     """Bounded multi-chain sweep so its destinations reach the substrate."""
     import os
@@ -207,7 +257,8 @@ def main() -> int:
         snap["why"] = entry.get("why")
         snapshots.append(snap)
 
-        hits = contacts(counterparties, world)
+        seen = contacts(counterparties, world)
+        hits, infra = shared_infrastructure(seen, busy_flags(seen))
         if hits:
             found_contacts[address] = hits
         deltas = changes(previous.get(address), snap)
@@ -223,9 +274,14 @@ def main() -> int:
         if snap["errors"]:
             print(f"[watchlist]   unreadable in part: {snap['errors'][:3]}")
 
+        for hit in infra:
+            print(f"[watchlist]   shared infrastructure, not a contact: "
+                  f"{hit['address']} ({hit['is']} — busy on the whole chain)")
         for hit in hits:
-            print(f"[watchlist]   CONTACT {hit['address']} — {hit['is']}")
-            alert_watchlist_contact(address, hit["address"], hit["is"], entry.get("why"))
+            severity = contact_severity(hit["is"])
+            print(f"[watchlist]   CONTACT ({severity}) {hit['address']} — {hit['is']}")
+            alert_watchlist_contact(address, hit["address"], hit["is"], entry.get("why"),
+                                    severity=severity)
         for d in deltas:
             print(f"[watchlist]   CHANGE {d['kind']}: {d['detail']}")
         if deltas:
