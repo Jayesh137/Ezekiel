@@ -487,11 +487,43 @@ that it is.
 
 ## Operating facts
 
-- **Alerts arrive as GitHub Issues, not email.** Brevo SMTP has never once
-  delivered (account unactivated). `_github_issue_fallback` in `alerts.py`.
-  `send_alert` also delivers through Telegram (`TELEGRAM_BOT_TOKEN` +
-  `TELEGRAM_CHAT_ID`) and ntfy (`NTFY_TOPIC`) when those secrets exist; set
-  one of them and every severity arrives in seconds.
+- **Alerts arrive as GitHub Issues and ntfy, not email.** Brevo SMTP has never
+  once delivered (account unactivated). `_github_issue_fallback` in
+  `alerts.py`. `send_alert` also delivers through Telegram
+  (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`) and ntfy (`NTFY_TOPIC`) when
+  those secrets exist.
+- **Only CRITICAL and HIGH are routed anywhere.** Both the instant channels
+  and the GitHub fallback gate on `ESCALATING_SEVERITIES`, because the first
+  trace run after ntfy went live pushed 24 "Operational Counterparty" notices
+  at 3-11% confidence to a phone in one minute, which is how an operator
+  learns to swipe the channel away. INFO is still written to disk, still on
+  the dashboard and still counted; it just does not buzz. `NTFY_INCLUDE_INFO=1`
+  opts back in. **Do not read "an alert fired" as "the operator was told"** —
+  ask `_severity_of`.
+- **Delivery health is judged on the alerts that were MEANT to arrive, and
+  three fields in `data/alerts/latest.json` mean three different things.**
+  `healthy`/`consecutive_failures`/`undelivered` count only health-bearing
+  alerts (CRITICAL, HIGH, and anything whose severity cannot be parsed — an
+  alert we cannot classify is never assumed harmless); `suppressed` counts
+  what policy withheld. Before this split, every INFO recorded a delivery
+  FAILURE, so on 2026-09-11 the file read `healthy: false` with six failures
+  and the dashboard said ALERTING IS DOWN while all three CRITICALs still in
+  the record — including the watched wallet touching his world — had arrived
+  on ntfy in seconds. A flag pinned false by our own policy cannot report an
+  outage, because there is no state left for a real one to change. The stored
+  record was reclassified and replayed when this landed.
+- **A withheld alert is disposed of, not pending — `_send_with_cooldown`
+  returns True for it.** The rule that a failed send consumes no cooldown and
+  stays queued is right for a FAILURE and a livelock for an alert policy
+  routes nowhere: no cursor was written, `fire_alerts` recorded it
+  undelivered, and `select_alerts` re-selects an undelivered wallet
+  unconditionally, ahead of every confidence gate. One INFO notice came round
+  seven times in five hours, each pass evicting a real row from the 20-entry
+  delivery record. Fixing only the cursor leaves it re-alerting every 48h
+  forever; both halves go together. A genuine failure keeps every bit of its
+  retryability. `fire_alerts` returns `(delivered, undelivered, withheld)` and
+  counts withheld apart from delivered, because "never say sent for a send
+  that did not happen" applies here too.
 - **A stalled frontier now alerts, because the last one did not.** Discovery is
   the only vector that reaches an address nobody has seen; every other vector
   starts from something already known. When it died for two days the graph kept
@@ -536,7 +568,8 @@ that it is.
   interval as the cadence; quote the measurement.
 - **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
   collector run's silence and account-drop alerts arrived on the topic within
-  seconds while email failed as usual. Telegram is still unset.
+  seconds while email failed as usual, as did every CRITICAL that day.
+  Telegram is still unset.
 - Free tiers only. Etherscan free does not serve account endpoints for
   **base, bsc, optimism** — those chains are unreadable, not empty. They say so
   in the response ("Free API access is not supported for this chain"), and that
