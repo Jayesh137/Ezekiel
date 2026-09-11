@@ -277,6 +277,15 @@ def _send_webhooks(subject: str, body: str) -> list[str]:
     delivered: list[str] = []
     text = subject + "\n\n" + body
     severity = _severity_of(subject)
+    # Severity-gated for the same reason the GitHub fallback is: there are
+    # hundreds of INFO alerts and two that matter. Measured 2026-09-11, the
+    # first trace run after this channel went live pushed 24 "Operational
+    # Counterparty" notices at 3-11% confidence to a phone in one minute,
+    # which is how an operator learns to swipe the channel away. INFO is still
+    # written to disk, still on the dashboard, and still in the delivery
+    # record; it just does not buzz. Set NTFY_INCLUDE_INFO=1 to opt back in.
+    if severity not in ESCALATING_SEVERITIES and not os.environ.get("NTFY_INCLUDE_INFO"):
+        return delivered
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat = os.environ.get("TELEGRAM_CHAT_ID")
     if token and chat:

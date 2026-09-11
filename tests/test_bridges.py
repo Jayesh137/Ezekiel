@@ -147,3 +147,26 @@ def test_summarise_keeps_a_chainless_socket_destination():
     got = br.summarise(rows)
     assert got["decoded"] == 1
     assert got["destinations"][0]["chain"] is None
+
+
+def test_a_known_solana_recipient_is_not_foreign():
+    """A CCTP burn to Solana names a 32-byte mint recipient, which can never
+    match an EVM address. Without the hex form on record, all 23 of his burns
+    to his own Solana wallet alert as "outside the cluster" forever."""
+    import scripts.check_bridge_destinations as check
+
+    hexes = check.solana_cluster_hexes({
+        "2xm4bb8KmpafeC2Zcb37J7UFNcLfmKvaZmyhYKhRtVSv": {
+            "role": "cluster", "mint_recipient_hex": SOL},
+        "someLead": {"role": "lead", "mint_recipient_hex": "0xdead"},
+    })
+    assert hexes == {SOL}
+
+    cache = br.DecodeCache(__import__("pathlib").Path("/nonexistent/decodes.json"))
+    cache._table = {"0xsol": {"protocol": "cctp", "domain": 5, "chain": "solana",
+                              "recipient": SOL, "hl_account": None}}
+    recs = [{"src": T, "dst": "0xbridge", "tx_hash": "0xsol", "chain": "arbitrum",
+             "amount_usd": 999999.0, "ts": 1}]
+    rows, spent = br.decode_transfers(recs, {"0xbridge"}, {T} | hexes, cache,
+                                      fetch=lambda h, c: None)
+    assert spent == 0 and rows[0]["foreign"] is False

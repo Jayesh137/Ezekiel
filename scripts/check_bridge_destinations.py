@@ -21,10 +21,24 @@ from src.alerts import alert_foreign_destination
 from src.chain.bridges import CACHE_NAME, DecodeCache, decode_transfers, summarise
 from src.chain.collect import records_for
 from src.chain.labels import load_registry, service_addresses
+from src.solana_watch import load_addresses
 from src.utils import DATA_DIR, load_config, save_latest
 
 BRIDGE_DIR = DATA_DIR / "bridge_destinations"
 MAX_LOOKUPS = 25
+
+
+def solana_cluster_hexes(addresses: dict | None = None) -> set:
+    """Known Solana cluster addresses, as the 32-byte hex a CCTP burn names.
+
+    A burn to Solana carries a 32-byte mint recipient, which can never equal
+    an EVM address, so without these every one of his twenty-three burns to
+    his own Solana wallet reads as "outside the cluster" and alerts forever.
+    """
+    addresses = addresses if addresses is not None else (load_addresses() or {})
+    return {h for rec in addresses.values()
+            if rec.get("role") == "cluster"
+            and (h := (rec.get("mint_recipient_hex") or "").lower())}
 
 
 def describe(destination: dict) -> str:
@@ -48,6 +62,10 @@ def main() -> int:
     config = load_config()
     cluster = {(config.get("target_wallet") or "").lower()}
     cluster |= {(w or "").lower() for w in config.get("known_self_wallets", [])}
+    # Only EVM addresses have substrate records to read; the non-EVM ones
+    # below exist purely so a destination we already know is his is not
+    # reported as foreign.
+    known_his = cluster | solana_cluster_hexes()
     registry = load_registry(DATA_DIR / "labels" / "entities.json")
     bridges = service_addresses(registry, categories={"bridge"})
     bridges.discard((config.get("hl_bridge_contract") or "").lower())  # plain deposits
@@ -56,7 +74,7 @@ def main() -> int:
     for w in sorted(cluster):
         records.extend(records_for(w))
     cache = DecodeCache(DATA_DIR / "labels" / CACHE_NAME)
-    rows, spent = decode_transfers(records, bridges, cluster, cache,
+    rows, spent = decode_transfers(records, bridges, known_his, cache,
                                    max_lookups=MAX_LOOKUPS, sleep=time.sleep)
     report = summarise(rows)
     report["lookups_spent"] = spent
