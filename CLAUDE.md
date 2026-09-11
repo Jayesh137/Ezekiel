@@ -111,6 +111,34 @@ sub-accounts, **0 withdrawals ever**, HyperEVM nonce 0, 24 Arbitrum transactions
 Every dollar it holds came from two addresses and every dollar it sends goes to
 the Hyperliquid bridge.
 
+**Correction 2026-09-12: "0 agents" was a missing read, not a fact — and it was
+rule 5 in the one place it costs most.** An account holds agents in TWO fields.
+`webData2.agentAddress` is the UNNAMED frontend agent; **`extraAgents` is the
+NAMED list, which is where an API wallet appears.** `read_wallet` asked the
+first plus the explorer's `approveAgent` actions and never the second, so the
+watch serialised `"agents": []` while **`agent-2026-08-17`
+(`0x1e8695b7261ff0b422ccf46f0ccf093fad308c3a`)** was live to 2026-12-07. The
+explorer cannot cover for this: 300 actions, unpageable, so a birth-day
+approval on a wallet trading this hard has long rolled out — it is not in
+`data/actions/` at all. Net effect: the watch's `new_agent` CHANGE was dead for
+named agents on precisely the wallets busy enough to be worth watching, and a
+shared agent is the only vector here strong enough to CONFIRM alone.
+`scripts/check_watchlist.py` now calls `extraAgents` (reusing
+`agent_links.normalise_agents`), `tests/test_check_watchlist.py` covers it —
+the script had no tests at all — and the stored record was seeded so a
+three-week-old approval is not reported as a transition, the same rule
+`changes()` already applies to `vaults_led`, `dexes` and `hyperevm_nonce`.
+**When adding a field to a watch, ask which OTHER endpoint answers for it.**
+
+**That agent is bot-shaped, and it leans away from him.** Named for the
+wallet's own birth day, so approved at funding: API-driven from day one, where
+the target signs from the web frontend (unnamed `agentAddress`, 94.6% `Ioc`
+manual TWAP slices). `userRole` on it answers `agent → 0xdd53c529…` and nothing
+else, so there is **no shared-agent link to the target** today. Weigh it against
+the amount/timing match rather than discarding either: he could run a bot on a
+second account, and all three earlier correlation leads were bots too and were
+style-vetoed.
+
 **Its first CONTACT was an exchange, and that is rule 9 again.** The watch fired
 CRITICAL on `0xd7a827fb…` because the roster held it at POSSIBLE — while it
 carries **590,836 transactions and 489,454 token transfers on Arbitrum**. Fan

@@ -24,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.agent_links import normalise_agents
 from src.alerts import alert_explicit_link, alert_watchlist_change, alert_watchlist_contact
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
@@ -166,6 +167,18 @@ def read_wallet(address: str, config: dict) -> tuple[dict, list]:
                     withdrawals.append(dest)
                 elif a["type"] == "approveAgent":
                     agents.append(dest)
+
+    # The NAMED agents, which is where an API wallet appears. Neither source
+    # above can see one: `webData2.agentAddress` reports only the unnamed
+    # frontend agent, and the explorer's window is the last 300 actions, so on
+    # a wallet trading this hard an `approveAgent` from weeks ago has already
+    # rolled out of it. `extraAgents` is the only endpoint that still answers.
+    # Measured on the watched wallet: agentAddress None, extraAgents one entry.
+    try:
+        agents.extend(a["address"] for a in normalise_agents(
+            hl_post({"type": "extraAgents", "user": address})))
+    except Exception as exc:                          # noqa: BLE001 - transport
+        errors.append(f"extraAgents: {type(exc).__name__}: {exc}")
 
     activity = account_activity(address)
     if activity.get("errors"):
