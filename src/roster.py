@@ -45,6 +45,14 @@ VECTOR_AGENT = "shared_agent"
 # wallet's agent or sub-account, or its declared staking partner. Like a
 # shared agent, an act of control rather than an inference.
 VECTOR_EXPLICIT = "explicit_link"
+# One wallet goes quiet, another is born. The only vector that needs NO
+# connection between the two, which is exactly why it has to count: a wallet
+# funded from somewhere unobservable leaves nothing else to find it by. It
+# fired a CRITICAL alert from the day it was built and cast no vote here, so
+# `0xdd53c529` — born two days into a six-day silence, $999 to $51.3M in three
+# weeks, and independently an amount-correlation match — sat at POSSIBLE on
+# one vector.
+VECTOR_DORMANCY = "dormancy_handoff"
 
 TIER_CONFIRMED = "CONFIRMED"
 TIER_PROBABLE = "PROBABLE"
@@ -266,6 +274,25 @@ def build_roster(config: dict | None = None) -> dict:
         e["evidence"]["hl_birth_ms"] = ident.get("birth_ms")
         if ident.get("agent_address"):
             e["evidence"]["frontend_agent"] = ident["agent_address"]
+
+    # A wallet whose FIRST activity lands inside an unusual silence of his.
+    # Independent of every other vector by construction: it needs no transfer,
+    # no shared address and no style resemblance, so it cannot fail the same
+    # way any of them do.
+    try:
+        with open(DATA_DIR / "dormancy" / "latest.json") as f:
+            handoffs = json.load(f).get("handoffs") or {}
+    except (OSError, ValueError, AttributeError):
+        handoffs = {}
+    for a, h in handoffs.items():
+        a = (a or "").lower()
+        if not a or a == target or not (h or {}).get("score"):
+            continue
+        e = entry(a)
+        e["vectors"].add(VECTOR_DORMANCY)
+        e["evidence"]["dormancy_handoff"] = {
+            k: h.get(k) for k in ("score", "gap_length", "delay_days",
+                                  "candidate_first_day")}
 
     # Lead/lag co-movement: evidence, and the one behavioural reading a copier
     # cannot fake. A `same_hand` verdict still needs an independent vector.

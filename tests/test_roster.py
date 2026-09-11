@@ -214,3 +214,32 @@ def test_portfolio_overlap_is_evidence_and_never_a_vector(tmp_path, monkeypatch)
     # Recorded, but it buys no tier.
     assert "portfolio" not in row["vectors"]
     assert row["tier"] != roster.TIER_CONFIRMED
+
+
+def test_a_dormancy_handoff_counts_as_an_independent_vector(tmp_path, monkeypatch):
+    """The only vector needing no connection between the two wallets, and it
+    cast no vote: 0xdd53c529 was born two days into a six-day silence, ran
+    $999 to $51.3M in three weeks, independently matched an exit amount — and
+    sat at POSSIBLE on one vector."""
+    import json
+
+    from src import roster as r
+
+    monkeypatch.setattr(r, "DATA_DIR", tmp_path)
+    (tmp_path / "dormancy").mkdir(parents=True)
+    (tmp_path / "dormancy" / "latest.json").write_text(json.dumps({
+        "handoffs": {"0xDD53": {"score": 0.4286, "gap_length": 6, "delay_days": 2,
+                                "candidate_first_day": 20685},
+                     "0xzero": {"score": 0.0, "reason": "did not start during a silence"}}}))
+    (tmp_path / "correlations").mkdir(parents=True)
+    (tmp_path / "correlations" / "latest.json").write_text(json.dumps({
+        "matches": [{"wallet": "0xdd53", "confidence": 0.6445}]}))
+    monkeypatch.setattr(r, "behavioural_is_trustworthy", lambda: False)
+
+    out = r.build_roster({"target_wallet": "0xTARGET", "known_self_wallets": []})
+    row = next(w for w in out["wallets"] if w["wallet"] == "0xdd53")
+    assert set(row["vectors"]) == {r.VECTOR_CORRELATION, r.VECTOR_DORMANCY}
+    assert row["tier"] == r.TIER_PROBABLE          # two vectors, confidence unproven
+    assert row["evidence"]["dormancy_handoff"]["gap_length"] == 6
+    # A scored-zero handoff is "did not happen", not a vector.
+    assert all(w["wallet"] != "0xzero" for w in out["wallets"])

@@ -282,7 +282,9 @@ ten on 2026-09-11: xyz, flx, vntl, hyna, km, abcd, cash, para, mkts, io), not
 just the configured `hip3_dexes` — a book opened on another is what a migration
 inside Hyperliquid would look like, and he uses only `xyz` today ($6.76M, four
 positions). Candidates keep the configured list, because eleven calls per wallet
-across a five-hundred-wallet sweep is not free. Including them moved `liquidation_distance` from CONSISTENT to
+across a five-hundred-wallet sweep is not free.
+
+Including the HIP-3 book moved `liquidation_distance` from CONSISTENT to
 UNTESTABLE, which is the honest reading: the crypto book is all cross and 100%+
 from liquidation, but `xyz:XYZ100` sits **22%** away and `xyz:SP500` 40%, both
 LONG indices on **isolated** 4x. GCR ran cross throughout.
