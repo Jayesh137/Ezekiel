@@ -292,3 +292,25 @@ def test_a_startblock_above_a_numeric_endblock_is_what_broke_the_walk(monkeypatc
     assert error is None, (
         "an inverted window is indistinguishable from real emptiness at this "
         "layer, which is why the ceiling had to go rather than the handling")
+
+
+# --- plan-tier chain refusal -----------------------------------------------------------------
+# Etherscan's free tier answers base, optimism and bsc account endpoints with a
+# refusal naming the PLAN, not a transient fault. Measured live and persisted in
+# data/transfers/latest.json on 2026-09-11: identical text for all three chains
+# on all ten swept wallets, while arbitrum, ethereum and polygon read cleanly.
+PLAN_REFUSAL = ("Free API access is not supported for this chain. Please upgrade "
+                "your api plan for full chain coverage. https://etherscan.io/apis")
+
+
+def test_a_plan_tier_refusal_is_recognised_as_unsupported():
+    assert client.unsupported_for_plan(PLAN_REFUSAL) is True
+
+
+def test_a_transient_failure_is_not_mistaken_for_an_unsupported_chain():
+    """The distinction is the whole point: a rate limit must stay retryable."""
+    assert client.unsupported_for_plan("Max rate limit reached") is False
+    assert client.unsupported_for_plan("Invalid API Key") is False
+    assert client.unsupported_for_plan("budget_exhausted:out of calls") is False
+    assert client.unsupported_for_plan(None) is False
+    assert client.unsupported_for_plan("") is False

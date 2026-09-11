@@ -38,6 +38,33 @@ ENDBLOCK = "latest"
 
 EMPTY_MESSAGES = ("no transactions found", "no records found")
 
+# Etherscan's free tier does not serve account endpoints for every chain it
+# lists. It says so in the response, naming the PLAN rather than any fault:
+# base, optimism and bsc answer with this on every call, while arbitrum,
+# ethereum and polygon read normally.
+#
+# That is a permanent, KNOWN coverage gap, and it must not be handled as a
+# failed read. A failed read is retried, and a caller that waits for a retry to
+# succeed waits forever — which is exactly what stalled the transfer graph's
+# frontier for two days: every frontier wallet was deferred over three chains
+# no amount of retrying can reach, discarding the three that had just been read
+# successfully.
+#
+# Reporting it is still mandatory. "Not covered by our plan" is not "nothing
+# there" — it stays named in `unsupported_sources` so a gap in coverage can
+# never read as an absence of money.
+PLAN_REFUSAL_MARKER = "free api access is not supported for this chain"
+
+
+def unsupported_for_plan(error: str | None) -> bool:
+    """Whether this error means the chain is off our API plan entirely.
+
+    Distinguishes a permanent coverage gap from a transient failure. A rate
+    limit, a bad key or an exhausted budget are all retryable and must return
+    False — only the plan refusal is forever.
+    """
+    return PLAN_REFUSAL_MARKER in str(error or "").lower()
+
 
 def _rows_or_error(payload: dict) -> tuple[list[dict], str | None]:
     """Split an Etherscan payload into rows and an error string."""

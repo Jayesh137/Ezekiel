@@ -22,7 +22,12 @@ from pathlib import Path
 
 from src.chain import spam as spam_mod
 from src.chain.assets import decimals_of, value_usd
-from src.chain.client import fetch_kind, newest_block, probe_activity
+from src.chain.client import (
+    fetch_kind,
+    newest_block,
+    probe_activity,
+    unsupported_for_plan,
+)
 from src.utils import DATA_DIR, append_records, save_latest
 
 TRANSFERS_DIR = DATA_DIR / "transfers"
@@ -230,6 +235,33 @@ def _blank_chain_result() -> dict:
             "unverified_kinds": {}}
 
 
+def unreadability(chain_result: dict) -> str | None:
+    """How this chain failed, if it did: "unsupported", "degraded", or None.
+
+    One rule in one place because two callers record it — the per-wallet sweep
+    and the run summary built from that sweep — and a summary that contradicts
+    the result it was built from is worse than either answer alone.
+
+    "unsupported" is reserved for a chain our API plan does not serve: permanent,
+    never retried, and never to be read as an empty chain. Everything else that
+    went wrong is "degraded" — blindness we can and must re-read out of.
+
+    Judged across EVERY kind, not `chain_result["error"]`, which holds only the
+    LAST kind's error: a rate limit on erc20 followed by a plan refusal on
+    internal is still a chain we failed to read. A probe refusal records no
+    per-kind errors at all, so it falls back to the chain-level one.
+    """
+    errors = [e for e in (chain_result.get("errors_by_kind") or {}).values() if e]
+    if not errors and chain_result.get("error"):
+        errors = [chain_result["error"]]
+    if chain_result.get("incomplete_kinds"):
+        # Read the wrong amount and did not notice. Never "unsupported".
+        return "degraded"
+    if not errors:
+        return None
+    return "unsupported" if all(unsupported_for_plan(e) for e in errors) else "degraded"
+
+
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
                  price_lookup=None, canonical: dict | None = None,
                  dust_usd: float = 1.0, page_size: int = 1000,
@@ -251,7 +283,13 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
     price_lookup = price_lookup or (lambda symbol, date: None)
     cursors = read_cursors()
     result = {"address": addr, "status": "ok", "chains": {},
-              "degraded_sources": []}
+              # Two different absences, deliberately never merged. `degraded` is
+              # blindness we can retry out of; `unsupported` is a chain our API
+              # plan does not serve at all, which no retry can fix. Folding the
+              # second into the first stalled the transfer graph's frontier for
+              # two days: every wallet was deferred over three chains no run
+              # would ever read, discarding the three just read successfully.
+              "degraded_sources": [], "unsupported_sources": []}
 
     # Without a key every request returns "Invalid API Key", which would burn
     # the whole budget producing nothing while looking like a rate-limit
@@ -280,7 +318,11 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 # claim the wallet has nothing here on the strength of a failed
                 # request — blindness dressed as knowledge.
                 chain_result["error"] = probe_error
-                result["degraded_sources"].append(name)
+                verdict = unreadability(chain_result)
+                if verdict == "unsupported":
+                    result["unsupported_sources"].append(name)
+                else:
+                    result["degraded_sources"].append(name)
                 continue
             if not active:
                 chain_result["probed_inactive"] = True
@@ -376,10 +418,10 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         chain_result["spam"] = len(quarantined)
         chain_result["unpriced"] = sum(
             1 for rec in clean if rec.get("value_basis") == "price_unavailable")
-        if chain_result["error"] or chain_result["incomplete_kinds"]:
-            # Incomplete counts as degraded. A sweep that stopped short is
-            # blindness whether or not anything raised, and the frontier must
-            # not mark a wallet explored on the strength of it.
+        verdict = unreadability(chain_result)
+        if verdict == "unsupported":
+            result["unsupported_sources"].append(name)
+        elif verdict == "degraded":
             result["degraded_sources"].append(name)
 
         # Flushed per chain, immediately after that chain's own writes, rather
@@ -427,6 +469,7 @@ def sweep_health(results: list[dict]) -> dict:
     """One summary across every wallet swept this run."""
     records = spam = calls = gaps = unpriced = 0
     degraded: list[str] = []
+    unsupported: list[str] = []
     incomplete: dict[str, str] = {}
     spam_by_reason: dict[str, int] = {}
     for res in results:
@@ -440,8 +483,10 @@ def sweep_health(results: list[dict]) -> dict:
                 spam_by_reason[reason] = spam_by_reason.get(reason, 0) + count
             for kind, why in (chain_result.get("incomplete_kinds") or {}).items():
                 incomplete.setdefault(f"{name}:{kind}", why)
-            if (chain_result["error"] or chain_result.get("incomplete_kinds")) \
-                    and name not in degraded:
+            verdict = unreadability(chain_result)
+            if verdict == "unsupported" and name not in unsupported:
+                unsupported.append(name)
+            elif verdict == "degraded" and name not in degraded:
                 degraded.append(name)
     return {
         "computed_at": datetime.now(UTC).isoformat(),
@@ -458,6 +503,9 @@ def sweep_health(results: list[dict]) -> dict:
         # fixes — and the second is the one that hid a $13M trail.
         "incomplete": incomplete,
         "degraded_sources": sorted(degraded),
+        # Chains Etherscan's free tier refuses outright. A permanent coverage
+        # limit, reported every run so it can never pass for "nothing there".
+        "unsupported_sources": sorted(unsupported),
         "per_wallet": results,
     }
 

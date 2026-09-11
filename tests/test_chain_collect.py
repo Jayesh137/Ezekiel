@@ -867,3 +867,134 @@ def test_records_for_keeps_records_that_have_no_id(tmp_path, monkeypatch):
     monkeypatch.setattr(collect, "TRANSFERS_DIR", str(tmp_path / "transfers"))
     collect.clear_record_cache()
     assert len(collect.records_for("0xaaa")) == 2
+
+
+# --- chains our API plan does not cover -------------------------------------------------------
+PLAN_REFUSAL = ("Free API access is not supported for this chain. Please upgrade "
+                "your api plan for full chain coverage. https://etherscan.io/apis")
+
+
+def test_a_chain_off_our_plan_is_unsupported_rather_than_degraded(tmp_path, monkeypatch):
+    """Permanent coverage gap, not a failed read — the two need different handling.
+
+    A degraded chain is retried; a chain our plan cannot reach never will be, so
+    treating it as degraded stalls every caller that waits for a clean sweep.
+    """
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    monkeypatch.setattr(collect, "probe_activity", lambda a, c, b: (False, PLAN_REFUSAL))
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda *a, **k: pytest.fail("must not sweep a chain off our plan"))
+
+    result = collect.sweep_wallet("0xfrontier", [BASE], budget(), cluster=False)
+
+    assert result["unsupported_sources"] == ["base"]
+    assert result["degraded_sources"] == []
+    # Still reported, never silently empty: a gap in coverage is not an absence.
+    assert result["chains"]["base"]["error"] == PLAN_REFUSAL
+    assert result["chains"]["base"]["probed_inactive"] is False
+
+
+def test_a_cluster_sweep_of_a_chain_off_our_plan_is_also_unsupported(tmp_path, monkeypatch):
+    """Cluster wallets skip the probe, so the refusal arrives from fetch_kind."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []),
+                                                     PLAN_REFUSAL))
+
+    result = collect.sweep_wallet("0xtarget", [BASE], budget(), cluster=True)
+
+    assert result["unsupported_sources"] == ["base"]
+    assert result["degraded_sources"] == []
+
+
+def test_a_mixed_sweep_separates_the_unreachable_from_the_unread(tmp_path, monkeypatch):
+    """One chain off the plan, one genuinely failing: they must not merge."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    errors = {"base": PLAN_REFUSAL, "arbitrum": "Max rate limit reached"}
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []),
+                                                     errors[c["name"]]))
+
+    result = collect.sweep_wallet("0xtarget", [ARB, BASE], budget(), cluster=True)
+
+    assert result["unsupported_sources"] == ["base"]
+    assert result["degraded_sources"] == ["arbitrum"]
+
+
+def test_sweep_health_reports_unsupported_chains_beside_degraded_ones(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    errors = {"base": PLAN_REFUSAL, "arbitrum": "Max rate limit reached"}
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []),
+                                                     errors[c["name"]]))
+
+    result = collect.sweep_wallet("0xtarget", [ARB, BASE], budget(), cluster=True)
+    health = collect.sweep_health([result])
+
+    assert health["unsupported_sources"] == ["base"]
+    assert health["degraded_sources"] == ["arbitrum"]
+
+
+def test_a_chain_is_degraded_when_any_kind_failed_for_a_reason_we_can_retry(
+        tmp_path, monkeypatch):
+    """Only the LAST kind's error lands in chain_result["error"], so judging the
+    chain on that alone would let a real failure hide behind a plan refusal that
+    happened to come last. Any retryable failure makes the whole chain degraded."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    by_kind = {"erc20": "Max rate limit reached", "native": PLAN_REFUSAL,
+               "internal": PLAN_REFUSAL}
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []),
+                                                     by_kind[k]))
+
+    result = collect.sweep_wallet("0xtarget", [BASE], budget(), cluster=True)
+
+    assert result["degraded_sources"] == ["base"]
+    assert result["unsupported_sources"] == []
+
+
+def test_sweep_health_agrees_with_the_sweep_about_what_was_unreadable(
+        tmp_path, monkeypatch):
+    """The run summary must classify a chain exactly as the sweep did, or the
+    persisted health file contradicts the result it was built from."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    by_kind = {"erc20": "Max rate limit reached", "native": PLAN_REFUSAL,
+               "internal": PLAN_REFUSAL}
+    monkeypatch.setattr(collect, "fetch_kind",
+                        lambda a, c, k, s, b, **kw: (WalkResult([], s, 1, False, []),
+                                                     by_kind[k]))
+
+    result = collect.sweep_wallet("0xtarget", [BASE], budget(), cluster=True)
+    health = collect.sweep_health([result])
+
+    assert health["degraded_sources"] == result["degraded_sources"] == ["base"]
+    assert health["unsupported_sources"] == result["unsupported_sources"] == []
+
+
+def test_sweep_health_agrees_about_a_chain_refused_at_the_probe(tmp_path, monkeypatch):
+    """A probe refusal never reaches the per-kind loop, so it records no
+    errors_by_kind at all — the summary must still classify it the way the
+    sweep did rather than falling back to "degraded"."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "transfer_cursors.json")
+    monkeypatch.setattr(collect, "probe_activity", lambda a, c, b: (False, PLAN_REFUSAL))
+
+    result = collect.sweep_wallet("0xfrontier", [BASE], budget(), cluster=False)
+    health = collect.sweep_health([result])
+
+    assert result["unsupported_sources"] == ["base"]
+    assert health["unsupported_sources"] == ["base"]
+    assert health["degraded_sources"] == []

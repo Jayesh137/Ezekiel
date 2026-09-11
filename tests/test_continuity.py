@@ -451,9 +451,10 @@ def _sweeps(monkeypatch, by_wallet, rows_by_wallet=None):
                         lambda wallet, **kw: (rows_by_wallet or {}).get(wallet.lower(), []))
 
 
-def _sweep_result(address, degraded=(), status="ok"):
+def _sweep_result(address, degraded=(), status="ok", unsupported=()):
     return {"address": address, "status": status, "chains": {},
-            "degraded_sources": list(degraded)}
+            "degraded_sources": list(degraded),
+            "unsupported_sources": list(unsupported)}
 
 
 def test_a_degraded_sweep_leaves_the_wallet_out_of_explored(monkeypatch):
@@ -520,3 +521,58 @@ def test_a_clean_sweep_returning_nothing_still_marks_the_wallet_explored(monkeyp
     assert diag["partial_failures"] == []
     assert diag["degraded_sources"] == []
     assert diag["status"] == "ok"
+
+
+def test_a_chain_off_our_api_plan_does_not_stop_the_frontier(monkeypatch):
+    """Measured on production 2026-09-10/11: every run reported `failed`, 0
+    wallets explored, 0 new edges, because Etherscan's free tier refuses base,
+    optimism and bsc outright. Deferring a wallet over chains no run can ever
+    read waits for a retry that cannot come, and throws away the chains that
+    WERE read. The walk must proceed on its real coverage."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"))
+    _sweeps(monkeypatch,
+            {A: _sweep_result(A, unsupported=["base", "optimism", "bsc"])},
+            {A: [as_substrate_record(l1(A, C, 980_000, 4, "0x3"))]})
+
+    out, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A in diag["expanded_ledger"],         "a chain our plan cannot reach must not hold the frontier open forever"
+    assert diag["partial_failures"] == []
+    assert diag["status"] == "ok"
+    assert len(out) > len(seed), "the chains we CAN read must still yield edges"
+    # Reported, never silently dropped: coverage is not the same as absence.
+    # Insertion-ordered like `degraded_sources`, not sorted.
+    assert diag["unsupported_sources"] == ["base", "optimism", "bsc"]
+
+
+def test_a_real_failure_still_defers_a_wallet_that_also_has_an_unsupported_chain(monkeypatch):
+    """The narrow version of the fix: only the permanent gap is forgiven."""
+    seed = edges(l1(T, A, 1_000_000, 5, "0x1"), l1(T, B, 900_000, 6, "0x2"))
+    _sweeps(monkeypatch, {
+        A: _sweep_result(A, degraded=["arbitrum"], unsupported=["base"]),
+        B: _sweep_result(B, unsupported=["base"]),
+    })
+
+    _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
+
+    assert A not in diag["expanded_ledger"], "a chain we should have read failed"
+    assert B in diag["expanded_ledger"], "only the real failure defers a wallet"
+    assert diag["partial_failures"][0]["chains"] == ["arbitrum"]
+    assert diag["degraded_sources"] == ["arbitrum"],         "a chain off our plan must never be filed as a failed read"
+
+
+def test_graph_health_always_names_the_chains_our_plan_cannot_reach():
+    """The field must exist even when no expansion ran, or the dashboard reads
+    `undefined` instead of a coverage limit — and a limit nobody can see is the
+    same as one nobody knows about."""
+    g = build_graph(edges(l1(T, A, 1_000_000, 5, "0x1")), T, now_ts=NOW)
+    assert g["health"]["expansion"]["unsupported_sources"] == []
+    assert g["health"]["unsupported_sources"] == []
+
+    g2 = build_graph(edges(l1(T, A, 1_000_000, 5, "0x1")), T, now_ts=NOW,
+                     expansion={"status": "ok",
+                                "unsupported_sources": ["base", "optimism", "bsc"]})
+    assert g2["health"]["unsupported_sources"] == ["base", "optimism", "bsc"]
+    # A coverage gap is not a failed read, so it must not make the graph
+    # look incomplete on its own.
+    assert g2["health"]["frontier_incomplete"] is False

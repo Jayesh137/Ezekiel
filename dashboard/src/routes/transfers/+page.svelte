@@ -362,6 +362,14 @@
 						than recorded as explored.
 					</p>
 				{/if}
+				{#if health.unsupported_sources?.length}
+					<p class="health-note">
+						Not covered by our API plan:
+						<span class="mono">{health.unsupported_sources.join(', ')}</span>
+						— a permanent coverage limit, not a failed read. The walk proceeds on
+						the chains we can reach; nothing here is evidence of an empty chain.
+					</p>
+				{/if}
 				{#if health.degraded_sources?.length}
 					<p class="health-degraded">
 						Degraded source{health.degraded_sources.length > 1 ? 's' : ''}:

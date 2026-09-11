@@ -506,7 +506,21 @@ that it is.
   collector run's silence and account-drop alerts arrived on the topic within
   seconds while email failed as usual. Telegram is still unset.
 - Free tiers only. Etherscan free does not serve account endpoints for
-  **base, bsc, optimism** — those chains are unreadable, not empty.
+  **base, bsc, optimism** — those chains are unreadable, not empty. They say so
+  in the response ("Free API access is not supported for this chain"), and that
+  is a **permanent coverage gap, not a failed read**. The two are now separate
+  buckets everywhere: `unsupported_sources` (never retried, always reported) and
+  `degraded_sources` (blindness we re-read out of). **Merging them cost two days
+  of discovery**: `expand_frontier` deferred every frontier wallet over three
+  chains no retry can reach, so from 2026-09-09 18:56 to 2026-09-11 every run
+  reported `failed` with 0 wallets explored and 0 new edges, throwing away the
+  arbitrum, ethereum and polygon reads it had just completed. `0xf078969e…` sat
+  at the head of that queue the whole time. One rule decides which bucket —
+  `chain.collect.unreadability` — because the per-wallet sweep and the run
+  summary both record it and must never disagree.
+  **If the Etherscan plan is ever upgraded**, clear `expanded_ledger` in
+  `data/transfer_graph/latest.json`: wallets marked explored were explored on
+  the chains we could read at the time, and nothing re-walks them by itself.
 - **HyperEVM IS readable through the Etherscan key, at `chainid=999`.**
   Measured 2026-09-11: `status: "1"`, real rows. What is unreconstructable is
   the PUBLIC RPC, which caps `eth_getLogs` at 1000 blocks against ~1s blocks.

@@ -1072,7 +1072,7 @@ def build_graph(edges: list[dict], target: str, *,
         "decisions_truncated": 0,
         "expanded_ledger": [], "skipped_already_expanded": 0,
         "partial_failures": [], "decisions": [], "deepest_expanded": 0,
-        "degraded_sources": [], "error": None,
+        "degraded_sources": [], "unsupported_sources": [], "error": None,
         **(expansion or {}),
     }
     sources = sorted({e["discovery_source"] for e in wallet_edges})
@@ -1111,6 +1111,12 @@ def build_graph(edges: list[dict], target: str, *,
             ),
             "discovery_sources": sources,
             "degraded_sources": expansion.get("degraded_sources", []),
+            # Not folded into `degraded_sources`, and deliberately NOT part of
+            # `frontier_incomplete`: a chain off our API plan is a permanent
+            # limit on coverage, reported so nobody mistakes it for an absence,
+            # but it can never be cleared and so must not mark every run
+            # incomplete forever.
+            "unsupported_sources": expansion.get("unsupported_sources", []),
             "oldest_evidence": _iso(min(all_stamps)) if all_stamps else None,
             "newest_evidence": _iso(max(all_stamps)) if all_stamps else None,
         },
@@ -1880,6 +1886,12 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         "decisions": [],
         "deepest_expanded": 0,
         "degraded_sources": [],
+        # Chains Etherscan's free tier will not serve at all. Kept apart from
+        # `degraded_sources` because they call for opposite handling: a degraded
+        # chain is re-read next run, an unsupported one never can be. Recorded
+        # every run so the walk's real coverage stays legible — a wallet marked
+        # explored was explored on the chains we can reach, not on all six.
+        "unsupported_sources": [],
         "partial_failures": [],
         "error": None,
     }
@@ -1908,6 +1920,12 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         for name in names:
             if name and name not in diag["degraded_sources"]:
                 diag["degraded_sources"].append(name)
+
+    def uncovered(names):
+        """Merge chain names into diag['unsupported_sources'], order-stable."""
+        for name in names:
+            if name and name not in diag["unsupported_sources"]:
+                diag["unsupported_sources"].append(name)
 
     if not os.environ.get("ETHERSCAN_API_KEY"):
         diag["status"] = "skipped_no_api_key"
@@ -2044,6 +2062,14 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 # genuinely has nothing.
                 degraded = list((sweep or {}).get("degraded_sources") or [])
                 status = (sweep or {}).get("status", "ok")
+                # A chain our API plan does not serve is a permanent, KNOWN gap,
+                # not a failed read. Deferring the wallet over it waits for a
+                # retry that can never succeed: measured on production
+                # 2026-09-10/11, every run reported `failed` with 0 wallets
+                # explored and 0 new edges, while arbitrum, ethereum and polygon
+                # had been read successfully each time and were thrown away.
+                # Recorded, never forgiven silently.
+                uncovered((sweep or {}).get("unsupported_sources") or [])
                 if degraded or status != "ok":
                     named = ", ".join(degraded) or "unknown chain(s)"
                     diag["partial_failures"].append(
