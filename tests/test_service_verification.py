@@ -87,9 +87,13 @@ def test_verify_fan_services_asks_on_the_chain_the_value_moved_on(monkeypatch):
                                             {"name": "ethereum", "chain_id": 1,
                                              "native": "ETH", "enabled": True, "priority": 1}]})
     busy, persons = tg.verify_fan_services(
-        edges, set(), {"service_fanout": 25, "service_fanin": 25}, cache=FakeCache())
-    assert asked == [(HUB, "ethereum")]
-    assert busy == {} and persons == {HUB}
+        edges, set(), {"service_fanout": 25, "service_fanin": 25}, cache=FakeCache(),
+        skip={T})
+    # The hub is asked on the chain its value moved on. Value-ranked addresses
+    # are asked too, which is the point of that pass; the hub's verdict is what
+    # this test is about.
+    assert (HUB, "ethereum") in asked
+    assert busy == {} and HUB in persons
 
 
 # --- linkage: shared destinations must be measured, not assumed ----------------
@@ -118,3 +122,44 @@ def test_busy_and_unmeasured_destinations_cannot_be_shared_deposit_evidence():
 def test_no_cache_means_every_destination_is_pending():
     excluded, pending = lk.activity_exclusions(["0xa", "0xb"], {}, None)
     assert excluded == {"0xa", "0xb"} and pending == ["0xa", "0xb"]
+
+
+# --- fan degree is not the only way to be infrastructure ----------------------
+
+class _EmptyCache:
+    _table: dict = {}
+
+    def get(self, addr, chain):
+        return None
+
+
+def test_high_value_addresses_are_measured_even_without_fan_degree():
+    """An exchange address the cluster used a handful of times never trips the
+    fan rule, so it was never measured and stayed a lead: 0xd7a827fb sat at
+    POSSIBLE carrying 590,571 Arbitrum transactions, and it is the address
+    that funded the watched wallet with $43.1M."""
+    rich = "0x" + "d" * 40
+    poor = "0x" + "e" * 40
+    edges = [_edge(rich, T, usd=43_100_000.0), _edge(poor, T, usd=5.0)]
+    got = tg.value_ranked_unmeasured(edges, set(), {}, cache=_EmptyCache(), skip={T})
+    assert got == [rich, poor]                     # ranked by value, target skipped
+
+
+def test_already_measured_and_known_services_are_not_re_read():
+    rich = "0x" + "d" * 40
+    known = "0x" + "b" * 40
+
+    class Cached:
+        _table = {f"arbitrum:{rich}": {"is_contract": False, "txs": 1, "token_transfers": 0}}
+
+        def get(self, addr, chain):
+            return None
+
+    edges = [_edge(rich, T, usd=10.0), _edge(known, T, usd=9.0)]
+    assert tg.value_ranked_unmeasured(edges, {known}, {}, cache=Cached(), skip={T}) == []
+
+
+def test_inferred_and_bridge_edges_carry_no_value_here():
+    a = "0x" + "d" * 40
+    edge = {**_edge(a, T, usd=1_000_000.0), "inferred": True}
+    assert tg.value_ranked_unmeasured([edge], set(), {}, cache=_EmptyCache(), skip={T}) == []

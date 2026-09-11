@@ -2352,8 +2352,49 @@ def busy_on_record() -> dict:
     return out
 
 
+# Addresses measured per run beyond the fan-flagged ones, ranked by the value
+# they move with the cluster. Cached forever, so the backlog drains in a few
+# runs and the steady state costs nothing.
+VALUE_READINGS_PER_RUN = 12
+
+
+def value_ranked_unmeasured(edges: list[dict], known_services: set,
+                            already: dict, cache=None, skip=None) -> list[str]:
+    """The highest-value addresses nobody has measured yet. Pure given `cache`.
+
+    A reading is taken once per address, ever, so this only has to pick the
+    ones whose answer would change a tier soonest — and value moved with the
+    cluster is exactly that ordering.
+    """
+    from src.chain.activity import ActivityCache
+
+    if cache is None:
+        try:
+            cache = ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                                  max_lookups=0)
+        except Exception:                             # noqa: BLE001
+            return []
+    seen = set(getattr(cache, "_table", {}) or {})
+    measured = {key.split(":", 1)[-1].lower() for key in seen}
+    # The target is on every edge and is never a service.
+    measured |= {(a or "").lower() for a in (skip or set())}
+
+    totals: dict[str, float] = {}
+    for e in edges:
+        if e.get("bridge_event") or e.get("inferred"):
+            continue
+        usd = float(e.get("amount_usd") or 0)
+        if usd <= 0:
+            continue
+        for side in ("src", "dst"):
+            a = (e.get(side) or "").lower()
+            if a and a not in known_services and a not in already and a not in measured:
+                totals[a] = totals.get(a, 0.0) + usd
+    return sorted(totals, key=lambda a: -totals[a])[:VALUE_READINGS_PER_RUN]
+
+
 def verify_fan_services(edges: list[dict], known_services: set, cfg: dict,
-                        cache=None) -> tuple[dict, set]:
+                        cache=None, skip=None) -> tuple[dict, set]:
     """Measure every fan-detected service against the chain it was seen on.
 
     Returns (busy, persons). `busy` also carries every address already on
@@ -2366,6 +2407,15 @@ def verify_fan_services(edges: list[dict], known_services: set, cfg: dict,
     fan = {a: r for a, r in detect_services(
         edges, known_services, fanout=cfg["service_fanout"],
         fanin=cfg["service_fanin"]).items() if a not in known_services}
+
+    # Fan degree is not the only way to be infrastructure. An exchange address
+    # the cluster used a handful of times never trips it, so it was never
+    # measured and stayed a lead: `0xd7a827fb…` sat at POSSIBLE while carrying
+    # 590,571 transactions on Arbitrum, and it is the address that funded the
+    # watched wallet with $43.1M. Whoever moves the most value through this
+    # graph is worth one reading each, ranked, bounded, and cached forever.
+    valuable = value_ranked_unmeasured(edges, known_services, fan, cache, skip=skip)
+    fan.update(dict.fromkeys(valuable, "high value moved with the cluster"))
     if not fan:
         return on_record, persons_on_record()
 
@@ -2469,7 +2519,8 @@ def run_transfer_graph(expand: bool = True) -> dict:
     # busy, and a quiet EOA is a person however many protocols it touches.
     never_services: set = set()
     try:
-        busy_reasons, never_services = verify_fan_services(edges, known_services, cfg)
+        busy_reasons, never_services = verify_fan_services(edges, known_services, cfg,
+                                                           skip={target})
         known_services |= set(busy_reasons)
         hl_services.update(busy_reasons)
     except Exception as exc:  # noqa: BLE001 - verification must never break the graph
