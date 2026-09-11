@@ -101,3 +101,31 @@ def test_selection_is_deterministic():
 def test_accepts_either_field_spelling(key):
     rows = [{"ethAddress": "0xa", key: "10"}, {"ethAddress": "0xb", key: "99"}]
     assert select_leaderboard_wallets(rows, 1)[0]["ethAddress"] == "0xb"
+
+
+def test_bridge_depositors_are_ranked_by_size_and_capped(monkeypatch):
+    """Reading the whole window instead of one page took this source from a
+    handful of wallets to 251, each costing a full targeted scan — eight
+    minutes of a job that finishes in twenty-two against a thirty-minute
+    timeout. Depositing to Hyperliquid is weak evidence on its own."""
+    from src import correlator
+    from src import scanner as sc
+
+    pool = [{"wallet": f"0x{i:040x}", "amount": float(i)} for i in range(1, 51)]
+    # Imported inside the function, so the name lives on the correlator.
+    monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
+                        lambda window_days, min_amount: (pool, None))
+    got = sc.get_recent_bridge_depositors(max_wallets=5)
+    assert got == [f"0x{i:040x}" for i in (50, 49, 48, 47, 46)]
+
+    everything = sc.get_recent_bridge_depositors(max_wallets=500)
+    assert len(everything) == 50
+
+
+def test_a_missing_api_key_yields_no_depositors(monkeypatch):
+    from src import correlator
+    from src import scanner as sc
+
+    monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
+                        lambda window_days, min_amount: ([], "skipped_no_api_key"))
+    assert sc.get_recent_bridge_depositors() == []

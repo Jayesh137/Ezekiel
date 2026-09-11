@@ -114,8 +114,13 @@ def score_decisions(t_dec: list[dict], c_dec: list[dict]) -> dict:
     """As `score`, on decisions already compressed (and possibly accumulated
     across runs, see scripts/check_comovement.py)."""
     if not t_dec or not c_dec:
+        # `pairs` is present and zero rather than absent: a reader comparing
+        # candidates should see the same fields whatever the verdict, and a
+        # missing key renders as None, which reads like a failed measurement
+        # rather than a measured nothing.
         return {"verdict": "untestable", "reason": "no decisions on one side",
-                "candidate_decisions": len(c_dec), "target_decisions": len(t_dec)}
+                "pairs": 0, "candidate_decisions": len(c_dec),
+                "target_decisions": len(t_dec)}
     pairs = pair(t_dec, c_dec)
     control = pair(t_dec, _shifted(c_dec, CONTROL_SHIFT_MS))
     paired_share = len(pairs) / len(c_dec)

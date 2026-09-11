@@ -70,3 +70,10 @@ def test_report_orders_same_hand_first():
     report = cm.build_report(target, {"0xB": _fills([(5, 1)]), "0xA": lead})
     assert list(report["results"]) == ["0xa", "0xb"]
     assert report["results"]["0xa"]["verdict"] == "same_hand"
+
+
+def test_every_verdict_carries_the_same_fields():
+    """A missing key renders as None, which reads like a failed measurement
+    rather than a measured nothing."""
+    no_overlap = cm.score_decisions([], [{"coin": "ETH", "side": "B", "start": 1, "end": 2}])
+    assert no_overlap["pairs"] == 0 and no_overlap["verdict"] == "untestable"

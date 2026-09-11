@@ -1118,7 +1118,8 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
     }
 
 
-def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30) -> list[str]:
+def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30,
+                                 max_wallets: int = 120) -> list[str]:
     """Wallets that made large deposits to the HL bridge on Arbitrum in the window.
 
     This used to be one `offset=1000, sort=desc` call. The bridge is among the
@@ -1144,8 +1145,21 @@ def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30) -> li
         if w:
             depositors[w] = max(depositors.get(w, 0.0), float(d.get("amount") or 0))
 
-    print(f"[scanner] Bridge depositor scan: {len(depositors)} wallets >= ${min_usdc:,.0f} in last {days}d")
-    return list(depositors.keys())
+    # Largest deposit first, and bounded. Reading the whole window instead of
+    # one page took this source from a handful of wallets to 251, and each one
+    # costs a full targeted scan — about eight minutes of a job that finishes
+    # in twenty-two against a thirty-minute timeout. Depositing to Hyperliquid
+    # is weak evidence on its own (everyone who trades there does it), and the
+    # precise version of this signal — a deposit matching a target exit in
+    # amount and time — is the correlator's, measured across the whole pool.
+    # So the cap keeps the wallets a migrating whale would be among and lets
+    # the tail go.
+    ranked = sorted(depositors, key=lambda w: -depositors[w])
+    kept = ranked[:max_wallets]
+    print(f"[scanner] Bridge depositor scan: {len(depositors)} wallets >= "
+          f"${min_usdc:,.0f} in last {days}d; scanning the largest {len(kept)}"
+          + (f" (capped from {len(depositors)})" if len(kept) < len(depositors) else ""))
+    return kept
 
 
 def _load_target_vault_addresses() -> set:

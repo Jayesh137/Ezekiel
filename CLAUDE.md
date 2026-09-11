@@ -234,10 +234,11 @@ trade reviews (`Trade Reviews.pdf`, 406 images extracted to
   flow cannot reach.
 - Unmeasurable traits return UNTESTABLE, never "consistent". Counting absent
   evidence as agreement is how a profile confirms itself.
-- The writing is 2021-2023; the Hyperliquid account dates from 2024-01 (first
-  deposit 2024-02-29, first perp activity 2024-05) and this project's
-  collection from 2026-02-20. Only enduring style crosses that gap, and people
-  change.
+- The writing is 2021-2023; the Hyperliquid account is funded on 2024-02-29,
+  first holds value on 2024-03-06 (`portfolio`'s first non-zero point, which
+  is what `hl_identity.parse_birth` reads), first trades perps in 2024-05, and
+  this project's collection starts 2026-02-20. Only enduring style crosses
+  that gap, and people change.
 
 **Read the sources before trusting the summaries — his words describe him worse
 than his blotters do.** Two review passes, two checks overturned:
