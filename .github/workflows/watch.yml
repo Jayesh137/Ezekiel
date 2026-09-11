@@ -1,9 +1,9 @@
 name: Watch Wallets
 
 # The watch has its own workflow because it has its own tempo. `trace.yml`
-# carries fourteen steps and a 15-minute ceiling; this one asks Hyperliquid
-# about a handful of wallets and finishes in about a minute, so it can run far
-# more often and it does not have to wait behind a frontier expansion.
+# carries a dozen-plus analysis steps and a 15-minute ceiling; this one asks
+# Hyperliquid about a handful of wallets and finishes in about a minute, so it
+# can run far more often and does not have to wait behind a frontier expansion.
 #
 # MEASURED 2026-09-11, and the reason this file exists: trace.yml's cron says
 # every 30 minutes and GitHub actually ran it a MEDIAN OF 198 MINUTES apart
@@ -23,10 +23,23 @@ permissions:
   contents: write
   issues: write
 
-# Shared with trace.yml and the other committing workflows: two jobs writing
-# data/ and pushing to main at once is a conflicted rebase, not a merge.
+# Its OWN group, not the shared `data-commit` one, since 2026-09-12.
+#
+# Sharing it made this job queue behind the long trace run, and a group
+# holds only one PENDING run: measured on run 34658275747, a dispatch waited
+# 90 seconds behind a trace job and was then dropped when the next dispatch
+# arrived. A swallowed dispatch is the same shape of failure as the stalled
+# frontier — an absence that looks like nothing happening — on the fastest
+# tripwire in the project.
+#
+# What the shared group was really protecting was two jobs writing the SAME
+# files. That is now handled at the source instead: `check_watchlist.py` and
+# `check_hyperevm.py` were removed from trace.yml the same day, so the files
+# this job writes (data/watchlist/, data/hyperevm/) have exactly one writer.
+# Concurrent COMMITS remain safe without a shared group — the push step below
+# rebases with -X theirs and every run rewrites its own files whole.
 concurrency:
-  group: data-commit
+  group: watch-data
   cancel-in-progress: false
 
 jobs:

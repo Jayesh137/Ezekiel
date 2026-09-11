@@ -594,6 +594,23 @@ that it is.
   **`workflow_dispatch` is not best-effort** — anything outside GitHub that
   can make one API call drives a run immediately. Do not quote the cron
   interval as the cadence; quote the measurement.
+- **`watch.yml` has its OWN concurrency group, and `check_watchlist.py` /
+  `check_hyperevm.py` have exactly ONE writer (2026-09-12).** They used to run
+  in `trace.yml` as well, while both workflows shared the `data-commit` group.
+  A group holds only one PENDING run, so the watch queued behind the long trace
+  job and a dispatch was dropped when the next arrived — measured on run
+  34658275747, cancelled after 90 seconds. A swallowed dispatch on the fastest
+  tripwire in the project is the stalled-frontier failure again: an absence
+  that looks like nothing happening. The group was really protecting two jobs
+  writing the same files, so that is fixed at the source instead — the two
+  steps were removed from `trace.yml`, which bought no freshness anyway
+  (watch.yml runs every ~11 minutes against trace's measured median of 198).
+  **Do not re-add them.** A second writer here is not a duplicate but a
+  lost-update bug: `watchlist.changes()` diffs against the STORED previous
+  reading, so a record discarded by a concurrent write can skip the very
+  transition the watch exists to report. The remaining shared file is
+  `data/alerts/latest.json`, which every workflow appends to and which the
+  push step's `-X theirs` rebase settles.
 - **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
   collector run's silence and account-drop alerts arrived on the topic within
   seconds while email failed as usual, as did every CRITICAL that day.

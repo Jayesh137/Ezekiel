@@ -102,20 +102,6 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           # Lets a failed email fall back to a GitHub issue.
           GITHUB_TOKEN: ${{ github.token }}
-      # Three JSON-RPC calls per watched wallet against a free public endpoint:
-      # no Etherscan budget, no key, a couple of seconds. It runs on the 30-minute
-      # job rather than the daily one because HyperEVM history cannot be
-      # reconstructed after the fact — its public RPC caps log queries at 1000
-      # blocks against ~1s blocks — so the nonce leaving zero has to be caught
-      # near the time it happens or not at all.
-      - name: Watch HyperEVM for cluster activity
-        env:
-          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
-          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
-          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-          # Lets a failed email fall back to a GitHub issue.
-          GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/check_hyperevm.py
       # Where every bridge transfer from the cluster went: CCTP and Socket
       # calldata name the destination chain and recipient, and Hyperliquid's
       # CCTP extension names the HyperCore account. Blockscout, no key, each
@@ -148,19 +134,16 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_solana.py
-      # Close watch on wallets that are probably his and are not confirmed.
-      # Their own actions, account value, agents, sub-accounts, withdrawal
-      # destinations and HyperEVM nonce, plus a bounded L1 sweep so a shared
-      # deposit address with the target can be seen at all. A contact with his
-      # world is the third vector; a change is evidence.
-      - name: Watch the watchlist
-        env:
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
-          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
-          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: python scripts/check_watchlist.py
+      # `check_hyperevm.py` and `check_watchlist.py` USED to run here as well.
+      # They were moved out when watch.yml was split off, and removed from this
+      # job on 2026-09-12 so that those two scripts have exactly ONE writer.
+      # watch.yml runs them every ~11 minutes against this job's measured
+      # median of 198, so the copies here bought no freshness — and once
+      # watch.yml has its own concurrency group the two jobs can overlap, at
+      # which point a second writer is a lost-update bug rather than a
+      # duplicate: `watchlist.changes()` diffs against the STORED previous
+      # reading, so a record discarded by a concurrent write can skip the very
+      # transition the watch exists to report.
       # Who moves first. A copy-trader follows the target's fills; a second
       # account run by the same hand moves with them or before. One fills call
       # per roster candidate over the scanner's 21-day window.
