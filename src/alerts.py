@@ -477,6 +477,59 @@ def alert_hl_native_transfer(destination: str, out_usd: float, in_usd: float,
     return _send_with_cooldown(f"hl_transfer_{destination.lower()}", 72, subject, body)
 
 
+def alert_discovery_stalled(hours: float, last_expansion_at: str | None,
+                            status: str | None, error: str | None,
+                            queued: int, top_queued: str | None) -> bool:
+    """Fire when the transfer graph's frontier has stopped finding new addresses.
+
+    The frontier is the only vector that can reach an address nobody has seen.
+    Every other vector needs something already known: a counterparty to follow,
+    an amount to match, a fingerprint to compare against. When the walk stops
+    the graph still rebuilds from known edges, the roster still tiers, and every
+    report still looks healthy — so the failure presents as an absence of
+    discoveries, which is indistinguishable from there being nothing to find.
+
+    Not hypothetical. From 2026-09-09 18:56 to 2026-09-11 the walk explored zero
+    wallets on every run, deferring each one over three chains Etherscan's free
+    tier refuses outright, and nothing said so. `0xf078969e...` — CONFIRMED,
+    two-way with the target — sat at the head of the queue the whole time.
+
+    HIGH rather than CRITICAL by design: CRITICAL in this system means something
+    about the TARGET — he moved, a wallet is his. This is a capability of ours
+    being down. Filing it as CRITICAL would teach the operator to discount the
+    severity that matters most.
+    """
+    subject = f"[EZEKIEL] HIGH: Wallet Discovery Stalled ({hours:.1f}h)"
+    last = last_expansion_at or "never — no expansion on record"
+    if top_queued:
+        cost = (f"  {queued} wallet(s) queued behind the stall. Highest priority:\n"
+                f"    {top_queued}\n")
+    else:
+        cost = f"  {queued} wallet(s) queued behind the stall.\n"
+    body = f"""The transfer graph's L1 frontier has not expanded a single wallet in
+{hours:.1f} hours.
+
+  last expansion  : {last}
+  last run status : {status or "unknown"}
+  reason          : {error or "(none recorded)"}
+
+WHAT IT IS COSTING
+{cost}
+WHY THIS MATTERS
+  The frontier is the only vector that reaches an address nobody has seen.
+  Everything else starts from something we already have. While it is stalled
+  the system cannot find a wallet he funded from somewhere unobserved, and the
+  failure looks exactly like there being nothing to find.
+
+WHERE TO LOOK
+  data/transfer_graph/latest.json -> health.expansion
+  `status`, `partial_failures` and `degraded_sources` name the chains that
+  could not be read. `unsupported_sources` is NOT a fault: those chains are
+  off our API plan permanently and are expected to be listed on every run.
+"""
+    return _send_with_cooldown("discovery_stalled", 24, subject, body)
+
+
 def alert_scorer_unreliable(self_score: float, best_stranger: float,
                             margin: float, rank: int, total: int,
                             failures: list) -> bool:

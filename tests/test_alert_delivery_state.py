@@ -215,3 +215,52 @@ def test_successful_hl_transfer_alert_advances_cursor_once(monkeypatch):
     assert store["last_hl_transfer_alert_ms"] == 1_700_000_000_000
     # Second run: at/below the cursor, so it is skipped rather than re-alerted.
     assert ledger_analyzer.check_new_outbound_transfers(result) == []
+
+
+# --- discovery liveness ----------------------------------------------------------------------
+
+def test_a_stalled_frontier_alerts_with_what_the_outage_is_costing(monkeypatch, cursors):
+    """The frontier is the only vector that finds an address nobody has seen.
+    It died for two days in Sept 2026 and nothing said so — the graph kept
+    rebuilding from known edges and every report looked healthy."""
+    sent = {}
+    monkeypatch.setattr(alerts, "send_alert",
+                        lambda subject, body, html=None: sent.update(
+                            subject=subject, body=body) or True)
+
+    fired = alerts.alert_discovery_stalled(
+        hours=38.1,
+        last_expansion_at="2026-09-09T18:56:29+00:00",
+        status="failed",
+        error="sweep ok: could not read base, optimism, bsc",
+        queued=17,
+        top_queued="0xf078969e55cabf9ae3f26afeb5ec627b4430f19e")
+
+    assert fired is True
+    # HIGH, not CRITICAL: CRITICAL in this system means something about HIM.
+    # This is a capability of OURS being down, and blurring the two teaches the
+    # operator to discount the severity that matters most.
+    assert sent["subject"].startswith("[EZEKIEL] HIGH:")
+    assert "38.1" in sent["subject"] or "38.1" in sent["body"]
+    # What it is costing has to be in the body, or the alert is just a status.
+    assert "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e" in sent["body"]
+    assert "17" in sent["body"]
+    assert "sweep ok: could not read base, optimism, bsc" in sent["body"]
+
+
+def test_a_stalled_frontier_pages_once_a_day_not_every_run(monkeypatch, cursors):
+    """A multi-day outage is one problem. Trace runs every ~3h; without a
+    cooldown this would be the "stop the phone buzzing 24 times" bug again."""
+    calls = []
+    monkeypatch.setattr(alerts, "send_alert",
+                        lambda subject, body, html=None: calls.append(subject) or True)
+
+    first = alerts.alert_discovery_stalled(hours=38.1, last_expansion_at=None,
+                                           status="failed", error=None,
+                                           queued=0, top_queued=None)
+    second = alerts.alert_discovery_stalled(hours=41.2, last_expansion_at=None,
+                                            status="failed", error=None,
+                                            queued=0, top_queued=None)
+
+    assert first is True and second is False
+    assert len(calls) == 1

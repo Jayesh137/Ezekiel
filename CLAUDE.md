@@ -475,6 +475,21 @@ that it is.
   `send_alert` also delivers through Telegram (`TELEGRAM_BOT_TOKEN` +
   `TELEGRAM_CHAT_ID`) and ntfy (`NTFY_TOPIC`) when those secrets exist; set
   one of them and every severity arrives in seconds.
+- **A stalled frontier now alerts, because the last one did not.** Discovery is
+  the only vector that reaches an address nobody has seen; every other vector
+  starts from something already known. When it died for two days the graph kept
+  rebuilding from known edges and nothing looked different, so the failure
+  presented as an absence of discoveries — indistinguishable from there being
+  nothing to discover. `alert_discovery_stalled` fires **HIGH** (not CRITICAL:
+  CRITICAL means something about HIM, this is a capability of OURS) when no run
+  has expanded a wallet in `transfer_graph.STALL_HOURS` = 12h, cooled down to
+  once a day. Replayed against the real outage it would have fired at
+  **2026-09-10 06:56 UTC** instead of nobody noticing until the 11th.
+  **Liveness is keyed on wallets expanded, never on status** — `ok` requires the
+  frontier to fully drain, which a graph with more work than budget never does,
+  so the healthy steady state is `partial` and a status-keyed check would report
+  a permanent stall on a perfectly healthy walk. `last_successful` is kept only
+  for the dashboard's "last complete pass" line.
 - **Blockscout reads arbitrum/ethereum/base/optimism/polygon with no key**:
   address counters and labels (`chain/activity.py`), decoded transaction
   inputs (`chain/bridges.py`). The Hyperliquid explorer

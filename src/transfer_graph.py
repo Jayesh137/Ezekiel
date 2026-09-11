@@ -2206,6 +2206,59 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     return edges, diag
 
 
+# How long the frontier may go without moving before it is worth waking someone.
+#
+# Not a guess. This workflow's schedule is best-effort: measured over its last 73
+# scheduled runs GitHub started it a median of 198 minutes apart, never under 99,
+# up to 337 (5.6h). Twelve hours is roughly two consecutive worst-case gaps, set
+# the same way heartbeat.STALE_AFTER_MINUTES was set above ITS observed maximum —
+# tighter, and ordinary scheduling luck alone pages the operator.
+STALL_HOURS = 12.0
+
+
+def expansion_progress(expansion: dict | None, previous: dict | None) -> str | None:
+    """When the frontier last actually moved, or None if it never has.
+
+    Keyed on wallets expanded, NOT on status. `ok` requires the frontier to
+    drain completely, which a graph with more work than budget never does — the
+    healthy steady state here is `partial` with wallets explored and more
+    queued. Reading liveness off the status would therefore report a permanent
+    stall on a perfectly healthy walk, and `last_successful` (which does key on
+    status) is kept only for the dashboard's "last complete pass" line.
+
+    None means "never moved", never a stand-in timestamp: a stall clock started
+    from an invented now reads healthy on exactly the run that first breaks.
+    """
+    if (expansion or {}).get("wallets_expanded"):
+        return (expansion or {}).get("completed_at") or utc_now()
+    if (previous or {}).get("last_expansion_at"):
+        return previous["last_expansion_at"]
+    # Cold start only. A graph written before this field existed carries no
+    # clock, so a frontier already broken at deploy time would never start one
+    # and this alert could never fire — the exact silence it exists to end.
+    # `last_successful` timestamps a run that completed, which is a conservative
+    # lower bound, and a real expansion always outranks it above.
+    return (expansion or {}).get("last_successful") or (previous or {}).get("last_successful")
+
+
+def stalled_hours(last_expansion_at: str | None, now_iso: str) -> float | None:
+    """Hours since the frontier last moved. None when that cannot be read.
+
+    Unknown is None rather than 0.0 or a large number: one would claim the
+    frontier is fine and the other would alert on a fresh checkout, and both
+    would be a reading we do not have.
+    """
+    try:
+        then = datetime.fromisoformat(last_expansion_at)
+        now = datetime.fromisoformat(now_iso)
+    except (TypeError, ValueError):
+        return None
+    # A naive stamp from an older graph is UTC by construction (utc_now()).
+    then = then if then.tzinfo else then.replace(tzinfo=UTC)
+    now = now if now.tzinfo else now.replace(tzinfo=UTC)
+    return (now - then).total_seconds() / 3600.0
+
+
 def _read_previous_graph() -> dict:
     """Load the last saved graph, tolerating absence and a corrupt file.
 
@@ -2587,6 +2640,28 @@ def run_transfer_graph(expand: bool = True) -> dict:
         expansion["last_successful"] = prev_health.get("completed_at")
     elif prev_health.get("last_successful"):
         expansion["last_successful"] = prev_health["last_successful"]
+
+    # When the frontier last actually MOVED, which is not the same question as
+    # when it last completed. Discovery is the only vector that can reach an
+    # address nobody has seen, and when it dies the graph keeps rebuilding from
+    # known edges — so nothing else in the system looks any different.
+    expansion["last_expansion_at"] = expansion_progress(expansion, prev_health)
+    stalled = stalled_hours(expansion.get("last_expansion_at"), utc_now())
+    if stalled is not None and stalled >= STALL_HOURS:
+        queue = expansion.get("frontier_queue") or prev_health.get("frontier_queue") or []
+        try:
+            from src.alerts import alert_discovery_stalled
+            alert_discovery_stalled(
+                hours=stalled,
+                last_expansion_at=expansion.get("last_expansion_at"),
+                status=expansion.get("status"),
+                error=expansion.get("error") or prev_health.get("error"),
+                queued=int(expansion.get("frontier_remaining")
+                           or prev_health.get("frontier_remaining") or len(queue)),
+                top_queued=(queue[0] or {}).get("wallet") if queue else None)
+        except Exception as exc:  # noqa: BLE001 — a diagnostic must never kill the run
+            print(f"[graph] could not raise the discovery-stall alert: "
+                  f"{type(exc).__name__}: {exc}")
     # A run that did not expand must not erase what earlier runs finished.
     if expansion.get("status") in ("disabled", "skipped_no_api_key"):
         expansion.setdefault("expanded_ledger", prev_health.get("expanded_ledger") or [])

@@ -576,3 +576,79 @@ def test_graph_health_always_names_the_chains_our_plan_cannot_reach():
     # A coverage gap is not a failed read, so it must not make the graph
     # look incomplete on its own.
     assert g2["health"]["frontier_incomplete"] is False
+
+
+# --- discovery liveness ----------------------------------------------------------------------
+# The frontier is the only thing that finds an address nobody has seen. When it
+# stops, nothing else in the system notices: the graph still rebuilds from
+# already-known edges, the roster still tiers, every report still looks healthy.
+# Measured 2026-09-09 to 2026-09-11 — two days, zero wallets expanded, no alert.
+
+def test_progress_is_recorded_whenever_the_frontier_actually_moved():
+    """`ok` is not the test. A run that expanded wallets with more still queued
+    reports `partial`, and that is the NORMAL healthy state for a frontier with
+    more work than budget — so liveness has to key on wallets, not on status."""
+    moved = {"status": "partial", "completed_at": "2026-09-11T20:58:53+00:00",
+             "wallets_expanded": [A, B]}
+    assert tg.expansion_progress(moved, None) == "2026-09-11T20:58:53+00:00"
+
+
+def test_progress_does_not_advance_on_a_run_that_expanded_nothing():
+    """The exact production shape of the outage: status set, lookups spent,
+    nothing explored. It must not read as progress."""
+    stalled = {"status": "failed", "completed_at": "2026-09-11T17:43:00+00:00",
+               "wallets_expanded": []}
+    previous = {"last_expansion_at": "2026-09-09T18:56:29+00:00"}
+    assert tg.expansion_progress(stalled, previous) == "2026-09-09T18:56:29+00:00"
+
+
+def test_progress_carries_forward_when_a_run_never_expanded_at_all():
+    previous = {"last_expansion_at": "2026-09-09T18:56:29+00:00"}
+    for status in ("disabled", "skipped_no_api_key", "not_attempted"):
+        assert tg.expansion_progress({"status": status, "wallets_expanded": []},
+                                     previous) == "2026-09-09T18:56:29+00:00"
+
+
+def test_progress_is_unknown_when_nothing_has_ever_expanded():
+    """None, never a timestamp standing in for one — a stall clock started from
+    an invented `now` would read healthy on exactly the run that first breaks."""
+    assert tg.expansion_progress({"status": "failed", "wallets_expanded": []},
+                                 None) is None
+
+
+def test_a_stall_is_measured_in_hours_since_the_frontier_last_moved():
+    """12h is two of the worst scheduled gaps ever observed for this workflow
+    (median 198 min, max 337), so ordinary scheduling luck cannot trip it."""
+    now = "2026-09-11T07:00:00+00:00"
+    assert tg.stalled_hours("2026-09-09T18:56:29+00:00", now) == pytest.approx(36.06, abs=0.01)
+    assert tg.stalled_hours("2026-09-11T06:00:00+00:00", now) == pytest.approx(1.0, abs=0.01)
+
+
+def test_a_frontier_that_has_never_moved_is_not_reported_as_a_stall():
+    """A first run, or a graph with no history, has no clock to read. Returning
+    a number here would alert on every fresh checkout."""
+    assert tg.stalled_hours(None, "2026-09-11T07:00:00+00:00") is None
+
+
+def test_an_unreadable_timestamp_is_not_silently_treated_as_healthy():
+    """Rule 5: a failed read must never serialise as a clean result. Unknown is
+    None — it does not alert, and it does not claim the frontier is fine."""
+    assert tg.stalled_hours("not-a-timestamp", "2026-09-11T07:00:00+00:00") is None
+
+
+def test_progress_bootstraps_from_the_last_complete_pass_on_first_deploy():
+    """Cold start: a graph written before `last_expansion_at` existed has no
+    clock, so a frontier ALREADY broken at deploy time would never start one and
+    the stall alert could never fire — the exact silence it exists to end.
+    `last_successful` is a real timestamp of a run that completed, so it is a
+    conservative lower bound to start from. Used only when nothing better
+    exists, and never preferred over a real expansion."""
+    prior = {"status": "failed", "wallets_expanded": [],
+             "last_successful": "2026-09-09T18:56:29+00:00"}
+    assert tg.expansion_progress(prior, {}) == "2026-09-09T18:56:29+00:00"
+
+    # A recorded expansion always wins over the bootstrap.
+    both = {"last_expansion_at": "2026-09-11T20:58:53+00:00",
+            "last_successful": "2026-09-09T18:56:29+00:00"}
+    assert tg.expansion_progress({"wallets_expanded": []},
+                                 both) == "2026-09-11T20:58:53+00:00"

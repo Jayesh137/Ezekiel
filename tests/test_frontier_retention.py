@@ -463,3 +463,78 @@ def test_successful_delivery_reports_delivered_not_queued(capsys, monkeypatch,
     assert graph["undelivered_alerts"] == []
     assert "0 failed" in out and "0 queued for retry" in out
     assert f"{graph['alerts_fired']} delivered" in out
+
+
+# --- discovery liveness ----------------------------------------------------
+# The frontier stopped expanding on 2026-09-09 and nothing noticed for two days.
+# The graph rebuilt cleanly from known edges every run, so every other signal —
+# node counts, roster tiers, the daily report — looked entirely normal.
+
+def _previous_graph(tmp_path, expansion: dict) -> None:
+    d = tmp_path / "transfer_graph"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "latest.json").write_text(json.dumps({
+        "schema_version": 2, "nodes": [], "edges": [], "chains": [],
+        "health": {"expansion": expansion}}))
+
+
+def _quiet_graph_run(monkeypatch, tmp_path):
+    monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tg, "collect_known_edges",
+                        lambda: edges(l1(T, addr("a"), 900_000, 5, "0x1")))
+    monkeypatch.setattr(tg, "_load_behavioural_scores", lambda: ({}, set()))
+    monkeypatch.setattr(tg, "_load_linkage_evidence", lambda: {})
+    monkeypatch.setattr(tg, "_load_correlations", lambda: {})
+    monkeypatch.setattr("src.alerts.alert_transfer_graph_discovery",
+                        lambda *a, **k: True)
+
+
+def test_a_frontier_that_has_not_moved_in_days_alerts(monkeypatch, tmp_path):
+    fired = {}
+    _quiet_graph_run(monkeypatch, tmp_path)
+    monkeypatch.setattr("src.alerts.alert_discovery_stalled",
+                        lambda **kw: fired.update(kw) or True)
+    _previous_graph(tmp_path, {
+        "status": "failed", "wallets_expanded": [],
+        "last_expansion_at": "2026-09-09T18:56:29+00:00",
+        "error": "sweep ok: could not read base, optimism, bsc",
+        "frontier_remaining": 17,
+        "frontier_queue": [{"wallet": addr("f"), "depth": 1, "priority": 0.91}],
+    })
+
+    tg.run_transfer_graph(expand=False)
+
+    assert fired, "a stalled frontier must reach the operator"
+    assert fired["hours"] > tg.STALL_HOURS
+    assert fired["last_expansion_at"] == "2026-09-09T18:56:29+00:00"
+    # What the outage is costing, not just that there is one.
+    assert fired["queued"] == 17
+    assert fired["top_queued"] == addr("f")
+
+
+def test_a_frontier_that_moved_recently_stays_quiet(monkeypatch, tmp_path):
+    from datetime import UTC, datetime, timedelta
+    fired = {}
+    _quiet_graph_run(monkeypatch, tmp_path)
+    monkeypatch.setattr("src.alerts.alert_discovery_stalled",
+                        lambda **kw: fired.update(kw) or True)
+    recent = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    _previous_graph(tmp_path, {"status": "partial", "wallets_expanded": [],
+                               "last_expansion_at": recent})
+
+    tg.run_transfer_graph(expand=False)
+
+    assert not fired, "a walk that moved 2h ago is healthy, not stalled"
+
+
+def test_a_graph_with_no_history_never_alerts(monkeypatch, tmp_path):
+    """A fresh checkout has no clock to read. Alerting here would cry wolf on
+    the first run every time, which is how an operator learns to ignore it."""
+    fired = {}
+    _quiet_graph_run(monkeypatch, tmp_path)
+    monkeypatch.setattr("src.alerts.alert_discovery_stalled",
+                        lambda **kw: fired.update(kw) or True)
+
+    tg.run_transfer_graph(expand=False)
+
+    assert not fired
