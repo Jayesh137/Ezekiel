@@ -152,6 +152,22 @@ def _health_bearing(subject: str) -> bool:
     return bool(os.environ.get("NTFY_INCLUDE_INFO"))
 
 
+def discovery_severity(classification: str) -> str:
+    """The severity a transfer-graph discovery of this class alerts at."""
+    return "CRITICAL" if classification == "MIGRATION_CANDIDATE" else (
+        "HIGH" if classification == "POSSIBLE_LINKED_WALLET" else "INFO")
+
+
+def discovery_withheld(classification: str) -> bool:
+    """Whether such a discovery is withheld by policy rather than delivered.
+
+    `fire_alerts` needs this to report what actually left the process, and it
+    must not carry its own copy of the rule — asking here means `NTFY_INCLUDE_INFO`
+    flows through in one place and the log cannot disagree with the channel.
+    """
+    return not _health_bearing(f"[EZEKIEL] {discovery_severity(classification)}: x")
+
+
 def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
     """Open a GitHub issue so a failed email still reaches the operator.
 
@@ -210,6 +226,18 @@ def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
 
 
 def _send_with_cooldown(key: str, hours: float, subject: str, body: str) -> bool:
+    """True when the alert has been DISPOSED OF — delivered, or deliberately
+    withheld. False only when something meant to arrive did not, which is the
+    one case a caller should queue for retry.
+
+    The distinction is the difference between a retry and a livelock. A failed
+    send must consume no cooldown and stay queued, because the next run may
+    succeed. An alert policy routes nowhere can never succeed on a retry, so
+    treating it as pending re-fires it every run forever: measured 2026-09-11,
+    one INFO notice came round seven times in five hours, each pass evicting a
+    real row from the 20-entry delivery record while the wallet sat permanently
+    in the transfer graph's `undelivered_alerts`.
+    """
     if not _cooldown_ok(key, hours):
         print(f"[alerts] Cooldown active for {key}, skipping: {subject}")
         return False
@@ -219,6 +247,14 @@ def _send_with_cooldown(key: str, hours: float, subject: str, body: str) -> bool
     # Email failed. For anything worth waking someone for, try the channel that
     # does not depend on a mail provider being activated.
     if _github_issue_fallback(key, subject, body):
+        write_cursor(f"alert_{key}", now_ms())
+        return True
+    # Nothing carried it — but if nothing was ever going to, that is this
+    # system's own policy working, and there is nothing for a retry to fix.
+    # It is on the dashboard and counted in the delivery record; consume the
+    # cooldown so it does not come round again.
+    if not _health_bearing(subject):
+        print(f"[alerts] Withheld by policy (not routed at this severity): {subject}")
         write_cursor(f"alert_{key}", now_ms())
         return True
     return False
@@ -1017,8 +1053,7 @@ def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
     cls = node["classification"]
     conf = node["confidence"]
 
-    severity = "CRITICAL" if cls == "MIGRATION_CANDIDATE" else (
-        "HIGH" if cls == "POSSIBLE_LINKED_WALLET" else "INFO")
+    severity = discovery_severity(cls)
     subject = f"[EZEKIEL] {severity}: {cls.replace('_', ' ').title()} ({conf:.0%} confidence)"
 
     path = address_path(node.get("path") or [wallet])

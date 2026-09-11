@@ -38,6 +38,14 @@ def cursors(monkeypatch):
     monkeypatch.setenv("BREVO_SMTP_LOGIN", LOGIN)
     monkeypatch.setenv("BREVO_SMTP_KEY", KEY)
     monkeypatch.setenv("ALERT_EMAIL", EMAIL)
+    # Email is the only channel these tests configure. Cleared rather than
+    # assumed absent: an operator's own NTFY_TOPIC or a GITHUB_TOKEN exported
+    # in the shell would make these tests POST to ntfy.sh or open a real
+    # issue — a network call in a suite that must have none, and a result
+    # that depends on whose machine it runs on.
+    for var in ("NTFY_TOPIC", "NTFY_INCLUDE_INFO", "TELEGRAM_BOT_TOKEN",
+                "TELEGRAM_CHAT_ID", "GITHUB_TOKEN", "GH_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
     return store
 
 
@@ -131,6 +139,15 @@ def _graph_with_one_discovery():
                        correlations={W: {"confidence": 0.9, "gap_hours": 2.0}})
 
 
+def _graph_with_one_info_discovery():
+    """The same transfer with no corroboration: DIRECT_RECIPIENT, so the alert
+    subject carries INFO rather than CRITICAL."""
+    e = normalise_l1_transfer({
+        "from": T, "to": W, "value": "900000000", "timeStamp": "1784000000",
+        "hash": "0xabc", "tokenSymbol": "USDC"})
+    return build_graph([e], T)
+
+
 def test_undelivered_alert_is_reselected_next_run(monkeypatch):
     graph = _graph_with_one_discovery()
     first = select_alerts(graph, None)
@@ -155,15 +172,17 @@ def test_fire_alerts_reports_undelivered_wallets(monkeypatch):
 
     monkeypatch.setattr("src.alerts.alert_transfer_graph_discovery",
                         lambda *a, **k: False)
-    sent, undelivered = transfer_graph.fire_alerts(graph, alerts_list)
+    sent, undelivered, withheld = transfer_graph.fire_alerts(graph, alerts_list)
     assert sent == 0
     assert undelivered == [W]
+    assert withheld == 0
 
     monkeypatch.setattr("src.alerts.alert_transfer_graph_discovery",
                         lambda *a, **k: True)
-    sent, undelivered = transfer_graph.fire_alerts(graph, alerts_list)
+    sent, undelivered, withheld = transfer_graph.fire_alerts(graph, alerts_list)
     assert sent == 1
     assert undelivered == []
+    assert withheld == 0, "a MIGRATION_CANDIDATE is CRITICAL — never withheld"
 
 
 def test_state_advance_without_the_fix_would_lose_the_alert():
@@ -264,3 +283,87 @@ def test_a_stalled_frontier_pages_once_a_day_not_every_run(monkeypatch, cursors)
 
     assert first is True and second is False
     assert len(calls) == 1
+
+
+# --- the mirror rule: state MUST advance past an alert nothing will deliver ------
+#
+# The rule above — a failed send consumes no cooldown and stays queued — is
+# right for a FAILURE. Applied to an alert this system deliberately does not
+# route, it becomes a livelock, and it ran as one in production on 2026-09-11.
+#
+# INFO is gated out of the instant channels on purpose and out of the GitHub
+# fallback too, so `send_alert` returns False having done exactly what policy
+# asked. `_send_with_cooldown` then wrote no cursor, `fire_alerts` recorded the
+# wallet undelivered, and `select_alerts` re-selects an undelivered wallet
+# unconditionally — ahead of every confidence gate. So the same notice came
+# round every run: "Operational Counterparty (33% confidence)" seven times
+# between 17:13 and 21:52, each one evicting a real row from the 20-entry
+# delivery record, and the wallet pinned in `undelivered_alerts` forever
+# waiting for a retry that policy can never satisfy.
+#
+# A deliberately withheld alert is DISPOSED OF, not pending: it is on the
+# dashboard and in the delivery record, and it must consume its cooldown and
+# leave the retry queue. A genuine failure keeps every bit of its retryability.
+
+
+def test_a_suppressed_info_consumes_its_cooldown(cursors, monkeypatch):
+    """Policy withheld it, so there is nothing to retry — and nothing should
+    come round again next run."""
+    _smtp(monkeypatch, "auth")
+
+    handled = alerts._send_with_cooldown(
+        "tg_info", 48, "[EZEKIEL] INFO: Operational Counterparty (33% confidence)", "b")
+
+    assert handled is True, "a withheld alert is handled, not failed"
+    assert cursors.get("alert_tg_info"), "a withheld alert must consume its cooldown"
+
+
+def test_a_failed_critical_still_consumes_no_cooldown(cursors, monkeypatch):
+    """The original rule, pinned against the new one: severity decides whether
+    an alert was withheld, and a CRITICAL is never withheld."""
+    _smtp(monkeypatch, "auth")
+
+    handled = alerts._send_with_cooldown(
+        "tg_critical", 48, "[EZEKIEL] CRITICAL: Migration Candidate (84% confidence)", "b")
+
+    assert handled is False
+    assert "alert_tg_critical" not in cursors, "a real failure stays retryable"
+
+
+def test_a_suppressed_info_discovery_leaves_the_retry_queue(cursors, monkeypatch):
+    """End to end, on the loop that actually ran: an INFO discovery already in
+    `undelivered_alerts` is re-selected, withheld again, and must come out of
+    the queue rather than round again forever."""
+    _smtp(monkeypatch, "auth")
+    graph = _graph_with_one_info_discovery()
+    queued = dict(graph)
+    queued["undelivered_alerts"] = [W]
+
+    selected = select_alerts(graph, queued)
+    assert len(selected) == 1, "an undelivered wallet is re-selected unconditionally"
+    node = selected[0]["node"]
+    assert node["classification"] == "DIRECT_RECIPIENT", "INFO severity, not CRITICAL"
+
+    delivered, undelivered, withheld = transfer_graph.fire_alerts(graph, selected)
+
+    assert undelivered == [], "a withheld alert must not stay queued for retry"
+    assert withheld == 1
+    assert delivered == 0, (
+        "nothing left the process — counting a withheld alert as delivered is "
+        "the 'never say sent for a send that did not happen' rule again")
+
+
+def test_only_policy_decides_what_is_withheld(monkeypatch):
+    """`fire_alerts` must not carry its own copy of the severity rule. It asks
+    alerts.py, so turning INFO back on flows through in one place."""
+    for var in ("NTFY_INCLUDE_INFO",):
+        monkeypatch.delenv(var, raising=False)
+
+    assert alerts.discovery_withheld("DIRECT_RECIPIENT") is True
+    assert alerts.discovery_withheld("OPERATIONAL_COUNTERPARTY") is True
+    assert alerts.discovery_withheld("MIGRATION_CANDIDATE") is False
+    assert alerts.discovery_withheld("POSSIBLE_LINKED_WALLET") is False
+
+    monkeypatch.setenv("NTFY_INCLUDE_INFO", "1")
+    assert alerts.discovery_withheld("DIRECT_RECIPIENT") is False, (
+        "opting INFO back in makes it deliverable, so it is no longer withheld")

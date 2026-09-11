@@ -1287,30 +1287,39 @@ def _format_path(path: list[str]) -> str:
     return "\n    -> ".join(path) if path else "(unknown)"
 
 
-def fire_alerts(graph: dict, alerts: list[dict]) -> tuple[int, list[str]]:
+def fire_alerts(graph: dict, alerts: list[dict]) -> tuple[int, list[str], int]:
     """Send one email per meaningful discovery, with the full audit trail.
 
-    Returns (sent_count, undelivered_wallets). The caller MUST persist the
-    undelivered list: the graph state advances on every run, so a discovery that
-    was selected but not delivered would otherwise look "already reported" on the
-    next run and be lost permanently.
+    Returns (delivered_count, undelivered_wallets, withheld_count). The caller
+    MUST persist the undelivered list: the graph state advances on every run, so
+    a discovery that was selected but not delivered would otherwise look
+    "already reported" on the next run and be lost permanently.
+
+    Withheld is counted apart from delivered rather than folded into it. An
+    INFO discovery is routed to no channel on purpose, so it is disposed of and
+    must leave the retry queue — but nothing left the process, and calling that
+    "delivered" is the same lie as the old "0/4 alert(s) sent".
     """
-    from src.alerts import alert_transfer_graph_discovery
+    from src.alerts import alert_transfer_graph_discovery, discovery_withheld
 
     edges_by_id = {e["id"]: e for e in graph.get("edges", [])}
-    sent = 0
+    delivered = 0
+    withheld = 0
     undelivered = []
     for a in alerts:
         node = a["node"]
         edges = [edges_by_id[i] for i in node["edge_ids"] if i in edges_by_id]
         edges.sort(key=lambda e: e["ts"] or 0)
         if alert_transfer_graph_discovery(node, a["trigger_reasons"], edges):
-            sent += 1
+            if discovery_withheld(node["classification"]):
+                withheld += 1
+            else:
+                delivered += 1
         else:
             undelivered.append(node["wallet"].lower())
             print(f"[graph] alert NOT delivered for {node['wallet'][:12]}... "
                   f"({node['classification']}) — queued for retry next run")
-    return sent, undelivered
+    return delivered, undelivered, withheld
 
 
 # --- I/O wrapper ----------------------------------------------------------------
@@ -2724,11 +2733,15 @@ def run_transfer_graph(expand: bool = True) -> dict:
 
     alerts = select_alerts(graph, previous)
     if alerts:
-        sent, undelivered = fire_alerts(graph, alerts)
+        sent, undelivered, withheld = fire_alerts(graph, alerts)
     else:
-        sent, undelivered = 0, []
+        sent, undelivered, withheld = 0, [], 0
     advance_alert_state(graph, previous, alerts, undelivered)
     graph["alerts_fired"] = sent
+    # Disposed of without being sent: routed to no channel at their severity.
+    # Kept separate from `alerts_fired` so neither number has to be read as
+    # the other.
+    graph["alerts_withheld"] = withheld
     graph["pending_alerts"] = len(alerts)
     # Persisted so the next run re-selects these. Without it the saved graph
     # advances as though the alert had been delivered, select_alerts sees no
@@ -2756,6 +2769,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
         delivered = graph["alerts_fired"]
         failed = len(graph["undelivered_alerts"])
         print(f"[graph] alerts: {attempted} attempted, {delivered} delivered, "
+              f"{graph['alerts_withheld']} withheld (INFO, not routed), "
               f"{failed} failed, {len(graph['undelivered_alerts'])} queued for retry")
     return graph
 
