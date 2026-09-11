@@ -82,19 +82,38 @@ def etherscan_get(params: dict, chain_id: int | None = None) -> dict:
 
 # --- Cursor Management ---
 
+def cursor_filename(name: str) -> str:
+    """A cursor name reduced to characters every filesystem accepts.
+
+    Cursor names are built from alert keys, and an alert key is built from
+    whatever describes the alert — on 2026-09-11 that included the kind
+    `bridge:cctp->solana`, so CI wrote
+    `data/state/alert_foreign_bridge:cctp->solana_0x1d24….txt`, committed it,
+    and `git checkout main` then failed outright on Windows: `:` and `>` are
+    not legal in an NTFS filename. A repository that cannot be checked out on
+    the operator's own machine is a worse outcome than any alert.
+
+    Collisions are not a concern here: the substituted characters are
+    punctuation inside otherwise distinct keys, and a cursor is a timestamp
+    watermark, not a claim about identity.
+    """
+    safe = "".join(c if (c.isalnum() or c in "._-") else "_" for c in str(name))
+    return safe or "cursor"
+
+
 def read_cursor(name: str, base: str | None = None) -> int:
     """Read a timestamp cursor. Returns 0 if file doesn't exist."""
     base_path = Path(base) if base else DATA_DIR / "state"
-    cursor_file = base_path / f"{name}.txt"
+    cursor_file = base_path / f"{cursor_filename(name)}.txt"
     if cursor_file.exists():
         return int(cursor_file.read_text().strip())
     return 0
 
 def write_cursor(name: str, value: int, base: str | None = None) -> None:
-    """Write a timestamp cursor."""
+    """Write a timestamp cursor. See cursor_filename for why the name is sanitised."""
     base_path = Path(base) if base else DATA_DIR / "state"
     base_path.mkdir(parents=True, exist_ok=True)
-    cursor_file = base_path / f"{name}.txt"
+    cursor_file = base_path / f"{cursor_filename(name)}.txt"
     cursor_file.write_text(str(value))
 
 # --- Date Helpers ---

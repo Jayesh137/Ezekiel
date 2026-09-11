@@ -97,3 +97,23 @@ def test_save_latest_still_produces_the_same_shape_after_the_refactor():
         filepath = save_latest(d, {"x": 1})
         assert filepath == str(Path(d) / "latest.json")
         assert json.loads(Path(filepath).read_text()) == {"x": 1}
+
+
+def test_cursor_names_are_filesystem_safe(tmp_path):
+    """CI wrote data/state/alert_foreign_bridge:cctp->solana_0x1d24….txt and
+    committed it; `git checkout main` then failed outright on Windows, because
+    ':' and '>' are not legal in an NTFS filename. A repository the operator
+    cannot check out is worse than any alert."""
+    from src.utils import cursor_filename, read_cursor, write_cursor
+
+    nasty = "foreign_bridge:cctp->solana_0xAB*?|<>"
+    # Hyphen, dot and underscore survive; everything else becomes an underscore.
+    assert cursor_filename(nasty) == "foreign_bridge_cctp-_solana_0xAB_____"
+    assert cursor_filename("plain_key-1.2") == "plain_key-1.2"
+    assert cursor_filename("") == "cursor"
+
+    write_cursor(nasty, 1234, base=str(tmp_path))
+    written = [p.name for p in tmp_path.iterdir()]
+    assert len(written) == 1
+    assert not any(c in written[0] for c in ':*?|<>')
+    assert read_cursor(nasty, base=str(tmp_path)) == 1234
