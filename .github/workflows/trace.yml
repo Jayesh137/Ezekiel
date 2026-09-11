@@ -58,8 +58,11 @@ jobs:
     # a 390s budget when the target has moved money to many destinations. That
     # gap is why the timeout is 15 minutes rather than the 10 this job ran at
     # when it held five fewer steps — at 10 the first busy run would be
-    # cancelled and lose the commit. The schedule is every 30 minutes, so a
-    # 15-minute job still cannot overlap itself.
+    # cancelled and lose the commit. The schedule asks for every 30 minutes and
+    # the concurrency group below is what actually guarantees no overlap: this
+    # cron is delivered a median of 198 minutes apart in practice (measured
+    # 2026-09-11 over 73 runs), which is why the watch has its own small
+    # workflow in watch.yml rather than depending on this one.
     #
     # The steps above run on every dispatch, scheduled or manual. "Investigate
     # a specific wallet" below runs ONLY on a manual dispatch that sets

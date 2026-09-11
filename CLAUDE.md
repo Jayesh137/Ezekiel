@@ -83,7 +83,7 @@ trading style. Never promote a wallet on one vector alone.
 | Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
 | Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
 | Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
-| Close watch | `watchlist.py`, `scripts/check_watchlist.py` | `config.watch_wallets`: a wallet that is probably his and is not confirmed, read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
+| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets`: a wallet that is probably his and is not confirmed, read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -481,6 +481,17 @@ that it is.
   (`rpc.hyperliquid.xyz/explorer`, `userDetails`) returns the last 300
   actions with payloads and cannot be paged. `vaultSummaries` answered `[]`;
   vault leadership comes from `webData2.leadingVaults`.
+- **A cron in this repo is a wish, not a schedule.** `trace.yml` asks for
+  every 30 minutes; measured over its last 73 scheduled runs (2026-09-01 to
+  2026-09-11) GitHub actually started it a **median of 198 minutes apart,
+  never under 99, up to 337**. Scheduled events on free shared runners are
+  best-effort and get dropped under load, and this repo had seven workflows
+  competing for them. That is a five-hour blind spot in the one thing the
+  project exists to catch. Two mitigations are in: `watch.yml` is a small,
+  fast, single-purpose job (a small job is dropped less often), and
+  **`workflow_dispatch` is not best-effort** — anything outside GitHub that
+  can make one API call drives a run immediately. Do not quote the cron
+  interval as the cadence; quote the measurement.
 - **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
   collector run's silence and account-drop alerts arrived on the topic within
   seconds while email failed as usual. Telegram is still unset.
