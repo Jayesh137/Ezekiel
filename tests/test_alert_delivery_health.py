@@ -60,6 +60,14 @@ def wired(tmp_path, monkeypatch):
     monkeypatch.setenv("BREVO_SMTP_LOGIN", "id@smtp-brevo.example")
     monkeypatch.setenv("BREVO_SMTP_KEY", "a-key")
     monkeypatch.setenv("ALERT_EMAIL", "op@example.com")
+    # Email is the only channel here unless a test says otherwise. Cleared
+    # rather than assumed absent: an operator's own NTFY_TOPIC exported in the
+    # shell would otherwise make these tests POST to ntfy.sh for real, which
+    # is both a network call in a suite that must have none and a result that
+    # depends on whose machine it runs on.
+    for var in ("NTFY_TOPIC", "NTFY_INCLUDE_INFO",
+                "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+        monkeypatch.delenv(var, raising=False)
     return tmp_path
 
 
@@ -162,3 +170,88 @@ def test_recording_never_breaks_alerting(wired, monkeypatch):
     monkeypatch.setattr(alerts, "save_latest",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("read-only fs")))
     assert alerts.send_alert("s", "b") is True
+
+
+# --- INFO suppression is policy, not an outage ---------------------------------
+#
+# Measured on production 2026-09-11. `_send_webhooks` deliberately refuses to
+# buzz a phone for INFO — the first trace run after ntfy went live pushed 24
+# "Operational Counterparty" notices at 3-11% confidence in one minute — and
+# Brevo has never delivered anything. So every INFO alert reached no channel,
+# and every one of them was recorded as a delivery FAILURE: six consecutive
+# failures, `healthy: false`, and the dashboard announcing ALERTING IS DOWN
+# while four CRITICALs that same afternoon were delivered by ntfy in seconds.
+#
+# That inverts the monitor. The question it exists to answer is "would I be
+# told if the trader migrated?", and the answer was yes throughout. A flag
+# pinned to false by a policy we chose on purpose cannot report the outage it
+# was built for, because there is no state left for a real outage to change.
+#
+# So health is judged on the alerts that were MEANT to reach the operator.
+# An INFO alert nothing carried is suppressed: counted, kept in `recent`, and
+# never allowed to touch `healthy`. CRITICAL and HIGH — and any subject whose
+# severity cannot be read, which must never be assumed harmless — are
+# health-bearing exactly as before.
+
+
+def test_an_info_alert_no_channel_carries_is_suppressed_not_failed(wired, monkeypatch):
+    """The production case: INFO is not routed anywhere, so nothing failed."""
+    monkeypatch.setattr(alerts.smtplib, "SMTP",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+
+    alerts.send_alert("[EZEKIEL] INFO: Operational Counterparty (33% confidence)", "body")
+
+    h = health(wired)
+    assert h is not None, "a suppressed alert must still leave a record"
+    assert h["healthy"] is True, "INFO reaching no channel is policy, not an outage"
+    assert h["consecutive_failures"] == 0
+    assert h["undelivered"] == 0
+
+
+def test_a_suppressed_info_alert_is_still_counted_and_visible(wired, monkeypatch):
+    """Suppressed is not silent. It must be countable, or the policy hides
+    how much the operator is no longer being told."""
+    monkeypatch.setattr(alerts.smtplib, "SMTP",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+
+    alerts.send_alert("[EZEKIEL] INFO: first", "b")
+    alerts.send_alert("[EZEKIEL] INFO: second", "b")
+
+    h = health(wired)
+    assert h["suppressed"] == 2
+    assert h["recent"][-1]["status"] == "suppressed"
+    assert h["recent"][-1]["subject"] == "[EZEKIEL] INFO: second"
+
+
+def test_suppressing_info_does_not_clear_a_standing_failure(wired, monkeypatch):
+    """The failure mode to avoid in the other direction: a stream of INFO
+    notices must not wash a real CRITICAL outage out of the record."""
+    monkeypatch.setattr(alerts.smtplib, "SMTP",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("connection refused")))
+
+    alerts.send_alert("[EZEKIEL] CRITICAL: migration candidate", "b")
+    failed = health(wired)
+    assert failed["healthy"] is False and failed["consecutive_failures"] == 1
+
+    alerts.send_alert("[EZEKIEL] INFO: Operational Counterparty (3% confidence)", "b")
+
+    h = health(wired)
+    assert h["healthy"] is False, "a suppressed INFO must not mark the channel healthy"
+    assert h["consecutive_failures"] == 1, "counters belong to health-bearing alerts"
+    assert h["undelivered"] == 1
+    assert "connection refused" in h["last_failure_reason"]
+    assert h["last_failure_at"] == failed["last_failure_at"]
+
+
+def test_info_counts_against_health_when_the_operator_opts_in(wired, monkeypatch):
+    """NTFY_INCLUDE_INFO routes INFO to the instant channels. Once an alert is
+    meant to arrive, failing to deliver it is an outage again."""
+    monkeypatch.setenv("NTFY_INCLUDE_INFO", "1")
+    monkeypatch.setattr(alerts.smtplib, "SMTP",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+
+    alerts.send_alert("[EZEKIEL] INFO: Operational Counterparty (33% confidence)", "b")
+
+    h = health(wired)
+    assert h["healthy"] is False
+    assert h["consecutive_failures"] == 1

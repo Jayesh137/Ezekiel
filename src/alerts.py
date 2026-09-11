@@ -63,21 +63,39 @@ def _record_delivery(subject: str, delivered: bool, reason: str | None = None) -
             except (OSError, ValueError):
                 prev = {}
         now = datetime.now(UTC).isoformat()
-        fails = 0 if delivered else int(prev.get("consecutive_failures", 0) or 0) + 1
+        # An alert no channel was ever going to carry reports nothing about the
+        # channels — see _health_bearing. It is still counted and still kept in
+        # `recent`, so suppression stays visible; it just leaves every health
+        # field describing the last alert that actually had somewhere to go.
+        suppressed = not delivered and not _health_bearing(subject)
+        status = "delivered" if delivered else ("suppressed" if suppressed else "failed")
         recent = list(prev.get("recent") or [])
-        recent.append({"at": now, "subject": subject,
-                       "delivered": delivered, "reason": reason})
+        recent.append({"at": now, "subject": subject, "delivered": delivered,
+                       "status": status, "reason": reason})
         state = {
             "updated_at": now,
-            "healthy": delivered,
-            "consecutive_failures": fails,
+            "healthy": bool(prev.get("healthy", True)),
+            "consecutive_failures": int(prev.get("consecutive_failures", 0) or 0),
             # How many alerts the operator was never told about.
-            "undelivered": 0 if delivered else int(prev.get("undelivered", 0) or 0) + 1,
-            "last_success_at": now if delivered else prev.get("last_success_at"),
-            "last_failure_at": prev.get("last_failure_at") if delivered else now,
-            "last_failure_reason": prev.get("last_failure_reason") if delivered else reason,
+            "undelivered": int(prev.get("undelivered", 0) or 0),
+            # How many were withheld on purpose. Not a fault, but the operator
+            # should be able to see how much is no longer reaching them.
+            "suppressed": int(prev.get("suppressed", 0) or 0) + (1 if suppressed else 0),
+            "last_success_at": prev.get("last_success_at"),
+            "last_failure_at": prev.get("last_failure_at"),
+            "last_failure_reason": prev.get("last_failure_reason"),
             "recent": recent[-20:],
         }
+        if not suppressed:
+            state["healthy"] = delivered
+            state["consecutive_failures"] = (
+                0 if delivered else state["consecutive_failures"] + 1)
+            state["undelivered"] = 0 if delivered else state["undelivered"] + 1
+            if delivered:
+                state["last_success_at"] = now
+            else:
+                state["last_failure_at"] = now
+                state["last_failure_reason"] = reason
         save_latest(str(DATA_DIR / "alerts"), state)
     except Exception as e:  # noqa: BLE001 - must never break alerting
         print(f"[alerts] could not record delivery health: {type(e).__name__}: {e}")
@@ -112,6 +130,26 @@ def _severity_of(subject: str) -> str:
         if f"] {level}:" in subject:
             return level
     return ""
+
+
+def _health_bearing(subject: str) -> bool:
+    """Whether failing to deliver this alert says anything about channel health.
+
+    INFO is deliberately routed nowhere that buzzes — `_send_webhooks` gates on
+    severity, and so does the GitHub fallback — so an INFO alert that no channel
+    took is this system's own policy working, not an outage. Counting it as a
+    delivery failure is what pinned `healthy` to false all through 2026-09-11
+    while every CRITICAL that afternoon arrived on ntfy within seconds, and a
+    flag that is always false cannot report the outage it exists for.
+
+    Everything else is health-bearing, including a subject whose severity
+    cannot be read: an alert we cannot classify must never be assumed harmless.
+    `NTFY_INCLUDE_INFO` puts INFO back on the instant channels, and an alert
+    that is meant to arrive is one whose failure to arrive counts again.
+    """
+    if _severity_of(subject) != "INFO":
+        return True
+    return bool(os.environ.get("NTFY_INCLUDE_INFO"))
 
 
 def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
