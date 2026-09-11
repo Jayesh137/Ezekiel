@@ -1,11 +1,12 @@
 {
-  "computed_at": "2026-09-11T16:25:24.402684+00:00",
+  "computed_at": "2026-09-11T16:42:35.072640+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 293,
   "behavioural_counts_as_a_vector": false,
   "tier_counts": {
     "CONFIRMED": 2,
-    "POSSIBLE": 85,
+    "PROBABLE": 1,
+    "POSSIBLE": 84,
     "WATCH": 49,
     "INFRASTRUCTURE": 157
   },
@@ -58,14 +59,15 @@
         "linkage",
         "transfer"
       ],
-      "confidence": 0.76,
+      "confidence": 0.84,
       "classification": "MIGRATION_CANDIDATE",
       "reasons": [
         "Received funds directly from the target wallet",
         "Sent funds to the target wallet",
         "Repeated transfers (1111 separate movements)",
         "Two-way flow \u2014 funds move both to and from this wallet",
-        "Sends to the same deposit address as the target (address reuse)"
+        "Sends to the same deposit address as the target (address reuse)",
+        "Actively trading on Hyperliquid after receiving funds"
       ],
       "evidence": {
         "service_reason": null,
@@ -87,6 +89,57 @@
       "known_self": false,
       "vector_count": 2,
       "tier": "CONFIRMED"
+    },
+    {
+      "wallet": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
+      "vectors": [
+        "correlation",
+        "dormancy_handoff"
+      ],
+      "confidence": 0.1767,
+      "classification": "CORRELATION_LEAD",
+      "reasons": [
+        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
+        "Exit amount re-appears as a deposit (single amount, 64% match confidence)",
+        "Behavioural similarity only 69% \u2014 weak on its own",
+        "Actively trading on Hyperliquid after receiving funds"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 1,
+        "chains": [
+          "inferred"
+        ],
+        "correlation_confidence": 0.6445,
+        "correlation_gap_hours": 156.1,
+        "competing_deposits": 7,
+        "behavioural_score": 0.6867,
+        "behavioural_tier": "CONFIRMED_CANDIDATE",
+        "style_vetoes": [],
+        "portfolio_overlap": 0.0082,
+        "shared_rare_markets": [
+          "VVV",
+          "ZRO"
+        ],
+        "hl_role": "user",
+        "hl_account_value": 51310835.607885,
+        "hl_birth_ms": 1787008800125,
+        "dormancy_handoff": {
+          "score": 0.4286,
+          "gap_length": 6,
+          "delay_days": 2,
+          "candidate_first_day": 20682
+        }
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 2,
+      "tier": "PROBABLE"
     },
     {
       "wallet": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
@@ -275,50 +328,6 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
-      "vectors": [
-        "correlation"
-      ],
-      "confidence": 0.1767,
-      "classification": "CORRELATION_LEAD",
-      "reasons": [
-        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
-        "Exit amount re-appears as a deposit (single amount, 64% match confidence)",
-        "Behavioural similarity only 69% \u2014 weak on its own",
-        "Actively trading on Hyperliquid after receiving funds"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 1,
-        "chains": [
-          "inferred"
-        ],
-        "correlation_confidence": 0.6445,
-        "correlation_gap_hours": 156.1,
-        "competing_deposits": 7,
-        "behavioural_score": 0.6867,
-        "behavioural_tier": "CONFIRMED_CANDIDATE",
-        "style_vetoes": [],
-        "portfolio_overlap": 0.0082,
-        "shared_rare_markets": [
-          "VVV",
-          "ZRO"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 51310835.607885,
-        "hl_birth_ms": 1787008800125
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
       "wallet": "0x02745fb27d7cee999fccf295f9d4a897fd22a7f7",
       "vectors": [
         "transfer"
@@ -362,7 +371,7 @@
         "Sent funds to the target wallet",
         "Transfer happened entirely inside Hyperliquid (no L1 trace)",
         "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 403 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 404 days ago \u2014 transfer evidence aged to 40%",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
@@ -381,6 +390,40 @@
         "hl_role": "user",
         "hl_account_value": 6213730.333076,
         "hl_birth_ms": 1692229500015
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xf07fc9df6cc892029addbef2994d8c221d37f2f6",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.16,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Sent funds to the target wallet",
+        "Transfer happened entirely inside Hyperliquid (no L1 trace)",
+        "Actively trading on Hyperliquid after receiving funds",
+        "Last movement 567 days ago \u2014 transfer evidence aged to 40%",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 963.19,
+          "edge_count": 1
+        },
+        "depth": 1,
+        "chains": [
+          "hyperliquid"
+        ],
+        "hl_role": "user",
+        "hl_account_value": 147.778896,
+        "hl_birth_ms": 1740611040038
       },
       "is_service": false,
       "known_self": false,
@@ -925,39 +968,6 @@
         "hl_role": "user",
         "hl_account_value": 0.0,
         "hl_birth_ms": 1737589800057
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xf07fc9df6cc892029addbef2994d8c221d37f2f6",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.08,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Sent funds to the target wallet",
-        "Transfer happened entirely inside Hyperliquid (no L1 trace)",
-        "Last movement 567 days ago \u2014 transfer evidence aged to 40%",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 963.19,
-          "edge_count": 1
-        },
-        "depth": 1,
-        "chains": [
-          "hyperliquid"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 147.778896,
-        "hl_birth_ms": 1740611040038
       },
       "is_service": false,
       "known_self": false,
@@ -1628,7 +1638,10 @@
         "depth": 3,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1659,7 +1672,10 @@
           "arbitrum",
           "ethereum",
           "polygon"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1721862480151
       },
       "is_service": false,
       "known_self": false,
@@ -1675,7 +1691,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (10 separate movements)",
-        "Last movement 713 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 714 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1688,7 +1704,10 @@
         "depth": 3,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1717,7 +1736,10 @@
         "depth": 3,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1809,7 +1831,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1870,7 +1895,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1899,7 +1927,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1959,7 +1990,10 @@
         "depth": 3,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1988,7 +2022,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -2016,7 +2053,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -2044,7 +2084,10 @@
         "depth": 2,
         "chains": [
           "arbitrum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -2073,7 +2116,10 @@
         "depth": 3,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -2101,7 +2147,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -2130,7 +2179,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -2159,7 +2211,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
