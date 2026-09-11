@@ -1,53 +1,60 @@
 {
   "wallet": "0x28233e5edddfc9f71f0cecf58ca98f6a2ca11f43",
   "first_seen": "2026-08-20T19:21:39.822516+00:00",
-  "last_seen": "2026-08-21T00:33:49.146742+00:00",
+  "last_seen": "2026-09-11T15:31:28.861594+00:00",
   "best_score": 0.482,
-  "latest_score": 0.4801,
-  "latest_tier": "WATCH_CLOSELY",
+  "latest_score": 0.3836,
+  "latest_tier": "BACKGROUND",
   "latest_evidence": {
-    "tier": "WATCH_CLOSELY",
+    "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
       "Matching long/short bias"
     ],
     "warnings": [
-      "Weak asset overlap",
-      "Very different account-size bracket"
+      "Very different account-size bracket",
+      "Very different trading frequency"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Decision frequency 5x apart (3.50 vs 0.67 position episodes/day)"
+    ],
     "asset_overlap": {
       "overlap": [
+        "AAVE",
         "BTC",
-        "ETH"
+        "ETH",
+        "LINK",
+        "NEAR"
       ],
       "target_only": [
-        "@107",
+        "ADA",
+        "ASTER",
         "CASHCAT",
+        "DOGE",
+        "ENA",
+        "ETHFI",
+        "FARTCOIN",
+        "GRAM",
         "MON",
-        "XPL",
-        "xyz:SKHX"
+        "ONDO",
+        "PUMP",
+        "SOL",
+        "XRP",
+        "ZEC",
+        "ZRO",
+        "kPEPE"
       ],
       "candidate_only": [
-        "AAVE",
-        "ADA",
-        "AVAX",
         "DOT",
-        "DYDX",
         "GRASS",
-        "HYPE",
-        "LINK",
-        "LTC",
-        "STABLE",
-        "STRK",
+        "TAO",
+        "UNI",
         "VIRTUAL",
-        "XMR",
-        "ZEC",
+        "WLD",
         "xyz:MSFT"
       ],
-      "overlap_count": 2,
+      "overlap_count": 5,
       "rare_overlap": [],
-      "jaccard": 0.0909
+      "jaccard": 0.1786
     },
     "market_rarity": {
       "shared_markets": [],
@@ -56,9 +63,14 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4801,
+      "score_without_bonus": 0.3836,
       "explanations": [],
       "frequencies": {}
+    },
+    "tooling": {
+      "requests": 6124371.0,
+      "cum_volume_usd": 151848094.63,
+      "requests_per_1k_usd": 40.3322
     }
   },
   "score_history": [
@@ -175,8 +187,28 @@
         "position_management": 0.7635,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-09-11T15:31:28.861594+00:00",
+      "score": 0.3836,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.4537,
+        "timing_profile": null,
+        "leverage_profile": 0.6522,
+        "entry_exit_style": 0.6724,
+        "hold_duration": 0.2443,
+        "account_size": 0.1123,
+        "trade_sequencing": 0.1879,
+        "position_sizing": 0.1353,
+        "order_profile": null,
+        "activity": 0.3332,
+        "direction_bias": 0.9023,
+        "position_management": 0.7732,
+        "loss_handling": null
+      }
     }
   ],
-  "status": "ACTIVE",
-  "recent_avg_score": null
+  "status": "COOLING",
+  "recent_avg_score": 0.4672
 }
