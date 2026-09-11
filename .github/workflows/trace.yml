@@ -26,31 +26,45 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-    # 600s, and every budget inside this job has to fit within it. A job that
+    # 900s, and every budget inside this job has to fit within it. A job that
     # is CANCELLED never reaches "Commit and push", so the cursors written to
     # the runner's working tree are discarded and the next run starts from
     # block 0 again — the same livelock --reset was fixed for, reached through
     # job cancellation instead.
+    #
+    # BUDGETED worst case, which is what the timeout has to cover:
     #
     #   config.collection.time_budget_seconds  150   cluster sweep (tracer)
     #   tracer.TRACE_BUDGET_SECONDS            240   destination tracing loop
     #   correlator.run_correlation               1   one Etherscan call
     #   config.transfer_graph.time_budget_...  150   frontier expansion
     #   transfer_graph.CODE_LOOKUP_SECONDS      20   bytecode labelling
+    #   the 2026-09-10 vectors (measured below) ~250
     #                                          ---
-    #                                          561   leaving ~39s for checkout,
+    #                                          811   leaving ~89s for checkout,
     #                                                pip (cached) and the push
+    #
+    # MEASURED, run 34618753307 on 2026-09-11 (total 6m42s), because the
+    # budgets above are ceilings the steps rarely reach and the new steps have
+    # no ceiling of their own — they are bounded by how many addresses they
+    # ask about:
+    #
+    #   identities 109   agents 79   graph 52   bridges 35   dormancy 25
+    #   tracer 21 (of its 390s budget: nothing new to trace that run)
+    #   overlap 19   co-movement 16   checkout+pip 28   push 8
+    #   withdrawals / solana / vaults / hyperevm probe   ~4 together
+    #
+    # The tracer is the one that can swing hardest: 21s on a quiet run against
+    # a 390s budget when the target has moved money to many destinations. That
+    # gap is why the timeout is 15 minutes rather than the 10 this job ran at
+    # when it held five fewer steps — at 10 the first busy run would be
+    # cancelled and lose the commit. The schedule is every 30 minutes, so a
+    # 15-minute job still cannot overlap itself.
     #
     # The steps above run on every dispatch, scheduled or manual. "Investigate
     # a specific wallet" below runs ONLY on a manual dispatch that sets
     # investigate_wallet, and it runs FIRST, so on that path its own budget is
-    # additive to the 561 above, not a substitute for any of it:
-    #
-    #   backfill_transfers.py --time-budget-seconds   9   investigate (manual dispatch only)
-    #                        + the 561 above         561
-    #                                                ---
-    #                                                570   leaving 30s — this job's
-    #                                                      existing, unwidened margin
+    # additive to the 811 above, not a substitute for any of it.
     #
     # 9s does not complete a multi-chain sweep for a wallet with real history —
     # scripts/backfill_transfers.py's own default (config.backfill, 2700s) is
@@ -60,7 +74,7 @@ jobs:
     # cancelled. A wallet with real history reports TRUNCATED and the chains it
     # could not reach; src/chain/collect.py flushes cursors per chain, so the
     # next dispatch of this same workflow resumes rather than restarts.
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

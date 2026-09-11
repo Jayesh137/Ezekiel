@@ -30,8 +30,13 @@ from src.alerts import alert_explicit_link
 from src.hl_identity import IDENTITY_DIR, explicit_links, probe, save
 from src.utils import DATA_DIR, hl_post, load_config
 
-# Addresses probed per run beyond the cluster. Five calls each.
-MAX_OTHERS = 40
+# Addresses probed per run beyond the cluster. Five calls each, and measured
+# at 109s for 42 addresses — the largest single step in the trace job, which
+# has a hard timeout and loses its commit if it is cancelled. Fifteen a run
+# against a half-hourly schedule still re-reads every roster wallet many
+# times over inside the seven-day recheck window; the cluster is read on
+# every run regardless, which is where a new agent or sub-account appears.
+MAX_OTHERS = 15
 # Re-probe a non-cluster address this many days after its last reading.
 RECHECK_DAYS = 7
 
