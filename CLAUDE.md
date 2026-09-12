@@ -288,6 +288,54 @@ wallets of one run and breaks out of the kind loop on a plan refusal, so the
 same sweep costs **3 calls instead of 90**. Wired into the frontier, the
 backfill and the close watch.
 
+**One slow wallet held the entire walk, and the step then retried it forever
+(fixed 2026-09-12).** With the ledger fixed the graph step still failed on its
+6-minute cap on every run from 05:05 UTC — 369 seconds against a 150s internal
+budget, having printed **nothing at all** between the seed counts and the
+timeout. Bisecting by hand ruled out the cheap explanations (frontier setup and
+ranking over 155,541 edges is 10.6s; `records_for` averages 1.3s a wallet) and
+could go no further, because nothing said where the time went.
+
+So the diagnostic came first: **one line per lookup carrying the wallet, the
+depth and the elapsed clock, plus `_phase` around expansion, bytecode
+labelling, activity verification and deposit inference** (reporting on
+`finally`, because the phase most likely to be killed is the slow one). It
+answered on its first run (34680963132): lookups 1-8 took 33.7s at 1.3-7s
+each, then lookup 9 — `0x892785f3…` at depth 4 — started and never came back.
+
+The frontier had handed that one wallet every second left in the walk, and
+nothing could take it back. **This is the exact case the "an internal
+`time_budget_seconds` cannot cover this" rule was written about.** The cost is
+not one slow wallet, it is a livelock: the walk stops so the other 195 queued
+wallets get nothing; the STEP is killed so the graph is never written; the
+frontier therefore never advances past the wallet that hung it; and it is
+retried on every run after. The `expanded_ledger` bug again, by another road —
+and discovery, the only vector that reaches an address nobody has seen, had
+been dead for three hours.
+
+Three bounds, nesting, each cutting a different link:
+
+- **`LOOKUP_SECONDS` = 45s.** `sweep_budget` is built PER LOOKUP from the time
+  left to the deadline, not once for the whole walk. Well above the 1.3-7s a
+  healthy lookup takes, small enough that three pathological wallets still
+  leave the walk time to finish and **persist** — which is what actually
+  carries the frontier past them.
+- **`timeout=(10, 30)`** on `etherscan_get` and `hl_post`. A scalar is one
+  number doing two jobs, and a slice cannot interrupt a request already in
+  flight, so this is the only bound on a stalled socket.
+- **The graph step 6 → 10 minutes.** A step that fails on every run is not a
+  backstop, it is an outage: a killed step writes nothing at all.
+
+**What is pinned is the ORDER, not the numbers** — lookup slice < walk budget <
+step timeout — because the three live in three different files and only their
+nesting is the invariant.
+
+Live after the fix: the run **succeeds**, `0x892785f3…` costs 46s instead of
+the run, **13 lookups instead of 9**, 155 new edges, expansion 152.7s /
+labelling 9.2s / activity 10.1s / inference 0.2s, and `expanded_ledger` broke
+past its old wall to **2,019 entries** with every wallet expanded that run
+remembered.
+
 Two things kept deliberately: it is **per-run and in-memory, never persisted**,
 so an upgraded API plan is picked up by the next run with nothing to invalidate
 by hand (contrast `expanded_ledger`, which does need clearing); and a skipped
