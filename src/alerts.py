@@ -977,6 +977,35 @@ def alert_foreign_destination(wallet: str, kind: str, destination: str,
     return _send_with_cooldown(key, 72, subject, body)
 
 
+def alert_unresolved_cctp_withdrawal(wallet: str, net_usd, when: str | None,
+                                     tx_hash: str | None) -> bool:
+    """A Circle withdrawal whose recipient nobody can name any more.
+
+    The ledger shows a send to the USDC system address; the explorer payload
+    that carried the recipient has rolled out of its 300-action window; and
+    no mint of the amount arrived at any cluster address on a chain the
+    substrate reads. That is money leaving Hyperliquid to an address this
+    project cannot see — not a contact, so HIGH rather than CRITICAL, but
+    never silence. Reported once per withdrawal.
+    """
+    subject = "[EZEKIEL] HIGH: Circle withdrawal to an address nobody can name"
+    body = (
+        "A cluster wallet withdrew through Hyperliquid's native Circle route\n"
+        "(`sendToEvmWithData`), and the recipient cannot be recovered: the\n"
+        "explorer payload has rolled out of its window and no USDC mint of this\n"
+        "amount landed at any address the roster knows as his.\n\n"
+        f"{address_line(wallet, 'Wallet')}\n"
+        f"Amount: {net_usd if net_usd is not None else 'n/a'} USDC\n"
+        f"When: {when or 'unknown'}\n"
+        f"Hyperliquid tx: {tx_hash or 'n/a'}\n\n"
+        "Look for a fresh USDC mint of this amount on the CCTP chains around\n"
+        "that time. An account funded this way is a new wallet he controls\n"
+        "until shown otherwise.\n"
+    )
+    key = f"cctp_unresolved_{(tx_hash or when or '').lower()}"
+    return _send_with_cooldown(key, 24 * 14, subject, body)
+
+
 def alert_newborn_whale(wallet: str, account_value: float, age: str,
                         volume: float, display_name: str | None) -> bool:
     """Fire when a large account that did not exist a week ago appears.
