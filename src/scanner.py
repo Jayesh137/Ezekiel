@@ -505,13 +505,29 @@ def compare_hold_duration(fp_a: dict, fp_b: dict) -> float | None:
     return float(np.mean(scores)) if scores else None
 
 
-def compare_leverage(fp_a: dict, fp_b: dict) -> float:
-    """Compare leverage profiles."""
-    overall_a = fp_a.get("overall", {})
-    overall_b = fp_b.get("overall", {})
+def compare_leverage(fp_a: dict, fp_b: dict) -> float | None:
+    """Compare leverage profiles. None when either side has no open book.
+
+    This returned 0.0 for an unmeasurable side until 2026-09-12, which is
+    rule 6 in the scorer itself: leverage is computed from OPEN POSITIONS, so
+    a wallet that is flat at the moment it was scanned has unknown leverage
+    habits, not dissimilar ones. Measured on the live scan that day, 69 of
+    174 candidates (40%) carried exactly 0.0 here — median score 0.1531
+    against 0.2980 for the 105 with a real reading — while every sibling
+    dimension already renormalised (hold_duration 119 None; timing_profile,
+    loss_handling and order_profile 174 None each).
+
+    Returning None costs us on the headline number rather than paying us:
+    `usable` in compute_similarity drops the dimension and renormalises, so
+    the 40% stop being penalised and the best stranger's score can only rise.
+    That is the point — the margin this narrows was partly an artefact of
+    charging strangers for a reading nobody took.
+    """
+    overall_a = fp_a.get("overall") or {}
+    overall_b = fp_b.get("overall") or {}
 
     if not overall_a or not overall_b:
-        return 0.0
+        return None
 
     mean_a = overall_a.get("mean", 0)
     mean_b = overall_b.get("mean", 0)
@@ -769,12 +785,14 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     )
     dimensions["timing_profile"] = round(dim_score, 4) if dim_score is not None else None
 
-    # Leverage
+    # Leverage — None when either side is flat, so the weight redistributes
+    # rather than scoring a misleading 0.0, as timing_profile and
+    # hold_duration already do.
     dim_score = compare_leverage(
         ezekiel_fp.get("leverage_profile", {}),
         candidate_fp.get("leverage_profile", {})
     )
-    dimensions["leverage_profile"] = round(dim_score, 4)
+    dimensions["leverage_profile"] = round(dim_score, 4) if dim_score is not None else None
 
     # Entry/exit style (market/limit ratio similarity)
     style_a = ezekiel_fp.get("entry_exit_style", {}).get("order_type_ratio", {})

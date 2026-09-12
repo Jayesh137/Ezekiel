@@ -360,3 +360,70 @@ def test_threshold_shape_normalisation_matches_dashboard_fallback():
     import pytest
     with pytest.raises(KeyError):
         th.normalise({"nonsense": 1})
+
+
+# --- leverage: an unmeasurable dimension is None, never 0.0 ----------------------
+#
+# Measured on the live scan of 2026-09-12: 69 of 174 candidates (40%) scored
+# EXACTLY 0.0 here, because `compare_leverage` returned 0.0 whenever either
+# side held no open positions. That is rule 6 — a wallet that is flat right
+# now has unknown leverage habits, not dissimilar ones — and it was the last
+# dimension still doing it, while hold_duration (119 None), timing_profile,
+# loss_handling and order_profile (174 None each) all already renormalised.
+# Those 69 candidates scored a median 0.1531 against 0.2980 for the 105 with a
+# real reading, so the penalty was substantial and entirely an artefact.
+
+def test_leverage_is_none_when_either_side_holds_no_position():
+    from src.scanner import compare_leverage
+
+    real = {"overall": {"mean": 5.0, "median": 5.0, "max": 5.0}}
+    assert compare_leverage(real, {"overall": {}}) is None
+    assert compare_leverage({"overall": {}}, real) is None
+    assert compare_leverage({}, {}) is None
+    # A flat wallet's fingerprint carries no `overall` key at all.
+    assert compare_leverage({"weight": 0.15, "per_coin": {}}, real) is None
+
+
+def test_leverage_still_scores_when_both_sides_have_a_book():
+    from src.scanner import compare_leverage
+
+    same = {"overall": {"mean": 5.0}}
+    assert compare_leverage(same, {"overall": {"mean": 5.0}}) == 1.0
+    half = compare_leverage(same, {"overall": {"mean": 10.0}})
+    assert 0.0 < half < 1.0
+
+
+def test_a_zero_mean_leverage_is_a_reading_not_a_gap():
+    """Both sides measured, both at zero, is agreement — distinct from neither
+    side being measurable, which is None."""
+    from src.scanner import compare_leverage
+
+    assert compare_leverage({"overall": {"mean": 0}}, {"overall": {"mean": 0}}) == 1.0
+
+
+def test_a_flat_candidate_renormalizes_instead_of_being_penalized():
+    """The whole point: dropping the dimension must LIFT a flat candidate's
+    score rather than charging it 0.0 on a 0.10 weight.
+
+    Both fingerprints are given a real book first, because a candidate built
+    from fills alone carries no positions and would otherwise be flat on both
+    sides — which is itself None now, and would not exercise the comparison.
+    """
+    book = {"weight": 0.15, "per_coin": {"BTC": {"value": 5.0, "type": "cross"}},
+            "overall": {"mean": 5.0, "median": 5.0, "max": 5.0}}
+    a = dict(_fp(swing_fills()))
+    a["leverage_profile"] = book
+    b = dict(_fp(swing_fills(start=1_700_000_000_000 + 30 * DAY_MS)))
+    b["leverage_profile"] = book
+    flat = dict(b)
+    flat["leverage_profile"] = {"weight": 0.15, "per_coin": {}, "overall": {}}
+
+    score_with, dims_with, _ = compute_similarity(a, b)
+    score_flat, dims_flat, _ = compute_similarity(a, flat)
+
+    assert dims_with["leverage_profile"] == 1.0
+    assert dims_flat["leverage_profile"] is None
+    # Before the fix the flat side scored 0.0 on a 0.10 weight and came out
+    # BELOW the identical-book pair; now the weight redistributes instead.
+    assert score_flat > 0.5
+    assert score_flat >= score_with - 0.02
