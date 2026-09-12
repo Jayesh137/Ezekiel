@@ -126,7 +126,11 @@ at zero on 2026-08-17, two days into a six-day silence of the target's (his p90
 gap is five days), ran $999 → $51.3M in three weeks, and matches his exits on
 amount and timing — two independent vectors, so PROBABLE, and deliberately *not*
 a `known_self_wallet`: that list is operator ground truth, this is a question
-under observation. Baseline 2026-09-11: role `user`, **$49.87M**, 0 agents, 0
+under observation. **Read the roster, not this paragraph, for its tier.** As of
+2026-09-12 it grades POSSIBLE on ONE vector: the amount-correlation match is an
+older reading outside the current 14-day window, and only the dormancy handoff
+(0.4286) is live. PROBABLE is what two agreeing vectors bought when both were
+supported; re-asserting it here by hand would fit the tier to the story. Baseline 2026-09-11: role `user`, **$49.87M**, 0 agents, 0
 sub-accounts, **0 withdrawals ever**, HyperEVM nonce 0, 24 Arbitrum transactions.
 Every dollar it holds came from two addresses and every dollar it sends goes to
 the Hyperliquid bridge.
@@ -345,6 +349,129 @@ there", which is rule 5. Only a PLAN refusal short-circuits; a rate limit is
 degradation we retry out of, and merging those two once stalled the frontier
 for two days.
 
+**The ranking that feeds every bounded budget was sorting on the ADDRESS, and
+it starved the leads (fixed 2026-09-12).** Five defects, one cascade, found by
+asking why the wallet under close watch carried zero vectors.
+
+It began with a regression. Splitting the candidate pools gave
+`run_correlation` a `pools` dict and a rule that a pool not read this run keeps
+its stored block — but every file written before the split had no `pools` key
+at all, only a flat `matches` list, which IS the bridge pool's answer.
+`_stored_pools` found nothing to preserve and overwrote it. Measured on the
+stored record: **7-10 matches on every run up to 02:14, then 0 on every run
+after 05:58**, with the bridge block absent entirely. Nothing had cleared the
+bridge pool; it had stopped being asked and its last answer was gone. The
+recovery path was analyze.yml — a daily cron, and the one workflow the local
+dispatcher did not drive. The lost reading included a **0.9974** match, a $2.2M
+deposit 4.4 hours after a $2.2M exit. It is restored, through the migration
+rather than by hand, and `_stored_pools` is keyed on the ABSENCE of a bridge
+block rather than the presence of the legacy list — the same rule the alert
+shards follow, because the file is rewritten carrying both shapes and the other
+keying would fold its own output back in every run.
+
+Then the loss propagated, because **the roster ranks by evidence already found
+and four detectors take the top N of that ranking**. `0xdd53c529…` lost its
+correlation vector, fell PROBABLE → WATCH, and at WATCH sorted **166th of 180**
+— outside the caps of 40 in `check_dormancy`, `check_comovement` and
+`check_portfolio_overlap`, and outside the 120 in `check_agents`. The cut-off
+was a wallet carrying confidence **0.0311**. So dormancy, the vector added FOR
+that wallet and named in its own docstring, had never once scored it; its
+agent `0x1e8695b7…` was not in the agent index at all, while
+`linked_to_target: {}` read as a measured no. Two vectors became none and the
+wallet the operator names by hand became one of 165 strangers.
+
+**A cap on a ranking of evidence-already-found starves the wallets with no
+evidence yet — which is the population this project hunts.** A wallet he has
+just migrated to is the newest, quietest, least-connected thing on the list:
+exactly the shape the ranking puts last. `roster.detector_candidates` now pins
+`config.watch_wallets` and `known_self_wallets` ahead of roster order and never
+trims them; the cap protects an API budget, and silence about a wallet a human
+named is not a saving.
+
+Underneath that, the sort itself was wrong. `confidence` is produced by the
+transfer graph alone, so a wallet reached by correlation, dormancy or an
+explicit link carries **0.0 by construction** — rule 6 inside the ranking.
+Measured live: **124 of 181 non-infrastructure wallets (69%) sat at exactly
+0.0, and 75 tied inside POSSIBLE**, so the sort fell through to its last key,
+the wallet address. Which leads a bounded budget looked at was being decided by
+leading hex digits: the 0.9974 correlation lead survived at #102 against a cap
+of 119 because it begins `0x7f`, while the 0.6839 lead sat at #130 and was
+cut — holding **33 live named agents in a `chip_oe*` family** that nothing had
+ever indexed. `roster.evidence_strength` now ranks on the best score any vector
+gives a wallet, with tier and vector COUNT still primary (two agreeing vectors
+must outrank one loud one) and the address demoted to a deterministic
+last-resort tiebreaker. **The `expanded_ledger` rule, third time: when a cap
+trims a collection, ask what the sort order MEANS.** For a chase queue it is
+priority, and an address is not one.
+
+Live after the fixes: the leads moved **#102/#130/#81/#166 → #2/#3/#5/#6**, the
+agent index went **15 → 49 agents**, `0xdd53c529…` scored a dormancy handoff of
+**0.4286** (started 2 days into a 6-day silence) and returned WATCH → POSSIBLE,
+and portfolio overlap went from 2 wallets with an open book to 7. The
+shared-agent answer is still **no** — `0x1e8695b7…` resolves to `0xdd53c529…`
+and nobody else — but it is now a measured no rather than an absent read, which
+is the difference rule 5 exists for.
+
+**Two things deliberately NOT done.** The `evidence_strength` maximum is taken
+over different scales and is **not a confidence**: it must never be stored as
+one or compared against a threshold, only used to order a queue. And the tier
+`0xdd53c529…` now holds is **POSSIBLE on one vector, not the PROBABLE this file
+claimed** — the amount-correlation match behind that grading is an older
+reading outside the current 14-day window. Promoting it back by hand would be
+fitting the tier to the story.
+
+**A wallet that LOSES evidence must not look like one that never had any.** The
+cascade above was invisible for hours because the roster is rebuilt from
+scratch every run — right, so that a change inside one detector cannot silently
+move a tier — and a wallet whose evidence lapses is therefore rewritten as
+though the evidence never existed. `roster.carry_peak_tier` now records
+`peak_tier` and `tier_dropped_from`, counted as `demoted_count` and printed in
+the run log. **Recorded, never alerted**: a lost inference is a fact about our
+own coverage, not a contact with his world, and grading a wallet INFRASTRUCTURE
+is a measurement that outranks an inference rather than a demotion. Rule 5 over
+time.
+
+**And the sibling call nobody guarded.** `extraAgents` was checked for a failed
+read; the `webData2` call beside it was not. `utils.hl_post` returns `{}` when
+its retries are exhausted, `parse_web_data({})` answers `agent_address: None`,
+and that is indistinguishable from a wallet that has authorised nobody — so a
+timeout silently removed a frontend agent while `unreadable` stayed 0. Observed
+during a live run that logged a read timeout on api.hyperliquid.xyz. webData2
+is the ONLY endpoint reporting the agent that actually signs orders, and two
+accounts driven by one are the same browser session: the CONFIRM-alone vector.
+A successful read always carries a document, so an empty payload is only ever a
+failure — `agent_links.webdata_is_unreadable` says so and the caller counts it.
+**When one call in a pair is guarded, ask what guards the other.**
+
+**The new-dex CRITICAL fired on the dex he has always used (fixed
+2026-09-12).** `new_dexes` correctly answers "no news" on a first reading, but
+it returns only the DIFF — so `check_new_dex`, computing `known | fresh`, stored
+an **empty** baseline and threw the live reading away. The next run read that
+empty file as "he trades no dexes" and `xyz` fired `CRITICAL: Target Opened A
+Book On A New Dex (xyz)` at 07:28 UTC. A false alarm at the top severity, on
+the alarm for a migration inside Hyperliquid — the INFO-flood lesson again,
+arriving where it costs most. `live_dexes` is now split out so the caller can
+seed what he is actually on; an unreadable account still never overwrites the
+stored set.
+
+**analyze.yml and scan.yml are dispatched now.** A daily cron is the most
+droppable kind: GitHub delivered a 30-minute cron a median of 198 minutes
+apart, and a once-a-day job that gets dropped is gone for a day. analyze.yml is
+the ONLY thing that reads the Arbitrum bridge pool, rebuilds the fingerprint
+and runs the GCR wallet tripwire. Their dispatch intervals are their own crons
+(60 and 1440 minutes), so the two schedulers agree rather than doubling up, and
+the existing group-busy check keeps them off a busy `data-commit`.
+
+**The Circle pool is behind and that is a backfill, not a fault.** Measured
+across six commits it advances ~2.7 days of feed per run and stood at
+2026-08-27 against a 14-day correlation window opening 08-29 — so it
+contributes nothing yet and says so, `candidates_considered: 0` under an
+explicit `candidate_pool_error`. That is the correct shape: a pool that could
+not be read whole has not cleared anyone, it has not looked. **Do not widen
+`cctp_time_budget_seconds` to hurry it** — the step timeout, the internal
+budget and the pacing are a nested order, and it reaches the present on its own
+within a run or two.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
@@ -359,6 +486,15 @@ for two days.
   keeping written down: the strongest vector in the project has been asked and
   does not connect `0xdd53c529…` to him, which is evidence to weigh against the
   amount/timing match rather than a gap still to be filled.
+  **Re-measured 2026-09-12 and the same numbers now mean something different.**
+  That reading was taken over a candidate set that did not CONTAIN
+  `0xdd53c529…` — it sorted 166th and the cap was 120, so `0x1e8695b7…` was
+  never in the index and the "no" was an absent read wearing the shape of an
+  answer. With the set fixed it is 120 wallets and 49 agents again, still 0
+  shared and 0 linked, and now it is an answer. `naming_families` is `{}`
+  correctly: `0xfc667adb…` runs 33 agents named `chip_oe02b…chip_oe33b`, but a
+  template used by ONE account is a habit with nothing to travel between, and
+  the vector looks for a scheme crossing accounts.
 - ~~`data/orders/`~~ — **wired 2026-09-10** as the `order_profile` dimension.
   54,866 records were being collected and never read. It discriminates hard:
   the target is 94.6% `Ioc` limit slices with **0% cancels and 0% client order
