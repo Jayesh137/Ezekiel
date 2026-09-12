@@ -188,3 +188,47 @@ def test_a_failing_circle_reader_never_loses_the_bridge_set(monkeypatch):
                         lambda window_days, min_amount: ([{"wallet": "0xbridge", "amount": 70_000.0}], None))
     monkeypatch.setattr(correlator, "get_recent_cctp_deposits", boom)
     assert sc.get_recent_bridge_depositors(max_wallets=5) == ["0xbridge"]
+
+
+def test_a_circle_only_run_keeps_matches_from_a_PRE_POOLS_file(tmp_path, monkeypatch):
+    """The bridge matches written before pools existed must survive the split.
+
+    Measured live 2026-09-12: every run up to 02:14 carried 7-10 matches under a
+    flat `matches` list and no `pools` key at all, because that shape predates
+    per-pool storage. The first `--pools cctp` run after the split found no
+    `pools` dict to preserve, wrote only its own (incomplete) Circle block, and
+    the correlator went to 0 matches — not because the bridge pool said no, but
+    because nobody asked it and its last answer had been overwritten. Recovery
+    needs analyze.yml, a daily cron that is not locally dispatched.
+
+    A flat `matches` list IS the bridge pool's stored answer; read it as one.
+    """
+    stored = {"computed_at": "yesterday", "match_count": 1, "candidates_considered": 801,
+              "candidate_pool_error": None,
+              "matches": [{"wallet": "0xbridgehit", "confidence": 0.61}]}
+    _wire_pools(monkeypatch, tmp_path, bridge=([], None), cctp=([], None), stored=stored)
+
+    result = correlator.run_correlation(pools=("cctp",))
+
+    assert [m["wallet"] for m in result["matches"]] == ["0xbridgehit"]
+    assert result["pools"]["bridge"]["matches"][0]["wallet"] == "0xbridgehit"
+    assert result["pools"]["bridge"]["matches"][0]["via"] == "bridge"
+    assert result["candidates_considered"] == 801
+
+
+def test_migrating_a_legacy_file_happens_once_and_never_doubles(tmp_path, monkeypatch):
+    """Once the bridge block exists, the flat list must not be folded in again.
+
+    The same trap the alert shards carry: `latest.json` is rewritten with both
+    shapes present, so a migration keyed on the legacy field rather than on the
+    absence of the new one re-reads its own output every run.
+    """
+    stored = {"matches": [{"wallet": "0xbridgehit", "confidence": 0.61, "via": "bridge"}],
+              "pools": {"bridge": {"computed_at": "today", "candidate_pool_error": None,
+                                   "candidates_considered": 0, "matches": []}}}
+    _wire_pools(monkeypatch, tmp_path, bridge=([], None), cctp=([], None), stored=stored)
+
+    result = correlator.run_correlation(pools=("cctp",))
+
+    assert result["matches"] == []
+    assert result["pools"]["bridge"]["matches"] == []
