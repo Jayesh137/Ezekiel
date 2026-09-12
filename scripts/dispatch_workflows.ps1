@@ -35,11 +35,25 @@ $Ref = "main"
 # workflow file -> minimum minutes between run starts. watch.yml is the fast
 # tripwire; collect.yml is what notices his silence and drawdowns; trace.yml
 # is the graph, the Circle pool and every check that hangs off them.
+#
+# `Group` names the GitHub concurrency group the workflow belongs to. A group
+# holds only ONE pending run, so a run queued behind a long job is CANCELLED
+# the moment a newer one arrives. Observed 2026-09-12: a collect dispatched at
+# 04:26 queued behind trace, collect's own cron fired at 04:35, and the
+# dispatched run was evicted (run 34673027518, conclusion "cancelled").
+# Nothing was lost — the evicting run does the same work — but the dispatch
+# was wasted, so this script now refuses to queue behind a busy group.
 $Schedule = @(
-    @{ File = "watch.yml";   Minutes = 10 },
-    @{ File = "collect.yml"; Minutes = 15 },
-    @{ File = "trace.yml";   Minutes = 30 }
+    @{ File = "watch.yml";   Minutes = 10; Group = "watch" },
+    @{ File = "collect.yml"; Minutes = 15; Group = "data-commit" },
+    @{ File = "trace.yml";   Minutes = 30; Group = "data-commit" }
 )
+
+# Every workflow sharing the `data-commit` group, including the ones this
+# script never dispatches. Any of them running means a dispatch into that
+# group would queue rather than start.
+$DataCommitWorkflows = @("collect.yml", "trace.yml", "scan.yml", "analyze.yml",
+                         "backfill.yml", "substrate-backfill.yml")
 
 $LogDir = Join-Path $env:LOCALAPPDATA "Ezekiel"
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
@@ -63,7 +77,22 @@ function Get-NewestRun([string]$Workflow) {
     return $rows
 }
 
+function Test-GroupBusy([string]$Group) {
+    # True when some workflow in $Group already has a run queued or running,
+    # so dispatching into it would only queue (and risk being evicted).
+    if ($Group -ne "data-commit") { return $false }
+    foreach ($wf in $DataCommitWorkflows) {
+        $newest = Get-NewestRun $wf
+        if ($null -ne $newest -and $newest.status -ne "completed") {
+            Write-Log "  (group data-commit busy: $wf is $($newest.status))"
+            return $true
+        }
+    }
+    return $false
+}
+
 $now = (Get-Date).ToUniversalTime()
+$groupChecked = @{}
 foreach ($job in $Schedule) {
     $wf = $job.File
     $newest = Get-NewestRun $wf
@@ -81,6 +110,14 @@ foreach ($job in $Schedule) {
     $age = ($now - $started).TotalMinutes
     if ($age -lt $job.Minutes) {
         Write-Log ("{0} : last run {1:n1} min ago (< {2}) - not yet" -f $wf, $age, $job.Minutes)
+        continue
+    }
+    # Don't queue behind a busy concurrency group: the run would sit pending
+    # and be cancelled by the next arrival. Checked at most once per group.
+    $g = $job.Group
+    if (-not $groupChecked.ContainsKey($g)) { $groupChecked[$g] = Test-GroupBusy $g }
+    if ($groupChecked[$g]) {
+        Write-Log ("{0} : group '{1}' is busy - skipping rather than queueing" -f $wf, $g)
         continue
     }
     & gh workflow run $wf --repo $Repo --ref $Ref 2>&1 | Out-Null
