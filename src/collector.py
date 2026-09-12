@@ -14,10 +14,12 @@ from src.utils import (
     load_config,
     now_ms,
     read_cursor,
+    read_cursor_text,
     save_latest,
     save_snapshot,
     update_index,
     write_cursor,
+    write_cursor_text,
 )
 
 
@@ -425,6 +427,79 @@ def check_silence() -> None:
         write_cursor("last_silence_alert", now_ms())
 
 
+def new_dexes(known, latest) -> list | None:
+    """HIP-3 dexes carrying a book now that are not in `known`. Pure.
+
+    Returns None when the account reading could not be understood — rule 5: an
+    unparseable file says nothing about which dexes he trades, and must not be
+    read either as "no new dex" or as confirmation of the stored set.
+
+    `known` of None is a FIRST reading: a baseline, not news. Without that,
+    the first run after this shipped would report every dex he has ever used
+    as new.
+    """
+    if not isinstance(latest, dict):
+        return None
+    hip3 = latest.get("hip3")
+    if not isinstance(hip3, dict):
+        return None
+    live = set()
+    for dex, state in hip3.items():
+        if not isinstance(state, dict):
+            continue
+        try:
+            value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+        except (TypeError, ValueError):
+            value = 0.0
+        positions = state.get("assetPositions") or []
+        # The collector only stores a dex with value or positions, but a stored
+        # entry that reads as empty is an artefact, not a book.
+        if value or positions:
+            live.add(str(dex))
+    if known is None:
+        return []
+    return sorted(live - {str(d) for d in known})
+
+
+def check_new_dex() -> None:
+    """Alert when the target opens a book on a dex he has never traded.
+
+    The collector reads every dex the venue lists for him on every run and
+    stores those with a book; nothing compared one run's set with the next
+    until 2026-09-12. A book on a new dex is a migration INSIDE Hyperliquid —
+    no L1 trace, no transfer, no new address — and the close watch already
+    does this for a WATCHED wallet while the target had no such alarm.
+    """
+    import json as _json
+
+    latest_path = DATA_DIR / "account" / "latest.json"
+    try:
+        with open(latest_path) as f:
+            latest = _json.load(f)
+    except (OSError, ValueError) as exc:
+        print(f"[collector] WARNING: cannot check for a new dex, {latest_path} "
+              f"is unreadable: {exc}")
+        return
+
+    stored = read_cursor_text("known_hip3_dexes")
+    known = [d for d in (stored or "").split(",") if d] if stored is not None else None
+    fresh = new_dexes(known, latest)
+    if fresh is None:
+        print("[collector] WARNING: the account file carries no readable `hip3` "
+              "section — which dexes he trades is unknown, not empty")
+        return
+
+    if fresh:
+        from src.alerts import alert_new_dex
+        print(f"[collector] NEW DEX: {fresh} (previously {known})")
+        alert_new_dex(load_config()["target_wallet"], fresh, known or [])
+
+    # Record the set every run, so a dex he stops using is not reported as new
+    # when he returns to it, and so the first run only ever seeds a baseline.
+    current = sorted(set(known or []) | set(fresh))
+    write_cursor_text("known_hip3_dexes", ",".join(current))
+
+
 def check_account_value_drop() -> None:
     """Alert if account value dropped >40% since last collection. Cooldown: once per 1h."""
     import json as _json
@@ -513,6 +588,10 @@ def main():
         ("hl transfer analysis", analyze_and_alert_hl_transfers),
         ("silence check", check_silence),
         ("account drop check", check_account_value_drop),
+        # A book on a dex he has never traded is a migration INSIDE
+        # Hyperliquid: no L1 trace, no transfer, no new address. The dex set
+        # has been collected every run since 2026-09-11 and nothing diffed it.
+        ("new dex check", check_new_dex),
         ("migration risk", compute_migration_risk),
         ("index", update_index),
     ]

@@ -116,6 +116,29 @@ def write_cursor(name: str, value: int, base: str | None = None) -> None:
     cursor_file = base_path / f"{cursor_filename(name)}.txt"
     cursor_file.write_text(str(value))
 
+
+def read_cursor_text(name: str, base: str | None = None) -> str | None:
+    """Read a cursor that holds text rather than a timestamp.
+
+    Returns None when it has never been written, which callers must be able to
+    tell from an empty string: "we have no baseline yet" and "the baseline is
+    empty" lead to opposite decisions — the first is a first reading to seed,
+    the second is a real state to diff against.
+    """
+    base_path = Path(base) if base else DATA_DIR / "state"
+    cursor_file = base_path / f"{cursor_filename(name)}.txt"
+    if cursor_file.exists():
+        return cursor_file.read_text().strip()
+    return None
+
+
+def write_cursor_text(name: str, value: str, base: str | None = None) -> None:
+    """Write a text cursor. See cursor_filename for why the name is sanitised."""
+    base_path = Path(base) if base else DATA_DIR / "state"
+    base_path.mkdir(parents=True, exist_ok=True)
+    cursor_file = base_path / f"{cursor_filename(name)}.txt"
+    cursor_file.write_text(str(value))
+
 # --- Date Helpers ---
 
 def today_str() -> str:

@@ -1133,6 +1133,36 @@ def alert_name_hit(address: str, name: str, source: str) -> bool:
     return _send_with_cooldown(f"name_{address.lower()}", 168, subject, body)
 
 
+def alert_new_dex(wallet: str, fresh: list, known: list) -> bool:
+    """Fire when the target opens a book on a HIP-3 dex he has never traded.
+
+    This is what a migration INSIDE Hyperliquid looks like: no L1 trace, no
+    transfer, no new address — the same account simply trading somewhere the
+    owner is not watching. He has used exactly one dex (`xyz`) out of the ten
+    the venue lists, so a second one is a change of venue by the person this
+    project exists to follow, and the owner copy-trades by hand and would see
+    nothing.
+
+    CRITICAL: this is an observed act by HIM, not an inference about a
+    stranger.
+    """
+    if not fresh:
+        return False
+    names = ", ".join(sorted(fresh))
+    subject = f"[EZEKIEL] CRITICAL: Target Opened A Book On A New Dex ({names})"
+    body = (
+        f"The target now holds a position on a HIP-3 dex he has never traded.\n\n"
+        f"{address_line(wallet, 'Wallet')}\n"
+        f"New dex: {names}\n"
+        f"Previously: {', '.join(sorted(known)) or 'none recorded'}\n\n"
+        f"A migration inside Hyperliquid leaves no L1 trace and moves no funds\n"
+        f"between addresses — the account just starts trading somewhere else.\n"
+        f"Check the new venue's book now; a copy-trader following only his old\n"
+        f"markets is already following a dead book.\n"
+    )
+    return _send_with_cooldown(f"new_dex_{'_'.join(sorted(fresh))}", 168, subject, body)
+
+
 def alert_referral_change(wallet: str, changes: list[dict]) -> bool:
     """Fire when a cluster wallet's referral state moves: a code created, an
     account referred through it, or the wallet itself referred by someone.
