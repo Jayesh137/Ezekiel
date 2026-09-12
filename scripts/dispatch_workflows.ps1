@@ -22,13 +22,55 @@
 # `repo` scope. The repo is public, so Actions minutes are unlimited.
 #
 # Install (once, as the logged-on user; every 5 minutes; survives reboots):
-#   schtasks /Create /F /SC MINUTE /MO 5 /TN "Ezekiel workflow dispatcher" `
-#     /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PWD\scripts\dispatch_workflows.ps1`""
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dispatch_workflows.ps1 -Install
 # Remove:
 #   schtasks /Delete /F /TN "Ezekiel workflow dispatcher"
 # Log: %LOCALAPPDATA%\Ezekiel\dispatch.log (last 2000 lines kept).
+#
+# Install is a SWITCH on this script and not a documented schtasks line, because
+# the schtasks defaults silently break it on a laptop. Registered with
+# `schtasks /Create` on 2026-09-12 the task carried DisallowStartIfOnBatteries
+# and StopIfGoingOnBatteries, both TRUE by default: the machine went to battery
+# and the dispatcher stopped dead after two runs. Measured at 06:05 UTC the log
+# held six lines — 04:06 and 04:39 — against the ~36 lines an hour it writes
+# when it is alive, and watch.yml had last run 65 minutes earlier against a
+# 10-minute cadence. A mitigation for a blind spot that is itself invisible
+# when it fails is worse than none, so the settings that keep it alive belong
+# in version control next to the thing they keep alive.
+
+[CmdletBinding()]
+param([switch]$Install)
 
 $ErrorActionPreference = "Continue"
+$TaskName = "Ezekiel workflow dispatcher"
+
+if ($Install) {
+    $me = $MyInvocation.MyCommand.Path
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$me`""
+    # Repeat forever from a start time already in the past, so the first run is
+    # the next 5-minute boundary rather than tomorrow.
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(-1) `
+        -RepetitionInterval (New-TimeSpan -Minutes 5)
+    $settings = New-ScheduledTaskSettingsSet `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable `
+        -MultipleInstances IgnoreNew `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+    #  -AllowStartIfOnBatteries / -DontStopIfGoingOnBatteries: the laptop
+    #     defaults that killed it. This is the whole reason -Install exists.
+    #  -StartWhenAvailable: run as soon as the machine wakes, instead of
+    #     silently skipping every occurrence missed while it slept.
+    #  -ExecutionTimeLimit 10m with IgnoreNew: a hung `gh` call would otherwise
+    #     hold the only permitted instance for the 72-hour default, which is
+    #     the same silent death by a different route.
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+        -Settings $settings -Force | Out-Null
+    Write-Output "Registered '$TaskName': every 5 minutes, on battery too."
+    Write-Output "Remove with: schtasks /Delete /F /TN `"$TaskName`""
+    return
+}
 $Repo = "Jayesh137/Ezekiel"
 $Ref = "main"
 
