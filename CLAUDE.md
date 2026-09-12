@@ -87,7 +87,7 @@ trading style. Never promote a wallet on one vector alone.
 | Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
 | Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
 | Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
-| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets` **plus every roster CONFIRMED/PROBABLE wallet** (capped at `MAX_WATCHED` = 6), read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
+| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets` **plus every roster CONFIRMED/PROBABLE wallet** (capped at `MAX_WATCHED` = 6), read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts **only for a wallet still in question** — a settled one records it without buzzing; a CHANGE is reported once, on the transition |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -212,6 +212,90 @@ counterparty before alerting — busy is shared infrastructure and never a
 contact, unmeasured still alerts, and only his own addresses (target, known
 self, a private deposit address) rate CRITICAL; a roster tier is an inference,
 so it rates HIGH.
+
+**Then the roster fed the watch and the vector ate itself (fixed 2026-09-12).**
+Adding CONFIRMED wallets to the watch — right, and the fix directly above —
+pointed the contact vector at wallets whose counterparties **are** his world by
+construction. The first run after it landed pushed **39 contact alerts in six
+seconds** (29 HIGH, 10 CRITICAL), burying that day's four real CRITICALs: a
+six-day silence, a CCTP recipient outside the cluster, a Socket destination
+outside the cluster, and an 84% migration candidate. That is the INFO-flood
+lesson again — "how an operator learns to swipe the channel away" — arriving
+this time at CRITICAL, where it costs most.
+
+Three defects, each independently wrong, measured on the stored record:
+
+- **A contact SETTLES a question, so a settled wallet has nothing to report.**
+  `alert_watchlist_contact` says so in its own docstring: the wallet is watched
+  because two inferences agreed, and an observed transfer is the third vector
+  that decides it. For a wallet already CONFIRMED as his there is no question
+  left, and "a known wallet of his touched another known wallet of his" is a
+  tautology with a siren on it. `watchlist.contacts_are_news` now gates the
+  alert on `settled` — set by `watched()` from `known_self_wallets` and roster
+  CONFIRMED. **PROBABLE stays unsettled**: it is still a question, and a contact
+  is exactly what would settle it. So is every `config.watch_wallets` entry, per
+  the rule that the operator's list is ground truth and the watch is a question.
+  All 38 stored contacts came from settled wallets; `0xdd53c529…`, the wallet
+  the vector was built for, fired none.
+- **A wallet was its own contact.** A watched wallet is itself in `world` —
+  usually *why* it is watched — and `contacts()` had no notion of a subject.
+  Two of the 38.
+- **`roster: POSSIBLE` counted as his world.** 29 of the 38. POSSIBLE is 140
+  wallets on one weak vector each, which is precisely why `WATCHED_TIERS`
+  already refuses to spend the fast job reading them; treating the same tier as
+  evidence on the way back in contradicted that judgement in the same file.
+  `check_watchlist.WORLD_TIERS` is now CONFIRMED/PROBABLE, matching it.
+
+Replayed against the live record: **38 alerts → 0**, with the contacts still
+written to `data/watchlist/latest.json` (6→3 and 32→4 rows) and still on the
+dashboard. Only the buzz stops, which is the policy INFO already follows.
+
+**The frontier was re-walking half the address space, forever (fixed
+2026-09-12).** `expanded_ledger` — the memory of which wallets are finished, and
+the only thing stopping the walk repeating hop 1 every run — was written as
+`sorted(explored)[:max_ledger]`. Sorting a set of COMPLETED WORK and cutting the
+tail makes retention alphabetical, so a saturated ledger keeps the lowest
+addresses and silently drops everything above them. Live on 2026-09-12 it held
+exactly 2,000 entries topping out at `0x7bfa…`, and **all nine wallets expanded
+that run sorted above it** — every one discarded, re-queued, and re-swept on the
+next run, out of a lookup budget that stops on time and never drains. The
+ledger now keeps insertion order and trims from the FRONT, so eviction drops the
+work finished longest ago. Replayed on the live file: remembered **0 of 9 → 9 of
+9**.
+
+This is the same defect `tests/test_frontier_retention.py` was opened for —
+truncating the pending queue by `(depth, address)` — fixed there and left
+standing in the second place that truncates. **When a cap trims a collection,
+ask what the sort order MEANS**: for a queue it is chase priority, for a ledger
+it is age, and in neither is it the address.
+
+The cap moved 2,000 → **20,000** at the same time, because it is not a tuning
+knob here: the live explored set was already **2,017**, so the ledger shed work
+every run whichever end it dropped. Eviction order decides *which* work is
+forgotten; only headroom stops work being forgotten at all. At ~44 bytes an
+address inside a 71MB graph file the headroom is free.
+
+**A chain the API plan refuses was re-asked for every wallet, every run (fixed
+2026-09-12).** Etherscan's free tier refuses base, optimism and bsc outright,
+and CLAUDE.md has said since 2026-09-11 that `unsupported_sources` is "never
+retried, always reported". The code reported it and retried it anyway: the
+refusal is discovered reactively, per chain, per wallet, with nothing
+remembering the answer. Measured on the live sweep — 10 wallets, 373 calls —
+**90 of them (24%) went to those three chains and every one came back refused**,
+at 3 calls each because a refusal on the first record kind did not stop the
+other two. `sweep_wallet` now takes a `plan_refused` map shared across the
+wallets of one run and breaks out of the kind loop on a plan refusal, so the
+same sweep costs **3 calls instead of 90**. Wired into the frontier, the
+backfill and the close watch.
+
+Two things kept deliberately: it is **per-run and in-memory, never persisted**,
+so an upgraded API plan is picked up by the next run with nothing to invalidate
+by hand (contrast `expanded_ledger`, which does need clearing); and a skipped
+chain still appears in `unsupported_sources` every wallet, carrying the API's
+own words — a chain that vanished from the summary would read as "nothing
+there", which is rule 5. Only a PLAN refusal short-circuits; a rate limit is
+degradation we retry out of, and merging those two once stalled the frontier
+for two days.
 
 ## Vectors collected but NOT wired into detection — pursue these
 
@@ -734,6 +818,30 @@ that it is.
   the better fix and is deliberately NOT done: it needs a proven
   single-writer map, and a wrong one is the lost-update bug this repo has
   already paid for once.
+  **`schtasks /Create` silently kills it on a laptop — install with `-Install`
+  (2026-09-12).** Registered with the documented `schtasks` line, the task
+  carried `DisallowStartIfOnBatteries` and `StopIfGoingOnBatteries`, both TRUE
+  by default. The machine went to battery and the dispatcher **stopped dead
+  after two runs**: measured at 06:05 UTC the log held six lines — 04:06 and
+  04:39 — against the ~36 lines an hour it writes when alive, and `watch.yml`
+  had last run 65 minutes earlier against its 10-minute cadence. So the
+  mitigation for GitHub's 198-minute blind spot spent its first two hours
+  dead, in exactly the way it was built to prevent, and nothing said so.
+  `schtasks /Query` was no help: it reported `Status: Ready`, `Last Run Time:
+  30/11/1999` and `Last Result: 267011`. The power state is what tells you —
+  `Get-CimInstance Win32_Battery`, `BatteryStatus=1` is discharging.
+  The registration is now a `-Install` switch on the script itself rather than
+  a comment, because settings that keep it alive belong in version control
+  next to the thing they keep alive: `-AllowStartIfOnBatteries`
+  `-DontStopIfGoingOnBatteries` (the defaults that killed it),
+  `-StartWhenAvailable` (run on wake instead of skipping every occurrence
+  missed while asleep) and `-ExecutionTimeLimit 10m` (with `IgnoreNew`, a hung
+  `gh` would otherwise hold the only permitted instance for the 72-hour
+  default — the same silent death by another route). Verified on battery at
+  36%: `LastTaskResult 0`, next run 3 minutes out, and it immediately
+  dispatched a `watch.yml` that was 111 minutes stale.
+  **A tripwire that can die quietly is worth what a dead tripwire is worth.**
+  Check the log's newest line, never the task's `Status`.
 - **`watch.yml` has its OWN concurrency group, and `check_watchlist.py` /
   `check_hyperevm.py` have exactly ONE writer (2026-09-12).** They used to run
   in `trace.yml` as well, while both workflows shared the `data-commit` group.

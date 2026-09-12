@@ -35,7 +35,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 819 passed
+.\.venv\Scripts\python.exe -m pytest -q          # expect: 1265 passed
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
