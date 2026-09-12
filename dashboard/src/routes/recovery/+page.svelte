@@ -11,6 +11,8 @@
 		fetchHlTransfers,
 		fetchRisk,
 		fetchCorrelations,
+		fetchWatchlist,
+		fetchWithdrawals,
 		formatUSD,
 		shortAddr,
 		currentScore,
@@ -28,13 +30,15 @@
 	let hlTransfers = null;
 	let risk = null;
 	let correlations = null;
+	let closeWatch = null;
+	let withdrawals = null;
 	let loading = true;
 
 	let timelineChartEl;
 	let timelineChart;
 
 	onMount(async () => {
-		[positions, hip3Xyz, index, scan, candidates, fundFlows, hlTransfers, risk, correlations] = await Promise.all([
+		[positions, hip3Xyz, index, scan, candidates, fundFlows, hlTransfers, risk, correlations, closeWatch, withdrawals] = await Promise.all([
 			fetchLatest('positions'),
 			fetchLatest('positions_hip3_xyz'),
 			fetchIndex(),
@@ -44,6 +48,8 @@
 			fetchHlTransfers(),
 			fetchRisk(),
 			fetchCorrelations(),
+			fetchWatchlist(),
+			fetchWithdrawals(),
 		]);
 		loading = false;
 		await new Promise(r => setTimeout(r, 0));
@@ -214,6 +220,24 @@
 		return 'risk-low';
 	}
 
+	// The band src/watchlist.py OUTGREW_TARGET alerts on. Named the same on
+	// both sides so a reader of either finds the other.
+	const OUTGREW_TARGET = 1.15;
+
+	function sinceMs(ms) {
+		if (!ms) return '-';
+		const h = (Date.now() - ms) / 3600000;
+		if (h < 1) return `${Math.max(0, Math.round(h * 60))}m`;
+		if (h < 48) return `${h.toFixed(1)}h`;
+		return `${(h / 24).toFixed(1)}d`;
+	}
+
+	// Rule 6 applies to the display too: a list that could not be read must
+	// not render as 0, or an outage looks like an all-clear.
+	function countOf(v) {
+		return Array.isArray(v) ? v.length : '?';
+	}
+
 	function topLeads() {
 		// Tier against the thresholds the backend actually resolved, never a
 		// literal. This filtered at 0.65 — ABOVE the scorer's own self-match
@@ -266,6 +290,138 @@
 					<p class="text-muted compact">No active migration signals. Baseline monitoring.</p>
 				{/if}
 			</div>
+		</section>
+	{/if}
+
+	{#if closeWatch?.wallets?.length}
+		{@const changed = closeWatch.changes || {}}
+		{@const touched = closeWatch.contacts || {}}
+		<section class="card" style="margin-bottom:16px">
+			<div class="panel-title">
+				<div>
+					<div class="section-kicker">Read Every Run</div>
+					<h2>Close Watch</h2>
+				</div>
+				<span class="count-pill">{closeWatch.wallets.length}</span>
+			</div>
+			<p class="text-muted" style="font-size:0.78rem;margin-bottom:12px">
+				Wallets read per-run by <span class="mono">watch.yml</span> — the operator's own list plus every roster
+				CONFIRMED/PROBABLE. <strong>Size</strong> is this wallet against the target's whole account (perp, every
+				HIP-3 dex and spot), both sides read by one function at the same moment; it alerts on crossing
+				<span class="mono">{OUTGREW_TARGET}x</span>, a band rather than parity because both are live books.
+				A <strong>contact</strong> with his world is an observed connection, not an inference.
+			</p>
+			<table>
+				<thead>
+					<tr>
+						<th>Wallet</th><th>Source</th><th>Value</th><th>Size vs target</th>
+						<th>Last fill</th><th>Agents</th><th>Subs</th><th>Withdrew to</th><th>EVM nonce</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each closeWatch.wallets as w}
+						<tr>
+							<td><Addr address={w.address} className="" /></td>
+							<td class="text-muted mono" style="font-size:0.72rem">{w.source || 'config'}</td>
+							<td class="mono">{w.account_value == null ? 'unreadable' : formatUSD(w.account_value)}</td>
+							<td class="mono">
+								{#if w.size_ratio == null}
+									<span class="text-muted">unknown</span>
+								{:else}
+									<span class="badge" class:badge-red={w.size_ratio >= OUTGREW_TARGET}
+										class:badge-yellow={w.size_ratio < OUTGREW_TARGET}>{w.size_ratio.toFixed(2)}x</span>
+								{/if}
+							</td>
+							<td class="mono text-muted">{sinceMs(w.last_fill_ms)}</td>
+							<td class="mono">{countOf(w.agents)}</td>
+							<td class="mono">{countOf(w.subaccounts)}</td>
+							<td class="mono">{countOf(w.withdrawal_destinations)}</td>
+							<td class="mono">{w.hyperevm_nonce == null ? '?' : w.hyperevm_nonce}</td>
+						</tr>
+						{#if w.why}
+							<tr><td colspan="9" class="text-muted watch-note">{w.why}</td></tr>
+						{/if}
+						{#if (touched[w.address] || []).length}
+							<tr><td colspan="9" class="watch-note">
+								<span class="badge badge-red">CONTACT</span>
+								{#each touched[w.address] as c}
+									<span class="mono" style="margin-left:6px">{shortAddr(c.address)} — {c.is}</span>
+								{/each}
+							</td></tr>
+						{/if}
+						{#if (changed[w.address] || []).length}
+							<tr><td colspan="9" class="watch-note">
+								{#each changed[w.address] as ch}
+									<span class="badge badge-yellow" style="margin-right:6px">{ch.kind}</span><span
+										class="text-muted" style="margin-right:10px">{ch.detail}</span>
+								{/each}
+							</td></tr>
+						{/if}
+						{#if w.read_ok === false}
+							<tr><td colspan="9" class="text-muted watch-note">
+								Partial read — this row is what we could see, not an all-clear.
+							</td></tr>
+						{/if}
+					{/each}
+				</tbody>
+			</table>
+			{#if (closeWatch.unreadable || []).length}
+				<p class="text-muted compact" style="margin-top:8px">
+					{closeWatch.unreadable.length} wallet(s) unreadable this run — unknown, not clear.
+				</p>
+			{/if}
+		</section>
+	{/if}
+
+	{#if withdrawals?.cctp}
+		{@const c = withdrawals.cctp}
+		{@const foreignCount = (withdrawals.unmatched || 0) + (c.foreign || []).length}
+		<section class="card" style="margin-bottom:16px">
+			<div class="panel-title">
+				<div>
+					<div class="section-kicker">Where The Money Left</div>
+					<h2>Withdrawal Pairing</h2>
+				</div>
+				<span class="count-pill">{(withdrawals.withdrawals || 0) + (c.withdrawals || 0)}</span>
+			</div>
+			<p class="text-muted" style="font-size:0.78rem;margin-bottom:12px">
+				Every Hyperliquid withdrawal matched to where it actually landed. Two routes out: the Arbitrum
+				<strong>bridge</strong>, and <strong>Circle/CCTP</strong> (<span class="mono">sendToEvmWithData</span>, which
+				the ledger shows only as a send to <span class="mono">0x2000…0000</span> and which can name a recipient on
+				any Circle chain). Anything unpaired is money leaving to an address this system does not sweep.
+			</p>
+			<div class="status-metrics">
+				<div>
+					<span class="metric-value">{withdrawals.matched_to_own_address ?? '?'}/{withdrawals.withdrawals ?? '?'}</span>
+					<span class="metric-label">Bridge paired</span>
+				</div>
+				<div>
+					<span class="metric-value">{c.matched_to_cluster_mint ?? '?'}/{c.withdrawals ?? '?'}</span>
+					<span class="metric-label">Circle paired</span>
+				</div>
+				<div>
+					<span class="metric-value">{foreignCount}</span>
+					<span class="metric-label">Foreign</span>
+				</div>
+				<div>
+					<span class="metric-value">{(c.unresolved || []).length}</span>
+					<span class="metric-label">Unresolved</span>
+				</div>
+			</div>
+			{#if (c.foreign || []).length}
+				<table style="margin-top:12px">
+					<thead><tr><th>Circle recipient</th><th>Chain</th><th>Amount</th></tr></thead>
+					<tbody>
+						{#each c.foreign as f}
+							<tr>
+								<td><Addr address={f.destination} className="" /></td>
+								<td class="mono">{f.chain || 'unknown'}</td>
+								<td class="mono">{formatUSD(f.net_usd)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
 		</section>
 	{/if}
 
@@ -534,6 +690,12 @@
 {/if}
 
 <style>
+	.watch-note {
+		padding-top: 0;
+		border-top: none;
+		font-size: 0.72rem;
+	}
+
 	.page-header { margin-bottom: 24px; }
 	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
 

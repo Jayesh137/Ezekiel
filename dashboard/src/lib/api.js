@@ -122,6 +122,27 @@ export async function fetchCorrelations() {
 }
 
 /**
+ * Fetch the close watch: every wallet read per-run by watch.yml — the
+ * operator's own `config.watch_wallets` plus every roster CONFIRMED/PROBABLE.
+ *
+ * Nothing on this dashboard read it until 2026-09-12, so the one reading that
+ * shows a migration in progress — capital leaving him and appearing somewhere
+ * else, as `size_ratio` — existed only in the JSON and in alert text.
+ */
+export async function fetchWatchlist() {
+	return fetchJSON('data/watchlist/latest.json');
+}
+
+/**
+ * Fetch withdrawal pairing: every HL withdrawal matched to where it landed,
+ * by the Arbitrum bridge and by Circle/CCTP. An unresolved one is money that
+ * left to an address nobody can name.
+ */
+export async function fetchWithdrawals() {
+	return fetchJSON('data/withdrawals/latest.json');
+}
+
+/**
  * Fetch scan history across all dates to track wallet score trends.
  * @param {object} index - Data index with files.scans dates
  */
