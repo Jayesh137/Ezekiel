@@ -130,14 +130,22 @@ three-week-old approval is not reported as a transition, the same rule
 `changes()` already applies to `vaults_led`, `dexes` and `hyperevm_nonce`.
 **When adding a field to a watch, ask which OTHER endpoint answers for it.**
 
-**It is now worth more than he is, and nothing in the system knew (fixed
-2026-09-12).** The watch read its value every eleven minutes and never asked
-what the TARGET was worth, so the plainest reading of a migration in progress —
-capital leaving him and appearing somewhere else — could only be found by
-hand-diffing two files, which is how it was found. Measured: the watched wallet
-**$53.2M** against his **$24.1M across perp, `xyz` and spot**, a ratio of
-**2.21x**. The owner is copy-trading, by hand, the smaller half of what may be
-one book.
+**Nothing compared its size with his, and the hand-comparison that noticed
+was wrong (fixed 2026-09-12).** The watch read its value every eleven minutes
+and never asked what the TARGET was worth, so the plainest reading of a
+migration in progress — capital leaving him and appearing somewhere else —
+could only be got by hand-diffing two files. Done that way it said the watched
+wallet held **$53.2M against his $24.1M, 2.21x**, and that figure is FALSE: it
+summed his perp and `xyz` from `data/account/latest.json` and omitted **$44.7M
+of spot USDC**. His account on 2026-09-12 is $17.5M perp + $6.7M `xyz` +
+**$44.7M spot USDC = $68.9M**.
+
+Read properly — both sides through one function, live, across every dex plus
+spot — the first real reading is **$54,074,595 against $62,536,023, a ratio of
+0.86x**, and the check correctly fired nothing. So the wallet has NOT outgrown
+him; it is at 0.86x and the band is 1.15x. The vector is a forward tripwire,
+not a finding. Its value was proving the hand figure wrong within a minute of
+going live.
 
 `snapshot` now carries `target_value` and `size_ratio`, and `changes` reports
 `outgrew_target` on the crossing. Three things decided deliberately:
@@ -152,12 +160,14 @@ one book.
   marking him, not money moving. At parity the pair would flap across the line
   on noise like that.
 - **An ABSENT previous ratio counts as below the band, not as a first reading
-  to skip.** This is the opposite of the `extraAgents` seeding decision and the
-  reason is the asymmetry: that was a three-week-old approval whose transition
-  had already passed, this is a live state nobody has ever been told. A repeat
-  after an outage costs one alert a day against the 24h cooldown; a missed
-  crossing costs the mission. It rates HIGH, not CRITICAL — a size ratio is an
-  inference, not a contact with his world.
+  to skip.** This is the opposite of the `extraAgents` seeding decision: that
+  was a three-week-old approval whose transition had already passed, where this
+  would be a live state nobody had been told. A repeat after an outage costs one
+  alert a day against the 24h cooldown; a missed crossing costs the mission. It
+  rates HIGH, not CRITICAL — a size ratio is an inference, not a contact with
+  his world. (This was decided expecting the first run to alert at 2.21x. It
+  did not, because that number was wrong — the rule stands on its own reasoning,
+  not on the case that prompted it.)
 
 Nothing reads `data/watchlist/latest.json` on the dashboard, so the ratio is in
 the record and the run log, and reaches the operator through the alert.

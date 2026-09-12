@@ -52,10 +52,17 @@ QUIET_DAYS = 3.0
 # How much bigger than the target a watched wallet must be before its size is
 # news. A migration shows up as capital LEAVING him and appearing elsewhere, so
 # the relative size of the two accounts is the plainest reading of how far one
-# has gone — and nothing here compared them until 2026-09-12, which is how
-# `0xdd53c529…` came to hold $53.2M against his $24.1M, more than twice the
-# account it is a candidate FOR, with the operator manually copy-trading the
-# smaller half and never told.
+# has gone — and nothing here compared them until 2026-09-12.
+#
+# The comparison that motivated this was done BY HAND and was wrong, which is
+# the best argument for it existing in code. Summing his perp and `xyz` from
+# `data/account/latest.json` gave $24.1M against the watched wallet's $53.2M —
+# "more than twice the account it is a candidate for". It omitted **$44.7M of
+# spot USDC**. Read properly, both sides through one function, he is worth
+# $62.5M and the watched wallet $54.1M: **0.86x, and nothing fires.** Whoever
+# next reaches for a quick ratio from the stored account file: that file is
+# perp + hip3 + spot in three separate places, and leaving one out moves the
+# answer by a factor of three.
 #
 # A band, not parity, because both are live trading books: he fell 42% in a
 # single day on a $138M notional short while `withdrawable` stayed $0.00, which
