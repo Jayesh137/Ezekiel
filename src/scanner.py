@@ -1167,19 +1167,32 @@ def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30,
     correlator's pool had, fixed there and not here. It now reads the whole
     window through the correlator's paginated, time-bounded walk.
     """
-    from src.correlator import get_recent_bridge_deposits
+    from src.correlator import get_recent_bridge_deposits, get_recent_cctp_deposits
 
     deposits, error = get_recent_bridge_deposits(window_days=days, min_amount=min_usdc)
     if error == "skipped_no_api_key":
         print("[scanner] Etherscan API key missing, skipping bridge depositor scan")
-        return []
-    if error:
+        deposits = []
+    elif error:
         # Partial is still worth scanning, but a reader must not take the
         # count as the whole window.
         print(f"[scanner] Bridge depositor scan INCOMPLETE: {error}")
 
+    # The second way in. A deposit through Circle never touches the bridge;
+    # the forwarder's ledger names every one of them, with no key needed, so
+    # a wallet funded from Ethereum or Base and deposited through CCTP is a
+    # priority scan too — it is the fresh wallet the bridge pool cannot see.
+    try:
+        circle, circle_error = get_recent_cctp_deposits(window_days=days, min_amount=min_usdc)
+    except Exception as exc:                          # noqa: BLE001 - never lose the bridge set
+        circle, circle_error = [], f"{type(exc).__name__}: {exc}"
+    if circle_error:
+        print(f"[scanner] Circle depositor scan INCOMPLETE: {circle_error}")
+    if not deposits and not circle:
+        return []
+
     depositors: dict[str, float] = {}
-    for d in deposits:
+    for d in list(deposits) + list(circle):
         w = (d.get("wallet") or "").lower()
         if w:
             depositors[w] = max(depositors.get(w, 0.0), float(d.get("amount") or 0))
@@ -1195,8 +1208,9 @@ def get_recent_bridge_depositors(min_usdc: float = 50_000, days: int = 30,
     # the tail go.
     ranked = sorted(depositors, key=lambda w: -depositors[w])
     kept = ranked[:max_wallets]
-    print(f"[scanner] Bridge depositor scan: {len(depositors)} wallets >= "
-          f"${min_usdc:,.0f} in last {days}d; scanning the largest {len(kept)}"
+    print(f"[scanner] Depositor scan (bridge {len(deposits)} + Circle {len(circle)} deposits): "
+          f"{len(depositors)} wallets >= ${min_usdc:,.0f} in last {days}d; "
+          f"scanning the largest {len(kept)}"
           + (f" (capped from {len(depositors)})" if len(kept) < len(depositors) else ""))
     return kept
 

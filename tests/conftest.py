@@ -55,6 +55,10 @@ _PROBES = {
     # None, see prices._BudgetExhausted's docstring -- straight into the file
     # every run reads first, for a symbol/date pair that is never re-fetched.
     "the price cache": REAL_DATA_DIR / "prices",
+    # src/cctp_feed.py's incremental pool of Circle deposits. A test that
+    # reaches the real feed walks thirty days of a live ledger and writes the
+    # result here; it happened once (2026-09-12, 1.3MB) before this probe.
+    "the Circle deposit pool": REAL_DATA_DIR / "correlations" / "cctp_pool.json",
 }
 
 

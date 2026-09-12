@@ -630,6 +630,7 @@ def test_an_incomplete_candidate_pool_is_reported_not_silently_scored(monkeypatc
     monkeypatch.setattr(correlator, "collect_target_exits", lambda t, m: [])
     monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
                         lambda w, m: ([], "hit the page ceiling before the window ended"))
+    monkeypatch.setattr(correlator, "get_recent_cctp_deposits", lambda w, m: ([], None))
     monkeypatch.setattr(correlator, "save_latest", lambda d, data: "")
 
     result = correlator.run_correlation()
@@ -644,6 +645,7 @@ def test_a_whole_candidate_pool_records_no_error(monkeypatch):
     monkeypatch.setattr(correlator, "collect_target_exits", lambda t, m: [])
     monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
                         lambda w, m: ([{"wallet": "0xa", "amount": 1e6, "ts": 1}], None))
+    monkeypatch.setattr(correlator, "get_recent_cctp_deposits", lambda w, m: ([], None))
     monkeypatch.setattr(correlator, "save_latest", lambda d, data: "")
 
     result = correlator.run_correlation()

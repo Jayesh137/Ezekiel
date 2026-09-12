@@ -1184,15 +1184,19 @@ def alert_hyperevm_activation(wallet: str, label: str, nonce: int,
 
 
 def alert_deposit_correlation(candidate: str, confidence: float, deposit_usd: float,
-                              exit_usd: float, gap_hours: float, exit_source: str) -> bool:
-    """Fire when a target exit re-appears as a fresh HL bridge deposit (re-linked
-    across a CEX/cross-chain gap by amount + timing)."""
+                              exit_usd: float, gap_hours: float, exit_source: str,
+                              via: str | None = None) -> bool:
+    """Fire when a target exit re-appears as a fresh HL deposit (re-linked
+    across a CEX/cross-chain gap by amount + timing). `via` names the route
+    the deposit took: the Arbitrum bridge, or Circle's CCTP from any chain."""
     subject = "[EZEKIEL] CRITICAL: Deposit/Withdrawal Correlation — Possible Re-entry Wallet"
+    route = {"bridge": "through the Arbitrum bridge", "cctp": "through Circle (CCTP)"}.get(via)
     body = (
         f"A wallet deposited to Hyperliquid an amount closely matching a target exit,\n"
         f"shortly after — consistent with cashing out and re-entering on a fresh wallet.\n\n"
         f"{address_line(candidate, 'Candidate Wallet')}\n"
-        f"Correlation Confidence: {confidence:.0%}\n"
+        + (f"Deposit route: {route}\n" if route else "")
+        +         f"Correlation Confidence: {confidence:.0%}\n"
         f"Target exit: ${exit_usd:,.2f} ({exit_source})\n"
         f"This deposit: ${deposit_usd:,.2f}\n"
         f"Gap: {gap_hours:.1f} hours\n\n"

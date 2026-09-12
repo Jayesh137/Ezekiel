@@ -115,6 +115,8 @@ def test_bridge_depositors_are_ranked_by_size_and_capped(monkeypatch):
     # Imported inside the function, so the name lives on the correlator.
     monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
                         lambda window_days, min_amount: (pool, None))
+    monkeypatch.setattr(correlator, "get_recent_cctp_deposits",
+                        lambda window_days, min_amount: ([], None))
     got = sc.get_recent_bridge_depositors(max_wallets=5)
     assert got == [f"0x{i:040x}" for i in (50, 49, 48, 47, 46)]
 
@@ -128,4 +130,7 @@ def test_a_missing_api_key_yields_no_depositors(monkeypatch):
 
     monkeypatch.setattr(correlator, "get_recent_bridge_deposits",
                         lambda window_days, min_amount: ([], "skipped_no_api_key"))
+    # The Circle pool needs no key; with nothing there either, nothing to scan.
+    monkeypatch.setattr(correlator, "get_recent_cctp_deposits",
+                        lambda window_days, min_amount: ([], None))
     assert sc.get_recent_bridge_depositors() == []

@@ -37,6 +37,7 @@ jobs:
     #   config.collection.time_budget_seconds  150   cluster sweep (tracer)
     #   tracer.TRACE_BUDGET_SECONDS            240   destination tracing loop
     #   correlator.run_correlation               1   one Etherscan call
+    #   correlator --pools cctp                120   Circle pool walk (keyless)
     #   config.transfer_graph.time_budget_...  150   frontier expansion
     #   transfer_graph.CODE_LOOKUP_SECONDS      20   bytecode labelling
     #   the 2026-09-10 vectors (measured below) ~250
@@ -125,6 +126,20 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_withdrawals.py
+      # The Circle candidate pool: every CCTP deposit into any Hyperliquid
+      # account, read from USDC's forwarder ledger with no key, incrementally
+      # from a stored cursor (src/cctp_feed.py). The bridge pool costs hundreds
+      # of Etherscan calls and stays on the daily analyze job; this pool is a
+      # few calls a run once filled, and a fresh wallet funded through Circle
+      # from Ethereum or Base enters the correlator here and nowhere else.
+      # Budgeted at config.correlation.cctp_time_budget_seconds (120s).
+      - name: Correlate Circle deposits
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python src/correlator.py --pools cctp
       # One public-RPC call per cluster Solana address (the CCTP recipient of
       # $22.75M of his). Solana reaches Hyperliquid through Circle too.
       - name: Watch cluster Solana addresses

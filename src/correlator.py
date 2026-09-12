@@ -16,8 +16,26 @@ Two research-backed heuristics defeat that:
 2. Address reuse (highest-confidence heuristic — cryptographic certainty). A CEX
    deposit address is unique to one account. If a new wallet sends USDC to the
    SAME address the target withdraws to, they are almost certainly the same person.
+
+## Two routes in, two routes out (2026-09-12)
+
+The candidate pool used to be the Arbitrum bridge contract alone. A deposit
+through Circle's CCTP — from Ethereum, Base, Solana or any other Circle
+chain — never touches it; it arrives as a spot `send` from USDC's linked
+contract `0x6b9e7731…`, whose ledger is therefore a complete feed of every
+Circle deposit into every account (`src/cctp_feed.py`). The two pools are
+read, matched and stored SEPARATELY: the bridge pool costs hundreds of
+Etherscan calls and runs daily, the Circle pool is incremental and keyless
+and runs every trace. `run_correlation(pools=...)` reads the pools it is
+asked for and keeps the stored result of the other.
+
+Exits gained the mirror image: a spot send to the USDC system address is a
+Circle withdrawal. One that landed at his own address is not an exit — its
+onward L1 movement already is — so only the UNPAIRED ones count, which is
+exactly the case where the money left to an address nobody swept.
 """
 
+import argparse
 import os
 import sys
 import time
@@ -26,6 +44,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.cctp_feed import refresh_pool, strict_post
 from src.chain.collect import records_for
 from src.utils import (
     DATA_DIR,
@@ -33,6 +52,9 @@ from src.utils import (
     load_config,
     save_latest,
 )
+from src.withdrawals import cctp_inbound, cctp_withdrawals, match
+
+POOLS = ("bridge", "cctp")
 
 
 def utc_now() -> str:
@@ -188,8 +210,9 @@ def collect_target_exits(target: str, min_amount: float) -> list[dict]:
     and an exit of unknown size cannot be matched, correctly, to anything.
     """
     exits = []
+    ledger = load_all_records(str(DATA_DIR / "ledger"))
 
-    for entry in load_all_records(str(DATA_DIR / "ledger")):
+    for entry in ledger:
         d = entry.get("delta", {})
         if d.get("type") != "withdraw":
             continue
@@ -226,7 +249,34 @@ def collect_target_exits(target: str, min_amount: float) -> list[dict]:
                 "source": "l1_outbound",
                 "ref": rec.get("tx_hash", ""),
             })
+
+    exits.extend(unpaired_cctp_exits(target, ledger, min_amount))
     return exits
+
+
+def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float) -> list[dict]:
+    """Circle withdrawals that did NOT land at a cluster address.
+
+    A spot send to the USDC system address mints at some recipient minutes
+    later. Paired with a mint at his own address it is a transfer to himself
+    and its onward movement is already an exit; unpaired, it is money that
+    left Hyperliquid to an address this project does not sweep — precisely
+    the exit a fresh wallet's deposit should be matched against.
+    """
+    config = load_config()
+    target = (target or "").lower()
+    cluster = {target} | {(w or "").lower() for w in config.get("known_self_wallets", []) or []}
+    circle = cctp_withdrawals(ledger, target)
+    if not circle:
+        return []
+    inbound = []
+    for w in sorted(cluster):
+        inbound.extend(cctp_inbound(records_for(w), {w}))
+    inbound.sort(key=lambda r: r["ts"])
+    m = match(circle, inbound)
+    return [{"amount": float(w["gross_usd"]), "ts": int(w["time_s"]),
+             "source": "hl_cctp", "ref": w.get("hash", "")}
+            for w in m["unmatched"] + m["settling"] if float(w["gross_usd"]) >= min_amount]
 
 
 def get_recent_bridge_deposits(window_days: float, min_amount: float,
@@ -298,8 +348,55 @@ def get_recent_bridge_deposits(window_days: float, min_amount: float,
     return deposits, err
 
 
-def run_correlation() -> dict:
-    """Full pipeline: gather exits + fresh deposits, FIFO-correlate, persist, alert."""
+def get_recent_cctp_deposits(window_days: float, min_amount: float, *, post=None,
+                             max_calls: int | None = None,
+                             seconds: float | None = None) -> tuple[list[dict], str | None]:
+    """Every fresh Circle deposit into Hyperliquid within the window.
+    Returns (deposits, error), the same contract as the bridge reader.
+
+    Incremental and keyless: the forwarder's ledger is walked from a stored
+    cursor (src/cctp_feed.py). The poster is STRICT — `utils.hl_post` turns a
+    failed read into `[]`, and an empty page means "you have reached the
+    present" to the walker, so a transport failure would silently advance the
+    cursor past unread deposits. A failure here raises inside the walk and is
+    returned as an error with the cursor left where it was.
+    """
+    config = load_config()
+    cfg = config.get("correlation") or {}
+    target = (config.get("target_wallet") or "").lower()
+    excluded = {target}
+    excluded |= {(a or "").lower() for a in config.get("known_self_wallets", []) or []}
+    excluded |= {(a or "").lower() for a in config.get("excluded_addresses", []) or []}
+    deposits, error = refresh_pool(
+        post or strict_post, excluded=excluded,
+        max_calls=max_calls if max_calls is not None else int(cfg.get("cctp_max_calls", 120)),
+        seconds=seconds if seconds is not None else float(cfg.get("cctp_time_budget_seconds", 120)))
+    cutoff = int(time.time()) - int(window_days * 86400)
+    kept = [d for d in deposits
+            if int(d.get("ts") or 0) >= cutoff and float(d.get("amount") or 0) >= min_amount]
+    return kept, error
+
+
+def _stored_pools() -> dict:
+    try:
+        import json
+        with open(DATA_DIR / "correlations" / "latest.json") as f:
+            pools = json.load(f).get("pools")
+        return pools if isinstance(pools, dict) else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def run_correlation(pools=POOLS) -> dict:
+    """Gather exits and the requested candidate pools, FIFO-correlate each,
+    persist per pool, alert.
+
+    A pool not asked for this run keeps its stored result: the bridge pool is
+    read daily (hundreds of Etherscan calls) and the Circle pool on every
+    trace (a few keyless calls), and neither run may erase the other's
+    matches. `matches` at the top level is the union, which is what the
+    roster reads.
+    """
     from src.alerts import alert_deposit_correlation
 
     config = load_config()
@@ -309,46 +406,73 @@ def run_correlation() -> dict:
     window_days = cfg.get("window_days", 14)
     tol_pct = cfg.get("tolerance_pct", 0.03)
     min_conf = cfg.get("min_confidence", 0.55)
+    pools = tuple(p for p in (pools or POOLS) if p in POOLS)
 
     exits = collect_target_exits(target, min_amount)
-    entries, entries_error = get_recent_bridge_deposits(window_days, min_amount)
-    print(f"[correlator] {len(exits)} exits vs {len(entries)} fresh deposits "
-          f"(>= ${min_amount:,.0f}, {window_days}d window)")
-    if entries_error:
-        # A correlation run that could not see the whole candidate pool has not
-        # cleared the target — it has not looked. Saying so is the difference
-        # between "no match" and "no idea".
-        print(f"[correlator] INCOMPLETE candidate pool: {entries_error}")
+    readers = {"bridge": get_recent_bridge_deposits, "cctp": get_recent_cctp_deposits}
+    stored = _stored_pools()
+    blocks: dict[str, dict] = {}
+    for name in POOLS:
+        if name not in pools:
+            if name in stored:
+                blocks[name] = stored[name]
+            continue
+        entries, entries_error = readers[name](window_days, min_amount)
+        print(f"[correlator] {name}: {len(exits)} exits vs {len(entries)} fresh deposits "
+              f"(>= ${min_amount:,.0f}, {window_days}d window)")
+        if entries_error:
+            # A correlation run that could not see the whole candidate pool has
+            # not cleared the target — it has not looked. Saying so is the
+            # difference between "no match" and "no idea".
+            print(f"[correlator] {name}: INCOMPLETE candidate pool: {entries_error}")
+        findings = find_correlations(exits, entries, tol_pct, window_days, min_amount, min_conf)
+        for f in findings:
+            f["via"] = name
+        blocks[name] = {
+            "computed_at": utc_now(),
+            "candidate_pool_error": entries_error,
+            "candidates_considered": len(entries),
+            "matches": findings[:50],
+        }
 
-    findings = find_correlations(exits, entries, tol_pct, window_days, min_amount, min_conf)
-
+    merged = sorted((m for b in blocks.values() for m in b.get("matches") or []),
+                    key=lambda f: f.get("confidence", 0), reverse=True)
+    errors = [f"{n}: {b['candidate_pool_error']}" for n, b in blocks.items()
+              if b.get("candidate_pool_error")]
     result = {
         "computed_at": utc_now(),
         "target": target.lower(),
         "params": {"min_amount_usd": min_amount, "window_days": window_days,
                    "tolerance_pct": tol_pct, "min_confidence": min_conf},
-        "match_count": len(findings),
-        # Absent or empty means the pool was whole. Present means a zero match
-        # count is not evidence of absence.
-        "candidate_pool_error": entries_error,
-        "candidates_considered": len(entries),
-        "matches": findings[:50],
+        "pools_read": list(pools),
+        "match_count": len(merged),
+        # Absent or empty means every pool was whole. Present means a zero
+        # match count is not evidence of absence.
+        "candidate_pool_error": "; ".join(errors) or None,
+        "candidates_considered": sum(b.get("candidates_considered") or 0 for b in blocks.values()),
+        "matches": merged[:100],
+        "pools": blocks,
     }
     save_latest(str(DATA_DIR / "correlations"), result)
 
-    for f in findings:
-        if f["confidence"] >= cfg.get("alert_confidence", 0.7):
-            alert_deposit_correlation(
-                f["wallet"], f["confidence"], f["deposit_amount_usd"],
-                f["exit_amount_usd"], f["gap_hours"], f["exit_source"],
-            )
-    if findings:
-        print(f"[correlator] {len(findings)} correlation match(es); top confidence {findings[0]['confidence']}")
+    for name in pools:
+        for f in blocks[name]["matches"]:
+            if f["confidence"] >= cfg.get("alert_confidence", 0.7):
+                alert_deposit_correlation(
+                    f["wallet"], f["confidence"], f["deposit_amount_usd"],
+                    f["exit_amount_usd"], f["gap_hours"], f["exit_source"], via=name,
+                )
+    if merged:
+        print(f"[correlator] {len(merged)} correlation match(es); top confidence {merged[0]['confidence']}")
     return result
 
 
-def main():
-    run_correlation()
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Re-link target exits to fresh deposits.")
+    parser.add_argument("--pools", nargs="+", choices=POOLS, default=list(POOLS),
+                        help="candidate pools to read this run (default: all)")
+    args = parser.parse_args(argv)
+    run_correlation(tuple(args.pools))
 
 
 if __name__ == "__main__":
