@@ -86,7 +86,7 @@ trading style. Never promote a wallet on one vector alone.
 | Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
 | Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
 | Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
-| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets`: a wallet that is probably his and is not confirmed, read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
+| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets` **plus every roster CONFIRMED/PROBABLE wallet** (capped at `MAX_WATCHED` = 6), read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -103,6 +103,22 @@ shared with `0xf078969e…`, which is a personal wallet two-way with the target
 at $135M/$148M and now grades MIGRATION_CANDIDATE; `0x160f6ef9…` sent him
 $100.56M and is a person too. Both were INFRASTRUCTURE on fan degree before
 whole-chain activity was measured.
+
+**The watch is fed by the ROSTER, not just by hand (2026-09-12).** It read one
+address chosen by hand out of 348, and `0xf078969e…` — **CONFIRMED as his at
+0.84**, two-way with him at $155M/$135M and sharing his Binance deposit address
+— had nothing reading it per-wallet. The close watch is the only instrument
+that asks a wallet for its NAMED agents, sub-accounts, withdrawal destinations,
+HyperEVM nonce and size against his; leaving a confirmed wallet out of it is
+the migration this project exists to catch, happening somewhere nobody looks.
+`watched()` now takes the roster and appends every CONFIRMED/PROBABLE wallet
+after the operator's list, marked `source: "roster"` — being watched stays a
+QUESTION and never leaks into `known_self_wallets`. POSSIBLE is excluded (140
+of them, one weak vector each), services are excluded, and the TARGET is
+excluded because the collector already reads him and a second writer on
+`data/actions/` is a lost update. Capped at **6** to protect the cadence, which
+is the watch's whole value: 60-73s for one wallet, ~20-30s each once swept.
+Live, this took the watch from 1 wallet to 3.
 
 **Under close watch: `0xdd53c5297309130ab5fe5623dc905752e3342b13`.** It opened
 at zero on 2026-08-17, two days into a six-day silence of the target's (his p90
@@ -669,6 +685,22 @@ that it is.
   rebase that means the commit being replayed, i.e. this run's newer reading —
   which keeps our files and leaves untouched every file only the other side
   changed. Verified both ways against a simulated race before it was pushed.
+- **A STEP timeout is survivable; a JOB timeout is not (2026-09-12).** Run
+  34673026019 died on trace.yml's 15-minute job ceiling with
+  `transfer_graph.py` stuck at **699s having printed nothing at all** — so it
+  was inside an external call, not working. A cancelled job skips every
+  remaining step, **including `if: always()` ones**, so the finished
+  Circle-pool read, the withdrawal pairing, the frontier, the roster and the
+  accounting were all discarded. A STEP timeout instead fails only that step
+  and the run carries on. So every step making unbounded external calls now
+  carries `timeout-minutes` at roughly 3x its observed duration (measured over
+  the last eight successful runs: totals **347-534s**, graph **64-202s**), the
+  job ceiling is a 20-minute backstop rather than the primary limit, and every
+  committing workflow's push step is `if: always()`. Partial data beats none:
+  each writer rewrites its own file whole, so a file not updated this run keeps
+  the previous value. `failure()` still opens the failure issue.
+  **An internal `time_budget_seconds` cannot cover this** — it is checked
+  BETWEEN calls and cannot interrupt one that never returns.
 - **A cron in this repo is a wish, not a schedule.** `trace.yml` asks for
   every 30 minutes; measured over its last 73 scheduled runs (2026-09-01 to
   2026-09-11) GitHub actually started it a **median of 198 minutes apart,
