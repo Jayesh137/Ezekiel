@@ -1133,6 +1133,46 @@ def alert_name_hit(address: str, name: str, source: str) -> bool:
     return _send_with_cooldown(f"name_{address.lower()}", 168, subject, body)
 
 
+def alert_referral_change(wallet: str, changes: list[dict]) -> bool:
+    """Fire when a cluster wallet's referral state moves: a code created, an
+    account referred through it, or the wallet itself referred by someone.
+
+    A referred account is an address the wallet's owner chose to link to
+    himself — a second account of his is the obvious one to refer, since the
+    rebate is free money. HIGH rather than CRITICAL: it names addresses to
+    check, it is not yet a contact with a wallet believed to be his.
+    """
+    if not changes:
+        return False
+    lines = []
+    for c in changes:
+        kind = c.get("kind")
+        if kind == "referral_code":
+            after = c.get("after") or {}
+            before = c.get("before") or {}
+            lines.append(f"Referral code: {before.get('stage')}/{before.get('code') or '-'} -> "
+                         f"{after.get('stage')}/{after.get('code') or '-'}")
+        elif kind == "referred_account":
+            lines.append(f"Referred account: {address_line(c.get('address') or '', 'Account')} "
+                         f"(cumulative volume {c.get('cum_vlm') or 'n/a'})")
+        elif kind == "referred_by":
+            lines.append(f"Referred by: {address_line(c.get('referrer') or '', 'Referrer')}")
+        else:
+            lines.append(f"{kind}: {c}")
+    subject = "[EZEKIEL] HIGH: Referral State Changed On A Cluster Wallet"
+    body = (
+        "The referral state of a cluster wallet moved. A referral code is a\n"
+        "human-chosen label, and every account referred through it is an address\n"
+        "its owner chose to link to himself.\n\n"
+        f"{address_line(wallet, 'Wallet')}\n\n"
+        + "\n".join(lines) + "\n\n"
+        "Put every referred account to Hyperliquid at once (identity, agents,\n"
+        "sub-accounts, fills). An account he referred is a lead until shown\n"
+        "otherwise; one that also matches him on any other vector is his.\n"
+    )
+    return _send_with_cooldown(f"referral_change_{(wallet or '').lower()}", 24, subject, body)
+
+
 def alert_target_gained_agent(agent: str, name: str | None) -> bool:
     """Fire when the target authorises an agent he did not have before.
 

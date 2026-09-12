@@ -219,9 +219,38 @@ def collect_vault_equities(wallet: str) -> None:
 
 
 def collect_referral(wallet: str) -> None:
-    """Collect referral chain data."""
+    """Collect referral chain data, and say when it changes.
+
+    He has no referral code and was referred by nobody (2026-09-12). A second
+    account of his has every reason to be referred from the first — the
+    rebate is free money — and the moment a code exists, `referralStates`
+    names every account that used it. A change here is a lead handed over
+    by the account itself, so it is compared with the stored reading before
+    that reading is overwritten.
+    """
+    import json
+
+    from src.alerts import alert_referral_change
+    from src.referral import changes
+
+    previous = None
+    try:
+        with open(DATA_DIR / "referral" / "latest.json") as f:
+            previous = json.load(f)
+    except (OSError, ValueError):
+        pass
     ref = hl_post({"type": "referral", "user": wallet})
+    if not isinstance(ref, dict):
+        # hl_post's failure shape for a user query is []. Keep the stored
+        # reading: an overwrite would make the next real answer look like a
+        # code appearing from nothing.
+        print("[collector] referral UNREADABLE — stored reading kept")
+        return
     save_latest(str(DATA_DIR / "referral"), ref)
+    moved = changes(previous, ref)
+    if moved:
+        print(f"[collector] referral CHANGED: {moved}")
+        alert_referral_change(wallet, moved)
 
 
 def collect_agents(wallet: str) -> None:
