@@ -122,7 +122,7 @@ DEFAULTS = {
 #   1,168 of 1,368 pending wallets, so it was costing chase coverage to protect
 #   nothing. Ranking the full frontier costs 0.019 s with EdgeIndex (was 4.4 s).
 MAX_FRONTIER_QUEUE = 2000
-MAX_EXPANDED_LEDGER = 2000
+MAX_EXPANDED_LEDGER = 20000
 # `decisions` is unbounded in practice — 1,409 entries / 225 KB on the live
 # graph, already larger than a full frontier queue — and grows with the frontier.
 MAX_DECISIONS = 3000
@@ -1966,11 +1966,22 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     max_decisions = _positive_int(budget.get("max_decisions"), MAX_DECISIONS)
     max_ledger = _positive_int(budget.get("max_expanded_ledger"), MAX_EXPANDED_LEDGER)
 
+    # Chains this API key is refused on, learned once and shared by every
+    # wallet in the walk. The frontier stops on TIME, not on its lookup budget,
+    # so a call spent re-confirming a permanent refusal is a wallet nobody
+    # reaches.
+    plan_refused: dict = {}
+
     # Wallets fully expanded on an earlier run. Without this the frontier
     # re-walked the target's direct recipients every single run, so the lookup
     # budget was consumed by hop 1 forever and the deeper queue never drained.
     done = {(w or "").lower() for w in (already_expanded or []) if w}
-    explored = set(done)
+    # An ORDERED set: insertion order is the ledger's age record, and the cap
+    # below evicts by it. A plain set would lose that, and `sorted()` on write
+    # would convert "how old" into "how low the address is" — which is the
+    # defect this ordering exists to prevent (see `expanded_ledger` below).
+    explored = dict.fromkeys((w or "").lower()
+                             for w in (already_expanded or []) if w)
     calls = 0
     added = []
     stopped_reason = None
@@ -2003,7 +2014,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             for d, w in sorted(set(level)):
                 if w in services:
                     decide(w, d, "suppressed", f"service address: {services[w]}")
-                    explored.add(w)
+                    explored[w] = None
                     continue
                 pr, prof = _frontier_priority(w, d, walkable, now_ts)
                 ranked.append((pr, w, d, prof))
@@ -2042,7 +2053,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     # leaves (out of scope here; recorded as a follow-up).
                     sweep = sweep_wallet(wallet, sweep_chains, sweep_budget,
                                          canonical=_canonical(load_config()),
-                                         cluster=False)
+                                         cluster=False,
+                                         plan_refused=plan_refused)
                     rows = records_for(wallet)
                 except Exception as exc:
                     # One address failing must not abandon the rest of the walk.
@@ -2089,7 +2101,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     decide(wallet, d, "deferred",
                            f"sweep {status}; could not read {named}", pr)
                     continue
-                explored.add(wallet)
+                explored[wallet] = None
                 expanded_now.add(wallet)
                 diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
                 for rec in rows:
@@ -2155,7 +2167,14 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     diag["wallets_expanded"] = sorted(expanded_now)
     diag["skipped_already_expanded"] = len(done)
     # Everything ever expanded, so the next run does not repeat finished work.
-    diag["expanded_ledger"] = sorted(explored)[:max_ledger]
+    # Kept NEWEST-LAST and trimmed from the front, so a full ledger forgets the
+    # work finished longest ago. Sorting here instead — as this did until
+    # 2026-09-12 — makes retention alphabetical: the live ledger saturated at
+    # 2,000 entries topping out at `0x7bfa…` and every one of the nine wallets
+    # expanded that run sorted above it, so all nine were dropped and re-walked
+    # on the next run, and on every run after that. The frontier spent its
+    # whole budget re-doing the upper half of the address space.
+    diag["expanded_ledger"] = list(explored)[-max_ledger:]
     diag["frontier_size"] = len(explored) + len(pending)
     # Eligible = deduplicated, in-depth, not already expanded, not a service.
     diag["frontier_eligible"] = len(pending)

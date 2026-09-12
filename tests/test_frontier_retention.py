@@ -268,7 +268,7 @@ def test_shipped_config_declares_the_caps():
     cfg = json.loads((root / "config.json").read_text())["transfer_graph"]
     assert cfg["max_frontier_queue"] == 2000
     assert cfg["max_decisions"] == 3000
-    assert cfg["max_expanded_ledger"] == 2000
+    assert cfg["max_expanded_ledger"] == 20000
 
 
 # --- resume across process runs --------------------------------------------
@@ -538,3 +538,110 @@ def test_a_graph_with_no_history_never_alerts(monkeypatch, tmp_path):
     tg.run_transfer_graph(expand=False)
 
     assert not fired
+
+
+# --- the expanded ledger remembers the NEWEST work, not the lowest addresses -
+
+def test_the_expanded_ledger_evicts_the_oldest_not_the_highest_address(monkeypatch):
+    """A full ledger must drop the work finished longest ago.
+
+    The same defect this file was opened for, in the second place that
+    truncates: `expanded_ledger` was written as `sorted(explored)[:cap]`, so a
+    saturated ledger kept the alphabetically LOWEST addresses and silently
+    discarded everything above them. Because the ledger is what the next run
+    seeds `already_expanded` from, a wallet whose address sorts high was
+    forgotten the moment it was expanded and re-walked on every subsequent run
+    — forever, and for free, out of a lookup budget that never drained.
+
+    Measured on the live graph 2026-09-12: the ledger held exactly 2,000
+    entries topping out at `0x7bfa…`, and ALL NINE wallets expanded that run
+    sorted above it.
+    """
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    # A full ledger in the order the work was actually done — oldest first.
+    prior = ["0x" + f"{i:040x}" for i in range(2000)]
+    newest = "0x" + "f" * 40          # sorts above every entry in `prior`
+    _, diag = run(edges(l1(T, addr("1"), 900_000, 2, "0x1")),
+                  {"max_expanded_ledger": 2000},
+                  already_expanded=prior + [newest])
+
+    ledger = diag["expanded_ledger"]
+    assert len(ledger) == 2000, "the cap still bounds the file"
+    assert newest in ledger, "the most recent work must survive eviction"
+    assert prior[0] not in ledger, "eviction drops the oldest entry, not the highest"
+
+
+def test_the_expanded_ledger_keeps_its_order_across_a_round_trip(monkeypatch):
+    """Recency order is the ledger's meaning, so it must survive being stored.
+
+    Sorting on write would restore the defect: the order IS the age record.
+    """
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    prior = ["0x" + "f" * 40, "0x" + "a" * 40, "0x" + "c" * 40]
+    _, diag = run(edges(l1(T, addr("1"), 900_000, 2, "0x1")),
+                  {"max_expanded_ledger": 10}, already_expanded=prior)
+    assert diag["expanded_ledger"] == prior, "stored order is preserved, not sorted"
+
+
+def test_a_wallet_expanded_this_run_is_not_forgotten_by_the_cap(monkeypatch):
+    """The end-to-end property: finishing work must reduce future work."""
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    prior = ["0x" + f"{i:040x}" for i in range(50)]
+    high = "0x" + "e" * 40
+    _, diag = run(edges(l1(T, addr("1"), 900_000, 2, "0x1")),
+                  {"max_expanded_ledger": 50},
+                  already_expanded=prior + [high])
+    # Seed the next run from what the first one stored.
+    _, diag2 = run(edges(l1(T, addr("1"), 900_000, 2, "0x1")),
+                   {"max_expanded_ledger": 50},
+                   already_expanded=diag["expanded_ledger"])
+    assert high in diag2["expanded_ledger"], (
+        "a wallet expanded once must still be known as expanded on the next run")
+
+
+def test_the_ledger_cap_exceeds_the_frontier_it_must_remember():
+    """A cap below the working set thrashes however correctly it evicts.
+
+    Live on 2026-09-12 the graph had explored 2,017 wallets against a cap of
+    2,000, so the ledger shed work on every single run no matter which end it
+    dropped. Eviction order decides WHICH work is forgotten; only headroom
+    stops work being forgotten at all. The ledger is ~44 bytes an address
+    inside a 71MB graph file, so the headroom is close to free.
+    """
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    cfg = json.loads((root / "config.json").read_text())["transfer_graph"]
+    assert cfg["max_expanded_ledger"] >= 20_000
+    assert cfg["max_expanded_ledger"] > cfg["max_frontier_queue"], (
+        "every wallet that passes through the queue eventually needs remembering")
+    assert tg.MAX_EXPANDED_LEDGER == cfg["max_expanded_ledger"], (
+        "the fallback default must not silently re-impose the old ceiling")
+
+
+def test_the_frontier_learns_a_plan_refusal_once_per_run(monkeypatch):
+    """A refused chain must cost the walk one answer, not one per wallet.
+
+    The frontier is bounded by TIME, not by its lookup budget: live on
+    2026-09-12 it stopped at 10 of 40 allowed lookups on "time budget (150s)
+    exhausted" with 197 wallets still queued. Every call it spends on a chain
+    Etherscan's free tier refuses is taken straight out of the only vector that
+    reaches an address nobody has seen.
+    """
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    seen = []
+
+    def fake_sweep(wallet, chains, budget, **kw):
+        seen.append(kw.get("plan_refused"))
+        return {"status": "ok", "degraded_sources": [], "unsupported_sources": []}
+
+    # expand_frontier imports these inside the function, so patch the source.
+    from src.chain import collect as chain_collect
+    monkeypatch.setattr(chain_collect, "sweep_wallet", fake_sweep)
+    monkeypatch.setattr(chain_collect, "records_for", lambda w: [])
+    rows = [l1(T, addr(c), 900_000, 2, f"0x{c}") for c in "123"]
+    run(edges(*rows), {"max_expansions": 3})
+
+    assert len(seen) == 3, "three wallets were swept"
+    assert all(s is not None for s in seen), "the frontier must pass a refusal record"
+    assert len({id(s) for s in seen}) == 1, (
+        "every wallet in one walk must share ONE record, or nothing is learned")
