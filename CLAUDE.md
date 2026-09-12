@@ -472,6 +472,78 @@ not be read whole has not cleared anyone, it has not looked. **Do not widen
 budget and the pacing are a nested order, and it reaches the present on its own
 within a run or two.
 
+**Three alerts about HIM could not buzz at all (fixed 2026-09-12).** The
+severity token in a subject is not decoration — it IS the routing key.
+`_send_webhooks` and `_github_issue_fallback` both gate on
+`ESCALATING_SEVERITIES`, and `_health_bearing` treats an unclassifiable subject
+as health-bearing precisely so an alert nobody can read is never assumed
+harmless. Put those together and a word outside the vocabulary is the worst of
+both: the alert reaches **no channel at all**, falls through to email (which has
+never delivered), and then marks the whole system unhealthy for failing.
+
+Three live paths invented their own words:
+
+- **`alert_risk_level`** interpolated `risk.py`'s level straight into the
+  subject, so the unified migration-risk alert went out as `ELEVATED`. It fired
+  at **08:51 and 09:08**, reached nobody both times, and left `healthy: false`
+  with the dashboard announcing ALERTING IS DOWN — while every CRITICAL that day
+  arrived on ntfy in seconds. Risk CRITICAL now maps to CRITICAL and ELEVATED to
+  HIGH, with the level still named in the subject so nothing is lost.
+- **`alert_account_value_drop`** — "Possible Liquidation" — used `WARNING`. Now
+  HIGH, not CRITICAL: the cause is an inference, as the 52% "drop" on 2026-09-11
+  that was really a perp-to-spot transfer showed.
+- **`alert_target_silence`** used `WARNING`. Now HIGH, since
+  `alert_target_dormant` is the one calibrated on his own rhythm and already
+  rates CRITICAL.
+
+Guarded two ways, because a static reader cannot tell a safe variable from an
+unsafe one: every **literal** severity in `alerts.py` must be routable, and
+every function feeding an interpolated `{severity}` slot is exercised over its
+whole domain. `discovery_severity` and the watch-contact severity were checked
+and are fine — the test exists so the next invented word fails in CI rather than
+in the field.
+
+**This is the INFO-flood lesson inverted.** There, an alert buzzed when policy
+meant it not to; here, three alerts about him could not buzz at all — and both
+faults present identically in `data/alerts/latest.json`, as a health flag that
+is wrong for a reason of our own making. **Ask `_severity_of`, not "did an alert
+fire".**
+
+**A wallet can now ARRIVE above the size band, and nothing reported it (fixed
+2026-09-12).** `changes()` returns `[]` with no previous record. That is right
+for agents, sub-accounts, dexes and vaults — announcing a three-week-old
+approval as a transition is the `extraAgents` seeding mistake — and the size
+ratio is the documented exception, because a missed crossing costs the mission
+while a duplicate costs one alert a day against the 24h cooldown.
+
+But that exception was written for an absent **field** on a known wallet. Since
+the roster began feeding the watch, the absent thing can be the whole **record**:
+a wallet promoted to CONFIRMED or PROBABLE arrives already sized, and the early
+return skipped the one field meant to survive it. Measured live:
+`0x5b5d5120…` was promoted PROBABLE on two independent vectors, entered the
+watch on its first read holding **$230,394,643 against his $61,084,699 — 3.77x
+against a band of 1.15** — and `changes` was empty. A wallet worth nearly four
+times his appearing in his world is the plainest migration shape there is, and
+the tripwire built for exactly that said nothing.
+
+A first reading now evaluates the size ratio and nothing else. **The stored 3.77
+will not re-fire**, so that particular crossing stays unannounced in the
+channels; it is written here instead. **When a rule says "an absent X counts as
+below", ask whether X can be absent because the whole RECORD is new.**
+
+**`0x5b5d51203a0f9079f8aeb098a6523a13f298c060` is the roster's first PROBABLE,
+and it is worth reading properly.** Two independent vectors: it **shares the
+target's original funding source**, and an exit amount re-appears as a deposit
+(0.5674 confidence, 249.2h gap, **18 competing deposits** — which is why the
+confidence is only middling). It also scores **0.8293 behavioural with no style
+veto** and was the top stranger in the 2026-09-10 backtest, but that casts no
+vote while the backtest fails, and a high behavioural score on a wallet drawn
+FROM the scan's top scorers is close to circular. It holds $230M, runs two named
+agents, trades `perp` and `xyz`, has a HyperEVM nonce of 18 and no withdrawal
+destinations. It is now under close watch automatically. **No transfer to or
+from the target has ever been observed** — the correlation re-linked it across a
+gap on amount and timing alone.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
