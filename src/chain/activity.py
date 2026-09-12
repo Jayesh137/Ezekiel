@@ -91,12 +91,29 @@ class ActivityCache:
     """Per-(chain, address) readings on disk, refreshed only when stale."""
 
     def __init__(self, path: Path, fetcher=None, *, max_lookups: int = 30,
-                 sleep=time.sleep, now=None):
+                 seconds: float | None = None, sleep=time.sleep, now=None,
+                 clock=time.monotonic):
+        """`max_lookups` bounds CALLS; `seconds` bounds WALL CLOCK.
+
+        Both are needed, and only the first existed until 2026-09-12. One
+        reading is two HTTP requests at a 30s timeout, so the default 30
+        lookups is up to half an hour — in a `transfer_graph` step that runs
+        in 64-202s when the hosts are healthy. It blew a 15-minute JOB ceiling
+        and then a 6-minute STEP cap on consecutive runs, taking the graph,
+        roster, accounting, dormancy, identity and agents down with it.
+
+        `seconds=None` keeps the old unbounded behaviour for callers that
+        genuinely want it (and for `max_lookups=0`, which spends nothing).
+        """
         self.path = Path(path)
         self._fetch = fetcher or fetch_activity
         self.max_lookups = int(max_lookups)
+        self.seconds = None if seconds is None else float(seconds)
         self.lookups = 0
+        self.out_of_time = False
         self._sleep = sleep
+        self._clock = clock
+        self._started = clock()
         self._now = now or (lambda: datetime.now(UTC))
         try:
             self._table = json.loads(self.path.read_text())
@@ -128,6 +145,12 @@ class ActivityCache:
             return entry
         if self.lookups >= self.max_lookups:
             return entry  # stale is better than nothing, and is reported as such
+        if self.seconds is not None and (self._clock() - self._started) >= self.seconds:
+            # Out of time. A reading we did not take is None (or a stale entry),
+            # never a fabricated one — `unmeasured` is a first-class state here
+            # and still alerts, so stopping early is safe in the right direction.
+            self.out_of_time = True
+            return entry
         self.lookups += 1
         got = self._fetch(address, chain)
         self._sleep(0.35)

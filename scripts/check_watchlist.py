@@ -57,6 +57,11 @@ SWEEP_CALLS = 60
 # contact is the one finding here worth waking someone for, so it is worth a
 # call each to know whether the address is a person or an exchange.
 CONTACT_READINGS = 8
+# ...and a wall-clock bound on them. Eight readings is sixteen HTTP requests at
+# a 30s timeout, which is eight minutes in a job whose whole value is running
+# every ten. An unmeasured counterparty still alerts, so stopping early errs
+# towards telling the operator rather than away from it.
+CONTACT_SECONDS = 60.0
 
 
 def target_world(config: dict) -> dict:
@@ -74,6 +79,7 @@ def target_world(config: dict) -> dict:
     try:
         from src.linkage import (
             ACTIVITY_LOOKUPS_PER_RUN,
+            ACTIVITY_SECONDS_PER_RUN,
             activity_cache,
             activity_exclusions,
             get_outbound_addresses,
@@ -82,7 +88,8 @@ def target_world(config: dict) -> dict:
         destinations = get_outbound_addresses(target, config)
         excluded, _pending = activity_exclusions(
             destinations, outbound_chains(target),
-            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN))
+            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN,
+                           seconds=ACTIVITY_SECONDS_PER_RUN))
         for a in destinations - excluded:
             world.setdefault(a, "a private deposit address of his")
     except Exception as exc:                          # noqa: BLE001
@@ -262,7 +269,8 @@ def busy_flags(hits: list[dict]) -> dict:
         return out
     try:
         cache = ActivityCache(DATA_DIR / "labels" / "address_activity.json",
-                              max_lookups=CONTACT_READINGS)
+                              max_lookups=CONTACT_READINGS,
+                              seconds=CONTACT_SECONDS)
     except Exception as exc:                          # noqa: BLE001
         print(f"[watchlist] activity cache unavailable ({type(exc).__name__}) — "
               f"contacts cannot be checked against the whole chain")

@@ -52,6 +52,7 @@ jobs:
     # roster CONFIRMED/PROBABLE too (up to watchlist.MAX_WATCHED = 6).
     timeout-minutes: 12
     env:
+      PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}

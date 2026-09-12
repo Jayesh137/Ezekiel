@@ -2400,6 +2400,16 @@ def fan_verdicts(fan_services: dict, readings: dict) -> tuple[dict, set]:
 # backlog drains over a few runs and the steady state costs nothing.
 ACTIVITY_LOOKUPS_PER_RUN = 30
 
+# ...and a WALL CLOCK bound on them, which is what was missing. One reading is
+# two HTTP requests at a 30s timeout, so 30 lookups is up to half an hour in a
+# step that takes 64-202s when Blockscout is healthy. Measured 2026-09-12: this
+# phase blew a 15-minute JOB ceiling and then a 6-minute STEP cap on
+# consecutive runs, and a killed step takes the graph, roster, accounting,
+# dormancy, identity and agents with it. An address left unmeasured is already
+# a first-class state here — it is never treated as quiet — so stopping early
+# is safe in the right direction, and the backlog drains next run.
+ACTIVITY_SECONDS_PER_RUN = 120.0
+
 
 def persons_on_record() -> set:
     """Addresses already measured as quiet EOAs, from the activity cache."""
@@ -2523,7 +2533,8 @@ def verify_fan_services(edges: list[dict], known_services: set, cfg: dict,
                 best[a] = (usd, chain)
 
     cache = cache or ActivityCache(DATA_DIR / "labels" / "address_activity.json",
-                                   max_lookups=ACTIVITY_LOOKUPS_PER_RUN)
+                                   max_lookups=ACTIVITY_LOOKUPS_PER_RUN,
+                                   seconds=ACTIVITY_SECONDS_PER_RUN)
     readings = {a: cache.get(a, best[a][1]) for a in fan if a in best}
     busy, persons = fan_verdicts(fan, readings)
     unmeasured = [a for a in fan if readings.get(a) is None]

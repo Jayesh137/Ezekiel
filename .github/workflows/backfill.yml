@@ -13,6 +13,12 @@ concurrency:
 jobs:
   backfill:
     runs-on: ubuntu-latest
+    # Python block-buffers stdout into a pipe, so a step killed by a timeout
+    # loses everything it printed and the log reads as if it never got going.
+    # That cost a diagnosis on 2026-09-12: the graph step looked like it hung
+    # before its first line when the whole file phase measures 18s.
+    env:
+      PYTHONUNBUFFERED: "1"
     # src/backfill.py alone runs 48-50 minutes on this repo (measured across
     # every historical run), so 60 is a genuine ceiling, not a generous one.
     # The multi-chain sweep deliberately does NOT run here - see

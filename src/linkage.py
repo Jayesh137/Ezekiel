@@ -360,11 +360,16 @@ def high_fanin_addresses(threshold: int = 25) -> set:
     return {a for a, s in senders.items() if len(s) >= threshold}
 
 
-def activity_cache(max_lookups: int = 0):
-    """The global-activity cache, resolved against DATA_DIR at call time."""
+def activity_cache(max_lookups: int = 0, seconds: float | None = None):
+    """The global-activity cache, resolved against DATA_DIR at call time.
+
+    `seconds` bounds wall clock as well as calls. A reading is two HTTP
+    requests at a 30s timeout, so any caller that actually spends lookups
+    should pass one — see chain.activity.ActivityCache.
+    """
     from src.chain.activity import ActivityCache
     return ActivityCache(DATA_DIR / "labels" / "address_activity.json",
-                         max_lookups=max_lookups)
+                         max_lookups=max_lookups, seconds=seconds)
 
 
 def outbound_chains(wallet: str) -> dict:
@@ -414,6 +419,11 @@ def activity_exclusions(addresses, chain_of: dict, cache) -> tuple[set, list]:
 # Readings per run for the target's own destinations. They are the only
 # addresses a shared destination can ever be, so the cache converges fast.
 ACTIVITY_LOOKUPS_PER_RUN = 20
+# ...and a wall-clock bound. One reading is two HTTP requests at a 30s timeout,
+# so twenty is up to twenty minutes with no time budget at all — see
+# chain.activity.ActivityCache, and transfer_graph's ACTIVITY_SECONDS_PER_RUN
+# for the run this actually killed.
+ACTIVITY_SECONDS_PER_RUN = 90.0
 
 
 def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
@@ -461,7 +471,8 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     try:
         busy, pending = activity_exclusions(
             target_out, outbound_chains(target),
-            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN))
+            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN,
+                           seconds=ACTIVITY_SECONDS_PER_RUN))
     except Exception as exc:                          # noqa: BLE001
         print(f"[linkage] activity readings unavailable ({type(exc).__name__}: "
               f"{exc}) — every shared destination treated as unmeasured")
