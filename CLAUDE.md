@@ -546,9 +546,10 @@ gap on amount and timing alone.
 
 **The stored graph outgrew GitHub, so every trace run lost its work (fixed
 2026-09-12).** `data/transfer_graph/latest.json` reached **107 MB against a hard
-limit of 100 MiB**, and from **14:02 UTC every "Trace Fund Flows" run computed
+limit of 100 MiB**, and from **09:27 UTC every "Trace Fund Flows" run computed
 the graph and then had its push declined by the pre-receive hook** — failing the
-whole job, three runs in a row. Discovery is the only vector that reaches an
+whole job — **12 consecutive runs over six hours**, the last success at
+08:52. Discovery is the only vector that reaches an
 address nobody has seen, and it had stopped being able to save anything.
 
 Note the units: the limit is 100 **MiB** = 104.86 MB. The version sitting on

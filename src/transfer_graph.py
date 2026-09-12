@@ -670,7 +670,7 @@ def find_split_correlation(exit_amount: float, inbound: list[dict],
 # earliest 15 of a node's edges, taken from the in-memory graph before the save)
 # and the dashboard (a node's edges newest-first, 40 shown). The file was
 # carrying 212,457 edges to serve a maximum of 40, reached 107 MB, and GitHub
-# refuses anything over 100 MiB — so from 2026-09-12 14:02 UTC every trace run
+# refuses anything over 100 MiB — so from 2026-09-12 09:27 UTC every trace run
 # computed the graph and lost it at the push, the pre-receive hook declining the
 # whole job. 200 is five times what any consumer asks for and takes the live
 # file to 8.4 MB.

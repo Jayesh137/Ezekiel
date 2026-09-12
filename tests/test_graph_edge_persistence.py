@@ -2,7 +2,7 @@
 """The stored graph must fit in a git push, without lying about what it holds.
 
 `data/transfer_graph/latest.json` reached 107 MB and GitHub rejects any file over
-100 MiB, so from 2026-09-12 14:02 UTC EVERY "Trace Fund Flows" run computed the
+100 MiB, so from 2026-09-12 09:27 UTC EVERY "Trace Fund Flows" run computed the
 graph and then threw it away at the push step — the pre-receive hook declined it
 and the whole job failed. Discovery is the only vector that reaches an address
 nobody has seen, and it had stopped being able to save its work.
