@@ -1,13 +1,14 @@
 {
-  "computed_at": "2026-09-12T08:29:15.854847+00:00",
+  "computed_at": "2026-09-12T09:03:32.677304+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 349,
+  "wallet_count": 348,
   "behavioural_counts_as_a_vector": false,
   "tier_counts": {
     "CONFIRMED": 2,
-    "POSSIBLE": 129,
-    "WATCH": 50,
-    "INFRASTRUCTURE": 168
+    "PROBABLE": 1,
+    "POSSIBLE": 144,
+    "WATCH": 49,
+    "INFRASTRUCTURE": 152
   },
   "wallets": [
     {
@@ -89,6 +90,48 @@
       "known_self": false,
       "vector_count": 2,
       "tier": "CONFIRMED"
+    },
+    {
+      "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
+      "vectors": [
+        "correlation",
+        "linkage"
+      ],
+      "confidence": 0.4291,
+      "classification": "POSSIBLE_LINKED_WALLET",
+      "reasons": [
+        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
+        "Shares the target's original funding source",
+        "Exit amount re-appears as a deposit (single amount, 57% match confidence)",
+        "Trades like the target (behavioural similarity 83%)",
+        "Actively trading on Hyperliquid after receiving funds"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 1,
+        "chains": [
+          "inferred"
+        ],
+        "correlation_confidence": 0.5674,
+        "correlation_gap_hours": 249.2,
+        "competing_deposits": 18,
+        "behavioural_score": 0.8293,
+        "behavioural_tier": "WEAK_LEAD",
+        "style_vetoes": [],
+        "hl_role": "user",
+        "hl_account_value": 113966783.368841,
+        "hl_birth_ms": 1740612360037,
+        "frontend_agent": "0xb0e57c727bf855e6e0d0fc0bdd72d71f65b06b9c"
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 2,
+      "tier": "PROBABLE"
     },
     {
       "wallet": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
@@ -196,12 +239,12 @@
       "vectors": [
         "correlation"
       ],
-      "confidence": 0.2928,
+      "confidence": 0.2516,
       "classification": "CORRELATION_LEAD",
       "reasons": [
         "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
         "Began depositing/trading 51.4h after a target exit",
-        "Exit amount re-appears as a deposit (single amount, 95% match confidence)"
+        "Exit amount re-appears as a deposit (single amount, 68% match confidence)"
       ],
       "evidence": {
         "service_reason": null,
@@ -214,9 +257,13 @@
         "chains": [
           "inferred"
         ],
-        "correlation_confidence": 0.9523,
+        "correlation_confidence": 0.6773,
         "correlation_gap_hours": 51.4,
-        "competing_deposits": 0
+        "competing_deposits": 11,
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1752707152489,
+        "frontend_agent": "0x858bc03ac2fc93492753bfb29fae84482b962058"
       },
       "is_service": false,
       "known_self": false,
@@ -389,6 +436,41 @@
       "tier": "POSSIBLE"
     },
     {
+      "wallet": "0xc745044ae202b60d3ef5ee89a5f6738011651464",
+      "vectors": [
+        "correlation"
+      ],
+      "confidence": 0.1133,
+      "classification": "CORRELATION_LEAD",
+      "reasons": [
+        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
+        "Exit amount re-appears as a deposit (single amount, 76% match confidence)"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 1,
+        "chains": [
+          "inferred"
+        ],
+        "correlation_confidence": 0.7556,
+        "correlation_gap_hours": 250.9,
+        "competing_deposits": 0,
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1775082360007,
+        "frontend_agent": "0xdf40d3d3cfaaf897187d603d01a2fc09f2fbb72b"
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
       "wallet": "0x4c78a97cef589b01bb91dbf893fffa14243d2444",
       "vectors": [
         "transfer"
@@ -522,7 +604,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (11 separate movements)",
+        "Repeated transfers (14 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -530,7 +612,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 11
+          "edge_count": 14
         },
         "depth": 2,
         "chains": [
@@ -578,30 +660,34 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xc745044ae202b60d3ef5ee89a5f6738011651464",
+      "wallet": "0x69368941b012bedf2aed194a2cd1f11eecc0a162",
       "vectors": [
-        "correlation"
+        "transfer"
       ],
-      "confidence": 0.1092,
-      "classification": "CORRELATION_LEAD",
+      "confidence": 0.1001,
+      "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
-        "Exit amount re-appears as a deposit (single amount, 73% match confidence)"
+        "Repeated transfers (115 separate movements)",
+        "Actively trading on Hyperliquid after receiving funds",
+        "Last movement 163 days ago \u2014 transfer evidence aged to 80%",
+        "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 115
         },
-        "depth": 1,
+        "depth": 3,
         "chains": [
-          "inferred"
+          "arbitrum",
+          "ethereum",
+          "polygon"
         ],
-        "correlation_confidence": 0.7281,
-        "correlation_gap_hours": 204.6,
-        "competing_deposits": 1
+        "hl_role": "user",
+        "hl_account_value": 0.009021,
+        "hl_birth_ms": 1739402040055
       },
       "is_service": false,
       "known_self": false,
@@ -734,7 +820,10 @@
           "arbitrum",
           "ethereum",
           "polygon"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1728515400100
       },
       "is_service": false,
       "known_self": false,
@@ -806,6 +895,39 @@
       "tier": "POSSIBLE"
     },
     {
+      "wallet": "0x6a5dbf2fb5206ec8192620810c3edb6d5e62b188",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.065,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (925 separate movements)",
+        "Last movement 138 days ago \u2014 transfer evidence aged to 87%",
+        "Reached at 3 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 925
+        },
+        "depth": 3,
+        "chains": [
+          "arbitrum",
+          "ethereum"
+        ],
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1721254560095
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
       "wallet": "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43",
       "vectors": [
         "transfer"
@@ -813,7 +935,7 @@
       "confidence": 0.0603,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (6 separate movements)",
+        "Repeated transfers (8 separate movements)",
         "Last movement 259 days ago \u2014 transfer evidence aged to 54%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
@@ -822,7 +944,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 6
+          "edge_count": 8
         },
         "depth": 2,
         "chains": [
@@ -870,64 +992,30 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x97caca78ac2a94c67643d07843f85afaa44a3ea5",
+      "wallet": "0xfab8c9cd1298b3abb5cf3fae4b48a99b9356eb71",
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.0525,
+      "confidence": 0.0555,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (3 separate movements)",
-        "Reached at 4 hops from target \u2014 confidence discounted"
+        "Repeated transfers (512 separate movements)",
+        "Last movement 185 days ago \u2014 transfer evidence aged to 74%",
+        "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 3
+          "edge_count": 512
         },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x27db63bc2ea03c1e6dc171ce9ef38987c3a5a5c3",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0519,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (78 separate movements)",
-        "Last movement 94 days ago \u2014 transfer evidence aged to 99%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 78
-        },
-        "depth": 4,
+        "depth": 3,
         "chains": [
           "arbitrum",
-          "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 63544.202221,
-        "hl_birth_ms": 1772057280073,
-        "frontend_agent": "0x9a8cd14e67916ad07af01ddc03f0b9454897b297"
+          "ethereum",
+          "polygon"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -935,16 +1023,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x69368941b012bedf2aed194a2cd1f11eecc0a162",
+      "wallet": "0xfeb620b14a9c3683cecb9097802af9c32e51c701",
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.0491,
+      "confidence": 0.0511,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (6 separate movements)",
-        "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 308 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (8 separate movements)",
+        "Last movement 100 days ago \u2014 transfer evidence aged to 97%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -952,15 +1039,12 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 6
+          "edge_count": 8
         },
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.009021,
-        "hl_birth_ms": 1739402040055
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1071,7 +1155,7 @@
       "confidence": 0.045,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (145 separate movements)",
+        "Repeated transfers (148 separate movements)",
         "Last movement 447 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
@@ -1080,7 +1164,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 145
+          "edge_count": 148
         },
         "depth": 2,
         "chains": [
@@ -1321,15 +1405,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x6faec2944071b2a5ebfd1b08f43f29597aad8ca1",
+      "wallet": "0x5e9b7676b36f5de6ce31eef1fa4a23598af8eddc",
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.0416,
+      "confidence": 0.0385,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (6 separate movements)",
-        "Last movement 166 days ago \u2014 transfer evidence aged to 79%",
+        "Repeated transfers (5 separate movements)",
+        "Last movement 187 days ago \u2014 transfer evidence aged to 73%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1337,144 +1421,13 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 6
+          "edge_count": 5
         },
         "depth": 4,
         "chains": [
           "arbitrum",
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xd7154f006cfeba307540b01da84a84619f062af7",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0415,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (3 separate movements)",
-        "Last movement 166 days ago \u2014 transfer evidence aged to 79%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 3
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x32f17eb0c4ba27cde5b27b6acf86d8c198ec6a62",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0394,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (4 separate movements)",
-        "Last movement 181 days ago \u2014 transfer evidence aged to 75%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 4
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xc7bbec68d12a0d1830360f8ec58fa599ba1b0e9b",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0375,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (125 separate movements)",
-        "Last movement 195 days ago \u2014 transfer evidence aged to 71%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 125
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x80fa0866bbbab5c2aa0293cbdb0aaefcdec536ca",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0311,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (13 separate movements)",
-        "Last movement 239 days ago \u2014 transfer evidence aged to 59%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 13
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1514,111 +1467,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x43a0667b6f5b90e012a9900cea3361f6164e46fa",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0287,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (4 separate movements)",
-        "Last movement 255 days ago \u2014 transfer evidence aged to 55%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 4
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x096d20b5d3acd52b16f0cd716ba571bbb3959052",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.028,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 526 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 2
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.47261,
-        "hl_birth_ms": 1758753240006
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x555ce236c0220695b68341bc48c68d52210cc35b",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0265,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (26 separate movements)",
-        "Last movement 271 days ago \u2014 transfer evidence aged to 51%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 26
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": 1738794600074
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x097fa25193f17c52a2f825ad593c0b9dd5b0e915",
+      "wallet": "0x004375dff511095cc5a197a54140a24efef3a416",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.021,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (4 separate movements)",
-        "Last movement 374 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (13 separate movements)",
+        "Last movement 492 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1626,15 +1483,12 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 4
+          "edge_count": 13
         },
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1642,167 +1496,7 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x10c1858ab49bd1d0b6cfb02d447ec3de03d188f8",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.021,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (5 separate movements)",
-        "Last movement 402 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 5
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x13fbef50176b4fb0784368c25e403e79fc2f7f0a",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.021,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (7 separate movements)",
-        "Last movement 341 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 7
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x33a4f7f492b80424e71d12f40b532a7558c87d5d",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.021,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (12 separate movements)",
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 12
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x459d98777739571b6b1296214beb958b3daea935",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.021,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (3 separate movements)",
-        "Last movement 436 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 3
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x60594a405d53811d3bc4766596efd80fd545a270",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.021,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (14 separate movements)",
-        "Last movement 683 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 14
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x6a5dbf2fb5206ec8192620810c3edb6d5e62b188",
+      "wallet": "0x03567a339b9586e3f0b161f2df6ecdfa43a6921b",
       "vectors": [
         "transfer"
       ],
@@ -1810,7 +1504,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (6 separate movements)",
-        "Last movement 338 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 1805 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1823,10 +1517,7 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": 1721254560095
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1834,7 +1525,65 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x7a4ec6265263cd0c8f538300e8a2f8e67972fa81",
+      "wallet": "0x0681d8db095565fe8a346fa0277bffde9c0edbbf",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (12 separate movements)",
+        "Last movement 1942 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 12
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (26 separate movements)",
+        "Last movement 682 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 26
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x2942d95bc39b870e13f55db8fe44adc7c20d390f",
       "vectors": [
         "transfer"
       ],
@@ -1842,7 +1591,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (3 separate movements)",
-        "Last movement 1082 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 1957 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1851,6 +1600,93 @@
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
           "edge_count": 3
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x2b5634c42055806a59e9107ed44d43c426e58258",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (11 separate movements)",
+        "Last movement 2209 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 11
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x3041cbd36888becc7bbcbc0045e3b1f144466f5f",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (9 separate movements)",
+        "Last movement 684 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 9
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x397ff1542f962076d0bfe58ea045ffa2d347aca0",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (18 separate movements)",
+        "Last movement 678 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 18
         },
         "depth": 4,
         "chains": [
@@ -1866,15 +1702,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x7e683f9f70c723e5778be5ba871e188df2aef0ae",
+      "wallet": "0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.021,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (13 separate movements)",
-        "Last movement 1082 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (9 separate movements)",
+        "Last movement 1982 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1882,15 +1718,12 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 13
+          "edge_count": 9
         },
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": 1728515520100
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1898,39 +1731,7 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x96f8d14801cf7377afd6d78342f5ce58235be265",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.021,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (3 separate movements)",
-        "Last movement 374 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 3
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x9e5a44f6984d9b90a04deab5d24630b9b502cc56",
+      "wallet": "0x46340b20830761efd32832a74d7169b29feb9758",
       "vectors": [
         "transfer"
       ],
@@ -1938,7 +1739,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (5 separate movements)",
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2210 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1951,10 +1752,7 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1962,15 +1760,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xb638c146f057b9f37c5f5d85963a30951ab1bfec",
+      "wallet": "0x50770e3a529475509880f0da1b0b67a2e03cbfc0",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.021,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (4 separate movements)",
-        "Last movement 338 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (6 separate movements)",
+        "Last movement 1886 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1978,15 +1776,12 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 4
+          "edge_count": 6
         },
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -1994,7 +1789,7 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xc5b602c84b3e028782e9ccb1227a255dd263abcd",
+      "wallet": "0x514e9525fa9681b651d6b83a57577de7f9ad8a9a",
       "vectors": [
         "transfer"
       ],
@@ -2002,7 +1797,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (7 separate movements)",
-        "Last movement 341 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 1716 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2015,10 +1810,7 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2026,7 +1818,36 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xd59f8585ef4616417f21db0cc8741e3f367fb35f",
+      "wallet": "0x564286362092d8e7936f0549571a803b203aaced",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (19 separate movements)",
+        "Last movement 1942 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 19
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x60e40d6bc9dc9723301517db8bf13004dec93d49",
       "vectors": [
         "transfer"
       ],
@@ -2034,7 +1855,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (4 separate movements)",
-        "Last movement 467 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 1805 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2047,10 +1868,7 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2058,15 +1876,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xddf2b130c82d9fcdc5c7ca2e78f7fe2a5a0df6fc",
+      "wallet": "0x66e33d2605c5fb25ebb7cd7528e7997b0afa55e8",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.021,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (10 separate movements)",
-        "Last movement 1082 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (6 separate movements)",
+        "Last movement 2064 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2074,7 +1892,297 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 10
+          "edge_count": 6
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x675a8fa1cf8a9c3bf2c49ff14fdcaa01b11dd842",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (3 separate movements)",
+        "Last movement 2063 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 3
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x7adc457434e8c57737ad2ace768a863865f2aabc",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (21 separate movements)",
+        "Last movement 646 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 21
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x8907067a8e18c34334431692b886e7b650dc7c94",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (3 separate movements)",
+        "Last movement 2208 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 3
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x8faf97b6692f3058f36d99373407ad9e573a774c",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (4 separate movements)",
+        "Last movement 1629 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 4
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x97c4adc5d28a86f9470c70dd91dc6cc2f20d2d4d",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (9 separate movements)",
+        "Last movement 594 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 9
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (7 separate movements)",
+        "Last movement 682 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 7
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xa5407eae9ba41422680e2e00537571bcc53efbfd",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (9 separate movements)",
+        "Last movement 1911 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 9
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xa55c5e51ed5af6e024286613721a18eb02f0c55d",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (21 separate movements)",
+        "Last movement 1495 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 21
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xa7d4b4c73ebc2fc9f33d03ff947ecc669090f5c0",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (4 separate movements)",
+        "Last movement 2094 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 4
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (68 separate movements)",
+        "Last movement 360 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 68
         },
         "depth": 4,
         "chains": [
@@ -2090,15 +2198,15 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xf98dd82d0c3eba0e746020d9a28b17bc091b087a",
+      "wallet": "0xc9cb53b48a2f3a9e75982685644c1870f1405ccb",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.021,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (13 separate movements)",
-        "Last movement 374 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (3 separate movements)",
+        "Last movement 800 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2106,7 +2214,299 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 13
+          "edge_count": 3
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xca19cc0459ef7b49f09ddee9f2ed256653053e77",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (3 separate movements)",
+        "Last movement 2094 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 3
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xd551234ae421e3bcba99a0da6d736074f22192ff",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (19 separate movements)",
+        "Last movement 1942 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 19
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xd60dcdee1de7c0f64a461d45c10b636a15abcf58",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (3 separate movements)",
+        "Last movement 2058 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 3
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xdee128b57dd78e41a5927b4f0646a0c15f0dd156",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (6 separate movements)",
+        "Last movement 2054 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 6
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xe1573b9d29e2183b1af0e743dc2754979a40d237",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (4 separate movements)",
+        "Last movement 814 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 4
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xed5b940de6f21fcc6d1168cb78590f9ab6cd2ba6",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (11 separate movements)",
+        "Last movement 1654 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 11
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xfd0a40bc83c5fae4203dec7e5929b446b07d1c76",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.021,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (5 separate movements)",
+        "Last movement 727 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 5
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x008a0764d6d823eb33aa36cf224ef97bbf447340",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 1960 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 2
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x030061e77059c65c882f27c966943966e5b47f9f",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2095 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x0379da7a5895d13037b6937b109fa8607a659adf",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2062 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
         },
         "depth": 4,
         "chains": [
@@ -2150,70 +2550,6 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x07b5c698f40e01d0c98af09612320bf9491bdb8b",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 327 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x0a591c55351ae0b214f80131266309270634de88",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": 1741214040258
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
       "wallet": "0x0a80ae587ffb58dbc84f60a64fdcc26ffa0dd794",
       "vectors": [
         "transfer"
@@ -2233,102 +2569,6 @@
           "edge_count": 1
         },
         "depth": 2,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x0edd508a5aa578ddae9bc4995d4811d100728017",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 875 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x0f1b35a2f9e40cf183b6a2bfe8402cdf09f96730",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 106 days ago \u2014 transfer evidence aged to 96%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x103c676d7e4adc1273e7c7c9da7ed9c22b61f4c8",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 389 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
         "chains": [
           "ethereum"
         ],
@@ -2374,45 +2614,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x19206f03068ec1fa140380a3a9ec8cee2a15aeea",
+      "wallet": "0x190f5cd36c49e4d1b67166356aa9ac788f7067a2",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 2
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": 1707345900434
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x19ef7888bb6d61527d45b4d06de2fa9129b34bbb",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2071 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -2426,10 +2635,7 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2469,14 +2675,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x1e9b7ed825c0acb6bcf0e2ab53c99dc32b48bd29",
+      "wallet": "0x25bc339170adbff2b7b9ede682072577fa9d96e8",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2075 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -2490,10 +2696,35 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 2248.153793,
-        "hl_birth_ms": 1718841240060
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x25f39b584b8f8b323c08174eb6ff1959b7d03767",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2094 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 2
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2533,14 +2764,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x2ace4e9d7fe2d52b64d9ec64e120f149583d327b",
+      "wallet": "0x27b3d082f448976820f709b14bf03db98f6f2a0b",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2061 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -2554,10 +2785,36 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x2b1c7ad25b6aa5a4369d4c70f33bd9a24c10cc8e",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2226 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2590,6 +2847,35 @@
         "hl_role": "missing",
         "hl_account_value": 0.0,
         "hl_birth_ms": null
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x323e054a6dd8762011d60993f51e23e2096b221f",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2066 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2659,78 +2945,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x43ee35d5542f5b826fa92832bd97caff153675a8",
+      "wallet": "0x39aa39c021dfbae8fac545936693ac917d5e7563",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 687 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x43f991ea47ded5a9e4bf394009c8b5f10d3647bd",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 341 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x443eb1f18cf8fd345df376078c72e00b27e3f6a3",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2240 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2742,12 +2964,8 @@
         },
         "depth": 4,
         "chains": [
-          "arbitrum",
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2755,45 +2973,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x50c4e75a512f2a14a7b304787adf79c4531a5909",
+      "wallet": "0x3a8f476dd4172229961f4116985484b5405f612a",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x527f86e30aa81668eee773c3f31d33b8bb86044a",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 338 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2216 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -2807,10 +2994,152 @@
         "depth": 4,
         "chains": [
           "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x3c2982ca260e870eee70c423818010dfef212659",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2091 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x3f8374f67c7dd4c6bbf407c13d6819676847da0c",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2084 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x43efbe6a46973ae480256ce46d7a3b4dff251460",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2210 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x4936526a0062a7823e216f251ca99f9e380a1906",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2058 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x536ac5e92027e0179d5bccca75e613ba0c5eb60a",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2209 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -2850,72 +3179,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x54e6feef614946c0359d4937be5ee22ecdefa43e",
+      "wallet": "0x59a5208b32e627891c389ebafc644145224006e8",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x580ef0886646fb1563667d4397980d7571537c3d",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1080 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x5bf64c6bbe1a0f3342b499c7f26b3fa3ead0cb0d",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2210 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2967,22 +3238,23 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x5c824a5a5b68dc3ab57f89791b5ba9ad9b3cc870",
+      "wallet": "0x5da19063b9c431cf7ade98384d029a7128947c3a",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
+        "Last movement 2208 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 2
+          "edge_count": 1
         },
         "depth": 4,
         "chains": [
@@ -2995,14 +3267,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x5fd131a3c3a19750cc64d1dacefcd926a45d586c",
+      "wallet": "0x68114744a3c5e364b12c154300693642491696a7",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 194 days ago \u2014 transfer evidence aged to 71%",
+        "Last movement 2067 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3056,110 +3328,22 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x68d4ba66a8bf84b58ca93994648c495fbfd3c76f",
+      "wallet": "0x73139212d0f62c6ddb6514c6a55c3778eb798d72",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 133 days ago \u2014 transfer evidence aged to 88%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+        "Last movement 2000 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x6d3b8508d42b7c29fdc890c4038d2a12b341c2d7",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1082 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x6e8ae1ac54a297d09b5f71b47e5fc5c83415b076",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 500 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0x71a717fc34504aecaf916d01018e300839ac77e6",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 338 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 2
         },
         "depth": 4,
         "chains": [
@@ -3236,14 +3420,42 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x7914351b05a7c45ddc33974f05c99bce3b01c202",
+      "wallet": "0x74de5d4fcbf63e00296fd95d33236b9794016631",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 327 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 325 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 2
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0x79c88866247a3626d45011662efa093535554b34",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2053 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3265,14 +3477,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x7a2ed8e1b52a26f654e66e02667ce03ffdda9e4c",
+      "wallet": "0x7c3cd2fbb59eaa0ac250389fb21ffc6e158ff8e5",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2044 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3294,23 +3506,22 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x7c01aa3783577e15fd7e272443d44b92d5b21056",
+      "wallet": "0x7e72500397dc243673e709cd7130de1f1efb456f",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 394 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+        "Last movement 1889 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 2
         },
         "depth": 4,
         "chains": [
@@ -3355,22 +3566,23 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x80b0dcca24d9f31b3b8fb661442fe38c40a62261",
+      "wallet": "0x8463c03c0c57ff19fa8b431e0d3a34e2df89888e",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
+        "Last movement 2067 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 2
+          "edge_count": 1
         },
         "depth": 4,
         "chains": [
@@ -3415,21 +3627,23 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x876002653144939e97b02264ff342b0fd349a056",
+      "wallet": "0x88ff79eb2bc5850f27315415da8685282c7610f9",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Reached at 4 hops from target \u2014 confidence discounted"
+        "Last movement 2095 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 2
+          "edge_count": 1
         },
         "depth": 4,
         "chains": [
@@ -3442,23 +3656,22 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x897d267d159e7d1bf60b2399b4a89fdf43eea4d6",
+      "wallet": "0x8fd4106fb3a206c42e3535050de3a22f4c1a05bd",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 252 days ago \u2014 transfer evidence aged to 56%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+        "Last movement 2208 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 2
         },
         "depth": 4,
         "chains": [
@@ -3535,43 +3748,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0x966c0c73aca434158fabdb9628277a8725c0337d",
+      "wallet": "0x963900b776365feffe3a7cb52658e60986c7c7f9",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1104 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xa6f90c49aeef0e81ef4ef363eadf8fcac84c7041",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 687 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2086 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3593,14 +3777,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xb32a33ad9d9d24910e573ad79e6f85d353339d44",
+      "wallet": "0xa249ee8255df0aa00a15262b16bca3efd66c3e4c",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 556 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2095 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3622,14 +3806,72 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xbeed01dc7e6a8d23bf3bdad1aed5b19bb6c5a974",
+      "wallet": "0xa7028040e766c656a57fe2dfb4e83e1ab1bc3daa",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 954 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2208 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xa9ec5c3b5cf51c48c4feb1c60831efb0849dc799",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2094 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xad28be2059e305756124ca716164a76c71d9b93f",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2217 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3650,100 +3892,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xc0ee0cf2ed2a0a7842c4b40331e78bbf3a02c46f",
+      "wallet": "0xae461ca67b15dc8dc81ce7615e0320da1a9ab8d5",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 467 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xcf3fd91f500f143c8172ac9519445ef19eaf3890",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xcf5432ecaedf080c9049b9a2962019367cf05505",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 327 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
-      "wallet": "0xd3b375e4cf5517829748af1accbe1b4ad1fad169",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 1076 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2088 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3764,14 +3920,43 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xd69b31c3225728cc57ddaf9be532a4ee1620be51",
+      "wallet": "0xb6c057591e073249f2d9d88ba59a46cfc9b59edb",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 1710 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2219 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xb83ab1f44c2a60104bc4922d23f5fc08eeed2e67",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2050 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3783,7 +3968,210 @@
         },
         "depth": 4,
         "chains": [
-          "polygon"
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xb936525a77ba0529f6c0feab28f8b0ae6c0398c7",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2095 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xbbc81d23ea2c3ec7e56d39296f0cbb648873a5d3",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2219 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xbd387a071d586408677ae74cb5e5756293227636",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2183 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xc08b1fccd92afd1a0c35f8548cd3abdc3f0b3e62",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2097 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xd1602f68cc7c4c7b59d686243ea35a9c73b0c6a2",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2053 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xd3cf4e98e1e432b3d6ae42ae406a78f2ac8293d0",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2066 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xd47140f6ab73f6d6b6675fb1610bb5e9b5d96fe5",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2089 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
         ]
       },
       "is_service": false,
@@ -3799,7 +4187,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 340 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 341 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3854,14 +4242,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xe2b45518d664bfec6a547138732217a60c2dc302",
+      "wallet": "0xe069cb01d06ba617bcdf789bf2ff0d5e5ca20c71",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 327 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2083 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3883,14 +4271,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xe3d4034889d50b9bc8687575f9bd14dd1c5d12d4",
+      "wallet": "0xeb21209ae4c2c9ff2a86aca31e123764a3b6bc06",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 556 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2240 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -3912,14 +4300,14 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xe4032633726549c64988ceb9a9f5333a4666a960",
+      "wallet": "0xebd12620e29dc6c452db7b96e1f190f3ee02bde8",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 796 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 2112 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3931,7 +4319,6 @@
         },
         "depth": 4,
         "chains": [
-          "arbitrum",
           "ethereum"
         ]
       },
@@ -3941,23 +4328,22 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xee3ef747c81f3b1deec7423c225a92ce9b6c3004",
+      "wallet": "0xeda2384794841d5bfb0a73c9cac8df52466dc67f",
       "vectors": [
         "transfer"
       ],
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 327 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+        "Last movement 2210 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
         "service_reason": null,
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 2
         },
         "depth": 4,
         "chains": [
@@ -4032,34 +4418,6 @@
       "tier": "POSSIBLE"
     },
     {
-      "wallet": "0xf8956f4871f19984e66083cf01128928e72163f6",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE"
-    },
-    {
       "wallet": "0xfb74767c1ce1aada0a0e114441173b57f8c1571b",
       "vectors": [
         "transfer"
@@ -4110,6 +4468,35 @@
         "depth": 2,
         "chains": [
           "polygon"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE"
+    },
+    {
+      "wallet": "0xffde6d98d45476e694ca9960e44769321fe0177c",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 2201 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 4 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1
+        },
+        "depth": 4,
+        "chains": [
+          "ethereum"
         ]
       },
       "is_service": false,
@@ -4323,28 +4710,6 @@
       "tier": "WATCH"
     },
     {
-      "wallet": "0x523852be2db1a76a0e088ecbff32e849544054e5",
-      "vectors": [],
-      "confidence": 0.0,
-      "classification": null,
-      "reasons": [],
-      "evidence": {
-        "behavioural_score": 0.4172,
-        "behavioural_tier": "BACKGROUND",
-        "style_vetoes": [
-          "Decision frequency 23x apart (0.75 vs 17.00 position episodes/day)"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 93224.2625,
-        "hl_birth_ms": 1691624700016,
-        "frontend_agent": "0x8ea47aaed8d123a8f8923993d6a872162da16756"
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 0,
-      "tier": "WATCH"
-    },
-    {
       "wallet": "0x5581dc4ce76018e8da664ca1e2ca3d748564293a",
       "vectors": [],
       "confidence": 0.0,
@@ -4360,26 +4725,6 @@
         "hl_account_value": 0.0,
         "hl_birth_ms": 1723070160124,
         "frontend_agent": "0x797ef8b9fc431f8b95c5706da8cb2916e7a2b8fc"
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 0,
-      "tier": "WATCH"
-    },
-    {
-      "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
-      "vectors": [],
-      "confidence": 0.0,
-      "classification": null,
-      "reasons": [],
-      "evidence": {
-        "behavioural_score": 0.8294,
-        "behavioural_tier": "WEAK_LEAD",
-        "style_vetoes": [],
-        "hl_role": "user",
-        "hl_account_value": 113966783.368841,
-        "hl_birth_ms": 1740612360037,
-        "frontend_agent": "0xb0e57c727bf855e6e0d0fc0bdd72d71f65b06b9c"
       },
       "is_service": false,
       "known_self": false,
@@ -4567,6 +4912,22 @@
       "tier": "WATCH"
     },
     {
+      "wallet": "0x9e8b1e51c642f4c8b87c6ba11c53d516a218afc4",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "behavioural_score": 0.6715,
+        "behavioural_tier": "WEAK_LEAD",
+        "style_vetoes": []
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "WATCH"
+    },
+    {
       "wallet": "0xa1830e8d9f019feb448478a171bb37cc6c4c0482",
       "vectors": [],
       "confidence": 0.0,
@@ -4674,7 +5035,7 @@
       "classification": null,
       "reasons": [],
       "evidence": {
-        "behavioural_score": 0.7176,
+        "behavioural_score": 0.6698,
         "behavioural_tier": "WEAK_LEAD",
         "style_vetoes": [],
         "hl_role": "user",
@@ -4694,9 +5055,11 @@
       "classification": null,
       "reasons": [],
       "evidence": {
-        "behavioural_score": 0.5608,
-        "behavioural_tier": "WEAK_LEAD",
-        "style_vetoes": [],
+        "behavioural_score": 0.45,
+        "behavioural_tier": "BACKGROUND",
+        "style_vetoes": [
+          "Decision frequency 6x apart (2.00 vs 13.00 position episodes/day)"
+        ],
         "hl_role": "user",
         "hl_account_value": 3820375.342952,
         "hl_birth_ms": 1705535100051,
@@ -4965,7 +5328,7 @@
         "behavioural_score": 0.45,
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
-          "Decision frequency 38x apart (2.00 vs 77.00 position episodes/day)"
+          "Decision frequency 33x apart (2.00 vs 66.00 position episodes/day)"
         ],
         "hl_role": "user",
         "hl_account_value": 36000256.277378,
@@ -5162,7 +5525,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 409968827.15,
-          "edge_count": 520
+          "edge_count": 534
         },
         "depth": 1,
         "chains": [
@@ -5170,36 +5533,6 @@
           "ethereum",
           "polygon"
         ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x000000000004444c5dc75cb358380d2e3de08a90",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: global activity: 5,221 txs, 52,760,731 token transfers"
-      ],
-      "evidence": {
-        "service_reason": "global activity: 5,221 txs, 52,760,731 token transfers",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1157
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
       },
       "is_service": true,
       "known_self": false,
@@ -5248,7 +5581,7 @@
         "totals": {
           "received_from_target_usd": 752691.45,
           "sent_to_target_usd": 0,
-          "edge_count": 3
+          "edge_count": 6
         },
         "depth": 1,
         "chains": [
@@ -5440,10 +5773,11 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 999994.72,
-          "edge_count": 516
+          "edge_count": 523
         },
         "depth": 1,
         "chains": [
+          "arbitrum",
           "ethereum",
           "polygon"
         ],
@@ -5612,7 +5946,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 9
+          "edge_count": 12
         },
         "depth": 2,
         "chains": [
@@ -5623,33 +5957,6 @@
         "hl_role": "missing",
         "hl_account_value": 0.0,
         "hl_birth_ms": null
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x12175cb015650f8314cdab2b50bae1322f4010a4",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 8
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
       },
       "is_service": true,
       "known_self": false,
@@ -5671,7 +5978,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 534
+          "edge_count": 543
         },
         "depth": 2,
         "chains": [
@@ -5732,33 +6039,6 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x13a2ab748c2965f2301a07960de598b34c2ae152",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 61
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
         ]
       },
       "is_service": true,
@@ -5997,42 +6277,12 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9282918.5,
-          "edge_count": 39
+          "edge_count": 69
         },
         "depth": 1,
         "chains": [
           "ethereum"
         ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x226e7af139a0f34c6771deb252f9988876ac1ced",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 5
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
       },
       "is_service": true,
       "known_self": false,
@@ -6081,7 +6331,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 6
+          "edge_count": 27
         },
         "depth": 2,
         "chains": [
@@ -6139,7 +6389,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 3
         },
         "depth": 2,
         "chains": [
@@ -6223,36 +6473,9 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 1500097.32,
-          "edge_count": 155
+          "edge_count": 181
         },
         "depth": 1,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x2ccf230467fe7387674baa657747f0b5485c7fec",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: global activity: 12,074 txs, 34,671 token transfers (CCTPv2WithExecutor)"
-      ],
-      "evidence": {
-        "service_reason": "global activity: 12,074 txs, 34,671 token transfers (CCTPv2WithExecutor)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 13039
-        },
-        "depth": 4,
         "chains": [
           "ethereum"
         ]
@@ -6277,7 +6500,7 @@
         "totals": {
           "received_from_target_usd": 383447848.82,
           "sent_to_target_usd": 440899852.0,
-          "edge_count": 452
+          "edge_count": 464
         },
         "depth": 1,
         "chains": [
@@ -6418,7 +6641,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 6
+          "edge_count": 316
         },
         "depth": 2,
         "chains": [
@@ -6588,7 +6811,7 @@
         "totals": {
           "received_from_target_usd": 319771573.13,
           "sent_to_target_usd": 0,
-          "edge_count": 9151
+          "edge_count": 9176
         },
         "depth": 1,
         "chains": [
@@ -6688,33 +6911,6 @@
       "tier": "INFRASTRUCTURE"
     },
     {
-      "wallet": "0x3f6e8a8cffe377c4649aceb01e6f20c60faa356c",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 7
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
       "wallet": "0x3fc5c0e19b6287f25eb271c2e8e7ba898fe7ab29",
       "vectors": [
         "transfer"
@@ -6783,7 +6979,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 19
+          "edge_count": 25
         },
         "depth": 2,
         "chains": [
@@ -6987,7 +7183,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 11
+          "edge_count": 12
         },
         "depth": 2,
         "chains": [
@@ -7108,33 +7304,6 @@
       "tier": "INFRASTRUCTURE"
     },
     {
-      "wallet": "0x544ba588efd839d2692fc31ea991cd39993c135f",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 2
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
       "wallet": "0x56eddb7aa87536c09ccc2793473599fd21a8b17f",
       "vectors": [
         "transfer"
@@ -7149,7 +7318,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 14
+          "edge_count": 30
         },
         "depth": 2,
         "chains": [
@@ -7219,33 +7388,6 @@
       "tier": "INFRASTRUCTURE"
     },
     {
-      "wallet": "0x5d39456b62d6645de8fb4556c05a9ff97c10de81",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 5
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
       "wallet": "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
       "vectors": [
         "transfer"
@@ -7260,7 +7402,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 30
+          "edge_count": 31
         },
         "depth": 2,
         "chains": [
@@ -7438,33 +7580,6 @@
       "tier": "INFRASTRUCTURE"
     },
     {
-      "wallet": "0x6c424906745005686bd9e568d85f076b3a1674c9",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 2
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
       "wallet": "0x6c96de32cea08842dcc4058c14d3aaad7fa41dee",
       "vectors": [
         "transfer"
@@ -7479,7 +7594,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 19
+          "edge_count": 21
         },
         "depth": 2,
         "chains": [
@@ -7657,33 +7772,6 @@
       "tier": "INFRASTRUCTURE"
     },
     {
-      "wallet": "0x7b2700f30f2bad7de2602eb2f911c1ce2e01108b",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
       "wallet": "0x7fc7c91d556b400afa565013e3f32055a0713425",
       "vectors": [
         "transfer"
@@ -7760,33 +7848,6 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x8442d68524217601ed126f6859694e4b0c7c66a1",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 3
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
         ]
       },
       "is_service": true,
@@ -7919,65 +7980,10 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 908
+          "edge_count": 935
         },
         "depth": 2,
         "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x892785f33cdee22a30aef750f285e18c18040c3e",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 16906
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x89c6340b1a1f4b25d36cd8b063d49045caf3f818",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 7
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum",
           "ethereum"
         ]
       },
@@ -8168,7 +8174,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 2428
+          "edge_count": 2474
         },
         "depth": 2,
         "chains": [
@@ -8236,33 +8242,6 @@
       "tier": "INFRASTRUCTURE"
     },
     {
-      "wallet": "0x93249d69636124ab311798f047dc1a8a94dd0a9e",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
       "wallet": "0x9696f59e4d72e237be84ffd425dcad154bf96976",
       "vectors": [
         "transfer"
@@ -8277,7 +8256,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 17
+          "edge_count": 28
         },
         "depth": 2,
         "chains": [
@@ -8307,7 +8286,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 12189
+          "edge_count": 12191
         },
         "depth": 2,
         "chains": [
@@ -8340,36 +8319,6 @@
         "chains": [
           "arbitrum"
         ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0x9a36a7375559aae7b9e7bbc47b463839374c5855",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
-      ],
-      "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 6
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
       },
       "is_service": true,
       "known_self": false,
@@ -8583,7 +8532,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 5
+          "edge_count": 7
         },
         "depth": 2,
         "chains": [
@@ -8830,7 +8779,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 30
+          "edge_count": 31
         },
         "depth": 2,
         "chains": [
@@ -8887,7 +8836,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 111
+          "edge_count": 115
         },
         "depth": 2,
         "chains": [
@@ -8995,7 +8944,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 3
+          "edge_count": 15
         },
         "depth": 2,
         "chains": [
@@ -9022,7 +8971,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 5800081.45,
-          "edge_count": 12324
+          "edge_count": 12330
         },
         "depth": 1,
         "chains": [
@@ -9427,7 +9376,7 @@
         "totals": {
           "received_from_target_usd": 1264963.49,
           "sent_to_target_usd": 0,
-          "edge_count": 3828
+          "edge_count": 3835
         },
         "depth": 1,
         "chains": [
@@ -9483,7 +9432,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 32
+          "edge_count": 57
         },
         "depth": 2,
         "chains": [
@@ -9510,11 +9459,13 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 18
+          "edge_count": 204
         },
         "depth": 2,
         "chains": [
-          "ethereum"
+          "arbitrum",
+          "ethereum",
+          "polygon"
         ]
       },
       "is_service": true,
@@ -9564,7 +9515,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9308697.38,
-          "edge_count": 103
+          "edge_count": 155
         },
         "depth": 1,
         "chains": [
@@ -9732,34 +9683,6 @@
         },
         "depth": 2,
         "chains": [
-          "ethereum"
-        ]
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE"
-    },
-    {
-      "wallet": "0xfb052b4b3ff70bc23a1dca72b0895da8167658c0",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: conduit: forwards 97% of the $2,013,580 it receives straight to infrastructure"
-      ],
-      "evidence": {
-        "service_reason": "conduit: forwards 97% of the $2,013,580 it receives straight to infrastructure",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 32
-        },
-        "depth": 4,
-        "chains": [
-          "arbitrum",
           "ethereum"
         ]
       },
