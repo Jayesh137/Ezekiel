@@ -25,6 +25,8 @@ was dead for named agents on exactly the wallets busy enough to be worth
 watching.
 """
 
+import json
+
 import scripts.check_watchlist as check
 
 W = "0xdd53c5297309130ab5fe5623dc905752e3342b13"
@@ -199,7 +201,7 @@ def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
     monkeypatch.setattr(check, "_roster", lambda: {})
     monkeypatch.setattr(check, "target_account_value", fake_target_value)
     monkeypatch.setattr(check, "read_wallet", fake_read_wallet)
-    monkeypatch.setattr(check, "sweep", lambda addr, cfg: None)
+    monkeypatch.setattr(check, "sweep", lambda addr, cfg, **kw: None)
     monkeypatch.setattr(check, "target_world", lambda cfg: {})
     monkeypatch.setattr(check, "_previous", lambda: {})
     monkeypatch.setattr(check, "busy_flags", lambda hits: {})
@@ -250,3 +252,113 @@ def test_the_roster_feeds_the_watch_and_a_broken_one_never_shrinks_it(monkeypatc
 
     (tmp_path / "roster" / "latest.json").write_text("{ not json")
     assert check._roster() == {}
+
+
+# --- what counts as "his world" ---------------------------------------------
+
+def test_a_possible_roster_wallet_is_not_part_of_his_world(monkeypatch, tmp_path):
+    """29 of the 39 alerts on 2026-09-12 named a `roster: POSSIBLE` wallet.
+
+    POSSIBLE is 140 wallets carrying ONE weak vector each, which is precisely
+    why `watchlist.WATCHED_TIERS` already refuses to spend the fast job reading
+    them. Treating the same tier as evidence of his world on the way back in
+    contradicts that judgement and supplies almost all of the noise.
+    """
+    from src import utils
+    monkeypatch.setattr(utils, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(check, "DATA_DIR", tmp_path)
+    (tmp_path / "roster").mkdir()
+    (tmp_path / "roster" / "latest.json").write_text(json.dumps({"wallets": [
+        {"wallet": "0x" + "a" * 40, "tier": "CONFIRMED"},
+        {"wallet": "0x" + "b" * 40, "tier": "PROBABLE"},
+        {"wallet": "0x" + "c" * 40, "tier": "POSSIBLE"},
+    ]}))
+    # Keep the deposit-address lookup off the network for this test.
+    monkeypatch.setattr(check, "_deposit_addresses", lambda config: set())
+
+    world = check.target_world({"target_wallet": T, "known_self_wallets": []})
+    assert world["0x" + "a" * 40] == "roster: CONFIRMED"
+    assert world["0x" + "b" * 40] == "roster: PROBABLE"
+    assert "0x" + "c" * 40 not in world, "POSSIBLE is one weak vector, not his world"
+    assert world[T] == "the target"
+
+
+# --- the storm itself: what actually reaches the operator --------------------
+
+def _silent_loop(monkeypatch, tmp_path, entries, counterparties):
+    """Drive check_watchlist.main() with every network call stubbed out."""
+    from src import utils
+    from src import watchlist as wl
+
+    monkeypatch.setattr(utils, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(check, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(wl, "WATCHLIST_DIR", tmp_path / "watchlist")
+    monkeypatch.setattr(check, "load_config", lambda: {"target_wallet": T})
+    monkeypatch.setattr(check, "_roster", lambda: {})
+    monkeypatch.setattr(check, "watched", lambda cfg, roster=None: entries)
+    # The watched wallet is itself in his world — that is usually WHY it is
+    # watched — so this is the shape that produced the self-contacts.
+    monkeypatch.setattr(check, "target_world", lambda cfg: {
+        T: "the target", "0x" + "d" * 40: "a private deposit address of his",
+        "0x" + "a" * 40: "roster: CONFIRMED"})
+    monkeypatch.setattr(check, "sweep", lambda a, c, **kw: None)
+    monkeypatch.setattr(check, "target_account_value", lambda c: 1.0)
+    monkeypatch.setattr(check, "busy_flags", lambda hits: {})
+    monkeypatch.setattr(check, "read_wallet",
+                        lambda a, c, target_value=None: (
+                            wl.snapshot(a, account_value=1.0), counterparties))
+    fired = []
+    monkeypatch.setattr(check, "alert_watchlist_contact",
+                        lambda *a, **k: fired.append(a) or True)
+    monkeypatch.setattr(check, "alert_watchlist_change", lambda *a, **k: True)
+    monkeypatch.setattr(check, "alert_explicit_link", lambda *a, **k: True)
+    check.main()
+    saved = json.loads((tmp_path / "watchlist" / "latest.json").read_text())
+    return fired, saved
+
+
+def test_a_settled_wallet_records_its_contacts_but_does_not_buzz(monkeypatch, tmp_path):
+    """The 2026-09-12 storm, reproduced: a CONFIRMED wallet of his whose
+    counterparties are — necessarily — his own world."""
+    w = "0x" + "a" * 40
+    fired, saved = _silent_loop(
+        monkeypatch, tmp_path,
+        [{"address": w, "why": "roster CONFIRMED", "source": "roster",
+          "tier": "CONFIRMED", "settled": True}],
+        [T, "0x" + "d" * 40, w])
+
+    assert fired == [], "a wallet already known to be his settles nothing"
+    assert [c["address"] for c in saved["contacts"][w]] == [T, "0x" + "d" * 40], (
+        "the contacts are still recorded, and the wallet is not its own contact")
+
+
+def test_an_unsettled_wallet_still_wakes_the_operator(monkeypatch, tmp_path):
+    """The vector must keep working for the case it was built for."""
+    fired, saved = _silent_loop(
+        monkeypatch, tmp_path,
+        [{"address": W, "why": "born in his silence", "settled": False}],
+        [T])
+    assert [f[1] for f in fired] == [T]
+    assert saved["contacts"][W][0]["is"] == "the target"
+
+
+def test_the_watch_learns_a_plan_refusal_once_not_once_per_wallet(monkeypatch, tmp_path):
+    """The watch sweeps up to six wallets across six chains every ~11 minutes,
+    and three of those chains are permanently refused by the free tier."""
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    monkeypatch.setattr(check, "DATA_DIR", tmp_path)
+    seen = []
+
+    def fake_sweep(address, chains, budget, **kw):
+        seen.append(kw.get("plan_refused"))
+        return {"status": "ok", "chains": {}, "degraded_sources": [],
+                "unsupported_sources": []}
+
+    monkeypatch.setattr(check, "sweep_wallet", fake_sweep)
+    monkeypatch.setattr(check, "enabled_chains", lambda c: [])
+    monkeypatch.setattr(check, "load_config", lambda: {"target_wallet": T})
+
+    shared = {}
+    check.sweep("0x" + "a" * 40, {"target_wallet": T}, plan_refused=shared)
+    check.sweep("0x" + "b" * 40, {"target_wallet": T}, plan_refused=shared)
+    assert seen == [shared, shared], "both wallets share one refusal record"

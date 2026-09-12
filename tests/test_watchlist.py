@@ -311,3 +311,54 @@ def test_a_missing_or_broken_roster_leaves_the_operator_list_intact():
 def test_watched_without_a_roster_is_unchanged():
     assert [w["address"] for w in wl.watched(CFG)] == [
         "0xdd53c5297309130ab5fe5623dc905752e3342b13"]
+
+
+# --- the contact vector must only fire where there is something to settle ----
+#
+# Live on 2026-09-12 the close watch pushed 39 contact alerts to the operator's
+# phone inside six seconds, burying that day's four real CRITICALs (a six-day
+# silence, a CCTP recipient outside the cluster, a Socket destination outside
+# the cluster, and an 84% migration candidate). Every one of the 39 came from a
+# wallet already CONFIRMED as his — for which touching his world is not news,
+# it is the definition of the wallet. See CLAUDE.md on how an operator learns
+# to swipe the channel away.
+
+def test_a_wallet_is_never_its_own_contact():
+    """Two of the 39 were a wallet reporting contact with itself."""
+    world = {W: "a known wallet of his", T: "the target"}
+    got = wl.contacts([W, T], world, wallet=W)
+    assert [c["address"] for c in got] == [T]
+
+
+def test_a_settled_wallet_is_not_news_when_it_touches_his_world():
+    """A wallet we already believe is his has nothing left for a contact to
+    settle. It is still READ and still recorded — only the buzz stops."""
+    assert wl.contacts_are_news({"address": W, "settled": True}) is False
+    assert wl.contacts_are_news({"address": W, "settled": False}) is True
+    # Absent means unsettled: a question is the conservative reading, and the
+    # operator's own watch_wallets entries carry no tier at all.
+    assert wl.contacts_are_news({"address": W}) is True
+
+
+def test_the_operators_own_watch_entry_is_always_a_question():
+    """`0xdd53c529…` is deliberately NOT a known_self_wallet — CLAUDE.md is
+    explicit that the list is ground truth and the watch is a question."""
+    got = wl.watched({"target_wallet": T, "watch_wallets": [W]})
+    assert got[0]["settled"] is False
+
+
+def test_a_roster_confirmed_wallet_is_settled_and_a_probable_one_is_not():
+    roster = {"wallets": [
+        {"wallet": "0x" + "a" * 40, "tier": "CONFIRMED", "confidence": 0.9},
+        {"wallet": "0x" + "b" * 40, "tier": "PROBABLE", "confidence": 0.7},
+    ]}
+    got = {w["address"]: w for w in wl.watched({"target_wallet": T}, roster=roster)}
+    assert got["0x" + "a" * 40]["settled"] is True
+    assert got["0x" + "b" * 40]["settled"] is False, (
+        "PROBABLE is still a question, and a contact is what would settle it")
+
+
+def test_a_known_self_wallet_on_the_operators_list_is_settled():
+    got = wl.watched({"target_wallet": T, "watch_wallets": [W],
+                      "known_self_wallets": [W.upper()]})
+    assert got[0]["settled"] is True

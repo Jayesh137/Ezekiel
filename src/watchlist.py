@@ -122,6 +122,10 @@ def watched(config: dict, roster: dict | None = None) -> list[dict]:
     """
     out, seen = [], set()
     target = ((config or {}).get("target_wallet") or "").strip().lower()
+    # Operator ground truth. A wallet on this list is already his, so a contact
+    # with his world settles nothing — see `contacts_are_news`.
+    known_self = {(w or "").strip().lower()
+                  for w in (config or {}).get("known_self_wallets") or [] if w}
 
     for entry in (config or {}).get("watch_wallets") or []:
         if isinstance(entry, str):
@@ -131,7 +135,8 @@ def watched(config: dict, roster: dict | None = None) -> list[dict]:
         address = (entry.get("address") or "").strip().lower()
         if address and address != target and address not in seen:
             seen.add(address)
-            out.append({**entry, "address": address})
+            out.append({**entry, "address": address,
+                        "settled": address in known_self})
 
     rows = (roster or {}).get("wallets")
     candidates = []
@@ -160,7 +165,11 @@ def watched(config: dict, roster: dict | None = None) -> list[dict]:
         if reasons:
             why += ": " + "; ".join(reasons[:3])
         seen.add(address)
-        out.append({"address": address, "why": why, "source": "roster", "tier": tier})
+        # CONFIRMED is an answer; PROBABLE is still a question, and a contact
+        # with his world is exactly what would settle it.
+        out.append({"address": address, "why": why, "source": "roster",
+                    "tier": tier,
+                    "settled": tier == "CONFIRMED" or address in known_self})
 
     return out[:MAX_WATCHED]
 
@@ -308,8 +317,13 @@ def changes(previous: dict | None, current: dict, now_ms: int | None = None) -> 
     return out
 
 
-def contacts(counterparties, world: dict) -> list[dict]:
+def contacts(counterparties, world: dict, wallet: str | None = None) -> list[dict]:
     """Counterparties of a watched wallet that belong to the target's world.
+
+    `wallet` is the wallet being watched, and it is excluded: a watched wallet
+    is itself in `world` (that is usually WHY it is watched), so without this
+    every read reported the wallet in contact with itself. Two of the 39 alerts
+    fired on 2026-09-12 were exactly that.
 
     `world` maps an address to what it is ("the target", "a known wallet of
     his", "a private deposit address of his", "roster: PROBABLE"). An observed
@@ -317,12 +331,33 @@ def contacts(counterparties, world: dict) -> list[dict]:
     dormancy readings cannot supply, because both of those are inferences
     about coincidence and this is a thing that happened.
     """
+    subject = (wallet or "").strip().lower()
     out = []
     for raw in counterparties or []:
         a = (raw or "").lower()
-        if a and a in world:
+        if a and a != subject and a in world:
             out.append({"address": a, "is": world[a]})
     return sorted(out, key=lambda c: c["address"])
+
+
+def contacts_are_news(entry: dict) -> bool:
+    """Whether a contact between this watched wallet and his world is news.
+
+    The contact vector exists to SETTLE a question. `alert_watchlist_contact`
+    says so in as many words: the wallet is watched because two inferences
+    agreed about it, and an observed transfer is the third vector that decides
+    it. A wallet we already believe is his has no such question left — its
+    counterparties ARE his world, by construction, and reporting that is a
+    tautology with a siren attached.
+
+    What a settled wallet touches is still recorded, and still reaches the
+    dashboard and the stored reading. Only the buzz stops — the same policy
+    INFO alerts already follow.
+
+    Absent means unsettled. The operator's own `watch_wallets` entries carry no
+    tier, and a question is the conservative reading for a wake-someone signal.
+    """
+    return not bool((entry or {}).get("settled"))
 
 
 def shared_infrastructure(hits: list[dict], busy: dict) -> tuple[list, list]:

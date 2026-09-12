@@ -41,6 +41,7 @@ from src.watchlist import (
     changes,
     contact_severity,
     contacts,
+    contacts_are_news,
     explicit_links,
     save,
     shared_infrastructure,
@@ -64,18 +65,22 @@ CONTACT_READINGS = 8
 CONTACT_SECONDS = 60.0
 
 
-def target_world(config: dict) -> dict:
-    """Every address whose appearance beside a watched wallet would matter."""
-    target = (config.get("target_wallet") or "").lower()
-    world = {target: "the target"}
-    for w in config.get("known_self_wallets", []) or []:
-        a = (w or "").lower()
-        if a:
-            world[a] = "a known wallet of his"
+# Roster tiers strong enough to stand for "his world". POSSIBLE is out, and
+# deliberately the same judgement `watchlist.WATCHED_TIERS` already makes: there
+# are 140 of them and each rests on a single weak vector. Counted as his world
+# they supplied 29 of the 39 contact alerts fired on 2026-09-12 — an inference
+# this system made, echoed back to the operator as though it were a finding.
+WORLD_TIERS = ("CONFIRMED", "PROBABLE")
 
-    # His private deposit addresses: a destination he sends to that the whole
-    # chain says is quiet. Two wallets funding one are the same exchange
-    # customer, which is the strongest single signal this project has.
+
+def _deposit_addresses(config: dict) -> set:
+    """His private deposit addresses: destinations the whole chain calls quiet.
+
+    Two wallets funding one are the same exchange customer, which is the
+    strongest single signal this project has. Isolated behind its own function
+    because it is the one part of `target_world` that touches the network.
+    """
+    target = (config.get("target_wallet") or "").lower()
     try:
         from src.linkage import (
             ACTIVITY_LOOKUPS_PER_RUN,
@@ -90,11 +95,24 @@ def target_world(config: dict) -> dict:
             destinations, outbound_chains(target),
             activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN,
                            seconds=ACTIVITY_SECONDS_PER_RUN))
-        for a in destinations - excluded:
-            world.setdefault(a, "a private deposit address of his")
+        return set(destinations) - set(excluded)
     except Exception as exc:                          # noqa: BLE001
         print(f"[watchlist] deposit addresses unavailable ({type(exc).__name__}) — "
               f"a contact with one would not be recognised this run")
+        return set()
+
+
+def target_world(config: dict) -> dict:
+    """Every address whose appearance beside a watched wallet would matter."""
+    target = (config.get("target_wallet") or "").lower()
+    world = {target: "the target"}
+    for w in config.get("known_self_wallets", []) or []:
+        a = (w or "").lower()
+        if a:
+            world[a] = "a known wallet of his"
+
+    for a in _deposit_addresses(config):
+        world.setdefault(a, "a private deposit address of his")
 
     try:
         with open(DATA_DIR / "roster" / "latest.json") as f:
@@ -104,7 +122,7 @@ def target_world(config: dict) -> dict:
     for row in rows:
         a = (row.get("wallet") or "").lower()
         tier = row.get("tier")
-        if a and tier in ("CONFIRMED", "PROBABLE", "POSSIBLE"):
+        if a and tier in WORLD_TIERS:
             world.setdefault(a, f"roster: {tier}")
     return world
 
@@ -290,8 +308,13 @@ def busy_flags(hits: list[dict]) -> dict:
     return out
 
 
-def sweep(address: str, config: dict) -> None:
-    """Bounded multi-chain sweep so its destinations reach the substrate."""
+def sweep(address: str, config: dict, plan_refused: dict | None = None) -> None:
+    """Bounded multi-chain sweep so its destinations reach the substrate.
+
+    `plan_refused` is shared across the wallets of one run so a chain the free
+    tier refuses is asked once, not once per watched wallet — this is the
+    fastest job in the project and its whole value is the cadence.
+    """
     import os
     if not os.environ.get("ETHERSCAN_API_KEY"):
         print(f"[watchlist] no Etherscan key — {address[:12]}... not swept, so a "
@@ -302,7 +325,8 @@ def sweep(address: str, config: dict) -> None:
     try:
         result = sweep_wallet(address, enabled_chains(config), budget, cluster=True,
                               canonical=load_canonical_contracts(
-                                  config, DATA_DIR / "labels" / "token_contracts.json"))
+                                  config, DATA_DIR / "labels" / "token_contracts.json"),
+                              plan_refused=plan_refused)
     except Exception as exc:                          # noqa: BLE001
         print(f"[watchlist] sweep failed for {address[:12]}...: {type(exc).__name__}: {exc}")
         return
@@ -349,6 +373,7 @@ def main() -> int:
     # Once per run, so every watched wallet is sized against the same moment of
     # his book rather than against whatever it happened to be worth when its
     # own turn came round.
+    plan_refused: dict = {}
     his_value = target_account_value(config)
     if his_value is not None:
         print(f"[watchlist] the target is worth ${his_value:,.0f} across every "
@@ -356,16 +381,20 @@ def main() -> int:
 
     for entry in wallets:
         address = entry["address"]
-        sweep(address, config)
+        sweep(address, config, plan_refused=plan_refused)
         snap, counterparties = read_wallet(address, config, target_value=his_value)
         snap["why"] = entry.get("why")
         snap["source"] = entry.get("source") or "config"
         snapshots.append(snap)
 
-        seen = contacts(counterparties, world)
+        seen = contacts(counterparties, world, wallet=address)
         hits, infra = shared_infrastructure(seen, busy_flags(seen))
         if hits:
             found_contacts[address] = hits
+        # A contact SETTLES a question. A wallet already believed to be his has
+        # none left, and its counterparties are his world by construction — so
+        # it is read, printed and recorded, but it does not wake anyone.
+        news = contacts_are_news(entry)
         deltas = changes(previous.get(address), snap)
         if deltas:
             found_changes[address] = deltas
@@ -386,9 +415,12 @@ def main() -> int:
                   f"{hit['address']} ({hit['is']} — busy on the whole chain)")
         for hit in hits:
             severity = contact_severity(hit["is"])
-            print(f"[watchlist]   CONTACT ({severity}) {hit['address']} — {hit['is']}")
-            alert_watchlist_contact(address, hit["address"], hit["is"], entry.get("why"),
-                                    severity=severity)
+            note = "" if news else " — recorded only, this wallet is already his"
+            print(f"[watchlist]   CONTACT ({severity}) {hit['address']} — "
+                  f"{hit['is']}{note}")
+            if news:
+                alert_watchlist_contact(address, hit["address"], hit["is"],
+                                        entry.get("why"), severity=severity)
         for d in deltas:
             print(f"[watchlist]   CHANGE {d['kind']}: {d['detail']}")
         # Hyperliquid naming this wallet's owner is not a "change" among
