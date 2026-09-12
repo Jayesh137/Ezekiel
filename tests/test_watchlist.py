@@ -221,3 +221,93 @@ def test_a_stored_record_from_before_this_existed_still_reports_the_crossing():
     before.pop("size_ratio", None)
     after = wl.snapshot(W, account_value=53_000_000.0, target_value=24_000_000.0)
     assert [c["kind"] for c in _crossings(before, after)] == ["outgrew_target"]
+
+
+# --- the roster feeds the watch ---------------------------------------------
+#
+# Found 2026-09-12: `0xf078969e…` is CONFIRMED as his (0.84 — two-way
+# $155M/$135M, sharing his Binance deposit address) and NOTHING watched it
+# per-wallet. The close watch is the only instrument that reads a wallet's
+# named agents, sub-accounts, withdrawal destinations, HyperEVM nonce and
+# size against his, and it was pointed at one hand-picked address out of 348.
+
+ROSTER = {"wallets": [
+    {"wallet": "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFf078", "tier": "CONFIRMED",
+     "confidence": 0.84, "is_service": False,
+     "reasons": ["Sends to the same deposit address as the target (address reuse)"]},
+    {"wallet": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa111", "tier": "PROBABLE",
+     "confidence": 0.51, "is_service": False, "reasons": ["Repeated transfers"]},
+    {"wallet": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb222", "tier": "POSSIBLE",
+     "confidence": 0.40, "is_service": False, "reasons": []},
+    {"wallet": "0xcccccccccccccccccccccccccccccccccccccc33", "tier": "CONFIRMED",
+     "confidence": 0.90, "is_service": True, "reasons": []},
+]}
+CFG = {"target_wallet": "0x45d26f28196d226497130c4bac709d808fed4029",
+       "watch_wallets": [{"address": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
+                          "why": "hand-picked"}]}
+
+
+def test_confirmed_and_probable_roster_wallets_join_the_watch():
+    got = wl.watched(CFG, roster=ROSTER)
+    addrs = [w["address"] for w in got]
+    assert "0xfffffffffffffffffffffffffffffffffffff078" in addrs, "a CONFIRMED wallet of his is unwatched"
+    assert "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa111" in addrs
+    # POSSIBLE is an inference too weak to spend a per-run read on; a service
+    # is infrastructure and never his.
+    assert "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb222" not in addrs
+    assert "0xcccccccccccccccccccccccccccccccccccccc33" not in addrs
+
+
+def test_the_hand_picked_list_comes_first_and_keeps_its_reason():
+    got = wl.watched(CFG, roster=ROSTER)
+    assert got[0]["address"] == "0xdd53c5297309130ab5fe5623dc905752e3342b13"
+    assert got[0]["why"] == "hand-picked"
+    assert got[0].get("source") != "roster"
+    auto = [w for w in got if w["address"] == "0xfffffffffffffffffffffffffffffffffffff078"][0]
+    assert auto["source"] == "roster"
+    assert "CONFIRMED" in auto["why"] and "address reuse" in auto["why"]
+
+
+def test_a_wallet_on_both_lists_is_watched_once_as_the_operators_entry():
+    cfg = {**CFG, "watch_wallets": [{"address": "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFf078",
+                                     "why": "operator note"}]}
+    got = wl.watched(cfg, roster=ROSTER)
+    hits = [w for w in got if w["address"] == "0xfffffffffffffffffffffffffffffffffffff078"]
+    assert len(hits) == 1 and hits[0]["why"] == "operator note"
+
+
+def test_the_target_himself_is_never_watched_here():
+    """The collector reads him every run; watching him too would double-write
+    data/actions and spend the fast job's budget on a covered wallet."""
+    roster = {"wallets": [{"wallet": CFG["target_wallet"].upper(), "tier": "CONFIRMED",
+                           "confidence": 1.0, "is_service": False, "reasons": []}]}
+    assert CFG["target_wallet"] not in [w["address"] for w in wl.watched(CFG, roster=roster)]
+
+
+def test_the_watch_is_bounded_so_the_fast_job_stays_fast():
+    big = {"wallets": [{"wallet": f"0x{i:040x}", "tier": "PROBABLE", "confidence": 0.5,
+                        "is_service": False, "reasons": []} for i in range(1, 60)]}
+    got = wl.watched(CFG, roster=big)
+    assert len(got) == wl.MAX_WATCHED
+    assert got[0]["address"] == "0xdd53c5297309130ab5fe5623dc905752e3342b13"
+
+
+def test_confirmed_outranks_probable_when_the_cap_bites():
+    many = {"wallets": (
+        [{"wallet": f"0x{i:040x}", "tier": "PROBABLE", "confidence": 0.99,
+          "is_service": False, "reasons": []} for i in range(1, 40)]
+        + [{"wallet": "0x" + "e" * 40, "tier": "CONFIRMED", "confidence": 0.61,
+            "is_service": False, "reasons": []}])}
+    addrs = [w["address"] for w in wl.watched(CFG, roster=many)]
+    assert "0x" + "e" * 40 in addrs, "a CONFIRMED wallet must not be crowded out by PROBABLEs"
+
+
+def test_a_missing_or_broken_roster_leaves_the_operator_list_intact():
+    for bad in (None, {}, {"wallets": "nonsense"}, {"wallets": [None, 3, {}]}):
+        got = wl.watched(CFG, roster=bad)
+        assert [w["address"] for w in got] == ["0xdd53c5297309130ab5fe5623dc905752e3342b13"]
+
+
+def test_watched_without_a_roster_is_unchanged():
+    assert [w["address"] for w in wl.watched(CFG)] == [
+        "0xdd53c5297309130ab5fe5623dc905752e3342b13"]

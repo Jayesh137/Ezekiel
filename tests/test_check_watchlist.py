@@ -196,6 +196,7 @@ def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
 
     monkeypatch.setattr(check, "load_config", lambda: {
         "target_wallet": T, "watch_wallets": [W, second]})
+    monkeypatch.setattr(check, "_roster", lambda: {})
     monkeypatch.setattr(check, "target_account_value", fake_target_value)
     monkeypatch.setattr(check, "read_wallet", fake_read_wallet)
     monkeypatch.setattr(check, "sweep", lambda addr, cfg: None)
@@ -225,3 +226,27 @@ def test_a_cctp_withdrawal_counts_as_a_withdrawal_destination(monkeypatch):
 
     assert snap["withdrawal_destinations"] == [recipient]
     assert recipient in counterparties
+
+
+def test_the_roster_feeds_the_watch_and_a_broken_one_never_shrinks_it(monkeypatch, tmp_path):
+    """A CONFIRMED wallet of his must be read per-wallet without anyone editing
+    config.json — `0xf078969e…` sat CONFIRMED at 0.84 with nothing watching it.
+    And an unreadable roster must leave the operator's own list intact."""
+    from src import utils
+
+    monkeypatch.setattr(utils, "DATA_DIR", tmp_path)
+    assert check._roster() == {}                      # no file: not a crash
+
+    (tmp_path / "roster").mkdir()
+    (tmp_path / "roster" / "latest.json").write_text(
+        '{"wallets": [{"wallet": "0xF078969E55CABF9AE3F26AFEB5EC627B4430F19E",'
+        ' "tier": "CONFIRMED", "confidence": 0.84, "is_service": false,'
+        ' "reasons": ["Sends to the same deposit address as the target"]}]}')
+    seen = check.watched({"target_wallet": T, "watch_wallets": [W]},
+                         roster=check._roster())
+    addrs = [x["address"] for x in seen]
+    assert addrs == [W, "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e"]
+    assert seen[1]["source"] == "roster" and "CONFIRMED" in seen[1]["why"]
+
+    (tmp_path / "roster" / "latest.json").write_text("{ not json")
+    assert check._roster() == {}

@@ -24,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import utils
 from src.agent_links import normalise_agents
 from src.alerts import alert_explicit_link, alert_watchlist_change, alert_watchlist_contact
 from src.chain.budget import CallBudget
@@ -303,12 +304,35 @@ def sweep(address: str, config: dict) -> None:
           + (f", could not read {degraded}" if degraded else ""))
 
 
+def _roster() -> dict:
+    """The roster, or {} when it cannot be read.
+
+    A missing roster must never SHRINK the watch silently, so the operator's
+    own list is unaffected by a failure here and the fact is printed.
+    """
+    try:
+        # Resolved through the module at call time, not the name captured at
+        # import: the test suite repoints utils.DATA_DIR, and a captured path
+        # would read production state from a unit test.
+        with open(utils.DATA_DIR / "roster" / "latest.json") as f:
+            doc = json.load(f)
+        return doc if isinstance(doc, dict) else {}
+    except (OSError, ValueError) as exc:
+        print(f"[watchlist] roster unreadable ({type(exc).__name__}) — watching only "
+              f"the operator's own list this run")
+        return {}
+
+
 def main() -> int:
     config = load_config()
-    wallets = watched(config)
+    wallets = watched(config, roster=_roster())
     if not wallets:
-        print("[watchlist] config.watch_wallets is empty — nothing under close watch")
+        print("[watchlist] nothing under close watch: config.watch_wallets is "
+              "empty and the roster grades nothing CONFIRMED or PROBABLE")
         return 0
+    auto = [w["address"] for w in wallets if w.get("source") == "roster"]
+    print(f"[watchlist] watching {len(wallets)} wallet(s): "
+          f"{len(wallets) - len(auto)} from config, {len(auto)} from the roster")
 
     world = target_world(config)
     previous = _previous()
@@ -327,6 +351,7 @@ def main() -> int:
         sweep(address, config)
         snap, counterparties = read_wallet(address, config, target_value=his_value)
         snap["why"] = entry.get("why")
+        snap["source"] = entry.get("source") or "config"
         snapshots.append(snap)
 
         seen = contacts(counterparties, world)

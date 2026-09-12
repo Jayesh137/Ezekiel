@@ -85,18 +85,84 @@ def _ratio(value, target):
     return round(value / target, 4)
 
 
-def watched(config: dict) -> list[dict]:
-    """Normalise `config.watch_wallets`, accepting plain addresses or objects."""
-    out = []
+# The cap exists to protect the CADENCE, which is the whole value of this
+# watch. Measured 2026-09-12: a run reads roughly a dozen endpoints per wallet
+# and took 60-73s for one, against an 8-minute job ceiling and a 10-minute
+# dispatch interval. A wallet's first L1 sweep can spend the full
+# SWEEP_SECONDS=45 budget; afterwards it resumes from a cursor and costs
+# ~20-30s. Six is therefore about three minutes in the steady state and stays
+# inside the ceiling even on a run where several wallets are swept for the
+# first time — while being twice what the roster grades highly today.
+MAX_WATCHED = 6
+
+# Tiers worth a per-run read, strongest first. POSSIBLE is deliberately out:
+# there are 140 of them and the tier is an inference from a single weak vector,
+# so spending the fast job on them would cost the wallets that matter.
+WATCHED_TIERS = ("CONFIRMED", "PROBABLE")
+
+
+def watched(config: dict, roster: dict | None = None) -> list[dict]:
+    """Every wallet the close watch should read this run.
+
+    Two sources, and the order matters. `config.watch_wallets` is the
+    operator's own list and always comes first. The roster supplies the rest:
+    any wallet it grades CONFIRMED or PROBABLE is a wallet we believe is his,
+    and until 2026-09-12 nothing read those per-wallet at all — `0xf078969e…`
+    sat CONFIRMED at 0.84, two-way with him at $155M/$135M and sharing his
+    Binance deposit address, while no job asked it for an agent, a sub-account,
+    a withdrawal destination or a HyperEVM nonce.
+
+    Auto-added wallets are marked `source: "roster"`. That keeps the
+    distinction this project insists on: being watched is a QUESTION under
+    observation, never ground truth, and nothing here may leak into
+    `known_self_wallets` or the cluster.
+
+    The target himself is never included — the collector reads him every run,
+    and watching him too would put a second writer on `data/actions/`.
+    """
+    out, seen = [], set()
+    target = ((config or {}).get("target_wallet") or "").strip().lower()
+
     for entry in (config or {}).get("watch_wallets") or []:
         if isinstance(entry, str):
             entry = {"address": entry}
         if not isinstance(entry, dict):
             continue
         address = (entry.get("address") or "").strip().lower()
-        if address:
+        if address and address != target and address not in seen:
+            seen.add(address)
             out.append({**entry, "address": address})
-    return out
+
+    rows = (roster or {}).get("wallets")
+    candidates = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        address = (row.get("wallet") or "").strip().lower()
+        tier = row.get("tier")
+        if not address or address == target or address in seen:
+            continue
+        if tier not in WATCHED_TIERS or row.get("is_service"):
+            continue
+        try:
+            confidence = float(row.get("confidence") or 0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        candidates.append((WATCHED_TIERS.index(tier), -confidence, address, row, tier))
+
+    # CONFIRMED before PROBABLE, then by confidence, so the cap can only ever
+    # drop the weakest evidence.
+    for _tier_rank, _negconf, address, row, tier in sorted(candidates, key=lambda c: c[:3]):
+        if len(out) >= MAX_WATCHED:
+            break
+        reasons = [r for r in (row.get("reasons") or []) if isinstance(r, str)]
+        why = f"roster {tier} ({row.get('confidence')})"
+        if reasons:
+            why += ": " + "; ".join(reasons[:3])
+        seen.add(address)
+        out.append({"address": address, "why": why, "source": "roster", "tier": tier})
+
+    return out[:MAX_WATCHED]
 
 
 def snapshot(address: str, *, account_value=None, last_fill_ms=None,
