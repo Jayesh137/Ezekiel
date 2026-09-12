@@ -265,7 +265,7 @@ def unreadability(chain_result: dict) -> str | None:
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
                  price_lookup=None, canonical: dict | None = None,
                  dust_usd: float = 1.0, page_size: int = 1000,
-                 max_pages: int = 50) -> dict:
+                 max_pages: int = 50, plan_refused: dict | None = None) -> dict:
     """Collect every transfer for one wallet across `chains`.
 
     `canonical` maps (chain, SYMBOL) to the one contract that really is that
@@ -278,6 +278,21 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
     unconditionally. Everything else is probed first: one call establishes
     whether an address has ever transacted on a chain, which is far cheaper
     than six full sweeps that return nothing.
+
+    `plan_refused` maps a chain name to the refusal its API returned, and is
+    shared across the wallets of ONE run. A plan refusal is a property of the
+    API key, not of the address, so asking again per wallet buys nothing and
+    costs the scarcest resource the sweep has. Measured 2026-09-12: 90 of 373
+    calls in a ten-wallet sweep went to base, optimism and bsc and every one
+    came back refused — 24% of the budget, and of the wall clock that actually
+    bounds the transfer graph's frontier.
+
+    Deliberately per-run and in-memory, never persisted: each run re-learns the
+    refusal from the first wallet that asks, so an upgraded API plan is picked
+    up by the next run with nothing to invalidate by hand. The gap is still
+    recorded in `unsupported_sources` for every wallet, carrying the API's own
+    words — a chain that vanished from the summary would read as "nothing
+    there", which is the failure rule 5 exists to prevent.
     """
     addr = (address or "").lower()
     price_lookup = price_lookup or (lambda symbol, date: None)
@@ -309,6 +324,12 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         chain_result = _blank_chain_result()
         result["chains"][name] = chain_result
 
+        # Already settled this run: report it, spend nothing.
+        if plan_refused is not None and name in plan_refused:
+            chain_result["error"] = plan_refused[name]
+            result["unsupported_sources"].append(name)
+            continue
+
         if not cluster:
             before = budget.calls_used
             active, probe_error = probe_activity(addr, chain, budget)
@@ -321,6 +342,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 verdict = unreadability(chain_result)
                 if verdict == "unsupported":
                     result["unsupported_sources"].append(name)
+                    if plan_refused is not None:
+                        plan_refused[name] = probe_error
                 else:
                     result["degraded_sources"].append(name)
                 continue
@@ -341,6 +364,13 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             if error:
                 chain_result["error"] = error
                 chain_result["errors_by_kind"][kind] = error
+                # A plan refusal answers for the CHAIN, not for this record
+                # kind, so the remaining kinds cannot succeed where this one
+                # was refused. Only a plan refusal is final — a rate limit or
+                # a timeout is degradation we retry out of, and short-circuiting
+                # on those would turn a transient failure into a silent gap.
+                if unsupported_for_plan(error):
+                    break
 
             for row in walk.rows:
                 rec = normalise_row(row, chain, kind, price_lookup,
@@ -421,6 +451,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         verdict = unreadability(chain_result)
         if verdict == "unsupported":
             result["unsupported_sources"].append(name)
+            if plan_refused is not None:
+                plan_refused[name] = chain_result["error"]
         elif verdict == "degraded":
             result["degraded_sources"].append(name)
 

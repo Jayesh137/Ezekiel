@@ -127,12 +127,14 @@ def main(argv=None) -> int:
         config, Path(DATA_DIR) / "labels" / "token_contracts.json")
 
     results = []
+    plan_refused: dict = {}
     for wallet in wallets:
         print(f"[backfill] sweeping {wallet} across "
               f"{len(enabled_chains(config))} chain(s)")
         results.append(sweep_wallet(wallet, enabled_chains(config), budget,
-                                    canonical=canonical,
-                                    cluster=True, price_lookup=price_lookup))
+                                    canonical=canonical, cluster=True,
+                                    price_lookup=price_lookup,
+                                    plan_refused=plan_refused))
 
     # Merging rather than clobbering: the trace job writes this same file every
     # 30 minutes for the target alone, and a --wallet run here sweeps something

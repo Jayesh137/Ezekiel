@@ -998,3 +998,128 @@ def test_sweep_health_agrees_about_a_chain_refused_at_the_probe(tmp_path, monkey
     assert result["unsupported_sources"] == ["base"]
     assert health["unsupported_sources"] == ["base"]
     assert health["degraded_sources"] == []
+
+
+# --- a chain the plan refuses is asked once a run, not once a wallet ---------
+
+REFUSAL = "Free API access is not supported for this chain"
+
+
+def test_a_plan_refused_chain_is_not_re_asked_for_every_wallet(tmp_path, monkeypatch):
+    """Etherscan's free tier refuses base, optimism and bsc outright.
+
+    Measured on the live sweep 2026-09-12: 90 of 373 calls — 24% of the run's
+    whole call budget and, because every call carries a mandatory 0.25s pace
+    plus a round trip, 24% of its wall clock — went to those three chains and
+    every one came back refused. The frontier is bounded by TIME, not by its
+    lookup budget: it stopped at 10 of 40 allowed lookups with 197 wallets
+    still queued.
+
+    The refusal is a property of the API plan, not of the wallet, so one
+    answer settles it for the whole run.
+    """
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "c.json")
+    asked = []
+
+    def refuse(a, c, k, s, b, **kw):
+        asked.append(c["name"])
+        b.spend()
+        return WalkResult([], s, 1, False, []), REFUSAL
+
+    monkeypatch.setattr(collect, "fetch_kind", refuse)
+
+    refused = {}
+    first = collect.sweep_wallet("0xone", [BASE], budget(), cluster=True,
+                                 plan_refused=refused)
+    second = collect.sweep_wallet("0xtwo", [BASE], budget(), cluster=True,
+                                  plan_refused=refused)
+
+    assert "base" in first["unsupported_sources"]
+    assert asked == ["base"], "the second wallet must not re-ask a refused chain"
+    # ...and the gap is still REPORTED, never silently dropped. A chain missing
+    # from the summary would pass for "nothing there", which is rule 5.
+    assert "base" in second["unsupported_sources"]
+    assert second["chains"]["base"]["error"] == REFUSAL
+
+
+def test_a_refused_chain_costs_no_further_call_budget(tmp_path, monkeypatch):
+    """The point of the skip is the spend, so pin the spend."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "c.json")
+
+    def refuse(a, c, k, s, b, **kw):
+        b.spend()
+        return WalkResult([], s, 1, False, []), REFUSAL
+
+    monkeypatch.setattr(collect, "fetch_kind", refuse)
+    refused, b = {}, budget()
+    collect.sweep_wallet("0xone", [BASE], b, cluster=True, plan_refused=refused)
+    spent_once = b.calls_used
+    collect.sweep_wallet("0xtwo", [BASE], b, cluster=True, plan_refused=refused)
+    assert b.calls_used == spent_once, "a known refusal must cost nothing"
+    assert spent_once > 0, "the first wallet really did pay to find out"
+
+
+def test_without_the_shared_set_each_sweep_still_stands_alone(tmp_path, monkeypatch):
+    """`plan_refused` is optional: callers that pass nothing behave as before."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "c.json")
+    asked = []
+
+    def refuse(a, c, k, s, b, **kw):
+        asked.append(c["name"])
+        b.spend()
+        return WalkResult([], s, 1, False, []), REFUSAL
+
+    monkeypatch.setattr(collect, "fetch_kind", refuse)
+    collect.sweep_wallet("0xone", [BASE], budget(), cluster=True)
+    collect.sweep_wallet("0xtwo", [BASE], budget(), cluster=True)
+    assert asked == ["base", "base"]
+
+
+def test_one_refusal_settles_a_chain_for_the_whole_wallet(tmp_path, monkeypatch):
+    """A refusal answers for the chain, not merely for the record kind asked.
+
+    The sweep walks three kinds per chain (erc20, native, internal), so a
+    refused chain cost three identical refusals per wallet — the 3 calls a
+    wallet spent on each of base, optimism and bsc in the live measurement.
+    """
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "c.json")
+    kinds = []
+
+    def refuse(a, c, k, s, b, **kw):
+        kinds.append(k)
+        b.spend()
+        return WalkResult([], s, 1, False, []), REFUSAL
+
+    monkeypatch.setattr(collect, "fetch_kind", refuse)
+    result = collect.sweep_wallet("0xone", [BASE], budget(), cluster=True)
+    assert len(kinds) == 1, "the other two kinds cannot succeed where the first was refused"
+    assert "base" in result["unsupported_sources"]
+    assert result["chains"]["base"]["error"] == REFUSAL
+
+
+def test_a_transient_error_on_one_kind_still_tries_the_others(tmp_path, monkeypatch):
+    """Only a PLAN refusal is final. A rate limit must not skip the rest —
+    that is the degraded/unsupported distinction, and merging the two once
+    stalled the frontier for two days."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    monkeypatch.setattr(collect, "SPAM_DIR", tmp_path / "transfers_spam")
+    monkeypatch.setattr(collect, "CURSOR_PATH", tmp_path / "state" / "c.json")
+    kinds = []
+
+    def limited(a, c, k, s, b, **kw):
+        kinds.append(k)
+        b.spend()
+        return WalkResult([], s, 1, False, []), "Max rate limit reached"
+
+    monkeypatch.setattr(collect, "fetch_kind", limited)
+    result = collect.sweep_wallet("0xone", [ARB], budget(), cluster=True)
+    assert kinds == list(collect.KINDS)
+    assert "arbitrum" in result["degraded_sources"]
