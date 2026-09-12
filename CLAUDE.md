@@ -544,6 +544,58 @@ destinations. It is now under close watch automatically. **No transfer to or
 from the target has ever been observed** — the correlation re-linked it across a
 gap on amount and timing alone.
 
+**The stored graph outgrew GitHub, so every trace run lost its work (fixed
+2026-09-12).** `data/transfer_graph/latest.json` reached **107 MB against a hard
+limit of 100 MiB**, and from **14:02 UTC every "Trace Fund Flows" run computed
+the graph and then had its push declined by the pre-receive hook** — failing the
+whole job, three runs in a row. Discovery is the only vector that reaches an
+address nobody has seen, and it had stopped being able to save anything.
+
+Note the units: the limit is 100 **MiB** = 104.86 MB. The version sitting on
+origin was 104.23 MB — 99.4 MiB, under by a hair — so the file had only just
+crossed, and the failure looked sudden while the cause had been building for
+weeks.
+
+**81.4 MB of it was `edges`: 212,457 of them, one node alone carrying 44,196
+`edge_ids`.** Nothing reads that array back. `collect_known_edges()` rebuilds
+every edge from `data/transfers/` on each run, and `annotate_changes`,
+`select_alerts`, `advance_alert_state` and `migrate_graph` never touch it. Its
+only consumers are the alert body — the earliest **15** of a node's edges, taken
+from the IN-MEMORY graph before the save — and the dashboard, which sorts a
+node's edges newest-first and shows **40**. The file was carrying 212,457 edges
+to serve a maximum of 40.
+
+`trim_edges_for_storage` keeps the **200 most recent per node**, applied at the
+SAVE only so `fire_alerts` still reads everything: **107.23 MB → 8.43 MB**, with
+`expanded_ledger` (2,037) and `frontier_queue` (176) — the state the next run
+depends on — untouched.
+
+**`edge_count`, `node.totals.edge_count` and `node.edge_ids` are deliberately
+NOT trimmed.** How many transfers were observed is a fact; which details we kept
+is a storage decision. A truncated list that reads as complete would understate
+a wallet's activity, and that is the direction that loses a migration — rule 5,
+pointed the expensive way. The file declares
+`edges_truncated`/`edges_per_node_cap`/`edges_stored`, and the dashboard now
+takes its count from `totals` and says when it is showing only the most recent
+held on file.
+
+**The next file to watch is the substrate, and nothing compacts it.** Measured
+the same day: `data/transfers/ethereum/2026-09-10.json` is **76.69 MB (73.1
+MiB)** for one finished day, with today's arbitrum at 58.95 MB and ethereum at
+50.12 MB still growing at 15:00 UTC. That is roughly 27% of headroom on a full
+day, and a busy day could cross. `scripts/compact_data.py` covers `scans/` and
+the per-minute snapshots and **does not touch `data/transfers/`** — which is
+awkward, because these files are the substrate `collect_known_edges()` rebuilds
+from, so they cannot simply be dropped. The same gzipped-JSONL rolling that
+script already applies to old snapshot days is the obvious answer, with
+`collect_known_edges` taught to read `.gz`. **Not built yet.**
+
+**Two general rules.** A repo that commits its own output on every run has a
+size budget, and nothing was watching it — the check is cheap and belongs in CI
+before the push, not in a pre-receive hook's rejection. And when a file has to
+shrink, ask **who actually reads the part that is large**: here the answer was
+"nobody, across runs" and the 92% reduction cost no consumer anything.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went

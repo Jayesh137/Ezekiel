@@ -110,6 +110,13 @@ jobs:
       - name: Commit and push
         if: always()
         run: |
+          # Before anything else: a blob over 100 MiB is refused by GitHub's
+          # pre-receive hook, which fails the push AFTER the work is done and
+          # throws the run's whole reading away. On 2026-09-12 the transfer
+          # graph crossed that line and three trace runs in a row died here,
+          # with the one sentence naming the file buried among five identical
+          # retry rejections. Said plainly, first, and nothing is committed.
+          python scripts/check_repo_size.py .
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add profile/ data/
