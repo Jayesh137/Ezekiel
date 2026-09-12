@@ -150,3 +150,74 @@ def test_a_book_on_a_new_dex_is_a_migration_inside_hyperliquid():
 def test_leading_a_vault_is_reported():
     got = wl.changes(wl.snapshot(W, vaults_led=[]), wl.snapshot(W, vaults_led=["0xV1"]))
     assert [(c["kind"], c["address"]) for c in got] == [("new_vault_led", "0xv1")]
+
+
+# --- relative size -------------------------------------------------------------
+#
+# Nothing compared a watched wallet's size with the target's until 2026-09-12,
+# so the fact that `0xdd53c529…` held $53.2M against his $24.1M — more than
+# twice the account it is a candidate FOR — was only ever found by hand.
+
+
+def test_the_ratio_to_the_target_is_recorded_and_is_none_when_he_is_unreadable():
+    known = wl.snapshot(W, account_value=53_211_991.0, target_value=24_105_539.0)
+    assert known["target_value"] == 24_105_539.0
+    assert known["size_ratio"] == round(53_211_991.0 / 24_105_539.0, 4)
+    # Rule 6: never price a missing value as 0.0 — zero is invisible to every
+    # threshold, and a ratio against an unread target is not "he has nothing".
+    blind = wl.snapshot(W, account_value=53_211_991.0, target_value=None)
+    assert blind["target_value"] is None and blind["size_ratio"] is None
+    assert wl.snapshot(W, account_value=None, target_value=24_105_539.0)["size_ratio"] is None
+    assert wl.snapshot(W, account_value=53_211_991.0, target_value=0.0)["size_ratio"] is None
+
+
+def test_outgrowing_the_target_is_reported_on_the_crossing():
+    before = wl.snapshot(W, account_value=20_000_000.0, target_value=24_000_000.0)
+    after = wl.snapshot(W, account_value=53_000_000.0, target_value=24_000_000.0)
+    got = wl.changes(before, after)
+    assert [c["kind"] for c in got if c["kind"] == "outgrew_target"] == ["outgrew_target"]
+    assert "2.21x" in [c for c in got if c["kind"] == "outgrew_target"][0]["detail"]
+
+
+def test_outgrowing_the_target_is_reported_once_not_every_run():
+    already = wl.snapshot(W, account_value=53_000_000.0, target_value=24_000_000.0)
+    later = wl.snapshot(W, account_value=54_000_000.0, target_value=24_000_000.0)
+    assert [c["kind"] for c in wl.changes(already, later)] == []
+
+
+def test_a_wallet_merely_near_his_size_has_not_outgrown_him():
+    before = wl.snapshot(W, account_value=20_000_000.0, target_value=24_000_000.0)
+    after = wl.snapshot(W, account_value=25_000_000.0, target_value=24_000_000.0)
+    assert [c["kind"] for c in wl.changes(before, after)] == []
+
+
+def _crossings(before, after):
+    """Only the size finding — a big move also fires `value_move`, separately."""
+    return [c for c in wl.changes(before, after) if c["kind"] == "outgrew_target"]
+
+
+def test_falling_back_below_re_arms_the_crossing():
+    above = wl.snapshot(W, account_value=53_000_000.0, target_value=24_000_000.0)
+    below = wl.snapshot(W, account_value=20_000_000.0, target_value=24_000_000.0)
+    assert _crossings(above, below) == []
+    assert [c["kind"] for c in _crossings(below, above)] == ["outgrew_target"]
+
+
+def test_an_unreadable_side_never_manufactures_a_crossing():
+    below = wl.snapshot(W, account_value=20_000_000.0, target_value=24_000_000.0)
+    no_target = wl.snapshot(W, account_value=53_000_000.0, target_value=None)
+    assert _crossings(below, no_target) == []
+
+
+def test_a_stored_record_from_before_this_existed_still_reports_the_crossing():
+    """An absent previous ratio must not read as "already above".
+
+    The wallet crossed weeks ago and no record carries the field, so skipping
+    it the way `vaults_led` skips a first reading would mean the operator is
+    never told. A duplicate after an outage costs one alert a day against the
+    24h cooldown; a missed crossing costs the mission.
+    """
+    before = wl.snapshot(W, account_value=20_000_000.0)
+    before.pop("size_ratio", None)
+    after = wl.snapshot(W, account_value=53_000_000.0, target_value=24_000_000.0)
+    assert [c["kind"] for c in _crossings(before, after)] == ["outgrew_target"]

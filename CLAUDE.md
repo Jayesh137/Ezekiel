@@ -83,7 +83,7 @@ trading style. Never promote a wallet on one vector alone.
 | Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
 | Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
 | Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
-| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets`: a wallet that is probably his and is not confirmed, read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
+| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets`: a wallet that is probably his and is not confirmed, read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts; a CHANGE is reported once, on the transition |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -130,6 +130,38 @@ three-week-old approval is not reported as a transition, the same rule
 `changes()` already applies to `vaults_led`, `dexes` and `hyperevm_nonce`.
 **When adding a field to a watch, ask which OTHER endpoint answers for it.**
 
+**It is now worth more than he is, and nothing in the system knew (fixed
+2026-09-12).** The watch read its value every eleven minutes and never asked
+what the TARGET was worth, so the plainest reading of a migration in progress —
+capital leaving him and appearing somewhere else — could only be found by
+hand-diffing two files, which is how it was found. Measured: the watched wallet
+**$53.2M** against his **$24.1M across perp, `xyz` and spot**, a ratio of
+**2.21x**. The owner is copy-trading, by hand, the smaller half of what may be
+one book.
+
+`snapshot` now carries `target_value` and `size_ratio`, and `changes` reports
+`outgrew_target` on the crossing. Three things decided deliberately:
+
+- **Both sides are read by one function** (`check_watchlist.account_value`),
+  across the same live dexes plus spot. The stored `data/account/latest.json`
+  was the tempting source and is the wrong one: it holds only the CONFIGURED
+  dexes and is written by a best-effort cron, so it would divide two different
+  quantities and could manufacture a crossing out of a stale file.
+- **A band at 1.15x, not parity.** Both are live books — he fell 42% in one day
+  on $138M notional while `withdrawable` stayed $0.00, which is the market
+  marking him, not money moving. At parity the pair would flap across the line
+  on noise like that.
+- **An ABSENT previous ratio counts as below the band, not as a first reading
+  to skip.** This is the opposite of the `extraAgents` seeding decision and the
+  reason is the asymmetry: that was a three-week-old approval whose transition
+  had already passed, this is a live state nobody has ever been told. A repeat
+  after an outage costs one alert a day against the 24h cooldown; a missed
+  crossing costs the mission. It rates HIGH, not CRITICAL — a size ratio is an
+  inference, not a contact with his world.
+
+Nothing reads `data/watchlist/latest.json` on the dashboard, so the ratio is in
+the record and the run log, and reaches the operator through the alert.
+
 **That agent is bot-shaped, and it leans away from him.** Named for the
 wallet's own birth day, so approved at funding: API-driven from day one, where
 the target signs from the web frontend (unnamed `agentAddress`, 94.6% `Ioc`
@@ -153,10 +185,18 @@ so it rates HIGH.
 
 ## Vectors collected but NOT wired into detection — pursue these
 
-- **`data/agents/`** — HL API agent wallets. An agent is *explicitly authorised*
-  by an account. An agent shared between two accounts is close to proof of common
-  control. Collected by `collector.py`, used by nothing. **Highest-value unused
-  signal.**
+- ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
+  on claiming otherwise until 2026-09-12 while the table above already listed
+  the vector as working. `agent_links.py` + `scripts/check_agents.py` run in
+  `trace.yml`, `roster.py` reads the result as `VECTOR_AGENT` — the one vector
+  that CONFIRMs alone — and the close watch asks `extraAgents` per wallet.
+  The live answer is a real and useful **no**: 120 wallets, 49 agents seen,
+  **0 shared, 0 naming-family hits, 0 linked to the target**. His frontend
+  agent `0x98cf3fee…` and the watched wallet's named bot agent `0x1e8695b7…`
+  each resolve by `userRole` to their own owner and to nobody else. Worth
+  keeping written down: the strongest vector in the project has been asked and
+  does not connect `0xdd53c529…` to him, which is evidence to weigh against the
+  amount/timing match rather than a gap still to be filled.
 - ~~`data/orders/`~~ — **wired 2026-09-10** as the `order_profile` dimension.
   54,866 records were being collected and never read. It discriminates hard:
   the target is 94.6% `Ioc` limit slices with **0% cancels and 0% client order

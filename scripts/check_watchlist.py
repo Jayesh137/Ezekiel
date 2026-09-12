@@ -110,7 +110,47 @@ def _previous() -> dict:
         return {}
 
 
-def read_wallet(address: str, config: dict) -> tuple[dict, list]:
+def account_value(address: str, dexes: list) -> tuple[float, dict]:
+    """What an account is worth across every dex it can trade, plus spot USDC.
+
+    One function for BOTH sides of the comparison. A watched wallet read across
+    the live dexes against a target read some other way would divide two
+    different quantities and call the answer a ratio, which is how this project
+    has been bitten before — so the only way to read a value here is this one.
+
+    Raises rather than returning a number it could not compute: the callers
+    disagree about what to do with a failure and neither may see a 0.0.
+    """
+    state = merged_clearinghouse_state(address, dexes=dexes)
+    value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+    spot = hl_post({"type": "spotClearinghouseState", "user": address}) or {}
+    for b in spot.get("balances") or []:
+        if str(b.get("coin", "")).upper() == "USDC":
+            value += float(b.get("total") or 0)
+    return value, state
+
+
+def target_account_value(config: dict) -> float | None:
+    """The target's own size, so a watched wallet can be measured against it.
+
+    None when he could not be read. Rule 6: a target priced at 0.0 would make
+    every watched wallet infinitely larger than him and fire the crossing on an
+    outage — the one reading that must never be manufactured.
+    """
+    target = (config.get("target_wallet") or "").strip().lower()
+    if not target:
+        return None
+    try:
+        return account_value(target, live_hip3_dexes())[0]
+    except Exception as exc:                          # noqa: BLE001 - transport
+        print(f"[watchlist] the target's own value is unreadable "
+              f"({type(exc).__name__}: {exc}) — no wallet can be sized against "
+              f"him this run")
+        return None
+
+
+def read_wallet(address: str, config: dict, target_value: float | None = None
+                ) -> tuple[dict, list]:
     """One reading, plus every counterparty it has been seen with."""
     errors, counterparties = [], set()
 
@@ -120,18 +160,13 @@ def read_wallet(address: str, config: dict) -> tuple[dict, list]:
 
     value, dexes = None, []
     try:
-        state = merged_clearinghouse_state(address, dexes=live_hip3_dexes())
-        value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+        value, state = account_value(address, live_hip3_dexes())
         # Which venues it actually has a book on. A position opening on a dex
         # it has never used is what a migration INSIDE Hyperliquid looks like,
         # and the total account value alone cannot show it.
         for pos in state.get("assetPositions") or []:
             coin = str(((pos or {}).get("position") or {}).get("coin") or "")
             dexes.append(coin.split(":", 1)[0].lower() if ":" in coin else "perp")
-        spot = hl_post({"type": "spotClearinghouseState", "user": address}) or {}
-        for b in spot.get("balances") or []:
-            if str(b.get("coin", "")).upper() == "USDC":
-                value += float(b.get("total") or 0)
     except Exception as exc:                          # noqa: BLE001 - transport
         errors.append(f"account value: {type(exc).__name__}: {exc}")
 
@@ -203,6 +238,7 @@ def read_wallet(address: str, config: dict) -> tuple[dict, list]:
         vaults_led=[(v or {}).get("vaultAddress") if isinstance(v, dict) else v
                     for v in (ident.get("leading_vaults") or [])],
         dexes=dexes if value is not None else None,
+        target_value=target_value,
         read_ok=not errors, errors=errors)
     return snap, sorted(counterparties)
 
@@ -275,10 +311,18 @@ def main() -> int:
     previous = _previous()
     snapshots, found_changes, found_contacts = [], {}, {}
 
+    # Once per run, so every watched wallet is sized against the same moment of
+    # his book rather than against whatever it happened to be worth when its
+    # own turn came round.
+    his_value = target_account_value(config)
+    if his_value is not None:
+        print(f"[watchlist] the target is worth ${his_value:,.0f} across every "
+              f"live dex and spot")
+
     for entry in wallets:
         address = entry["address"]
         sweep(address, config)
-        snap, counterparties = read_wallet(address, config)
+        snap, counterparties = read_wallet(address, config, target_value=his_value)
         snap["why"] = entry.get("why")
         snapshots.append(snap)
 
@@ -291,8 +335,10 @@ def main() -> int:
             found_changes[address] = deltas
 
         value = snap["account_value"]
+        ratio = snap["size_ratio"]
         print(f"[watchlist] {address} role={snap['role']} "
               f"value={'unreadable' if value is None else f'${value:,.0f}'} "
+              f"vs-target={'unknown' if ratio is None else f'{ratio:.2f}x'} "
               f"agents={len(snap['agents'])} subaccounts={len(snap['subaccounts'])} "
               f"withdrawals={len(snap['withdrawal_destinations'])} "
               f"nonce={snap['hyperevm_nonce']} counterparties={len(counterparties)}")

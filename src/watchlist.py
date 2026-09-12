@@ -49,6 +49,34 @@ EMPTY_USD = 10_000.0
 # silence of days is a change of state, not a quiet weekend.
 QUIET_DAYS = 3.0
 
+# How much bigger than the target a watched wallet must be before its size is
+# news. A migration shows up as capital LEAVING him and appearing elsewhere, so
+# the relative size of the two accounts is the plainest reading of how far one
+# has gone — and nothing here compared them until 2026-09-12, which is how
+# `0xdd53c529…` came to hold $53.2M against his $24.1M, more than twice the
+# account it is a candidate FOR, with the operator manually copy-trading the
+# smaller half and never told.
+#
+# A band, not parity, because both are live trading books: he fell 42% in a
+# single day on a $138M notional short while `withdrawable` stayed $0.00, which
+# is the market marking him, not money moving. At parity the pair would flap
+# across the line on noise like that; 15% clear of it takes a real difference.
+OUTGREW_TARGET = 1.15
+
+
+def _ratio(value, target):
+    """`value` as a multiple of `target`, or None if either is not a reading.
+
+    Rule 6: never price a missing value as 0.0. A target of zero is not a
+    wallet infinitely outgrown, it is a wallet with nothing in it, and dividing
+    by it would report the largest ratio the system can express.
+    """
+    if not isinstance(value, (int, float)) or not isinstance(target, (int, float)):
+        return None
+    if target <= 0:
+        return None
+    return round(value / target, 4)
+
 
 def watched(config: dict) -> list[dict]:
     """Normalise `config.watch_wallets`, accepting plain addresses or objects."""
@@ -68,7 +96,7 @@ def snapshot(address: str, *, account_value=None, last_fill_ms=None,
              agents=None, subaccounts=None, withdrawal_destinations=None,
              hyperevm_nonce=None, role=None, master=None, owner=None,
              staking_link=None, vaults_led=None, dexes=None,
-             read_ok: bool = True, errors=None) -> dict:
+             target_value=None, read_ok: bool = True, errors=None) -> dict:
     """One reading of a watched wallet. Absent fields stay None, never 0.
 
     `master`, `owner` and `staking_link` are the fields that can NAME another
@@ -76,6 +104,11 @@ def snapshot(address: str, *, account_value=None, last_fill_ms=None,
     somebody's agent, or paired with a staking wallet. Each is an act its owner
     performed, so each confirms on its own — and none of them was being stored,
     let alone diffed, until 2026-09-11.
+
+    `target_value` is what the TARGET was worth at the same moment, read the
+    same way, so `size_ratio` compares like with like. It stays None whenever
+    either side could not be read: a ratio against an unreadable account is
+    "we could not tell", never "he has nothing".
     """
     return {
         "address": (address or "").lower(),
@@ -99,6 +132,8 @@ def snapshot(address: str, *, account_value=None, last_fill_ms=None,
             {(v or "").lower() for v in vaults_led if v}),
         "dexes": None if dexes is None else sorted(
             {str(d).lower() for d in dexes if d}),
+        "target_value": target_value,
+        "size_ratio": _ratio(account_value, target_value),
     }
 
 
@@ -126,6 +161,22 @@ def changes(previous: dict | None, current: dict, now_ms: int | None = None) -> 
                 out.append({"kind": "value_move",
                             "detail": f"{direction} {abs(move):.0%}: "
                                       f"${before:,.0f} -> ${after:,.0f}"})
+
+    # Outgrowing him. Reported on the crossing only, like every other change
+    # here — but an ABSENT previous ratio counts as below the band rather than
+    # as a first reading to be skipped. The wallet crossed weeks before this
+    # was built and no stored record carries the field, so treating it the way
+    # `vaults_led` treats a first reading would mean the operator is never
+    # told at all. The cost of the other error is bounded: `alert_watchlist_change`
+    # cools down 24h on the same kind, so a re-read after an outage repeats at
+    # most once a day, while a missed crossing is the mission failing quietly.
+    was_ratio, now_ratio = previous.get("size_ratio"), current.get("size_ratio")
+    if isinstance(now_ratio, (int, float)) and now_ratio >= OUTGREW_TARGET:
+        if not (isinstance(was_ratio, (int, float)) and was_ratio >= OUTGREW_TARGET):
+            out.append({"kind": "outgrew_target",
+                        "detail": f"worth {now_ratio:.2f}x the target: "
+                                  f"${current.get('account_value'):,.0f} against "
+                                  f"${current.get('target_value'):,.0f}"})
 
     for field, kind, label in (("agents", "new_agent", "authorised an agent"),
                                ("subaccounts", "new_subaccount", "created a sub-account"),

@@ -108,3 +108,102 @@ def test_an_account_with_no_agents_reads_clean(monkeypatch):
     assert snap["agents"] == []
     assert snap["read_ok"] is True
     assert snap["errors"] == []
+
+
+# --- the target's own size, for comparison -------------------------------------
+#
+# A watched wallet is only interesting relative to the account it is a
+# candidate for, and nothing read both. Measured 2026-09-11: the watched wallet
+# $53.2M, the target $24.1M across perp, xyz and spot.
+
+T = "0x45d26f28196d226497130c4bac709d808fed4029"
+
+
+def test_the_targets_value_is_read_the_same_way_the_watched_wallet_is(monkeypatch):
+    """Apples to apples, or the ratio is meaningless.
+
+    `data/account/latest.json` holds only the CONFIGURED dexes (xyz) and is
+    written by a best-effort cron, so comparing it against a watched wallet
+    read across every LIVE dex would divide two different quantities and could
+    manufacture a crossing out of a stale file.
+    """
+    seen = {}
+
+    def fake_merged(addr, **kw):
+        seen[addr] = kw.get("dexes")
+        return {"marginSummary": {"accountValue": "17357742.18"}, "assetPositions": []}
+
+    monkeypatch.setattr(check, "merged_clearinghouse_state", fake_merged)
+    monkeypatch.setattr(check, "live_hip3_dexes", lambda: ["xyz", "flx"])
+    monkeypatch.setattr(check, "hl_post", lambda body: {
+        "balances": [{"coin": "USDC", "total": "6747796.94"}]})
+
+    value = check.target_account_value({"target_wallet": T.upper()})
+
+    assert seen[T] == ["xyz", "flx"], "the target was not read across the live dexes"
+    assert value == 17357742.18 + 6747796.94
+
+
+def test_an_unreadable_target_is_none_not_zero(monkeypatch):
+    """Rule 6. A target priced at 0.0 makes every watched wallet infinitely
+    larger than him, which would fire the crossing on an outage."""
+    def boom(addr, **kw):
+        raise RuntimeError("503")
+
+    monkeypatch.setattr(check, "merged_clearinghouse_state", boom)
+    monkeypatch.setattr(check, "live_hip3_dexes", lambda: [])
+
+    assert check.target_account_value({"target_wallet": T}) is None
+
+
+def test_the_reading_carries_the_targets_value_and_the_ratio(monkeypatch):
+    _stub(monkeypatch, extra_agents=[])
+
+    snap, _ = check.read_wallet(W, {}, target_value=24_105_539.0)
+
+    assert snap["target_value"] == 24_105_539.0
+    assert snap["size_ratio"] == round(53616202.18 / 24_105_539.0, 4)
+
+
+def test_a_reading_with_no_target_value_still_records_the_wallet(monkeypatch):
+    """The watch must not stop working because his own account was unreadable."""
+    _stub(monkeypatch, extra_agents=[])
+
+    snap, _ = check.read_wallet(W, {})
+
+    assert snap["account_value"] == 53616202.18
+    assert snap["target_value"] is None and snap["size_ratio"] is None
+    assert snap["read_ok"] is True
+
+
+def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
+    """Every watched wallet is compared against the SAME reading of him.
+
+    Pricing him per wallet would spend a call set each time and, worse, compare
+    wallets against different moments of a book that moved 42% in a day.
+    """
+    calls, given = [], []
+    second = "0x1419e75330c71ce463102e6a1eb62fe80b412d5f"
+
+    def fake_target_value(config):
+        calls.append(config)
+        return 24_105_539.0
+
+    def fake_read_wallet(address, config, target_value=None):
+        given.append((address, target_value))
+        return check.snapshot(address, account_value=1.0,
+                              target_value=target_value), []
+
+    monkeypatch.setattr(check, "load_config", lambda: {
+        "target_wallet": T, "watch_wallets": [W, second]})
+    monkeypatch.setattr(check, "target_account_value", fake_target_value)
+    monkeypatch.setattr(check, "read_wallet", fake_read_wallet)
+    monkeypatch.setattr(check, "sweep", lambda addr, cfg: None)
+    monkeypatch.setattr(check, "target_world", lambda cfg: {})
+    monkeypatch.setattr(check, "_previous", lambda: {})
+    monkeypatch.setattr(check, "busy_flags", lambda hits: {})
+    monkeypatch.setattr(check, "save", lambda report: None)
+
+    assert check.main() == 0
+    assert len(calls) == 1, "the target was priced more than once"
+    assert given == [(W, 24_105_539.0), (second, 24_105_539.0)]
