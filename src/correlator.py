@@ -378,11 +378,36 @@ def get_recent_cctp_deposits(window_days: float, min_amount: float, *, post=None
 
 
 def _stored_pools() -> dict:
+    """The per-pool blocks last written, migrating a pre-`pools` file once.
+
+    Before the split there was one pool — the Arbitrum bridge — and its answer
+    was the flat `matches` list. A `--pools cctp` run preserves what it did not
+    read by copying `stored[name]`, so against that older shape it preserved
+    nothing and overwrote the bridge's last answer with silence. Measured live
+    2026-09-12: 7-10 matches every run up to 02:14, then 0 on every run after
+    the split, with `pools` holding `cctp` alone. Nothing had cleared the bridge
+    pool; it had simply stopped being asked, and its previous answer was gone.
+
+    Keyed on the ABSENCE of a bridge block rather than on the presence of the
+    legacy list — the same rule the alert shards follow. `latest.json` is
+    rewritten carrying both shapes, so a migration keyed the other way would
+    fold its own output back in on every subsequent run.
+    """
     try:
         import json
         with open(DATA_DIR / "correlations" / "latest.json") as f:
-            pools = json.load(f).get("pools")
-        return pools if isinstance(pools, dict) else {}
+            doc = json.load(f)
+        pools = doc.get("pools")
+        pools = dict(pools) if isinstance(pools, dict) else {}
+        if "bridge" not in pools and isinstance(doc.get("matches"), list):
+            pools["bridge"] = {
+                "computed_at": doc.get("computed_at"),
+                "candidate_pool_error": doc.get("candidate_pool_error"),
+                "candidates_considered": doc.get("candidates_considered") or 0,
+                "matches": [{**m, "via": m.get("via") or "bridge"}
+                            for m in doc["matches"] if isinstance(m, dict)],
+            }
+        return pools
     except (OSError, ValueError, AttributeError):
         return {}
 

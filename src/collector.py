@@ -427,16 +427,17 @@ def check_silence() -> None:
         write_cursor("last_silence_alert", now_ms())
 
 
-def new_dexes(known, latest) -> list | None:
-    """HIP-3 dexes carrying a book now that are not in `known`. Pure.
+def live_dexes(latest) -> set | None:
+    """Every HIP-3 dex carrying a book in this account reading. Pure.
 
-    Returns None when the account reading could not be understood — rule 5: an
+    Returns None when the reading could not be understood — rule 5: an
     unparseable file says nothing about which dexes he trades, and must not be
     read either as "no new dex" or as confirmation of the stored set.
 
-    `known` of None is a FIRST reading: a baseline, not news. Without that,
-    the first run after this shipped would report every dex he has ever used
-    as new.
+    Separate from `new_dexes` because the CALLER needs it. The diff alone is
+    not enough to seed a baseline: on a first reading the diff is empty by
+    design, so a caller with only the diff stores an empty set and throws the
+    live reading away. See `check_new_dex`.
     """
     if not isinstance(latest, dict):
         return None
@@ -456,6 +457,21 @@ def new_dexes(known, latest) -> list | None:
         # entry that reads as empty is an artefact, not a book.
         if value or positions:
             live.add(str(dex))
+    return live
+
+
+def new_dexes(known, latest) -> list | None:
+    """HIP-3 dexes carrying a book now that are not in `known`. Pure.
+
+    Returns None when the account reading could not be understood.
+
+    `known` of None is a FIRST reading: a baseline, not news. Without that,
+    the first run after this shipped would report every dex he has ever used
+    as new.
+    """
+    live = live_dexes(latest)
+    if live is None:
+        return None
     if known is None:
         return []
     return sorted(live - {str(d) for d in known})
@@ -494,9 +510,16 @@ def check_new_dex() -> None:
         print(f"[collector] NEW DEX: {fresh} (previously {known})")
         alert_new_dex(load_config()["target_wallet"], fresh, known or [])
 
-    # Record the set every run, so a dex he stops using is not reported as new
-    # when he returns to it, and so the first run only ever seeds a baseline.
-    current = sorted(set(known or []) | set(fresh))
+    # Record what he is LIVE on, unioned with what was already known, so that a
+    # dex he stops using is not reported as new when he returns to it.
+    #
+    # `fresh` is the wrong thing to store on its own: it is empty on a first
+    # reading by design, so `known | fresh` seeded an EMPTY baseline and the
+    # next run read it as "he trades no dexes". Measured live 2026-09-12 — the
+    # state file was written empty at baseline and `xyz`, the single dex he has
+    # used all along, fired a CRITICAL at 07:28 UTC. A false alarm at the top
+    # severity, on the alarm for a migration inside Hyperliquid.
+    current = sorted(set(known or []) | (live_dexes(latest) or set()))
     write_cursor_text("known_hip3_dexes", ",".join(current))
 
 

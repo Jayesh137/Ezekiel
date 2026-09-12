@@ -97,3 +97,89 @@ def test_no_new_dex_sends_nothing(monkeypatch):
     sent = []
     monkeypatch.setattr(alerts, "_send_with_cooldown", lambda *a: sent.append(a) or True)
     assert alerts.alert_new_dex(T, [], ["xyz"]) is False and sent == []
+
+
+# --- the baseline the caller stores -----------------------------------------
+
+def _wire_check(tmp_path, monkeypatch):
+    """check_new_dex against a sandboxed data dir, collecting alerts."""
+    import json
+
+    from src import utils
+    monkeypatch.setattr(collector, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(utils, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(collector, "load_config", lambda: {"target_wallet": T})
+    (tmp_path / "account").mkdir(parents=True, exist_ok=True)
+    fired = []
+    monkeypatch.setattr(alerts, "alert_new_dex",
+                        lambda w, fresh, known: fired.append((fresh, known)) or True)
+
+    def write_account(dexes):
+        (tmp_path / "account" / "latest.json").write_text(json.dumps(_acct(dexes)))
+
+    return write_account, fired
+
+
+def test_the_first_reading_stores_the_dexes_he_ALREADY_uses(tmp_path, monkeypatch):
+    """The baseline must record the live set, not the empty diff.
+
+    `new_dexes` correctly answers "no news" on a first reading, but it returns
+    only the DIFF — so the caller, computing `known | fresh`, stored an empty
+    set and threw the live reading away. Measured live 2026-09-12: the state
+    file was written empty by the baseline run, the next run read it as "he
+    trades no dexes", and `xyz` — the one dex he has used all along — fired
+    `CRITICAL: Target Opened A Book On A New Dex (xyz)` at 07:28 UTC.
+
+    A false CRITICAL is the expensive kind. It is how an operator learns to
+    swipe the channel away, and this one landed on the alarm for a migration
+    inside Hyperliquid.
+    """
+    from src.utils import read_cursor_text
+    write_account, fired = _wire_check(tmp_path, monkeypatch)
+    write_account(["xyz"])
+
+    collector.check_new_dex()
+
+    assert fired == []
+    assert read_cursor_text("known_hip3_dexes") == "xyz"
+
+
+def test_the_run_after_a_baseline_does_not_re_report_the_same_dex(tmp_path, monkeypatch):
+    """The regression itself: two runs, same dex, no alert."""
+    write_account, fired = _wire_check(tmp_path, monkeypatch)
+    write_account(["xyz"])
+
+    collector.check_new_dex()
+    collector.check_new_dex()
+
+    assert fired == []
+
+
+def test_a_dex_opened_after_the_baseline_still_alerts(tmp_path, monkeypatch):
+    """Seeding the baseline must not blunt the alarm it exists to arm."""
+    from src.utils import read_cursor_text
+    write_account, fired = _wire_check(tmp_path, monkeypatch)
+    write_account(["xyz"])
+    collector.check_new_dex()
+
+    write_account(["xyz", "flx"])
+    collector.check_new_dex()
+
+    assert fired == [(["flx"], ["xyz"])]
+    assert read_cursor_text("known_hip3_dexes") == "flx,xyz"
+
+
+def test_an_unreadable_account_never_overwrites_the_stored_set(tmp_path, monkeypatch):
+    """Rule 5: 'we could not tell' must not be stored as 'he trades nothing'."""
+    import json
+
+    from src.utils import read_cursor_text
+    write_account, fired = _wire_check(tmp_path, monkeypatch)
+    write_account(["xyz"])
+    collector.check_new_dex()
+
+    (tmp_path / "account" / "latest.json").write_text(json.dumps({"perp": {}}))
+    collector.check_new_dex()
+
+    assert read_cursor_text("known_hip3_dexes") == "xyz"
+    assert fired == []

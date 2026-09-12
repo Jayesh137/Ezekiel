@@ -85,10 +85,21 @@ $Ref = "main"
 # dispatched run was evicted (run 34673027518, conclusion "cancelled").
 # Nothing was lost — the evicting run does the same work — but the dispatch
 # was wasted, so this script now refuses to queue behind a busy group.
+#
+# analyze.yml and scan.yml are here because a DAILY cron is the most droppable
+# kind. GitHub delivered trace.yml's 30-minute cron a median of 198 minutes
+# apart; a once-a-day job that gets dropped is gone for a day, and analyze.yml
+# is the ONLY thing that reads the Arbitrum bridge candidate pool, rebuilds the
+# fingerprint and runs the GCR wallet tripwire. Measured 2026-09-12: the bridge
+# pool had not been refreshed since 02:14 and the correlator had matched
+# nothing for six hours. Their intervals are their own crons, so the two
+# schedulers agree rather than doubling up.
 $Schedule = @(
-    @{ File = "watch.yml";   Minutes = 10; Group = "watch" },
-    @{ File = "collect.yml"; Minutes = 15; Group = "data-commit" },
-    @{ File = "trace.yml";   Minutes = 30; Group = "data-commit" }
+    @{ File = "watch.yml";   Minutes = 10;   Group = "watch" },
+    @{ File = "collect.yml"; Minutes = 15;   Group = "data-commit" },
+    @{ File = "trace.yml";   Minutes = 30;   Group = "data-commit" },
+    @{ File = "scan.yml";    Minutes = 60;   Group = "data-commit" },
+    @{ File = "analyze.yml"; Minutes = 1440; Group = "data-commit" }
 )
 
 # Every workflow sharing the `data-commit` group, including the ones this

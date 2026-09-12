@@ -93,7 +93,8 @@
 				<th>Wallet</th>
 				<th>Tier</th>
 				<th class="num">Vectors</th>
-				<th class="num">Confidence</th>
+				<th class="num" title="Transfer-graph confidence. A wallet the graph never scored has no reading here and shows — , never 0%.">Confidence</th>
+				<th class="num" title="Chase priority: the best score any vector gives this wallet. Different scales, so it orders the queue and is not a confidence.">Strength</th>
 				<th>Supported by</th>
 			</tr>
 		</thead>
@@ -103,7 +104,13 @@
 					<td><Addr addr={w.wallet} /></td>
 					<td><span class="badge {TIER_BADGE[w.tier] || 'badge-grey'}">{TIER_LABEL[w.tier] || w.tier}</span></td>
 					<td class="num">{w.vector_count}</td>
-					<td class="num">{(w.confidence * 100).toFixed(0)}%</td>
+					<!-- Rule 6 in the UI: `confidence` is produced by the transfer graph
+					     alone, so a wallet reached by correlation, dormancy or an explicit
+					     link has no reading here. Rendering that as 0% prices a missing
+					     value as a measured zero, and put a 0.9974 correlation lead on
+					     screen showing "0%" at rank 2. -->
+					<td class="num">{w.confidence ? (w.confidence * 100).toFixed(0) + '%' : '—'}</td>
+					<td class="num">{w.rank_strength ? (w.rank_strength * 100).toFixed(0) + '%' : '—'}</td>
 					<td class="vectors">
 						{#each w.vectors as v}<span class="chip">{VECTOR_LABEL[v] || v}</span>{/each}
 						{#if !w.vectors.length}<span class="text-muted">—</span>{/if}
@@ -111,7 +118,7 @@
 				</tr>
 				{#if expanded === w.wallet}
 					<tr class="detail">
-						<td colspan="5">
+						<td colspan="6">
 							{#if w.known_self}
 								<p><strong>Known wallet of the target</strong> (from config, operator ground truth).</p>
 							{/if}

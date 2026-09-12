@@ -34,6 +34,25 @@ from src.utils import DATA_DIR, save_latest
 AGENT_LINKS_DIR = DATA_DIR / "agent_links"
 
 
+def webdata_is_unreadable(payload) -> bool:
+    """True when a `webData2` response is a failed read rather than an answer.
+
+    `utils.hl_post` returns a sentinel once every retry is exhausted — `{}` for
+    this request type — and `hl_identity.parse_web_data({})` answers
+    `agent_address: None`, which is exactly what a real account with no frontend
+    agent looks like. A successful webData2 read always carries a document (the
+    clearinghouse state at minimum), so an empty payload is only ever a failure.
+
+    It matters here more than almost anywhere: webData2 is the ONLY endpoint
+    that reports the agent which actually signs a wallet's orders, and two
+    accounts driven by the same one are the same browser session — the vector
+    strong enough to CONFIRM alone. `extraAgents` was already guarded this way
+    and its sibling call was not, so a timeout read as "he has authorised
+    nobody" while `unreadable` stayed 0.
+    """
+    return not isinstance(payload, dict) or not payload
+
+
 def normalise_agents(payload) -> list[dict]:
     """Agent entries out of whatever an endpoint returned.
 

@@ -32,21 +32,22 @@ MAX_CANDIDATES = 40
 
 
 def candidate_wallets(config: dict) -> list[str]:
-    target = (config.get("target_wallet") or "").lower()
-    out, seen = [], {target}
+    """Roster candidates then newborns, with the operator's wallets pinned first.
+
+    The two sources are concatenated and handed to one selector so the pinning
+    rule is applied once. See `roster.detector_candidates`.
+    """
+    from src.roster import detector_candidates
+
+    rows = []
     for source, key in (("roster", "wallets"), ("newborn", "newborn")):
         try:
             with open(DATA_DIR / source / "latest.json") as f:
-                rows = json.load(f).get(key, [])
+                got = json.load(f).get(key, [])
         except (OSError, ValueError, AttributeError):
-            rows = []
-        for row in rows:
-            a = (row.get("wallet") or "").lower()
-            if not a or a in seen or row.get("tier") == "INFRASTRUCTURE":
-                continue
-            seen.add(a)
-            out.append(a)
-    return out[:MAX_CANDIDATES]
+            got = []
+        rows += [r for r in got if isinstance(r, dict)]
+    return detector_candidates(config, {"wallets": rows}, MAX_CANDIDATES)
 
 
 MAX_HISTORY = 5000
