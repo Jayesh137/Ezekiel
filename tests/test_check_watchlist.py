@@ -207,3 +207,21 @@ def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
     assert check.main() == 0
     assert len(calls) == 1, "the target was priced more than once"
     assert given == [(W, 24_105_539.0), (second, 24_105_539.0)]
+
+
+def test_a_cctp_withdrawal_counts_as_a_withdrawal_destination(monkeypatch):
+    """`sendToEvmWithData` is the native Circle withdrawal. The ledger shows
+    it only as a send to 0x2000…0000; the explorer payload names the real
+    recipient, and the watch must treat that recipient exactly as it treats a
+    `withdraw3` destination — as a counterparty and a withdrawal."""
+    _stub(monkeypatch, extra_agents=[])
+    recipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+    monkeypatch.setattr(check, "own_actions", lambda rows, addr: [
+        {"hash": "0x1", "time": 1, "type": "sendToEvmWithData", "destination": recipient,
+         "destination_chain": "base", "destination_domain": 6, "amount": "2500000",
+         "token": "USDC", "error": None, "action": {}}])
+
+    snap, counterparties = check.read_wallet(W, {})
+
+    assert snap["withdrawal_destinations"] == [recipient]
+    assert recipient in counterparties

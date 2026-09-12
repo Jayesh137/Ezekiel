@@ -198,7 +198,10 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
             dest = a.get("destination")
             if dest:
                 counterparties.add(dest)
-                if a["type"] in ("withdraw3", "usdSend", "spotSend", "sendAsset"):
+                # sendToEvmWithData is the native Circle withdrawal: it names
+                # a recipient on any CCTP chain, and the ledger cannot show it.
+                if a["type"] in ("withdraw3", "sendToEvmWithData", "usdSend",
+                                 "spotSend", "sendAsset"):
                     withdrawals.append(dest)
                 elif a["type"] == "approveAgent":
                     agents.append(dest)

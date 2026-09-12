@@ -326,7 +326,8 @@ def collect_actions() -> None:
             except (TypeError, ValueError):
                 pass
             alert_foreign_destination(wallet, f["type"], f["destination"],
-                                      f.get("amount"), f.get("token"), when, f.get("hash"))
+                                      f.get("amount"), f.get("token"), when, f.get("hash"),
+                                      chain=f.get("destination_chain"))
         added = record(wallet, acts)
         reports[wallet] = summarise(wallet, acts, foreign_destinations(acts, cluster, ignore), error)
         reports[wallet]["new_this_run"] = added

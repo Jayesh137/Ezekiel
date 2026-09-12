@@ -22,6 +22,14 @@ Three things this module is careful about:
   * A withdrawal, send or sub-account transfer to an address outside the
     cluster is the event this project exists to catch, and it is alerted the
     moment it is seen. Everything else is evidence.
+  * `sendToEvmWithData` is Hyperliquid's native Circle/CCTP withdrawal, and
+    it is the one that can name ANY recipient on ANY CCTP chain. The info
+    API's ledger shows it only as a spot `send` to `0x2000...0000`; this
+    payload is the only place the recipient and chain appear, and
+    `destinationChainId` is a Circle domain (3 = Arbitrum, 6 = Base, 5 =
+    Solana, 19 = HyperEVM), not an EVM chain id. Found 2026-09-12: six of
+    them, $30M, all to his own Arbitrum address — recorded here for months
+    with `destination: None` and never alerted.
 """
 
 import sys
@@ -30,6 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.chain.bridges import CCTP_DOMAINS
 from src.utils import DATA_DIR, append_records, save_latest
 
 EXPLORER_URL = "https://rpc.hyperliquid.xyz/explorer"
@@ -44,6 +53,7 @@ TRADING_ACTIONS = {"order", "cancel", "cancelByCloid", "modify", "batchModify",
 # Actions that move value to, or hand control to, another address.
 DESTINATION_FIELDS = {
     "withdraw3": "destination",
+    "sendToEvmWithData": "destinationRecipient",
     "usdSend": "destination",
     "spotSend": "destination",
     "sendAsset": "destination",
@@ -82,6 +92,31 @@ def fetch_actions(address: str, *, post=None, timeout: float = 30.0) -> tuple[li
     return txs, None
 
 
+def normalise_address(value: str) -> str:
+    """Lowercase a hex address; keep anything else (a base58 Solana address,
+    say) verbatim, because base58 is case-sensitive and a lowercased one
+    would match nothing — including the cluster entry it should match."""
+    v = (value or "").strip()
+    if v.startswith(("0x", "0X")) and all(c in "0123456789abcdefABCDEF" for c in v[2:]):
+        return v.lower()
+    return v
+
+
+def cctp_destination(action: dict) -> tuple[int | None, str | None]:
+    """(domain, chain) named by a `sendToEvmWithData` payload.
+
+    An unknown domain is named `domain-N` rather than dropped: a chain Circle
+    added after this table was written is exactly where a migration would go
+    unnoticed, and "unknown chain" is still a place his money went.
+    """
+    raw = action.get("destinationChainId")
+    try:
+        domain = int(raw)
+    except (TypeError, ValueError):
+        return None, None
+    return domain, CCTP_DOMAINS.get(domain, f"domain-{domain}")
+
+
 def own_actions(rows: list, address: str) -> list[dict]:
     """Normalised non-trading actions the account itself performed. Pure."""
     a = (address or "").lower()
@@ -98,7 +133,8 @@ def own_actions(rows: list, address: str) -> list[dict]:
         field = DESTINATION_FIELDS.get(kind)
         dest = action.get(field) if field else None
         if isinstance(dest, str):
-            dest = dest.strip().lower()
+            dest = normalise_address(dest)
+        domain, chain = cctp_destination(action) if kind == "sendToEvmWithData" else (None, None)
         out.append({
             "hash": tx.get("hash"),
             "time": tx.get("time"),
@@ -106,6 +142,11 @@ def own_actions(rows: list, address: str) -> list[dict]:
             "user": a,
             "type": kind,
             "destination": dest if isinstance(dest, str) else None,
+            # Only a CCTP send carries these: the Circle domain it named and
+            # the chain that domain is. Every other action lands on Hyperliquid
+            # or Arbitrum and needs neither.
+            "destination_chain": chain,
+            "destination_domain": domain,
             "signature_chain_id": action.get("signatureChainId"),
             "amount": action.get("amount") if action.get("amount") is not None
             else action.get("usd") if action.get("usd") is not None
@@ -124,16 +165,16 @@ def foreign_destinations(actions: list[dict], cluster: set,
     `ignore` holds known infrastructure (the HLP vault, validators, system
     addresses) that receives from everyone and identifies nobody.
     """
-    cluster = {(c or "").lower() for c in cluster}
-    ignore = {(c or "").lower() for c in (ignore or set())}
-    kinds = {"withdraw3", "usdSend", "spotSend", "sendAsset",
+    cluster = {normalise_address(c) for c in cluster if c}
+    ignore = {normalise_address(c) for c in (ignore or set()) if c}
+    kinds = {"withdraw3", "sendToEvmWithData", "usdSend", "spotSend", "sendAsset",
              "subAccountTransfer", "subAccountSpotTransfer", "vaultTransfer",
              "approveAgent", "linkStakingUser"}
     out = []
     for act in actions or []:
         if act.get("type") not in kinds or act.get("error"):
             continue
-        dest = (act.get("destination") or "").lower()
+        dest = normalise_address(act.get("destination") or "")
         if not dest or dest in cluster or dest in ignore:
             continue
         if act.get("type") == "vaultTransfer" and not (act.get("action") or {}).get("isDeposit", True):
@@ -169,6 +210,7 @@ def summarise(address: str, actions: list[dict], foreign: list[dict],
         "agents_approved": sorted({a["destination"] for a in actions
                                    if a["type"] == "approveAgent" and a.get("destination")}),
         "foreign_destinations": [{"type": f["type"], "destination": f["destination"],
+                                  "chain": f.get("destination_chain"),
                                   "amount": f.get("amount"), "token": f.get("token"),
                                   "time": f.get("time"), "hash": f.get("hash")}
                                  for f in foreign],

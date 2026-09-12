@@ -928,9 +928,15 @@ def alert_explicit_link(kind: str, address: str, linked_to: str, why: str) -> bo
 
 def alert_foreign_destination(wallet: str, kind: str, destination: str,
                               amount, token: str | None, when: str | None,
-                              tx_hash: str | None = None) -> bool:
+                              tx_hash: str | None = None,
+                              chain: str | None = None) -> bool:
     """Fire when a cluster wallet hands value or control to an address outside
     the cluster, as seen in its own Hyperliquid actions.
+
+    `chain` is set for a `sendToEvmWithData` — Hyperliquid's native Circle
+    withdrawal, which names a recipient on ANY CCTP chain. The ledger shows
+    it only as a send to `0x2000…0000`, so this alert is the only place the
+    operator learns which chain to look at.
 
     The info API's ledger cannot show where a withdrawal went or which agent
     was approved; the explorer's action record can. A `withdraw3` to a fresh
@@ -942,6 +948,14 @@ def alert_foreign_destination(wallet: str, kind: str, destination: str,
         lead = ("A cluster wallet approved a new agent — a fresh address that now\n"
                 "signs for the account. Any other account approving the same one is\n"
                 "the same person.\n\n")
+    elif kind == "sendToEvmWithData":
+        subject = (f"[EZEKIEL] CRITICAL: Circle/CCTP withdrawal to an address outside "
+                   f"the cluster on {chain or 'an unknown chain'}")
+        lead = ("A cluster wallet withdrew through Hyperliquid's native Circle route\n"
+                "(`sendToEvmWithData`) to a recipient the roster does not know as his.\n"
+                "This route bypasses the Arbitrum bridge entirely: the money is minted\n"
+                "as USDC at the recipient on the named chain within minutes, and no\n"
+                "L1 sweep of his own addresses will ever see it.\n\n")
     else:
         subject = f"[EZEKIEL] CRITICAL: {kind} to an address outside the cluster"
         lead = (f"A cluster wallet performed `{kind}` towards an address the roster does\n"
@@ -950,7 +964,8 @@ def alert_foreign_destination(wallet: str, kind: str, destination: str,
         lead
         + f"{address_line(wallet, 'Wallet')}\n"
         f"{address_line(destination, 'Destination')}\n"
-        f"Amount: {amount if amount is not None else 'n/a'} {token or ''}\n"
+        + (f"Chain: {chain}\n" if chain else "")
+        + f"Amount: {amount if amount is not None else 'n/a'} {token or ''}\n"
         f"When: {when or 'unknown'}\n"
         f"Hyperliquid tx: {tx_hash or 'n/a'}\n\n"
         f"This is the account's OWN action, read from the Hyperliquid explorer,\n"

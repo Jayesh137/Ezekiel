@@ -100,3 +100,75 @@ def test_record_appends_once_per_hash(tmp_path, monkeypatch):
     acts = ha.own_actions(ROWS, TR)
     assert ha.record(TR, acts) == 6
     assert ha.record(TR, acts) == 0
+
+
+# --- sendToEvmWithData: Hyperliquid's native Circle/CCTP withdrawal ---------
+#
+# Captured live from the target on 2026-09-12. The ledger shows it only as a
+# spot `send` to 0x2000...0000; the explorer payload is the ONLY place the
+# real recipient and destination chain appear, and `destinationChainId` is a
+# Circle CCTP domain (3 = Arbitrum), not an EVM chain id. Every one of his six
+# sends ($30M) landed at his own Arbitrum address as a Circle mint within the
+# minute — but the action can name any recipient on any CCTP chain.
+
+CCTP_SELF = {
+    "time": 1789096580307, "user": T, "block": 1143240322, "hash": "0x159d", "error": None,
+    "action": {"type": "sendToEvmWithData", "signatureChainId": "0xa4b1",
+               "hyperliquidChain": "Mainnet", "token": "USDC", "amount": "7000000",
+               "sourceDex": "spot", "destinationRecipient": T.upper(),
+               "addressEncoding": "hex", "destinationChainId": 3, "gasLimit": 200000,
+               "data": "0x", "nonce": 1789096563140}}
+CCTP_FOREIGN = {
+    "time": 1789096580308, "user": T, "block": 1143240323, "hash": "0x159e", "error": None,
+    "action": {"type": "sendToEvmWithData", "signatureChainId": "0xa4b1",
+               "hyperliquidChain": "Mainnet", "token": "USDC", "amount": "2500000",
+               "sourceDex": "spot",
+               "destinationRecipient": "0xABCDEFabcdefABCDEFabcdefABCDEFabcdefABCD",
+               "addressEncoding": "hex", "destinationChainId": 6, "gasLimit": 200000,
+               "data": "0x", "nonce": 1789096563141}}
+CCTP_SOLANA = {
+    "time": 1789096580309, "user": T, "block": 1143240324, "hash": "0x159f", "error": None,
+    "action": {"type": "sendToEvmWithData", "token": "USDC", "amount": "1000000",
+               "sourceDex": "spot",
+               "destinationRecipient": "2xm4bb8KmpafeC2Zcb37J7UFNcLfmKvaZmyhYKhRtVSv",
+               "addressEncoding": "base58", "destinationChainId": 5, "gasLimit": 0,
+               "data": "0x", "nonce": 1789096563142}}
+
+
+def test_a_cctp_send_names_its_recipient_and_destination_chain():
+    acts = ha.own_actions([CCTP_SELF, CCTP_FOREIGN, CCTP_SOLANA], T)
+    by_hash = {a["hash"]: a for a in acts}
+    assert by_hash["0x159d"]["destination"] == T                  # lowercased hex
+    assert by_hash["0x159d"]["destination_chain"] == "arbitrum"
+    assert by_hash["0x159d"]["destination_domain"] == 3
+    assert by_hash["0x159d"]["amount"] == "7000000"
+    assert by_hash["0x159d"]["token"] == "USDC"
+    assert by_hash["0x159e"]["destination_chain"] == "base"
+    # A base58 address is case-sensitive: kept verbatim, never lowercased.
+    assert by_hash["0x159f"]["destination"] == "2xm4bb8KmpafeC2Zcb37J7UFNcLfmKvaZmyhYKhRtVSv"
+    assert by_hash["0x159f"]["destination_chain"] == "solana"
+
+
+def test_an_unknown_cctp_domain_is_named_not_dropped():
+    row = {**CCTP_FOREIGN, "action": {**CCTP_FOREIGN["action"], "destinationChainId": 99}}
+    a = ha.own_actions([row], T)[0]
+    assert a["destination_chain"] == "domain-99" and a["destination_domain"] == 99
+
+
+def test_a_cctp_send_to_a_foreign_recipient_is_foreign_and_to_self_is_not():
+    acts = ha.own_actions([CCTP_SELF, CCTP_FOREIGN, CCTP_SOLANA], T)
+    foreign = ha.foreign_destinations(acts, cluster={T}, ignore=set())
+    assert [(f["hash"], f["destination_chain"]) for f in foreign] == [
+        ("0x159e", "base"), ("0x159f", "solana")]
+    # The cluster may hold a non-EVM address of his; matching is exact there.
+    foreign = ha.foreign_destinations(
+        acts, cluster={T, "2xm4bb8KmpafeC2Zcb37J7UFNcLfmKvaZmyhYKhRtVSv"}, ignore=set())
+    assert [f["hash"] for f in foreign] == ["0x159e"]
+
+
+def test_summary_carries_the_chain_of_a_foreign_cctp_send():
+    acts = ha.own_actions([CCTP_FOREIGN], T)
+    foreign = ha.foreign_destinations(acts, cluster={T}, ignore=set())
+    s = ha.summarise(T, acts, foreign, None)
+    assert s["foreign_destinations"][0]["chain"] == "base"
+    assert s["kinds"] == {"sendToEvmWithData": 1}
