@@ -592,7 +592,20 @@
 									>{(n.discovery_sources || []).join(', ')}</span
 								></span>
 						</div>
-						<h4>Transfers ({edgesFor(n).length})</h4>
+						<!-- The TRUE count comes from totals, not from the list: the stored
+						     graph keeps only the most recent `edges_per_node_cap` edges per
+						     node (it hit GitHub's 100 MiB limit at 212,457 edges and no
+						     consumer uses more than 40). Counting the array instead would
+						     understate a wallet's activity — the direction that loses a
+						     migration. -->
+						<h4>
+							Transfers ({n.totals?.edge_count ?? edgesFor(n).length})
+							{#if (n.totals?.edge_count ?? 0) > edgesFor(n).length}
+								<span class="text-muted"
+									>— showing the {edgesFor(n).length} most recent held on file</span
+								>
+							{/if}
+						</h4>
 						<div class="table-scroll">
 							<table>
 								<thead>

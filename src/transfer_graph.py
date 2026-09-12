@@ -664,6 +664,18 @@ def find_split_correlation(exit_amount: float, inbound: list[dict],
 
 # --- graph construction ---------------------------------------------------------
 
+# How many edges per node survive into the STORED graph. Nothing reads the
+# stored array back — `collect_known_edges()` rebuilds every edge from
+# `data/transfers/` on each run — and its only consumers are the alert body (the
+# earliest 15 of a node's edges, taken from the in-memory graph before the save)
+# and the dashboard (a node's edges newest-first, 40 shown). The file was
+# carrying 212,457 edges to serve a maximum of 40, reached 107 MB, and GitHub
+# refuses anything over 100 MiB — so from 2026-09-12 14:02 UTC every trace run
+# computed the graph and lost it at the push, the pre-receive hook declining the
+# whole job. 200 is five times what any consumer asks for and takes the live
+# file to 8.4 MB.
+PERSISTED_EDGES_PER_NODE = 200
+
 SCHEMA_VERSION = 2
 
 
@@ -2330,6 +2342,45 @@ def stalled_hours(last_expansion_at: str | None, now_iso: str) -> float | None:
     return (now - then).total_seconds() / 3600.0
 
 
+def trim_edges_for_storage(graph: dict, cap: int = PERSISTED_EDGES_PER_NODE) -> dict:
+    """A copy of `graph` holding only the edges worth storing. Pure.
+
+    Keeps, per node, the `cap` most RECENT of its edges — newest-first is the
+    order the dashboard shows — and drops any edge no node references at all.
+
+    Three things are deliberately left ALONE, because they are facts rather than
+    storage decisions: `edge_count`, each node's `totals.edge_count`, and each
+    node's full `edge_ids`. A reader asking "how many transfers were observed"
+    must get the true answer, and only the list of edge DETAIL is abridged.
+    That the abridgement happened is stated in the file — a truncated list that
+    looks complete is rule 5, and this one would understate a wallet's activity,
+    which is the direction that loses a migration.
+
+    Never mutates the input: `fire_alerts` runs before the save and builds its
+    alert bodies from the full in-memory graph.
+    """
+    by_id = {e.get("id"): e for e in graph.get("edges") or [] if isinstance(e, dict)}
+    keep: dict[str, dict] = {}
+    truncated = False
+    for node in graph.get("nodes") or []:
+        ids = [i for i in (node.get("edge_ids") or []) if i in by_id]
+        if len(ids) > cap:
+            truncated = True
+            # `or 0` rather than a bare key: an edge whose time could not be read
+            # must not sort above every dated one.
+            ids.sort(key=lambda i: by_id[i].get("ts") or 0, reverse=True)
+            ids = ids[:cap]
+        for i in ids:
+            keep[i] = by_id[i]
+    if len(keep) < len(by_id):
+        truncated = True
+    return {**graph,
+            "edges": list(keep.values()),
+            "edges_stored": len(keep),
+            "edges_per_node_cap": cap,
+            "edges_truncated": truncated}
+
+
 def _read_previous_graph() -> dict:
     """Load the last saved graph, tolerating absence and a corrupt file.
 
@@ -2850,7 +2901,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
     if undelivered:
         print(f"[graph] {len(undelivered)} alert(s) undelivered and queued for retry")
 
-    save_latest(str(DATA_DIR / "transfer_graph"), graph)
+    # Trimmed at the SAVE only: every consumer above this line — `fire_alerts`
+    # in particular — has already read the complete in-memory graph.
+    save_latest(str(DATA_DIR / "transfer_graph"), trim_edges_for_storage(graph))
 
     by_class: dict[str, int] = {}
     for n in graph["nodes"]:
