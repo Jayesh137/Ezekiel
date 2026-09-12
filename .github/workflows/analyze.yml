@@ -127,10 +127,19 @@ jobs:
           # ended by opening a failure issue with its reading thrown away.
           # Measured: run 34630235534 on 2026-09-11 lost a whole watch reading
           # to a conflict in three data/*/latest.json files.
+          # --autostash, because a rebase REFUSES to start with unstaged
+          # changes in the tree ("error: cannot rebase: You have unstaged
+          # changes"), and this step commits only `data/`. Measured on run
+          # 34674713719: the commit itself succeeded (17 files, including the
+          # first Circle pool), the push lost a race, and then all five rebase
+          # attempts failed for that reason and the whole reading was dropped.
+          # Anything left unstaged is by definition not what this step commits,
+          # so stashing it across the rebase is exactly right.
+          git status --porcelain | head -20
           for i in 1 2 3 4 5; do
             if git push origin main; then exit 0; fi
             git fetch origin main || true
-            if ! git rebase -X theirs FETCH_HEAD; then
+            if ! git rebase -X theirs --autostash FETCH_HEAD; then
               git rebase --abort || true
               echo "attempt $i: rebase could not be settled automatically"
             fi
