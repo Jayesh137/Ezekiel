@@ -611,6 +611,30 @@ that it is.
   transition the watch exists to report. The remaining shared file is
   `data/alerts/latest.json`, which every workflow appends to and which the
   push step's `-X theirs` rebase settles.
+- **Delivery health is SHARDED per run, and `latest.json` is only a cache
+  (2026-09-12).** `_record_delivery` was a read-modify-write on one shared
+  file, safe only while the shared concurrency group meant no two committing
+  workflows overlapped. Giving `watch.yml` its own group ended that, and
+  `-X theirs` takes the pushing run's file WHOLE — so two runs computing
+  counters from the same base would erase one another: run A records a failed
+  CRITICAL (`healthy: false`), run B records a suppressed INFO from the same
+  base (`healthy: true`), B pushes second and A's failure is gone. That is the
+  outage this file exists to make visible, so the rebase settling the CONFLICT
+  was never the same thing as settling the LOST UPDATE.
+  Now each run appends to `data/alerts/runs/<run id>.json` — two runs can never
+  collide on distinct filenames — and `derive_health` recomputes
+  `latest.json` from every shard on each write. Every field is a pure function
+  of the events, which is the property that matters: **a rollup discarded by a
+  rebase costs nothing, because the shards it was built from all survive and
+  the next write rebuilds it.** Verified against the real production file in a
+  sandbox: all four counters came out identical (`healthy: true`, 0, 0,
+  `suppressed: 8`) and the field shape is unchanged, so the dashboard and the
+  69 existing alert tests needed no edit. Two things to know: `suppressed` now
+  counts the 30-day retention window rather than all time (the shards are the
+  only record and they are pruned, bounded also at 400 files), and migration is
+  automatic and once-only — keyed on no shards existing yet, NOT on
+  `legacy.json` being absent, because `latest.json` is derived after the first
+  shard write and re-migrating it would fold every event in twice.
 - **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
   collector run's silence and account-drop alerts arrived on the topic within
   seconds while email failed as usual, as did every CRITICAL that day.

@@ -35,6 +35,11 @@ REAL_DATA_DIR = utils.DATA_DIR
 # label -> real path a leaking test must never touch.
 _PROBES = {
     "alert-delivery state": REAL_DATA_DIR / "alerts" / "latest.json",
+    # The per-run delivery shards, which are the DURABLE record since
+    # 2026-09-12 — latest.json is only a cache derived from them. A leaked
+    # fixture shard would therefore survive being recomputed, where a leak into
+    # latest.json alone is overwritten by the next real run.
+    "alert-delivery shards": REAL_DATA_DIR / "alerts" / "runs",
     "sweep cursor state": REAL_DATA_DIR / "state" / "transfer_cursors.json",
     # src/tracer.py's incremental gate. A test that reaches trace_fund_flow
     # without repointing tracer.DATA_DIR would mark production records as

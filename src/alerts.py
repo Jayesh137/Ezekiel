@@ -24,7 +24,14 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from src.links import address_line, address_path
-from src.utils import DATA_DIR, now_ms, read_cursor, save_latest, write_cursor
+from src.utils import (
+    DATA_DIR,
+    atomic_write_json,
+    now_ms,
+    read_cursor,
+    save_latest,
+    write_cursor,
+)
 
 SMTP_HOST = "smtp-relay.brevo.com"
 SMTP_PORT = 587  # STARTTLS
@@ -49,19 +56,29 @@ def _record_delivery(subject: str, delivered: bool, reason: str | None = None) -
     detection vectors feeding an output that went nowhere, with every scan run
     reporting success.
 
-    The dashboard reads this file, so the outage becomes visible where the
-    operator already looks. Never raises: a diagnostic that can take down the
-    thing it diagnoses is worse than no diagnostic.
+    EACH RUN WRITES ITS OWN SHARD, since 2026-09-12. This used to be a
+    read-modify-write on one shared file, which was safe only because every
+    committing workflow shared the `data-commit` concurrency group and so never
+    overlapped. Once watch.yml got its own group that stopped being true, and
+    the push step settles a conflict with `git rebase -X theirs` — which takes
+    the pushing run's file WHOLE. Two runs computing counters from the same
+    base, one of them winning, erases the other's record:
+
+        run A  base healthy=true -> send FAILS -> writes healthy=false
+        run B  base healthy=true -> suppressed -> writes healthy=true
+        B pushes second, B wins, A's failure is gone
+
+    which is precisely the outage this file exists to make visible. So the
+    durable record is now data/alerts/runs/<run id>.json, which two runs can
+    never collide on, and latest.json is a DERIVED cache recomputed from every
+    shard on each write. The dashboard and its tests see an unchanged shape; a
+    rollup discarded by a rebase now costs nothing, because the shards it was
+    built from all survive and the next write rebuilds it.
+
+    Never raises: a diagnostic that can take down the thing it diagnoses is
+    worse than no diagnostic.
     """
     try:
-        path = DATA_DIR / "alerts" / "latest.json"
-        prev = {}
-        if path.exists():
-            try:
-                with open(path) as f:
-                    prev = json.load(f) or {}
-            except (OSError, ValueError):
-                prev = {}
         now = datetime.now(UTC).isoformat()
         # An alert no channel was ever going to carry reports nothing about the
         # channels — see _health_bearing. It is still counted and still kept in
@@ -69,36 +86,188 @@ def _record_delivery(subject: str, delivered: bool, reason: str | None = None) -
         # field describing the last alert that actually had somewhere to go.
         suppressed = not delivered and not _health_bearing(subject)
         status = "delivered" if delivered else ("suppressed" if suppressed else "failed")
-        recent = list(prev.get("recent") or [])
-        recent.append({"at": now, "subject": subject, "delivered": delivered,
-                       "status": status, "reason": reason})
-        state = {
-            "updated_at": now,
-            "healthy": bool(prev.get("healthy", True)),
-            "consecutive_failures": int(prev.get("consecutive_failures", 0) or 0),
-            # How many alerts the operator was never told about.
-            "undelivered": int(prev.get("undelivered", 0) or 0),
-            # How many were withheld on purpose. Not a fault, but the operator
-            # should be able to see how much is no longer reaching them.
-            "suppressed": int(prev.get("suppressed", 0) or 0) + (1 if suppressed else 0),
-            "last_success_at": prev.get("last_success_at"),
-            "last_failure_at": prev.get("last_failure_at"),
-            "last_failure_reason": prev.get("last_failure_reason"),
-            "recent": recent[-20:],
-        }
-        if not suppressed:
-            state["healthy"] = delivered
-            state["consecutive_failures"] = (
-                0 if delivered else state["consecutive_failures"] + 1)
-            state["undelivered"] = 0 if delivered else state["undelivered"] + 1
-            if delivered:
-                state["last_success_at"] = now
-            else:
-                state["last_failure_at"] = now
-                state["last_failure_reason"] = reason
-        save_latest(str(DATA_DIR / "alerts"), state)
+        event = {"at": now, "subject": subject, "delivered": delivered,
+                 "status": status, "reason": reason}
+
+        _migrate_legacy_record()
+        _append_to_shard(event)
+        _prune_shards()
+        save_latest(str(DATA_DIR / "alerts"), derive_health(load_shard_events()))
     except Exception as e:  # noqa: BLE001 - must never break alerting
         print(f"[alerts] could not record delivery health: {type(e).__name__}: {e}")
+
+
+# How long a shard is kept, and how many may exist at once. Retention bounds the
+# directory; it also bounds `suppressed`, which is a count over the window
+# rather than over all time — see derive_health.
+SHARD_MAX_AGE_DAYS = 30.0
+SHARD_MAX_FILES = 400
+
+# Rows kept in the rollup. Unchanged: the dashboard renders this list.
+RECENT_LIMIT = 20
+
+
+def _shard_dir():
+    return DATA_DIR / "alerts" / "runs"
+
+
+def _run_id() -> str:
+    """Identifies the writer. One shard per run is what makes this collide-free.
+
+    GITHUB_RUN_ID in CI; the pid locally, so two local processes still differ.
+    """
+    raw = os.environ.get("GITHUB_RUN_ID") or f"local-{os.getpid()}"
+    return "".join(c if (c.isalnum() or c in "-_") else "-" for c in str(raw))[:64]
+
+
+def _shard_path():
+    """This run's shard. Stable within a run, so repeat sends append to one file."""
+    return _shard_dir() / f"{_run_id()}.json"
+
+
+def _append_to_shard(event: dict) -> None:
+    """Add one event to this run's own file. A run owns it, so nothing races us."""
+    path = _shard_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    events = []
+    if path.exists():
+        try:
+            with open(path) as f:
+                events = (json.load(f) or {}).get("events") or []
+        except (OSError, ValueError):
+            events = []
+    events.append(event)
+    atomic_write_json(path, {"run_id": _run_id(), "events": events})
+
+
+def load_shard_events() -> list[dict]:
+    """Every event from every shard. An unreadable shard is skipped, not fatal."""
+    out: list[dict] = []
+    directory = _shard_dir()
+    if not directory.exists():
+        return out
+    for path in sorted(directory.glob("*.json")):
+        try:
+            with open(path) as f:
+                out.extend((json.load(f) or {}).get("events") or [])
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def _migrate_legacy_record() -> None:
+    """Carry a pre-shard latest.json into a shard once, so history is not lost.
+
+    Keyed on there being NO shards yet, not on legacy.json being absent. Once
+    sharding has started, latest.json is itself derived from the shards, so
+    migrating it again would fold every event back in a second time — and
+    `legacy.json` may by then have been pruned for age, which would let that
+    happen repeatedly.
+    """
+    directory = _shard_dir()
+    if directory.exists() and any(directory.glob("*.json")):
+        return
+    legacy = directory / "legacy.json"
+    path = DATA_DIR / "alerts" / "latest.json"
+    if not path.exists():
+        return
+    try:
+        with open(path) as f:
+            rows = (json.load(f) or {}).get("recent") or []
+    except (OSError, ValueError):
+        return
+    if not rows:
+        return
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(legacy, {"run_id": "legacy", "events": rows})
+
+
+def partition_shards_by_age(items, max_age_days: float,
+                            max_files: int | None = None):
+    """(name, age_days) pairs -> (kept, dropped). Youngest survive. Pure."""
+    ordered = sorted(items, key=lambda it: it[1])
+    kept = [it for it in ordered if it[1] <= max_age_days]
+    if max_files is not None and len(kept) > max_files:
+        kept = kept[:max_files]
+    keep_names = {name for name, _age in kept}
+    return kept, [it for it in ordered if it[0] not in keep_names]
+
+
+def _prune_shards() -> None:
+    """Bound the directory. Deleting a file never conflicts with another run."""
+    directory = _shard_dir()
+    if not directory.exists():
+        return
+    now = datetime.now(UTC).timestamp()
+    items = []
+    for path in directory.glob("*.json"):
+        # `legacy.json` holds the pre-shard history and has no run to rewrite
+        # it, so it ages out on mtime like any other shard.
+        try:
+            items.append((path.name, (now - path.stat().st_mtime) / 86400.0))
+        except OSError:
+            continue
+    _kept, dropped = partition_shards_by_age(items, SHARD_MAX_AGE_DAYS,
+                                             SHARD_MAX_FILES)
+    for name, _age in dropped:
+        try:
+            (directory / name).unlink()
+        except OSError:
+            continue
+
+
+def _event_sort_key(event: dict):
+    try:
+        return datetime.fromisoformat(str(event.get("at")))
+    except (TypeError, ValueError):
+        return datetime.min.replace(tzinfo=UTC)
+
+
+def derive_health(events: list[dict]) -> dict:
+    """The rollup, computed from scratch. Pure, so it cannot drift.
+
+    Every field is a function of the events, which is the property that makes a
+    lost rollup harmless: recomputing from the surviving shards gives the same
+    answer. An event whose `status` is "suppressed" is counted and kept but
+    never touches a health field — that is policy withholding an alert, not a
+    channel failing. Note that a DELIVERED info is not suppressed and does
+    count as a success, which is the behaviour the previous implementation had.
+
+    `suppressed` counts the retention window rather than all time, because the
+    shards are the only record and they are pruned at 30 days.
+    """
+    ordered = sorted(events or [], key=_event_sort_key)
+    state = {
+        "updated_at": datetime.now(UTC).isoformat(),
+        "healthy": True,
+        "consecutive_failures": 0,
+        "undelivered": 0,
+        "suppressed": 0,
+        "last_success_at": None,
+        "last_failure_at": None,
+        "last_failure_reason": None,
+        "recent": ordered[-RECENT_LIMIT:],
+    }
+    for event in ordered:
+        status = event.get("status")
+        if status is None:
+            status = ("delivered" if event.get("delivered") else
+                      ("suppressed" if not _health_bearing(
+                          str(event.get("subject") or "")) else "failed"))
+        if status == "suppressed":
+            state["suppressed"] += 1
+            continue
+        delivered = status == "delivered"
+        state["healthy"] = delivered
+        state["consecutive_failures"] = (
+            0 if delivered else state["consecutive_failures"] + 1)
+        state["undelivered"] = 0 if delivered else state["undelivered"] + 1
+        if delivered:
+            state["last_success_at"] = event.get("at")
+        else:
+            state["last_failure_at"] = event.get("at")
+            state["last_failure_reason"] = event.get("reason")
+    return state
 
 
 def _cooldown_ok(key: str, hours: float) -> bool:
