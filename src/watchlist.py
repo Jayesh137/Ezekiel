@@ -228,8 +228,17 @@ def changes(previous: dict | None, current: dict, now_ms: int | None = None) -> 
     """
     if not current.get("read_ok"):
         return []
-    if not previous:
-        return []
+    previous = previous or {}
+    # A first reading is a baseline for every field BUT the size ratio, which
+    # carries its own rule (below): an absent previous ratio counts as below the
+    # band rather than as a reading to skip. That rule was written for an absent
+    # FIELD on a known wallet, and since the roster began feeding the watch a
+    # wallet can ARRIVE already above the band — then the absent thing is the
+    # whole record, and returning early here skipped the one exception.
+    # Measured live 2026-09-12: `0x5b5d5120…` was promoted to PROBABLE, entered
+    # the watch on its first read at $230,394,643 against his $61,084,699 — 3.77x
+    # against a band of 1.15 — and nothing was reported.
+    first_reading = not previous
     out: list[dict] = []
 
     before, after = previous.get("account_value"), current.get("account_value")
@@ -259,6 +268,14 @@ def changes(previous: dict | None, current: dict, now_ms: int | None = None) -> 
                         "detail": f"worth {now_ratio:.2f}x the target: "
                                   f"${current.get('account_value'):,.0f} against "
                                   f"${current.get('target_value'):,.0f}"})
+
+    # Everything below compares against a stored reading, so on a first one
+    # there is nothing to report: a wallet's existing agents, sub-accounts,
+    # dexes and vaults are its baseline, not news it just made. Reporting them
+    # is the `extraAgents` seeding mistake — a three-week-old approval announced
+    # as a transition.
+    if first_reading:
+        return out
 
     for field, kind, label in (("agents", "new_agent", "authorised an agent"),
                                ("subaccounts", "new_subaccount", "created a sub-account"),

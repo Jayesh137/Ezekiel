@@ -362,3 +362,49 @@ def test_a_known_self_wallet_on_the_operators_list_is_settled():
     got = wl.watched({"target_wallet": T, "watch_wallets": [W],
                       "known_self_wallets": [W.upper()]})
     assert got[0]["settled"] is True
+
+
+def test_a_wallet_that_ARRIVES_already_bigger_than_him_reports_it():
+    """A first reading is a baseline for every field except this one.
+
+    `changes` returns [] when there is no previous record, which is right for
+    agents, sub-accounts and dexes — reporting a three-week-old approval as a
+    transition is the `extraAgents` seeding mistake. The size ratio is the
+    documented exception: an ABSENT previous ratio counts as below the band,
+    because a missed crossing costs the mission and a duplicate costs one alert
+    a day against the 24h cooldown.
+
+    That exception was defeated by the earlier guard. It was written for an
+    absent FIELD on a known wallet, and since the roster began feeding the watch
+    a wallet can now ARRIVE already above the band — the absent thing is the
+    whole record, not the field. Measured live 2026-09-12: `0x5b5d5120…` was
+    promoted to PROBABLE, entered the watch on its first read holding
+    $230,394,643 against his $61,084,699 — a ratio of 3.77 against a band of
+    1.15 — and `changes` was empty. A wallet worth nearly four times his
+    appearing in his world is the plainest migration shape there is, and the
+    tripwire built for exactly that said nothing.
+    """
+    first = wl.snapshot(W, account_value=230_394_643.0, target_value=61_084_699.0)
+    got = wl.changes(None, first)
+    assert [c["kind"] for c in got] == ["outgrew_target"]
+    assert "3.77x" in got[0]["detail"]
+
+
+def test_a_wallet_arriving_below_the_band_still_reports_nothing():
+    first = wl.snapshot(W, account_value=20_000_000.0, target_value=61_000_000.0)
+    assert wl.changes(None, first) == []
+
+
+def test_a_first_reading_still_seeds_every_other_field_silently():
+    """Only the size ratio is exempt; agents and the rest stay a baseline."""
+    first = wl.snapshot(W, account_value=1_000.0, target_value=61_000_000.0,
+                        agents=["0xagent"], subaccounts=["0xsub"],
+                        withdrawal_destinations=["0xdest"], dexes=["perp", "xyz"],
+                        vaults_led=["0xvault"], hyperevm_nonce=18)
+    assert wl.changes(None, first) == []
+
+
+def test_an_unreadable_first_reading_reports_nothing():
+    first = wl.snapshot(W, account_value=230_394_643.0, target_value=61_084_699.0)
+    first["read_ok"] = False
+    assert wl.changes(None, first) == []
