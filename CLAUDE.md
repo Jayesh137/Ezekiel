@@ -265,7 +265,33 @@ the next session rebuilding them:
 - **Gas and fee habits** — priority-fee setting is a per-human default.
 - **Counterparty-set overlap** — Jaccard over the full counterparty set, not just
   deposit addresses.
-- **Liquidation and leverage habits**, cross vs isolated margin preference.
+- ~~**Cross vs isolated margin preference**~~ — **measured 2026-09-12 and
+  rejected.** It looked like a clean per-human default, and the data for it was
+  already being collected and thrown away (`compute_leverage_profile` stores
+  `type` per coin; `compare_leverage` reads only the mean). It is not
+  discriminating: of the top-40 leaderboard accounts only **8 hold an open book
+  at all, and 7 of those 8 are all-cross**. A dimension that scores ~1.0 for
+  nearly everyone adds no separation and dilutes the ones that do. The target
+  is mixed (51 cross + 1 isolated on perp, 3 isolated + 1 cross on `xyz`) and so
+  was 1 of the 8 — n is far too small to call that rare. Revisit only with a
+  population measured in hundreds. **Liquidation-distance habits** are still
+  unbuilt and still worth having.
+- **A flat wallet is unknown, not dissimilar (fixed 2026-09-12).** Looking for
+  the above found rule 6 inside the scorer: `compare_leverage` returned **0.0**
+  when either side held no open positions, and leverage is computed FROM open
+  positions. Measured on the live scan, **69 of 174 candidates (40%)** carried
+  exactly 0.0 — median score 0.1531 against 0.2980 for the 105 with a real
+  reading — while every sibling dimension already renormalised (`hold_duration`
+  119 None; `timing_profile`, `loss_handling`, `order_profile` 174 None each).
+  It now returns `None`. Recomputed on those 69: median **+0.0433**, max
+  **+0.0719**, three then clear 0.55 and the top one goes 0.5247 → **0.5966**.
+  **Why this is a fix and not tuning:** a newly migrated wallet is
+  disproportionately likely to be FLAT at the moment it is scanned — just
+  deposited, no book open yet, or just closed out — so the artefact ran
+  precisely against the population this project hunts. It barely touches the
+  backtest (−0.0085 → −0.0082, still rank 2, still FAILING) because the
+  backtest's strangers are drawn from the scan's top scorers, who mostly hold
+  books. No weight and no threshold was changed.
 - **Rare-market co-presence** — already partly used via `xyz:` markets; extend to
   any market with few participants.
 
@@ -298,18 +324,25 @@ the next session rebuilding them:
    unchanged and his own windows identical (older 2026-05-25→08-04, recent
    2026-08-05→09-06):
 
-   | run | self | best stranger | margin | top stranger |
-   |---|---|---|---|---|
-   | 2026-09-10 09:51 | 0.5864 | 0.5503 | +0.0361 | `0x5b5d5120…` |
-   | 2026-09-10 09:58 | 0.5864 | 0.5495 | +0.0369 | `0x5b5d5120…` |
-   | 2026-09-11 02:11 | 0.5880 | 0.5783 | **+0.0097** | `0x97cc9bb5…` |
+   | run | self | best stranger | margin | top stranger | rank |
+   |---|---|---|---|---|---|
+   | 2026-09-10 09:51 | 0.5864 | 0.5503 | +0.0361 | `0x5b5d5120…` | 1 |
+   | 2026-09-10 09:58 | 0.5864 | 0.5495 | +0.0369 | `0x5b5d5120…` | 1 |
+   | 2026-09-11 02:11 | 0.5880 | 0.5783 | **+0.0097** | `0x97cc9bb5…` | 1 |
+   | 2026-09-12 00:06 | 0.5880 | 0.5965 | **−0.0085** | `0xe2ad3768…` | **2** |
 
-   His own score moved +0.0016. The margin fell by two thirds because a
-   **closer-matching stranger turned up in the lineup** — a different wallet
-   entirely. So a shrinking margin is not evidence the scorer got worse at
-   recognising him, and a single run's number is a snapshot of who happened to
-   be drawn that day, never a trend. That is exactly why chasing it with weights
-   would be fitting to the draw.
+   His own score moved +0.0016 then stopped moving entirely. The margin fell by
+   two thirds and then **went negative** because a closer-matching stranger
+   turned up in the lineup each time — a different wallet on every run. So a
+   shrinking margin is not evidence the scorer got worse at recognising him, and
+   a single run's number is a snapshot of who happened to be drawn that day,
+   never a trend. That is exactly why chasing it with weights would be fitting
+   to the draw.
+
+   **It now fails on BOTH conditions again** (rank 2, negative margin), which is
+   worse than the "one condition rather than two" above. Nothing regressed in
+   the scorer to cause it; `0xe2ad3768…` simply scores 0.5965. Read the file,
+   never this table, for the current number.
 5. **A failed read must never serialise as a clean result.** Distinguish
    "we could not tell" from "there is nothing there", everywhere.
 6. **Never price a missing value as `0.0`** — zero is invisible to every
@@ -659,6 +692,15 @@ that it is.
   the fallback. Log at `%LOCALAPPDATA%\Ezekiel\dispatch.log`; remove with
   `schtasks /Delete /F /TN "Ezekiel workflow dispatcher"`. The repo is public,
   so the minutes are free.
+  **It must not queue behind a busy group, and now does not.** A dispatched
+  collect at 04:26 sat pending behind trace in `data-commit`; collect's own
+  cron fired at 04:35 and EVICTED it (run 34673027518, "cancelled") — a group
+  holds only one pending run. Nothing was lost, since the evicting run does the
+  same work, but the dispatch bought nothing. The script now checks every
+  workflow in the group first and skips instead. Splitting the group would be
+  the better fix and is deliberately NOT done: it needs a proven
+  single-writer map, and a wrong one is the lost-update bug this repo has
+  already paid for once.
 - **`watch.yml` has its OWN concurrency group, and `check_watchlist.py` /
   `check_hyperevm.py` have exactly ONE writer (2026-09-12).** They used to run
   in `trace.yml` as well, while both workflows shared the `data-commit` group.
