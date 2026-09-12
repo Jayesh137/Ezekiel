@@ -217,7 +217,22 @@ jobs:
         # it was stuck inside an external call, not working. Its internal
         # `time_budget_seconds` is advisory: it is checked BETWEEN calls and
         # cannot interrupt one that never returns.
-        timeout-minutes: 6
+        #
+        # 6 minutes then failed this step on EVERY run from 05:05 UTC
+        # 2026-09-12. Instrumented (run 34680963132), the cause was one wallet:
+        # lookups 1-8 took 33.7s, lookup 9 started and never came back. Three
+        # fixes went in together — a per-lookup slice of the walk's clock
+        # (`transfer_graph.LOOKUP_SECONDS`), a (connect, read) timeout so a
+        # stalled socket cannot hang forever, and the ledger fix that stops the
+        # frontier re-walking finished work.
+        #
+        # 10 minutes because a step that always fails is not a backstop, it is
+        # an outage: a killed step writes nothing, so the frontier never
+        # advances past the wallet that hung it and retries it forever. The
+        # bound that matters is the ORDER — lookup slice < walk budget < this —
+        # and `test_the_slice_is_smaller_than_the_walk_and_the_walk_fits_the_step`
+        # pins it, because the three numbers live in three different files.
+        timeout-minutes: 10
         run: python src/transfer_graph.py
       # Last, because it only merges what the detectors above just wrote. Pure
       # file reads, no network, no budget.

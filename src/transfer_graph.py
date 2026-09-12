@@ -124,6 +124,33 @@ DEFAULTS = {
 #   nothing. Ranking the full frontier costs 0.019 s with EdgeIndex (was 4.4 s).
 MAX_FRONTIER_QUEUE = 2000
 MAX_EXPANDED_LEDGER = 20000
+# The most wall clock ONE frontier lookup may hold.
+#
+# Measured in production 2026-09-12 (run 34680963132): lookups 1-8 finished in
+# 33.7s, then lookup 9 started and never returned, and the step died on its
+# 6-minute cap 326 seconds later. The frontier had handed that wallet every
+# second left in the walk, and nothing could take it back — an internal budget
+# is checked BETWEEN calls and cannot interrupt one that never returns.
+#
+# The cost of that is not one slow wallet. The walk stops, so the other 195
+# queued wallets get nothing; and the STEP is killed, so the graph is never
+# written and the frontier never advances past the wallet that hung it. It is
+# then retried on every subsequent run, forever.
+#
+# 45s is comfortably above the 1.3-7s a healthy lookup took in that same run
+# and small enough that three pathological wallets still leave the walk time to
+# finish and persist. The walk's own budget stays the outer bound.
+LOOKUP_SECONDS = 45.0
+
+
+def lookup_seconds(remaining: float) -> float:
+    """The slice for the next lookup: never more than what the walk has left.
+
+    Near the end of the walk the slice shrinks to whatever remains, so slicing
+    can only ever make the walk finish sooner, never extend it past its
+    deadline.
+    """
+    return max(0.0, min(LOOKUP_SECONDS, float(remaining)))
 # `decisions` is unbounded in practice — 1,409 entries / 225 KB on the live
 # graph, already larger than a full frontier queue — and grows with the frontier.
 MAX_DECISIONS = 3000
@@ -1948,9 +1975,10 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     # max_expansions counted wallet lookups when one wallet cost one call; a
     # wallet now costs up to three calls per chain, so the budget has to be
     # denominated in calls or the ceiling silently means something else.
-    sweep_budget = CallBudget(
-        max_calls=budget["max_expansions"] * len(sweep_chains) * 3,
-        seconds=budget["time_budget_seconds"])
+    # Per-LOOKUP, not per-walk: see LOOKUP_SECONDS. A single budget shared
+    # across every lookup lets the first slow wallet hold every second the walk
+    # has left, which is exactly what killed the graph step.
+    sweep_calls = max(1, len(sweep_chains) * 3)
 
     started = time.monotonic()
     deadline = started + budget["time_budget_seconds"]
@@ -2046,6 +2074,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                       f"depth {d} — {time.monotonic() - started:.1f}s elapsed",
                       flush=True)
                 found = 0
+                sweep_budget = CallBudget(
+                    max_calls=sweep_calls,
+                    seconds=lookup_seconds(deadline - time.monotonic()))
                 try:
                     # Deliberately no price_lookup: this sweeps a FRONTIER
                     # candidate, not the target, and this job (transfer_graph's

@@ -700,3 +700,72 @@ def test_a_phase_that_raises_still_reports_its_clock(capsys):
     except ValueError:
         pass
     assert "exploding" in capsys.readouterr().out
+
+
+# --- one slow wallet must not be allowed to eat the whole walk --------------
+
+def test_one_lookup_cannot_spend_the_whole_remaining_budget(monkeypatch):
+    """A single wallet gets a SLICE of the clock, not everything that is left.
+
+    Measured in production 2026-09-12 (run 34680963132): lookups 1-8 completed
+    in 33.7s, then lookup 9 — `0x892785f3…` at depth 4 — started and never
+    returned, and the step died on its 6-minute cap 326 seconds later. The
+    frontier handed that one wallet every second remaining in the budget, and
+    CLAUDE.md already states why nothing could take it back: an internal
+    `time_budget_seconds` is checked BETWEEN calls and cannot interrupt one that
+    never returns.
+
+    Two costs, and the second is the one that matters. The walk stops dead — the
+    other 195 queued wallets get nothing. And because the STEP is killed, the
+    graph is never written, so the frontier never advances past the wallet that
+    hung it: the same wallet is retried on every run, forever. That is the
+    `expanded_ledger` livelock again, arriving by a different road.
+
+    Slicing the clock per lookup bounds the damage to one slice and lets the
+    run finish and PERSIST, which is what carries the frontier past it.
+    """
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+    seen = []
+
+    def fake_sweep(wallet, chains, budget, **kw):
+        seen.append(budget.seconds)
+        return {"status": "ok", "degraded_sources": [], "unsupported_sources": []}
+
+    from src.chain import collect as chain_collect
+    monkeypatch.setattr(chain_collect, "sweep_wallet", fake_sweep)
+    monkeypatch.setattr(chain_collect, "records_for", lambda w: [])
+
+    rows = [l1(T, addr(c), 900_000, 2, f"0x{c}") for c in "123"]
+    run(edges(*rows), {"max_expansions": 3, "time_budget_seconds": 150})
+
+    assert seen, "expected at least one sweep"
+    assert all(s <= tg.LOOKUP_SECONDS for s in seen), (
+        f"no single lookup may hold more than LOOKUP_SECONDS, got {seen}")
+
+
+def test_a_lookup_slice_never_outlives_the_walk_deadline():
+    """Near the end of the walk the slice shrinks; it never extends the walk."""
+    assert tg.lookup_seconds(remaining=1000.0) == tg.LOOKUP_SECONDS
+    assert tg.lookup_seconds(remaining=5.0) == 5.0
+    assert tg.lookup_seconds(remaining=0.0) == 0.0
+    assert tg.lookup_seconds(remaining=-3.0) == 0.0
+
+
+def test_the_slice_is_smaller_than_the_walk_and_the_walk_fits_the_step():
+    """The three clocks have to nest, or the outer one is the only real one.
+
+    lookup slice < frontier time budget < the graph step's timeout-minutes in
+    trace.yml. Pinning it here because the numbers live in three files and only
+    their ORDER is the invariant.
+    """
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    cfg = json.loads((root / "config.json").read_text())["transfer_graph"]
+    wf = (root / ".github" / "workflows" / "trace.yml").read_text()
+    step = wf.split("Rebuild transfer graph", 1)[1]
+    step_seconds = int(re.search(r"timeout-minutes:\s*(\d+)", step).group(1)) * 60
+
+    assert tg.LOOKUP_SECONDS < cfg["time_budget_seconds"]
+    assert cfg["time_budget_seconds"] < step_seconds, (
+        "the walk must finish inside the step, or the step timeout IS the budget")

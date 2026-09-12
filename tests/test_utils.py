@@ -119,3 +119,32 @@ def test_cursor_names_are_filesystem_safe(tmp_path):
     assert len(written) == 1
     assert not any(c in written[0] for c in ':*?|<>')
     assert read_cursor(nasty, base=str(state)) == 1234
+
+
+def test_an_etherscan_request_bounds_connect_and_read_separately(monkeypatch):
+    """A scalar timeout is one number doing two jobs, and neither well.
+
+    `requests` applies a scalar to BOTH the connect and the read, and the read
+    timeout is inactivity between bytes, not total. A slice of the frontier's
+    clock cannot interrupt a request already in flight — CLAUDE.md's own rule —
+    so the only bound on a stalled socket is this argument.
+    """
+    from src import utils
+
+    seen = {}
+
+    class _Resp:
+        def raise_for_status(self): pass
+        def json(self): return {"status": "1", "result": []}
+
+    def fake_get(url, params=None, timeout=None):
+        seen["timeout"] = timeout
+        return _Resp()
+
+    monkeypatch.setattr(utils.requests, "get", fake_get)
+    monkeypatch.setattr(utils.time, "sleep", lambda s: None)
+    utils.etherscan_get({"module": "account", "action": "txlist"})
+
+    connect, read = seen["timeout"]
+    assert connect <= 10, "a connect that has not landed in 10s will not land"
+    assert read <= 30

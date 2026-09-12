@@ -30,7 +30,8 @@ def hl_post(request_body: dict, retries: int = 3) -> dict | list:
                 config["hyperliquid_api"],
                 json=request_body,
                 headers={"Content-Type": "application/json"},
-                timeout=30,
+                # (connect, read) — same reasoning as etherscan_get below.
+                timeout=(10, 30),
             )
             if resp.status_code == 429:
                 wait = 2 ** (attempt + 1)
@@ -72,7 +73,12 @@ def etherscan_get(params: dict, chain_id: int | None = None) -> dict:
         resp = requests.get(
             config["etherscan_v2_base"],
             params=base_params,
-            timeout=30,
+            # (connect, read), not one scalar doing both jobs. The frontier
+            # slices its clock per lookup, but a slice cannot interrupt a
+            # request already in flight — an internal budget is checked BETWEEN
+            # calls — so this argument is the only bound on a stalled socket.
+            # A connect that has not landed in 10s will not land.
+            timeout=(10, 30),
         )
         resp.raise_for_status()
         return resp.json()
