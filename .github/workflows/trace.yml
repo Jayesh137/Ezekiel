@@ -26,11 +26,22 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-    # 900s, and every budget inside this job has to fit within it. A job that
-    # is CANCELLED never reaches "Commit and push", so the cursors written to
-    # the runner's working tree are discarded and the next run starts from
-    # block 0 again — the same livelock --reset was fixed for, reached through
-    # job cancellation instead.
+    # A BACKSTOP, not the primary limit — see the step-level `timeout-minutes`
+    # below, which is what actually bounds each step.
+    #
+    # The difference decides whether a run's work survives. A JOB timeout
+    # CANCELS the run, and a cancelled run skips every remaining step including
+    # `if: always()` ones, so "Commit and push" never happens and the cursors
+    # written to the runner's working tree are discarded — the same livelock
+    # --reset was fixed for, reached through job cancellation instead. A STEP
+    # timeout only fails that step, so the run continues and the commit still
+    # persists whatever completed.
+    #
+    # Measured 2026-09-12: run 34673026019 died exactly here at 15m15s with the
+    # graph step stuck at 699s, and threw away a finished Circle-pool read, the
+    # withdrawal pairing, the frontier, the roster and the accounting. Eight
+    # successful runs that day totalled 347-534s, so 20 minutes is roughly 2x
+    # the worst healthy run and is only reachable if several steps hang at once.
     #
     # BUDGETED worst case, which is what the timeout has to cover:
     #
@@ -78,7 +89,7 @@ jobs:
     # cancelled. A wallet with real history reports TRUNCATED and the chains it
     # could not reach; src/chain/collect.py flushes cursors per chain, so the
     # next dispatch of this same workflow resumes rather than restarts.
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -95,7 +106,9 @@ jobs:
         # the job-level comment above for the arithmetic. Re-dispatch this
         # workflow with the same wallet to continue a TRUNCATED sweep.
         run: python scripts/backfill_transfers.py --wallet "$INVESTIGATE_WALLET" --time-budget-seconds 9
+      # 3x its internal budgets (150s sweep + 240s trace loop). Observed 13-14s.
       - run: python src/tracer.py
+        timeout-minutes: 8
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
@@ -114,6 +127,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 3          # observed 34s
         run: python scripts/check_bridge_destinations.py
       # Every Hyperliquid withdrawal paired with the bridge payout at his own
       # address; an unpaired one is a withdrawal to a foreign address, which
@@ -125,6 +139,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 4          # observed 2s; resolves unpaired ones on Etherscan
         run: python scripts/check_withdrawals.py
       # The Circle candidate pool: every CCTP deposit into any Hyperliquid
       # account, read from USDC's forwarder ledger with no key, incrementally
@@ -139,6 +154,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 4          # observed 123s against a 120s internal budget
         run: python src/correlator.py --pools cctp
       # One public-RPC call per cluster Solana address (the CCTP recipient of
       # $22.75M of his). Solana reaches Hyperliquid through Circle too.
@@ -168,6 +184,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 3          # observed 16-17s
         run: python scripts/check_comovement.py
       # A vault led by a cluster wallet is a tradeable address of his. One call.
       - name: Watch vault leadership
@@ -193,6 +210,13 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           # Lets a failed email fall back to a GitHub issue.
           GITHUB_TOKEN: ${{ github.token }}
+        # THE one that has actually bitten. Observed 64-202s across eight
+        # successful runs, then 699s and still silent when run 34673026019 hit
+        # the JOB ceiling on 2026-09-12 — it had not printed a single line, so
+        # it was stuck inside an external call, not working. Its internal
+        # `time_budget_seconds` is advisory: it is checked BETWEEN calls and
+        # cannot interrupt one that never returns.
+        timeout-minutes: 6
         run: python src/transfer_graph.py
       # Last, because it only merges what the detectors above just wrote. Pure
       # file reads, no network, no budget.
@@ -211,6 +235,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 3          # observed 38s
         run: python scripts/check_identity.py
       - name: Check authorised agents
         env:
@@ -218,6 +243,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 4          # observed 95s, the largest HL per-wallet step
         run: python scripts/check_agents.py
       # The migration signature that needs NO connection between the wallets.
       # Judged against his own rhythm (median gap 2d, p90 5d, longest ever 21d),
@@ -229,6 +255,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 3          # observed 27s
         run: python scripts/check_dormancy.py
       # One free call per wallet. Rarity-weighted, so the majors count nothing.
       # Writes evidence and raises no alert: a copy-trader holds the same basket
@@ -241,7 +268,14 @@ jobs:
       # the roster just assigned. Pure file reads.
       - name: Reconcile outbound funds
         run: python src/accounting.py
+      # ALWAYS, so a step that timed out or failed costs only its own reading
+      # rather than the whole run's. Partial data beats no data: every writer
+      # here rewrites its own file whole, so a file that was not updated this
+      # run simply keeps the previous run's value. This does NOT run when the
+      # JOB is cancelled — only a step-level timeout is survivable, which is
+      # why the steps above carry their own.
       - name: Commit and push
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -47,7 +47,10 @@ jobs:
     runs-on: ubuntu-latest
     # A minute of work. The ceiling is generous only so a slow Hyperliquid
     # response cannot cancel the job before it commits what it read.
-    timeout-minutes: 8
+    # A backstop only; the step below carries its own. Raised from 8 when the
+    # watch stopped being one hand-picked wallet and started covering every
+    # roster CONFIRMED/PROBABLE too (up to watchlist.MAX_WATCHED = 6).
+    timeout-minutes: 12
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -66,6 +69,11 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        # Bounded so one hung endpoint cannot cost the whole run: a STEP
+        # timeout fails only the step, leaving `if: always()` on the commit to
+        # persist what was read, where a JOB timeout cancels and commits
+        # nothing. Observed 60-73s for one wallet.
+        timeout-minutes: 8
         run: python scripts/check_watchlist.py
       # The tripwire that cannot be reconstructed after the fact: HyperEVM
       # history is unsweepable, so a nonce that moves has to be caught live.
@@ -77,7 +85,12 @@ jobs:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/check_hyperevm.py
+      # ALWAYS: a step that failed costs its own reading, not the whole run's.
+      # Every writer rewrites its own file whole, so a file not updated this
+      # run keeps the previous value. (Job CANCELLATION still skips this — only
+      # a step-level failure is survivable.)
       - name: Commit and push
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

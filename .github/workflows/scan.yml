@@ -54,7 +54,12 @@ jobs:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+      # ALWAYS: a step that failed costs its own reading, not the whole run's.
+      # Every writer rewrites its own file whole, so a file not updated this
+      # run keeps the previous value. (Job CANCELLATION still skips this — only
+      # a step-level failure is survivable.)
       - name: Commit and push
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
