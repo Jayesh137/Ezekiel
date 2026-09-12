@@ -664,7 +664,12 @@ def alert_combined_match(candidate: str, score: float, flow_amount: str, flow_me
 
 
 def alert_target_silence(days_silent: float) -> bool:
-    subject = f"[EZEKIEL] WARNING: Target Wallet Silent for {days_silent:.1f} Days"
+    # HIGH, not "WARNING": the severity token is the routing key, and a word
+    # outside CRITICAL/HIGH/INFO reaches no channel at all while still counting
+    # as a delivery failure. HIGH rather than CRITICAL because this is the
+    # fixed 3-day threshold; `alert_target_dormant` is the one calibrated on his
+    # own rhythm (median gap 2d, p90 5d) and that one rates CRITICAL.
+    subject = f"[EZEKIEL] HIGH: Target Wallet Silent for {days_silent:.1f} Days"
     body = (
         f"The target wallet has made NO fills for {days_silent:.1f} days.\n\n"
         f"This may indicate migration to a new wallet.\n"
@@ -1316,7 +1321,18 @@ def alert_linkage_match(candidate: str, reasons: list, score: float) -> bool:
 
 def alert_risk_level(score: float, level: str, factors: list, wallet: str | None) -> bool:
     """Fire when the unified migration risk level rises into ELEVATED/CRITICAL."""
-    subject = f"[EZEKIEL] {level}: Migration Risk {score:.0f}/100"
+    # risk.py speaks LOW/GUARDED/ELEVATED/CRITICAL; the ROUTER speaks
+    # CRITICAL/HIGH/INFO, and the token in this subject is the routing key.
+    # Interpolating the risk level straight in produced an ELEVATED subject,
+    # which `_severity_of` cannot read — so the alert was gated out of ntfy and
+    # out of the GitHub fallback, fell through to email (which has never
+    # delivered), and then counted as a health-bearing FAILURE. Measured live
+    # 2026-09-12: it fired twice that morning, reached nobody both times, and
+    # left the dashboard announcing ALERTING IS DOWN while every CRITICAL that
+    # day arrived on ntfy in seconds. The level itself still names itself in
+    # the subject, so nothing is lost by mapping the severity.
+    severity = "CRITICAL" if level == "CRITICAL" else "HIGH"
+    subject = f"[EZEKIEL] {severity}: Migration Risk {level} {score:.0f}/100"
     factor_lines = "\n".join(f"  +{f['points']} {f['label']}" for f in factors[:8])
     body = (
         f"Unified migration risk has risen to {level} ({score:.0f}/100).\n\n"
@@ -1422,7 +1438,13 @@ def alert_account_value_drop(current: float, previous: float, drop_pct: float,
     bridged $7M to HyperEVM, with total equity flat. Naming where the value
     sits is what separates a liquidation from a transfer at a glance.
     """
-    subject = f"[EZEKIEL] WARNING: Account Value Drop {drop_pct:.0%} — Possible Liquidation"
+    # HIGH, not "WARNING": an unroutable severity reaches no channel while still
+    # counting as a failure, so this alert could never have arrived. HIGH rather
+    # than CRITICAL because the cause is an inference — the previous version
+    # announced a "52% drop — possible liquidation" on 2026-09-11 when he had
+    # simply moved money from perp to spot, which is why the breakdown is in the
+    # body.
+    subject = f"[EZEKIEL] HIGH: Account Value Drop {drop_pct:.0%} — Possible Liquidation"
     breakdown = ""
     if components:
         def _fmt(v):
