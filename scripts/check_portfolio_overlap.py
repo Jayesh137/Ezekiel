@@ -27,20 +27,19 @@ MAX_CANDIDATES = 40
 
 
 def candidate_wallets(config: dict) -> list[str]:
-    target = (config.get("target_wallet") or "").lower()
-    out, seen = [], {target}
+    """Roster candidates, with the operator's own wallets pinned ahead of them.
+
+    See `roster.detector_candidates`: the roster ranks by evidence already
+    found, so a cap on that ranking starves the wallets this project hunts.
+    """
+    from src.roster import detector_candidates
+
     try:
         with open(DATA_DIR / "roster" / "latest.json") as f:
-            rows = json.load(f).get("wallets", [])
+            roster = json.load(f)
     except (OSError, ValueError, AttributeError):
-        rows = []
-    for row in rows:
-        a = (row.get("wallet") or "").lower()
-        if not a or a in seen or row.get("tier") == "INFRASTRUCTURE":
-            continue
-        seen.add(a)
-        out.append(a)
-    return out[:MAX_CANDIDATES]
+        roster = {}
+    return detector_candidates(config, roster, MAX_CANDIDATES)
 
 
 def main() -> int:

@@ -140,6 +140,193 @@ def behavioural_is_trustworthy() -> bool:
         return False
 
 
+def pinned_wallets(config: dict | None) -> list[str]:
+    """Wallets no cap may ever drop: the operator's watch list, then his own.
+
+    `config.watch_wallets` is a question a human asked by hand, and
+    `known_self_wallets` is ground truth. Neither is an inference the roster is
+    entitled to rank.
+    """
+    config = config or {}
+    target = ((config.get("target_wallet") or "").strip().lower())
+    out, seen = [], {target} if target else set()
+    for group in (config.get("watch_wallets") or [],
+                  config.get("known_self_wallets") or []):
+        for entry in group:
+            if isinstance(entry, str):
+                entry = {"address": entry}
+            if not isinstance(entry, dict):
+                continue
+            address = (entry.get("address") or "").strip().lower()
+            if address and address not in seen:
+                seen.add(address)
+                out.append(address)
+    return out
+
+
+def detector_candidates(config: dict | None, roster: dict | None,
+                        limit: int) -> list[str]:
+    """The wallets a per-wallet detector should ask about this run.
+
+    The roster ranks by how much evidence a wallet ALREADY has, so taking the
+    first N of it to decide where to LOOK for evidence inverts the search. A
+    wallet with no vectors sorts below every wallet with one, and a wallet he
+    has just migrated to has no vectors by construction — it is the newest,
+    quietest, least-connected thing on the list, which is exactly the shape the
+    ranking puts last.
+
+    Measured live 2026-09-12: `0xdd53c529…`, the only wallet in
+    `config.watch_wallets`, under close watch since the 11th and graded PROBABLE
+    on amount and timing, sat at position 166 of 180 non-infrastructure rows and
+    was cut by all four detector caps of 40. The cut-off was a wallet carrying
+    confidence 0.0311. So dormancy — the vector added FOR that wallet, whose own
+    docstring names it — had never once scored it, the shared-agent vector had
+    never seen its named agent `0x1e8695b7…`, and both absences read in the
+    stored files as a measured "no".
+
+    So the pinned wallets go first and are never trimmed: the cap exists to
+    protect an API budget, and silence about a wallet the operator named by hand
+    is not a saving. Everything after them keeps roster order, where the ranking
+    is doing the job it is good at — spending a bounded budget on the strongest
+    of the wallets nobody has vouched for.
+    """
+    picked = pinned_wallets(config)
+    seen = set(picked)
+    target = ((config or {}).get("target_wallet") or "").strip().lower()
+    if target:
+        seen.add(target)
+    rows = (roster or {}).get("wallets")
+    room = max(0, int(limit) - len(picked))
+    for row in rows if isinstance(rows, list) else []:
+        if room <= 0:
+            break
+        if not isinstance(row, dict):
+            continue
+        address = (row.get("wallet") or "").strip().lower()
+        if not address or address in seen:
+            continue
+        if row.get("tier") == TIER_INFRASTRUCTURE or row.get("is_service"):
+            continue
+        seen.add(address)
+        picked.append(address)
+        room -= 1
+    return picked
+
+
+def load_roster() -> dict:
+    """The stored roster, or an empty one. A detector must still run without it."""
+    try:
+        with open(ROSTER_DIR / "latest.json") as f:
+            doc = json.load(f)
+        return doc if isinstance(doc, dict) else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def _as_float(value) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def evidence_strength(row: dict) -> float:
+    """The best score any vector gives this wallet, for RANKING only.
+
+    `confidence` comes from the transfer graph alone, so a wallet reached by any
+    other vector carries 0.0 — rule 6 inside the ranking, a missing reading
+    priced as zero and invisible to every comparison. Measured live 2026-09-12:
+    124 of 181 non-infrastructure wallets sat at exactly 0.0 and 75 of them tied
+    inside POSSIBLE, so the sort fell through to the wallet ADDRESS and leading
+    hex digits decided which leads a bounded budget looked at. A correlation
+    lead at 0.9974 survived the cap because it begins `0x7f`; one at 0.6839 was
+    cut at #130, holding 33 live named agents nothing had indexed.
+
+    These are different scales and the maximum of them is NOT a confidence — it
+    must never be stored as one or compared against a threshold. It is a chase
+    priority: a number whose only job is to put the strongest thing we know
+    about a wallet ahead of the weakest thing we know about another.
+    """
+    evidence = row.get("evidence") or {}
+    scores = [_as_float(row.get("confidence")),
+              _as_float(evidence.get("correlation_confidence")),
+              _as_float((evidence.get("dormancy_handoff") or {}).get("score")),
+              _as_float(evidence.get("portfolio_overlap"))]
+    return max(scores)
+
+
+def rank_key(row: dict):
+    """Chase priority: tier, then agreeing vectors, then strength, then address.
+
+    Tier and vector COUNT stay primary — independent vectors agreeing is the
+    project's whole premise, and one loud score must not outrank two quiet ones
+    that corroborate. The address remains last, but only as a deterministic
+    tiebreaker between wallets we genuinely know the same amount about.
+    """
+    return (TIER_ORDER.get(row.get("tier"), 9),
+            -int(row.get("vector_count") or 0),
+            -evidence_strength(row),
+            row.get("wallet") or "")
+
+
+def attach_rank_strength(rows: list) -> None:
+    """Record on each row the strength that decided its position.
+
+    Serialised so the ordering is legible rather than mysterious: a reader
+    seeing a correlation lead at rank 2 with no transfer-graph confidence needs
+    to be told what put it there. Emphatically NOT a confidence — see
+    `evidence_strength`.
+    """
+    for row in rows:
+        row["rank_strength"] = round(evidence_strength(row), 4)
+
+
+def carry_peak_tier(rows: list, previous: dict | None) -> None:
+    """Mark each row with the best tier it has ever held, and any fall from it.
+
+    The roster is rebuilt from scratch every run so that a change inside one
+    detector cannot silently move a tier. The cost is that a wallet whose
+    evidence LAPSES is rewritten as though it never had any, and nothing in the
+    file distinguishes the two.
+
+    Measured live 2026-09-12: `0xdd53c529…` held amount-correlation and dormancy,
+    a pool refactor destroyed the bridge pool's stored answer, and the wallet
+    fell PROBABLE → WATCH. At WATCH it sorted 166th of 180 and was cut by all
+    four detector caps of 40, so dormancy stopped scoring it too and the last
+    vector went as well. A wallet under close watch by name became
+    indistinguishable from 165 strangers, and no file recorded that anything
+    had moved.
+
+    Rule 5 over time: "we no longer have the evidence" is not "there was never
+    anything here". Recorded, never alerted — a lost inference is a fact about
+    OUR coverage, not a contact with his world.
+    """
+    prior = {}
+    for row in ((previous or {}).get("wallets") or []):
+        if not isinstance(row, dict):
+            continue
+        address = (row.get("wallet") or "").lower()
+        if not address:
+            continue
+        seen = [t for t in (row.get("peak_tier"), row.get("tier")) if t in TIER_ORDER]
+        if seen:
+            prior[address] = min(seen, key=lambda t: TIER_ORDER[t])
+
+    for row in rows:
+        tier = row.get("tier")
+        was = prior.get((row.get("wallet") or "").lower())
+        best = tier
+        if was in TIER_ORDER and tier in TIER_ORDER:
+            best = min((was, tier), key=lambda t: TIER_ORDER[t])
+        row["peak_tier"] = best
+        # Grading a wallet INFRASTRUCTURE is a measurement that outranks every
+        # inference — `0xd7a827fb…` was POSSIBLE until its 590,836 Arbitrum
+        # transactions were counted. Reporting that as a demotion inverts it.
+        dropped = (tier != TIER_INFRASTRUCTURE and best != tier
+                   and TIER_ORDER.get(best, 9) < TIER_ORDER.get(tier, 9))
+        row["tier_dropped_from"] = best if dropped else None
+
+
 def build_roster(config: dict | None = None) -> dict:
     """Merge every detector's output into one ranked roster."""
     config = config or load_config()
@@ -332,12 +519,15 @@ def build_roster(config: dict | None = None) -> dict:
                                 e["is_service"], e["known_self"])
         rows.append(e)
 
-    rows.sort(key=lambda r: (TIER_ORDER.get(r["tier"], 9),
-                             -r["vector_count"], -r["confidence"], r["wallet"]))
+    carry_peak_tier(rows, load_roster())
+    attach_rank_strength(rows)
+
+    rows.sort(key=rank_key)
 
     counts: dict[str, int] = {}
     for r in rows:
         counts[r["tier"]] = counts.get(r["tier"], 0) + 1
+    demoted = [r for r in rows if r.get("tier_dropped_from")]
 
     return {
         "computed_at": datetime.now(UTC).isoformat(),
@@ -347,6 +537,10 @@ def build_roster(config: dict | None = None) -> dict:
         # one with five, rather than wondering why nothing is behavioural.
         "behavioural_counts_as_a_vector": trust_behavioural,
         "tier_counts": counts,
+        # A wallet that LOST a vector since the last run. Recorded, not alerted.
+        "demoted_count": len(demoted),
+        "demoted": [{"wallet": r["wallet"], "tier": r["tier"],
+                     "was": r["tier_dropped_from"]} for r in demoted[:20]],
         "wallets": rows,
     }
 
@@ -358,6 +552,11 @@ def main() -> int:
           + ", ".join(f"{k} {v}" for k, v in sorted(
               roster["tier_counts"].items(),
               key=lambda kv: TIER_ORDER.get(kv[0], 9))))
+    for d in roster.get("demoted") or []:
+        # Not an alert: a lost inference is a fact about our coverage, not about
+        # him. It belongs in the run log where a stalled vector shows up.
+        print(f"[roster]   DEMOTED {d['wallet'][:14]}... {d['was']} -> {d['tier']} "
+              f"(a vector it used to have is no longer supported)")
     shown = 0
     for row in roster["wallets"]:
         if row["tier"] == TIER_INFRASTRUCTURE or shown >= 8:

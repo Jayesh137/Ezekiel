@@ -25,7 +25,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agent_links import AGENT_LINKS_DIR, build_agent_links, normalise_agents, save
+from src.agent_links import (
+    AGENT_LINKS_DIR,
+    build_agent_links,
+    normalise_agents,
+    save,
+    webdata_is_unreadable,
+)
 from src.alerts import alert_shared_agent, alert_target_gained_agent
 from src.utils import DATA_DIR, hl_post, load_config
 
@@ -38,27 +44,24 @@ def wallets_to_check(config: dict) -> list[str]:
     """The target, anything believed to be his, and every roster candidate.
 
     Infrastructure is skipped: an exchange's agents say nothing about him.
+
+    The cap is applied HERE rather than by the caller, so that the operator's
+    watch list survives it. A shared agent is the one vector strong enough to
+    CONFIRM alone, and until 2026-09-12 the wallet under close watch was cut by
+    this cap — its named agent `0x1e8695b7…` was never in the index at all,
+    while `linked_to_target: {}` read as a measured no.
     """
+    from src.roster import detector_candidates
+
     target = (config.get("target_wallet") or "").lower()
-    out = [target]
-    seen = {target}
-    for addr in config.get("known_self_wallets", []) or []:
-        a = (addr or "").lower()
-        if a and a not in seen:
-            seen.add(a)
-            out.append(a)
     try:
         with open(DATA_DIR / "roster" / "latest.json") as f:
-            rows = json.load(f).get("wallets", [])
+            roster = json.load(f)
     except (OSError, ValueError, AttributeError):
-        rows = []
-    for row in rows:
-        a = (row.get("wallet") or "").lower()
-        if not a or a in seen or row.get("tier") == "INFRASTRUCTURE":
-            continue
-        seen.add(a)
-        out.append(a)
-    return out
+        roster = {}
+    # The target is never his own candidate inside the selector, so he is put
+    # back at the head: this detector reads HIS agents to compare against.
+    return [target] + detector_candidates(config, roster, DEFAULT_MAX_WALLETS - 1)
 
 
 def _previous() -> dict:
@@ -72,7 +75,7 @@ def _previous() -> dict:
 def main() -> int:
     config = load_config()
     target = (config.get("target_wallet") or "").lower()
-    wallets = wallets_to_check(config)[:DEFAULT_MAX_WALLETS]
+    wallets = wallets_to_check(config)
 
     from src.hl_identity import parse_web_data
 
@@ -96,14 +99,28 @@ def main() -> int:
         # The frontend agent that actually signs orders is NOT in extraAgents;
         # only webData2 reports it. Two accounts driven by the same one are the
         # same browser session, which is the same person.
+        #
+        # A failed call here used to vanish: hl_post returns `{}` once its
+        # retries are exhausted, parse_web_data reads that as "no agent", and
+        # nothing was counted. Same guard as extraAgents above — a read we
+        # could not make must never serialise as a wallet that authorised
+        # nobody.
         try:
-            web = parse_web_data(hl_post({"type": "webData2", "user": wallet}))
+            payload = hl_post({"type": "webData2", "user": wallet})
+        except Exception as exc:                      # noqa: BLE001 - transport
+            unreadable += 1
+            print(f"[agents] {wallet[:12]}... webData2 unreadable: {type(exc).__name__}")
+            payload = None
+        if webdata_is_unreadable(payload):
+            if payload is not None:
+                unreadable += 1
+                print(f"[agents] {wallet[:12]}... webData2 unreadable: empty response")
+        else:
+            web = parse_web_data(payload)
             if web["agent_address"]:
                 by_wallet[wallet].append({"address": web["agent_address"],
                                           "name": None,
                                           "validUntil": web["agent_valid_until"]})
-        except Exception as exc:                      # noqa: BLE001 - transport
-            print(f"[agents] {wallet[:12]}... webData2 unreadable: {type(exc).__name__}")
         time.sleep(0.15)
 
     result = build_agent_links(by_wallet, target)
