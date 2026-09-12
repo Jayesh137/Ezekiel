@@ -30,6 +30,7 @@ import json
 import math
 import sys
 import time
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -1951,7 +1952,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         max_calls=budget["max_expansions"] * len(sweep_chains) * 3,
         seconds=budget["time_budget_seconds"])
 
-    deadline = time.monotonic() + budget["time_budget_seconds"]
+    started = time.monotonic()
+    deadline = started + budget["time_budget_seconds"]
     max_calls = budget["max_expansions"]
     max_depth = budget.get("max_depth", DEFAULTS["max_depth"])
     branching = budget.get("max_branching", DEFAULTS.get("max_branching", 8))
@@ -2033,6 +2035,16 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     decide(wallet, d, "deferred", stopped_reason, pr)
                     continue
                 calls += 1
+                # One line per lookup, with the clock. A step that goes silent
+                # for six minutes cannot be diagnosed, only guessed at: the
+                # graph step failed on its cap four runs running having printed
+                # nothing at all between the seed counts and the timeout, so
+                # 369s against a 150s budget could not be attributed to
+                # network, disk or local compute without bisecting by hand.
+                # Costs one line per lookup and answers the question directly.
+                print(f"[graph]   lookup {calls}/{max_calls} {wallet} "
+                      f"depth {d} — {time.monotonic() - started:.1f}s elapsed",
+                      flush=True)
                 found = 0
                 try:
                     # Deliberately no price_lookup: this sweeps a FRONTIER
@@ -2568,6 +2580,28 @@ def verify_fan_services(edges: list[dict], known_services: set, cfg: dict,
     return {**on_record, **busy}, persons | persons_on_record()
 
 
+def _phase(name: str):
+    """Time one phase of the graph run and say so, however it ends.
+
+    The graph step runs expansion, bytecode labelling, whole-chain activity
+    verification and deposit inference; three of the four make external calls
+    under separate budgets. When it hit trace.yml's 6-minute cap four runs
+    running there was no line to say which of them had the time, so a budget
+    overrun was indistinguishable from a hang. `finally` rather than a plain
+    exit because the phase most likely to be killed is the slow one.
+    """
+    @contextmanager
+    def _timed():
+        start = time.monotonic()
+        print(f"[graph] -> {name}", flush=True)
+        try:
+            yield
+        finally:
+            print(f"[graph] <- {name} [{time.monotonic() - start:.1f}s]",
+                  flush=True)
+    return _timed()
+
+
 def run_transfer_graph(expand: bool = True) -> dict:
     """Full pipeline: gather edges, traverse, score, persist, alert."""
     config = load_config()
@@ -2612,10 +2646,11 @@ def run_transfer_graph(expand: bool = True) -> dict:
         if already:
             print(f"[graph] {len(already)} wallet(s) already expanded on an "
                   f"earlier run — not repeating")
-        edges, expansion = expand_frontier(
-            edges, target, cfg, resume=resume,
-            known_services=known_services, already_expanded=already,
-            never_services=persons_on_record())
+        with _phase("frontier expansion"):
+            edges, expansion = expand_frontier(
+                edges, target, cfg, resume=resume,
+                known_services=known_services, already_expanded=already,
+                never_services=persons_on_record())
         write_cursor("transfer_graph_last_expansion_ms", now_ms())
     else:
         from src.chain.chains import enabled_chains
@@ -2628,7 +2663,8 @@ def run_transfer_graph(expand: bool = True) -> dict:
     # addresses expansion just discovered, which a pre-expansion pass would miss
     # for a whole run.
     try:
-        label_contracts(edges, known_services, config, cfg["dust_usd"])
+        with _phase("bytecode labelling"):
+            label_contracts(edges, known_services, config, cfg["dust_usd"])
     except Exception as exc:  # noqa: BLE001 - labelling must never break the graph
         print(f"[graph] bytecode labelling failed: {type(exc).__name__}: {exc}")
 
@@ -2637,8 +2673,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
     # busy, and a quiet EOA is a person however many protocols it touches.
     never_services: set = set()
     try:
-        busy_reasons, never_services = verify_fan_services(edges, known_services, cfg,
-                                                           skip={target})
+        with _phase("whole-chain activity verification"):
+            busy_reasons, never_services = verify_fan_services(
+                edges, known_services, cfg, skip={target})
         known_services |= set(busy_reasons)
         hl_services.update(busy_reasons)
     except Exception as exc:  # noqa: BLE001 - verification must never break the graph
@@ -2655,7 +2692,8 @@ def run_transfer_graph(expand: bool = True) -> dict:
         # deposit address forwarding into one is the same signature.
         hot = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"),
                                 categories={"cex_hot"}) | set(busy_on_record())
-        inferred_deposits = infer_deposit_addresses(edges, hot)
+        with _phase("deposit-address inference"):
+            inferred_deposits = infer_deposit_addresses(edges, hot)
         for addr, info in inferred_deposits.items():
             if addr not in known_services:
                 known_services.add(addr)

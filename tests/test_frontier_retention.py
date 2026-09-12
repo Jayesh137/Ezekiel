@@ -645,3 +645,58 @@ def test_the_frontier_learns_a_plan_refusal_once_per_run(monkeypatch):
     assert all(s is not None for s in seen), "the frontier must pass a refusal record"
     assert len({id(s) for s in seen}) == 1, (
         "every wallet in one walk must share ONE record, or nothing is learned")
+
+
+def test_each_lookup_reports_where_the_walk_is(monkeypatch, capsys):
+    """A silent step cannot be diagnosed, only guessed at.
+
+    trace.yml's graph step failed on its 6-minute cap four runs running, having
+    printed nothing between "N wallet(s) already expanded" and the timeout — so
+    369 seconds were unaccounted for against a 150s internal budget, and the
+    only way to tell whether the time went to network, to disk or to local
+    compute was to bisect it by hand. This is the same blindness that made the
+    earlier JOB timeout unreadable: "stuck at 699s having printed nothing at
+    all".
+
+    One line per lookup, carrying the wallet and the elapsed clock, turns the
+    next occurrence into a reading instead of an investigation.
+    """
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
+
+    from src.chain import collect as chain_collect
+    monkeypatch.setattr(chain_collect, "sweep_wallet", lambda *a, **k: {
+        "status": "ok", "degraded_sources": [], "unsupported_sources": []})
+    monkeypatch.setattr(chain_collect, "records_for", lambda w: [])
+
+    run(edges(l1(T, addr("1"), 900_000, 2, "0x1")), {"max_expansions": 1})
+
+    out = capsys.readouterr().out
+    lines = [ln for ln in out.splitlines() if "lookup 1/" in ln]
+    assert lines, f"expected a per-lookup progress line, got:\n{out}"
+    assert addr("1")[:10] in lines[0], "the line must name the wallet being swept"
+    assert "s elapsed" in lines[0], "and say how much of the budget is gone"
+
+
+def test_every_graph_phase_reports_its_own_clock(capsys):
+    """`_phase` names each phase and how long it took.
+
+    The graph step runs expansion, bytecode labelling, whole-chain activity
+    verification and deposit inference, and three of the four make external
+    calls under separate budgets. When the step hit its cap there was no way to
+    say which of them spent the time.
+    """
+    with tg._phase("doing a thing"):
+        pass
+    out = capsys.readouterr().out
+    assert "doing a thing" in out
+    assert "s]" in out, "a phase line must carry its elapsed time"
+
+
+def test_a_phase_that_raises_still_reports_its_clock(capsys):
+    """The slow phase is the one most likely to die, so it must still report."""
+    try:
+        with tg._phase("exploding"):
+            raise ValueError("boom")
+    except ValueError:
+        pass
+    assert "exploding" in capsys.readouterr().out
