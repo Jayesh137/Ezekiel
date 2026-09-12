@@ -69,7 +69,10 @@ trading style. Never promote a wallet on one vector alone.
 |---|---|---|
 | Observed transfer | `transfer_graph.py` | On-chain and HL-native movement |
 | Linkage | `linkage.py` | Shared funder, shared CEX deposit address, first-gas funding. **Address reuse is the strongest single signal** — a CEX deposit address belongs to one account |
-| Amount correlation | `correlator.py` | Exit re-appears as a same-size deposit across a CEX gap |
+| Amount correlation | `correlator.py` | Exit re-appears as a same-size deposit across a CEX gap. **Two candidate pools since 2026-09-12**: the Arbitrum bridge (daily, Etherscan) and Circle's forwarder feed (every trace, keyless) |
+| Circle withdrawals | `hl_actions.py`, `withdrawals.py`, `scripts/check_withdrawals.py` | `sendToEvmWithData` names a recipient on ANY CCTP chain; the ledger shows only a send to `0x2000…0000`. Each is paired with the mint at a cluster address; a foreign recipient alerts CRITICAL with the chain, one nobody can name alerts HIGH |
+| Circle deposits | `cctp_feed.py`, `correlator.py --pools cctp` | USDC's forwarder `0x6b9e7731…` sends every CCTP deposit to its recipient, so its ledger is a complete keyless feed of every Circle deposit into every account. Incremental, paced, persisted; Circle depositors also join the scan priority set |
+| Referral | `referral.py` (collector step) | He has no code today. Creating one, referring an account through it, or being referred alerts HIGH with the addresses — a referred account is one he chose to link to himself |
 | Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated — see below** |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
@@ -644,6 +647,18 @@ that it is.
   **`workflow_dispatch` is not best-effort** — anything outside GitHub that
   can make one API call drives a run immediately. Do not quote the cron
   interval as the cadence; quote the measurement.
+- **A local dispatcher now drives the crons (2026-09-12).**
+  `scripts/dispatch_workflows.ps1` runs from Windows Task Scheduler on the
+  operator's machine every 5 minutes and dispatches `watch.yml` (10 min),
+  `collect.yml` (15 min) and `trace.yml` (30 min) whenever the newest run is
+  complete and older than the interval — never while one is queued or
+  running, and a cron-started run counts, so the two schedulers do not
+  double up. Measured at install: watch.yml's scheduled runs were 119-145
+  minutes apart, and collect.yml's last run was **240 minutes** old against
+  its 15-minute cron. Only while the machine is on; GitHub's crons remain
+  the fallback. Log at `%LOCALAPPDATA%\Ezekiel\dispatch.log`; remove with
+  `schtasks /Delete /F /TN "Ezekiel workflow dispatcher"`. The repo is public,
+  so the minutes are free.
 - **`watch.yml` has its OWN concurrency group, and `check_watchlist.py` /
   `check_hyperevm.py` have exactly ONE writer (2026-09-12).** They used to run
   in `trace.yml` as well, while both workflows shared the `data-commit` group.
@@ -711,12 +726,42 @@ that it is.
   The surveyed answer for the cluster is **nothing**: the target has 8 ERC-20
   transfers there, all inbound airdrop spam, 0 native and 0 internal
   transactions, and has never sent anything; the treasury has 3, the same
-  shape. No USDC at either address.
-- **The $30,000,000 to `0x2000…0000` is still unaccounted for.** Six sends of
-  spot USDC to the HyperCore system address for token 0 (2026-06-12 to
-  2026-09-11), nothing returning that way, nonce 0, no ERC-20 on HyperEVM, no
-  balance on any of the ten HIP-3 dexes, and no Transfer log crediting him in
-  a window around the latest send. Every tool this project has says it is not
-  where it should be. The nonce tripwire remains the watch.
+  shape. No USDC at either address — which was correct, and was read as a
+  mystery for two days because the sends to `0x2000…0000` were assumed to be
+  HyperEVM transfers. They were Circle withdrawals to Arbitrum (see below).
+- **The $30,000,000 to `0x2000…0000` is RESOLVED (2026-09-12), and the
+  premise behind two days of searching was wrong.** A spot `send` to the USDC
+  system address is not a transfer to HyperEVM. It is the ledger's only trace
+  of **`sendToEvmWithData`** — Hyperliquid's native Circle/CCTP withdrawal —
+  whose explorer payload carries `destinationRecipient` and a
+  `destinationChainId` that is a **Circle domain** (3 = Arbitrum, 6 = Base,
+  5 = Solana, 19 = HyperEVM), not an EVM chain id. All six sends minted at
+  **his own Arbitrum address within the same minute**, from the zero address,
+  for the amount less Circle's $0.20; the substrate held every mint the whole
+  time and nothing joined the two sides. Read it as a lesson about the
+  vocabulary: `0x2000…0000` is the *system* address, and what the system does
+  with the money depends on the action, which only the explorer shows.
+  What the route means for the mission is worse than a lost $30M: the action
+  can name **any recipient on ~14 chains**, `withdraw3` pairing never saw it,
+  `hl_actions` stored it with `destination: None`, and the explorer's
+  300-action window rolls a payload out within a day (295 orders on
+  2026-09-06 alone). Built the same day: the parser and CRITICAL alert, the
+  mint pairing with a HIGH alert for one nobody can name, the watch counting
+  it as a withdrawal destination, and unpaired Circle withdrawals as
+  correlator exits. The HyperEVM nonce tripwire stays — as a tripwire on the
+  one chain he can reach without L1, not as the answer to this question.
+- **The inbound half of the same route was the correlator's blind spot.** A
+  Circle deposit into Hyperliquid never touches the Arbitrum bridge: it is
+  minted on HyperEVM to USDC's linked contract `0x6b9e7731…` and forwarded on
+  HyperCore by that contract's own account, so it arrives as a spot `send`
+  FROM the forwarder — the exact shape of his own 18 deposits ($66.46M).
+  The forwarder's `userNonFundingLedgerUpdates` is therefore a complete feed
+  of every Circle deposit into every account (measured: ~4,400 sends a day,
+  2,000-row pages, ascending, `endTime` honoured, `[]` past the present, and
+  rate-limited by page weight — hence paced and incremental). A fresh wallet
+  funded from a CEX on Ethereum or Base and deposited through Circle enters
+  the candidate pool through `cctp_feed.py` and nowhere else. **Never read
+  this feed through `utils.hl_post`**: it returns `[]` on failure, and to a
+  cursor walker an empty page means "reached the present".
 - Tests must stay network-free and must never write to real `data/`.
 - Verify before claiming: run it, read the output, report what it actually says.

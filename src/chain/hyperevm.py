@@ -1,10 +1,14 @@
 # src/chain/hyperevm.py
 """Reading HyperEVM, the one chain the target can reach without touching L1.
 
-Why this exists: the target has sent $23,000,000 to `0x2000...0000` — the
+Why this was built: the target had sent $23,000,000 to `0x2000...0000` — the
 HyperCore system address for spot token index 0 (USDC) — across five transfers
-between 2026-06-12 and 2026-08-28, and nothing has come back that way. That is
-real money leaving into a chain no other module in this project can read.
+between 2026-06-12 and 2026-08-28, and nothing came back that way. Resolved
+2026-09-12: those sends were `sendToEvmWithData`, the native Circle/CCTP
+withdrawal, and every one minted at his own ARBITRUM address within the
+minute (see src/withdrawals.py). HyperEVM never received them. What remains
+true is the sentence below: HyperEVM is the one chain he can reach without
+an L1 footprint, and the nonce is a one-call tripwire on it.
 
 ## What is and is not feasible here
 

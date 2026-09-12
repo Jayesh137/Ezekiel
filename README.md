@@ -129,7 +129,10 @@ Each is one script, one data directory, and a step in the workflow named.
 | `scripts/check_identity.py` | trace | `data/identity/` | `userRole` (agent → owner, sub-account → master), the frontend agent from `webData2`, staking links, validators, real birth dates. An explicit link to the cluster confirms alone |
 | collector `actions` step | collect | `data/actions/` | The cluster's own explorer actions: withdrawal destinations, agent approvals, vault transfers, sub-accounts. A foreign destination alerts |
 | `scripts/check_bridge_destinations.py` | trace | `data/bridge_destinations/`, `data/labels/bridge_decodes.json` | CCTP and Socket calldata decoded to chain and recipient; Hyperliquid's CCTP extension to the HL account credited |
-| `scripts/check_withdrawals.py` | trace | `data/withdrawals/` | Each HL withdrawal paired with the bridge payout at his own address; unpaired ones resolved with Etherscan |
+| `scripts/check_withdrawals.py` | trace | `data/withdrawals/` | Each HL withdrawal paired with the bridge payout at his own address; unpaired ones resolved with Etherscan. Since 2026-09-12 also every Circle withdrawal (`sendToEvmWithData`, seen in the ledger as a send to `0x2000…0000`) paired with its mint at a cluster address on any chain; a foreign recipient alerts CRITICAL, one nobody can name alerts HIGH |
+| `src/correlator.py --pools cctp` | trace | `data/correlations/` (per-pool), `data/correlations/cctp_pool.json` | The Circle candidate pool: every CCTP deposit into any Hyperliquid account, from USDC's forwarder ledger, incremental and keyless. The bridge pool still runs daily in analyze |
+| collector `referral` step | collect | `data/referral/` | A referral code created, an account referred through it, or the wallet being referred — alerts HIGH with the addresses |
+| `scripts/dispatch_workflows.ps1` | local Task Scheduler | `%LOCALAPPDATA%\Ezekiel\dispatch.log` | Dispatches watch/collect/trace at their real intervals from outside GitHub, because the crons are delivered hours apart |
 | `scripts/check_newborn.py` | scan | `data/newborn/` | Accounts born within a month, from the leaderboard's window volumes; the youngest large ones are scanned first |
 | `scripts/check_names.py` | scan | `data/names/` | Leaderboard display names and vault names matching the naming family |
 | `scripts/check_solana.py` | trace | `data/solana/` | New signatures on the cluster's Solana address (`data/labels/solana_addresses.json`) |
@@ -344,9 +347,15 @@ nonce `0` is a real all-clear and nonce going above `0` is the moment to catch.
 A nonce that could not be read is recorded as unknown and alerts nothing — it is
 never treated as `0`.
 
-Context for why this exists: the target has sent **$23,000,000** to the HyperCore
-system address for USDC across five transfers (2026-06-12 to 2026-08-28) while
-his own HyperEVM nonce has stayed `0`.
+Context for why this was built: the target had sent **$23,000,000** to the
+HyperCore system address for USDC across five transfers (2026-06-12 to
+2026-08-28) while his own HyperEVM nonce stayed `0`. On 2026-09-12 those sends
+turned out to be Circle/CCTP withdrawals to his own Arbitrum address — the
+explorer payload is `sendToEvmWithData` with a Circle domain, and every mint is
+in the substrate — so HyperEVM never received them. The nonce watch stays as a
+cheap tripwire on the one chain he can reach without touching L1; its original
+rationale did not survive, and `scripts/check_withdrawals.py` now owns the
+question it was built to answer.
 
 **A transfer is not ownership.** The top two tiers require corroboration from an
 independent vector (behavioural similarity, amount correlation, address reuse, gas

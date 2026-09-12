@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Watch HyperEVM for the moment the cluster starts using it.
 
-The target has sent $23,000,000 to the HyperCore system address for USDC across
-five transfers (2026-06-12 to 2026-08-28) while his own HyperEVM nonce stayed 0.
-That combination is the whole reason this runs: money is going somewhere we
-cannot reconstruct in arrears, because the public RPC caps log queries at 1000
-blocks against roughly one-second blocks. The nonce leaving zero is the event
-worth catching, and it costs one request per wallet to watch.
+The target's sends to the HyperCore system address for USDC ($30M by
+2026-09-11) were what this was built for, on the belief that the money went to
+HyperEVM. It did not: they are Circle/CCTP withdrawals that minted at his own
+Arbitrum address (resolved 2026-09-12, src/withdrawals.py pairs them). The
+watch stays because the premise underneath it still holds — HyperEVM is the
+one chain he can reach without an L1 footprint, its public RPC caps log queries
+at 1000 blocks against roughly one-second blocks so history there cannot be
+reconstructed in arrears, and the nonce leaving zero is the event worth
+catching at one request per wallet.
 
 Cheap by construction: three calls per wallet, no Etherscan budget, no key.
 """
