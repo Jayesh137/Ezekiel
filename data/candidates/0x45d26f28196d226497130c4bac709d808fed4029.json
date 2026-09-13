@@ -1,16 +1,19 @@
 {
   "wallet": "0x45d26f28196d226497130c4bac709d808fed4029",
   "first_seen": "2026-09-12T13:46:05.486439+00:00",
-  "last_seen": "2026-09-13T01:44:29.209566+00:00",
+  "last_seen": "2026-09-13T06:55:00.740571+00:00",
   "best_score": 1.0,
   "latest_score": 1.0,
-  "latest_tier": "WEAK_LEAD",
+  "latest_tier": "CONFIRMED_CANDIDATE",
   "latest_evidence": {
-    "tier": "WEAK_LEAD",
+    "tier": "CONFIRMED_CANDIDATE",
     "reasons": [
       "Strong asset mix overlap",
       "Similar market/limit execution style",
+      "Similar account-size bracket",
+      "Matching trade frequency and cadence",
       "Matching long/short bias",
+      "Similar scaling/TWAP/clip-size habits",
       "Shares the target's original funding source (same CEX/funder)",
       "Sends funds to the same address as target (address reuse): 0x09551a4e..., 0x160f6ef9..."
     ],
@@ -25,18 +28,11 @@
         "ETH",
         "FARTCOIN"
       ],
-      "target_only": [
-        "BTC",
-        "ETHFI",
-        "PUMP",
-        "XRP",
-        "ZEC",
-        "kPEPE"
-      ],
+      "target_only": [],
       "candidate_only": [],
       "overlap_count": 4,
       "rare_overlap": [],
-      "jaccard": 0.4
+      "jaccard": 1.0
     },
     "market_rarity": {
       "shared_markets": [],
@@ -45,7 +41,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.7581,
+      "score_without_bonus": 0.992,
       "explanations": [],
       "frequencies": {}
     },
@@ -235,8 +231,28 @@
         "position_management": 0.7914,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-09-13T06:55:00.740571+00:00",
+      "score": 1.0,
+      "tier": "CONFIRMED_CANDIDATE",
+      "dimensions": {
+        "asset_preferences": 1.0,
+        "timing_profile": null,
+        "leverage_profile": 0.9566,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.9899,
+        "trade_sequencing": 1.0,
+        "position_sizing": 0.9798,
+        "order_profile": null,
+        "activity": 1.0,
+        "direction_bias": 1.0,
+        "position_management": 1.0,
+        "loss_handling": null
+      }
     }
   ],
   "status": "ACTIVE",
-  "recent_avg_score": 0.985
+  "recent_avg_score": 1.0
 }
