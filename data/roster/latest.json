@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-13T13:07:25.461384+00:00",
+  "computed_at": "2026-09-13T17:07:21.026927+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 345,
   "behavioural_counts_as_a_vector": false,
@@ -106,7 +106,7 @@
         "linkage",
         "transfer"
       ],
-      "confidence": 0.4452,
+      "confidence": 0.4451,
       "classification": "POSSIBLE_LINKED_WALLET",
       "reasons": [
         "Repeated transfers (906 separate movements)",
@@ -128,9 +128,9 @@
           "ethereum",
           "inferred"
         ],
-        "correlation_confidence": 0.6346,
+        "correlation_confidence": 0.634,
         "correlation_gap_hours": 105.0,
-        "competing_deposits": 20,
+        "competing_deposits": 21,
         "behavioural_score": 0.382,
         "behavioural_tier": "BACKGROUND",
         "style_vetoes": [
@@ -147,7 +147,7 @@
       "tier": "PROBABLE",
       "peak_tier": "PROBABLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.6346
+      "rank_strength": 0.634
     },
     {
       "wallet": "0xfe7ce058edc7cfcde9ef8262ba51f8d4796ab7ae",
@@ -499,7 +499,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.3196,
+      "confidence": 0.3194,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Received funds directly from the target wallet",
@@ -529,7 +529,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.3196
+      "rank_strength": 0.3194
     },
     {
       "wallet": "0x84abc08c0ea62e687c370154de1f38ea462f4d37",
@@ -687,7 +687,7 @@
         "Sent funds to the target wallet",
         "Transfer happened entirely inside Hyperliquid (no L1 trace)",
         "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 405 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 406 days ago \u2014 transfer evidence aged to 40%",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
@@ -936,7 +936,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (12 separate movements)",
+        "Repeated transfers (13 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -944,7 +944,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 12
+          "edge_count": 13
         },
         "depth": 2,
         "chains": [
@@ -1178,7 +1178,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (52 separate movements)",
+        "Repeated transfers (59 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1186,7 +1186,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 52
+          "edge_count": 59
         },
         "depth": 2,
         "chains": [
@@ -1278,7 +1278,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.0999,
+      "confidence": 0.0998,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (119 separate movements)",
@@ -1309,14 +1309,14 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.0999
+      "rank_strength": 0.0998
     },
     {
       "wallet": "0x4e7a235ca1663ad6cdd3bf94b60909be7deead1c",
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.0983,
+      "confidence": 0.0982,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (3 separate movements)",
@@ -1344,7 +1344,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.0983
+      "rank_strength": 0.0982
     },
     {
       "wallet": "0x3d855cf5fff6eec436123d8f49e7afeac2b2a242",
@@ -1565,6 +1565,39 @@
       "rank_strength": 0.075
     },
     {
+      "wallet": "0x3bd64c22865b36b71fc7e2ae827f0d38de9ab138",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.075,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (451 separate movements)",
+        "Reached at 3 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 451
+        },
+        "depth": 3,
+        "chains": [
+          "arbitrum",
+          "ethereum",
+          "polygon"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.075
+    },
+    {
       "wallet": "0x5b48a792cf530ee1634d09e0fa1beafd13135942",
       "vectors": [
         "transfer"
@@ -1585,7 +1618,10 @@
         "depth": 3,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -1847,7 +1883,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.073,
+      "confidence": 0.0729,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (225 separate movements)",
@@ -1877,7 +1913,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.073
+      "rank_strength": 0.0729
     },
     {
       "wallet": "0x8579b7846bdce2421237347764e1bd209a0eb68e",
@@ -1919,7 +1955,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.0648,
+      "confidence": 0.0647,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (952 separate movements)",
@@ -1948,7 +1984,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.0648
+      "rank_strength": 0.0647
     },
     {
       "wallet": "0x07b5c698f40e01d0c98af09612320bf9491bdb8b",
@@ -1959,7 +1995,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (11 separate movements)",
-        "Last movement 145 days ago \u2014 transfer evidence aged to 85%",
+        "Last movement 146 days ago \u2014 transfer evidence aged to 85%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1994,7 +2030,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (6 separate movements)",
-        "Last movement 167 days ago \u2014 transfer evidence aged to 79%",
+        "Last movement 168 days ago \u2014 transfer evidence aged to 79%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2054,41 +2090,6 @@
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.0537
-    },
-    {
-      "wallet": "0xfeb620b14a9c3683cecb9097802af9c32e51c701",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0509,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (8 separate movements)",
-        "Last movement 101 days ago \u2014 transfer evidence aged to 97%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 8
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.0509
     },
     {
       "wallet": "0xa55c5e51ed5af6e024286613721a18eb02f0c55d",
@@ -2171,7 +2172,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (67 separate movements)",
-        "Last movement 235 days ago \u2014 transfer evidence aged to 60%",
+        "Last movement 236 days ago \u2014 transfer evidence aged to 60%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2345,7 +2346,7 @@
       "confidence": 0.045,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (152 separate movements)",
+        "Repeated transfers (153 separate movements)",
         "Last movement 448 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
@@ -2354,7 +2355,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 152
+          "edge_count": 153
         },
         "depth": 2,
         "chains": [
@@ -2557,7 +2558,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (8 separate movements)",
-        "Last movement 345 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 346 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2690,6 +2691,41 @@
       "rank_strength": 0.045
     },
     {
+      "wallet": "0x04f8fbeb5a165e93e89ca9ac94ba5fc659a37684",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0435,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Repeated transfers (35 separate movements)",
+        "Last movement 243 days ago \u2014 transfer evidence aged to 58%",
+        "Reached at 3 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 35
+        },
+        "depth": 3,
+        "chains": [
+          "ethereum"
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0435
+    },
+    {
       "wallet": "0x4a356947348d1d17d8989e54720b4e76cb2857e1",
       "vectors": [
         "transfer"
@@ -2734,7 +2770,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (116 separate movements)",
-        "Last movement 668 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 669 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2805,7 +2841,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (12 separate movements)",
-        "Last movement 1943 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 1944 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3084,7 +3120,7 @@
       "confidence": 0.021,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (136 separate movements)",
+        "Repeated transfers (138 separate movements)",
         "Last movement 361 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 4 hops from target \u2014 confidence discounted"
       ],
@@ -3093,7 +3129,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 136
+          "edge_count": 138
         },
         "depth": 4,
         "chains": [
@@ -3223,7 +3259,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 998 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 999 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3292,7 +3328,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 107 days ago \u2014 transfer evidence aged to 95%",
+        "Last movement 108 days ago \u2014 transfer evidence aged to 95%",
         "Reached at 3 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3501,7 +3537,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 224 days ago \u2014 transfer evidence aged to 63%",
+        "Last movement 225 days ago \u2014 transfer evidence aged to 63%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3698,41 +3734,6 @@
       "rank_strength": 0.0
     },
     {
-      "wallet": "0x3a8f476dd4172229961f4116985484b5405f612a",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 2217 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1
-        },
-        "depth": 4,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.0
-    },
-    {
       "wallet": "0x434fb334ba73684617ef253f8a71f53c16a304aa",
       "vectors": [
         "transfer"
@@ -3787,6 +3788,40 @@
           "edge_count": 1
         },
         "depth": 2,
+        "chains": [
+          "ethereum"
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
+      "wallet": "0x5fd131a3c3a19750cc64d1dacefcd926a45d586c",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 196 days ago \u2014 transfer evidence aged to 71%",
+        "Reached at 3 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 2
+        },
+        "depth": 3,
         "chains": [
           "ethereum"
         ],
@@ -3947,7 +3982,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 404 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 405 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -4064,40 +4099,6 @@
           "edge_count": 1
         },
         "depth": 2,
-        "chains": [
-          "ethereum"
-        ],
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.0
-    },
-    {
-      "wallet": "0x8fd4106fb3a206c42e3535050de3a22f4c1a05bd",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 2210 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 4 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 2
-        },
-        "depth": 4,
         "chains": [
           "ethereum"
         ],
@@ -5820,7 +5821,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 409968827.15,
-          "edge_count": 711
+          "edge_count": 715
         },
         "depth": 1,
         "chains": [
@@ -6323,7 +6324,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 586
+          "edge_count": 617
         },
         "depth": 2,
         "chains": [
@@ -6685,7 +6686,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9282918.5,
-          "edge_count": 83
+          "edge_count": 112
         },
         "depth": 1,
         "chains": [
@@ -6745,7 +6746,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 27
+          "edge_count": 80
         },
         "depth": 2,
         "chains": [
@@ -6839,7 +6840,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 10689918.59,
-          "edge_count": 35
+          "edge_count": 36
         },
         "depth": 1,
         "chains": [
@@ -6902,7 +6903,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 1500097.32,
-          "edge_count": 191
+          "edge_count": 221
         },
         "depth": 1,
         "chains": [
@@ -6965,7 +6966,7 @@
         "totals": {
           "received_from_target_usd": 383447848.82,
           "sent_to_target_usd": 440899852.0,
-          "edge_count": 1244
+          "edge_count": 1263
         },
         "depth": 1,
         "chains": [
@@ -7243,7 +7244,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 12809998.43,
-          "edge_count": 40
+          "edge_count": 41
         },
         "depth": 1,
         "chains": [
@@ -7309,7 +7310,7 @@
         "totals": {
           "received_from_target_usd": 319771573.13,
           "sent_to_target_usd": 0,
-          "edge_count": 9550
+          "edge_count": 9552
         },
         "depth": 1,
         "chains": [
@@ -7525,7 +7526,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 92
+          "edge_count": 95
         },
         "depth": 2,
         "chains": [
@@ -7900,7 +7901,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 32
+          "edge_count": 39
         },
         "depth": 2,
         "chains": [
@@ -8358,7 +8359,7 @@
         "totals": {
           "received_from_target_usd": 152591478.49,
           "sent_to_target_usd": 0,
-          "edge_count": 146
+          "edge_count": 147
         },
         "depth": 1,
         "chains": [
@@ -9004,7 +9005,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 30
+          "edge_count": 43
         },
         "depth": 2,
         "chains": [
@@ -9188,10 +9189,11 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1
+          "edge_count": 2
         },
         "depth": 2,
         "chains": [
+          "arbitrum",
           "ethereum"
         ]
       },
@@ -9494,10 +9496,10 @@
       "confidence": 0.0,
       "classification": "SERVICE",
       "reasons": [
-        "Excluded: global activity: 484,964 txs, 695,899 token transfers"
+        "Excluded: global activity: 484,964 txs, 695,899 token transfers (ERC1967Proxy)"
       ],
       "evidence": {
-        "service_reason": "global activity: 484,964 txs, 695,899 token transfers",
+        "service_reason": "global activity: 484,964 txs, 695,899 token transfers (ERC1967Proxy)",
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
@@ -9564,7 +9566,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 35795207.21,
-          "edge_count": 105
+          "edge_count": 106
         },
         "depth": 1,
         "chains": [
@@ -9931,7 +9933,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 5800081.45,
-          "edge_count": 12368
+          "edge_count": 12369
         },
         "depth": 1,
         "chains": [
@@ -10509,7 +10511,7 @@
         "totals": {
           "received_from_target_usd": 1264963.49,
           "sent_to_target_usd": 0,
-          "edge_count": 4127
+          "edge_count": 4406
         },
         "depth": 1,
         "chains": [
@@ -10571,7 +10573,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 66
+          "edge_count": 85
         },
         "depth": 2,
         "chains": [
@@ -10601,7 +10603,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 472
+          "edge_count": 474
         },
         "depth": 2,
         "chains": [
@@ -10758,7 +10760,7 @@
         "totals": {
           "received_from_target_usd": 5100000.0,
           "sent_to_target_usd": 0,
-          "edge_count": 39
+          "edge_count": 41
         },
         "depth": 1,
         "chains": [
