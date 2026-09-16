@@ -1127,6 +1127,46 @@ def alert_vault_led(vault: str, leader: str, name: str | None, tvl) -> bool:
     return _send_with_cooldown(f"vault_led_{vault.lower()}", 168, subject, body)
 
 
+def alert_cluster_subaccount(link: dict, detail: dict) -> bool:
+    """A sub-account on either side of a cluster wallet: a Hyperliquid address
+    of his, or the account he is a sub-account of.
+
+    CRITICAL: Hyperliquid only lets a master create a sub-account, so this is
+    an act of control declared by the venue itself, not an inference — and a
+    sub-account is an address the owner can copy directly.
+    """
+    subject = "[EZEKIEL] CRITICAL: Sub-Account Linked To His Wallets"
+    value = detail.get("account_value")
+    body = (
+        f"{address_line(link['address'], 'Sub-account')}\n"
+        f"{address_line(link['linked_to'], 'Master')}\n"
+        f"Name: {detail.get('name') or '(none)'}\n"
+        f"Account value: {'unknown' if value is None else f'${value:,.2f}'}\n\n"
+        f"Hyperliquid lets only a master create a sub-account, so the two are one\n"
+        f"operator. If the master is his, the sub-account is a tradeable address of\n"
+        f"his; if the sub-account is his, the master is. Check its book now.\n"
+    )
+    return _send_with_cooldown(f"hl_subaccount_{link['address'].lower()}", 168, subject, body)
+
+
+def alert_cluster_referral(link: dict) -> bool:
+    """A quiet referral code joining a wallet to a cluster wallet.
+
+    HIGH, not CRITICAL: a code is chosen by whoever types it, so it is an
+    association rather than control. Only codes with few users reach here.
+    """
+    subject = "[EZEKIEL] HIGH: Referral Link To His Wallets"
+    body = (
+        f"{address_line(link['address'], 'Referred')}\n"
+        f"{address_line(link['linked_to'], 'Referrer')}\n"
+        f"Accounts on this code: {link.get('code_accounts')}\n\n"
+        f"A second account of his is the obvious one to refer — the rebate is free\n"
+        f"money — and a code this few accounts use is not a public one.\n"
+    )
+    return _send_with_cooldown(
+        f"hl_referral_{link['address'].lower()}_{link['linked_to'].lower()}", 168, subject, body)
+
+
 def alert_name_hit(address: str, name: str, source: str) -> bool:
     subject = "[EZEKIEL] HIGH: Naming-Family Match on Hyperliquid"
     body = (
