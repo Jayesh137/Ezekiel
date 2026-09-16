@@ -1283,6 +1283,27 @@ that it is.
   36%: `LastTaskResult 0`, next run 3 minutes out, and it immediately
   dispatched a `watch.yml` that was 111 minutes stale.
   **A tripwire that can die quietly is worth what a dead tripwire is worth.**
+  **It also ran in a VISIBLE window until 2026-09-16.** The task runs as the
+  logged-on user ("Interactive only"), so Windows gave `powershell.exe` a
+  console: every five minutes a terminal opened over whatever the operator was
+  doing, showed nothing (the script logs to a file) and vanished. Reported as
+  "windows terminal keeps popping up randomly then closing". The action is now
+  `wscript.exe //nologo scripts\dispatch_hidden.vbs`, which has no console of
+  its own and starts PowerShell hidden from the first instant —
+  `-WindowStyle Hidden` alone does not fix it, because PowerShell applies that
+  only after the console already exists, which IS the flash.
+  Two things that look like simpler fixes and are not. Making the task "run
+  whether the user is logged on or not" removes the window completely, but
+  without a stored password that is an **S4U logon, whose token is denied
+  NETWORK access** — and calling the GitHub API with the user's `gh`
+  credentials is the script's entire job, so it would trade a visible
+  annoyance for a dispatcher that fails silently. And the launcher waits on
+  PowerShell (`Run(cmd, 0, True)`) rather than firing and forgetting: with
+  `False` the task would report finished immediately while the work continued,
+  defeating both `-ExecutionTimeLimit` (a hung `gh` no longer killed at ten
+  minutes) and `-MultipleInstances IgnoreNew` — the two settings `-Install`
+  exists for. **A cosmetic fix that reintroduces the silent death is not a
+  fix.**
   Check the log's newest line, never the task's `Status`.
 - **`watch.yml` has its OWN concurrency group, and `check_watchlist.py` /
   `check_hyperevm.py` have exactly ONE writer (2026-09-12).** They used to run

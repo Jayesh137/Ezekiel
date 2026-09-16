@@ -46,8 +46,20 @@ $TaskName = "Ezekiel workflow dispatcher"
 
 if ($Install) {
     $me = $MyInvocation.MyCommand.Path
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$me`""
+    # Through wscript, not powershell.exe directly: the task runs in the user's
+    # own session, so Windows gives powershell.exe a console and a terminal
+    # window appeared over whatever the operator was doing every five minutes,
+    # showing nothing (this script logs to a file). wscript has no console and
+    # starts the child hidden from the first instant, where -WindowStyle Hidden
+    # alone only hides it after it has already appeared. See
+    # scripts/dispatch_hidden.vbs for what was rejected and why it waits.
+    $launcher = Join-Path (Split-Path -Parent $me) "dispatch_hidden.vbs"
+    if (-not (Test-Path $launcher)) {
+        Write-Error "missing $launcher - the hidden launcher is part of the install"
+        return
+    }
+    $action = New-ScheduledTaskAction -Execute "wscript.exe" `
+        -Argument "//nologo `"$launcher`""
     # Repeat forever from a start time already in the past, so the first run is
     # the next 5-minute boundary rather than tomorrow.
     $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(-1) `
