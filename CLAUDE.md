@@ -878,16 +878,34 @@ along. The node budget did not degrade: 299 nodes before and after, all three
 key wallets retained, and every one of the 82 nodes that swapped out had **$0
 direct flow** with the target. Graph build 42.7s, stored file 16.7 → 22.1 MB.
 
-**One deliberate divergence, written down so it is not "fixed" by accident.**
-`_expandable_edges` says it must match `build_graph`'s filter, and it no longer
-does: an unvalued edge is a graph edge but is **not walkable**. Keeping it
-costs nothing; WALKING it spends an Etherscan lookup, and the frontier sweep
-passes no `price_lookup` by design, so every frontier major returns
-`price_unavailable` — making those walkable would aim the whole lookup budget
-at ETH counterparties indiscriminately. The divergence is in the SAFE
-direction: the graph knows more than the frontier walks, where the 2026-07-28
-bug was the frontier walking more than the graph knew. **Whether to spend
-lookups on ETH edges is an open budget question, not a bug.**
+**The frontier walks unvalued edges too (operator decision, 2026-09-16).**
+The two filters diverged for one day — an unvalued edge was a graph edge but
+not walkable — on the argument that walking one spends an Etherscan lookup.
+
+**What settled it is that these are permanently unvaluable, not temporarily
+so.** 260,006 of the 277,208 unvalued edges are ETH/WETH, and measured against
+the price cache **only 641 of them fall on a date we have a price for**: every
+ETH miss is dated 2020-07-25 to 2025-09-14, every date inside CoinGecko's free
+365-day window is already priced, and there are **zero misses inside it**. So
+"wait for a price" was never going to arrive, and refusing to walk them meant
+refusing to follow the target's ETH history at all.
+
+**The starvation I expected did not happen, and the reason is worth keeping.**
+`_frontier_priority` weights value at 0.45 from `received_usd`, so I expected
+ETH-reached wallets to score ~0 and never be walked. They do not, because
+`received_usd` is the wallet's WHOLE inbound profile, not the edge that reached
+it: a wallet found down an unvalued ETH edge still carries every valued edge it
+has. Measured on the live graph — depth-1 candidates 33 → 38, and the best
+newcomer ranks **#11 of 38 at priority 0.8109 on $92M received**. No ranking
+change was needed, and the one I had drafted would have been a fix for a
+problem that does not exist.
+
+**It costs ranking time, which is the real price.** Walkable edges go 340,626 →
+617,834, and `_frontier_priority` runs ~10ms per candidate against the index
+(EdgeIndex build 0.53s). A full 2,000-deep queue therefore costs ~20s of the
+150s walk budget where it cost ~5s. The walk stops on time, so that is fewer
+lookups per run, not a failure — but it is the thing to watch if discovery
+slows.
 
 **The classifier change is forward-looking.** `unpriced` tokens are not in the
 substrate yet — nothing re-fetches what the cursor has passed. The +277,208 is

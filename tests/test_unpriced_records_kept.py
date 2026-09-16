@@ -146,18 +146,19 @@ def test_measured_dust_is_still_quarantined():
 
 # --- 5. the graph knows more than the frontier walks ----------------------
 
-def test_an_unvalued_edge_is_a_graph_edge_but_is_not_walkable():
-    """A deliberate divergence between two filters that used to match exactly.
+def test_an_unvalued_edge_is_walkable():
+    """The two filters match again, by operator decision on 2026-09-16.
 
-    Keeping the edge costs nothing and preserves a real link. WALKING it spends
-    an Etherscan lookup, and the frontier sweep passes no price_lookup by
-    design — so every frontier major returns `price_unavailable`, and making
-    those walkable would aim the entire lookup budget at ETH counterparties.
-    Measured when the graph gate opened: 326,886 -> 619,877 edges, 203,279 of
-    the 277,208 newcomers ETH.
+    They diverged for one day: an unvalued edge was a graph edge but not
+    walkable, on the budget argument that walking one spends an Etherscan
+    lookup. The decision is to spend it. 260,006 of the 277,208 unvalued edges
+    are ETH/WETH, and 99.8% of them fall outside CoinGecko's free 365-day
+    window, so they are permanently unpriceable — refusing to walk them meant
+    refusing to follow the target's ETH history at all.
 
-    The divergence is in the safe direction: the graph knows more than the
-    frontier walks. The 2026-07-28 bug was the opposite, and far worse.
+    `_expandable_edges` says it must match `build_graph`'s filter, and this
+    restores that. The 2026-07-28 bug was the frontier walking MORE than the
+    graph knew; both now admit exactly the same edges.
     """
     from src.transfer_graph import _expandable_edges, edge_passes_dust
 
@@ -165,7 +166,7 @@ def test_an_unvalued_edge_is_a_graph_edge_but_is_not_walkable():
                 "discovery_source": "l1", "ts": 1}
 
     assert edge_passes_dust(unvalued, dust_usd=1.0) is True
-    assert _expandable_edges([unvalued], dust_usd=1.0) == []
+    assert _expandable_edges([unvalued], dust_usd=1.0) == [unvalued]
 
 
 def test_a_valued_edge_is_still_walkable():

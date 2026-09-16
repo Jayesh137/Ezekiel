@@ -1919,23 +1919,19 @@ def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
     addresses (770 of the target's 874 recorded out-edges are sub-dollar
     poisoning transfers) and one contributed zero edges to the finished graph.
 
-    **The two now differ in exactly one case, deliberately: an UNVALUED edge is
-    a graph edge but is not walkable.** `edge_passes_dust` keeps it in the
-    graph, because a transfer we cannot price is still an observed link and
-    deleting it was destroying 332,636 records; the `or 0` below keeps it out
-    of the frontier, because walking it SPENDS a lookup.
+    **They match again, and an UNVALUED edge is now walkable** (operator
+    decision, 2026-09-16). They diverged for one day on the argument that
+    walking an edge spends a lookup while merely keeping it costs nothing.
 
-    That is a budget decision already made and written down twenty lines from
-    here: the frontier sweep deliberately passes no `price_lookup`, so every
-    frontier major comes back `price_unavailable`, and admitting those to the
-    walk would point the whole lookup budget at ETH counterparties
-    indiscriminately. Measured when the graph gate opened: edges went 326,886 ->
-    619,877, and 203,279 of the 277,208 newcomers are ETH.
+    What settled it: 260,006 of the 277,208 unvalued edges are ETH/WETH, and
+    **99.8% of those fall outside CoinGecko's free 365-day window** — measured,
+    every ETH miss in the price cache is dated 2020-07-25 to 2025-09-14 and
+    every date inside the window is priced. They are therefore permanently
+    unvaluable, not temporarily so, and refusing to walk them meant refusing to
+    follow the target's ETH history at all.
 
-    The divergence is therefore in the SAFE direction — the graph knows more
-    than the frontier walks, where the 2026-07-28 bug was the frontier walking
-    more than the graph knew. Do not "fix" this by matching them without
-    deciding the budget question first.
+    Both filters admit exactly the same edges again, which is what this
+    docstring has always asked for.
     """
     keep = []
     for e in edges:
@@ -1946,7 +1942,7 @@ def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
             # to follow through it, and spending lookups on its far side would
             # chase a wallet we reached by inference as though it had been paid.
             continue
-        if (float(e.get("amount_usd", 0) or 0) < dust_usd
+        if (not edge_passes_dust(e, dust_usd)
                 and e.get("discovery_source") != SRC_GAS_FUNDING):
             continue
         keep.append(e)
