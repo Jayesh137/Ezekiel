@@ -64,6 +64,46 @@ TIER_ORDER = {TIER_CONFIRMED: 0, TIER_PROBABLE: 1, TIER_POSSIBLE: 2,
               TIER_WATCH: 3, TIER_INFRASTRUCTURE: 4}
 
 
+def linkage_from_first_funders(funders: dict, target: str,
+                               excluded: set) -> dict[str, str]:
+    """Wallets sharing the target's original funding source → that funder.
+
+    Linkage is the one vector that had no detector file of its own: it was
+    readable only off a transfer-graph node, so a wallet the BFS did not reach
+    could not carry it however true it was. `0x5b5d5120…` reached the target
+    only through an inferred CORRELATION edge, so when that match decayed below
+    `min_confidence` the wallet left the graph and the roster lost its linkage
+    and transfer vectors in the same run — while the shared funder itself never
+    changed and is still on disk. A permanent fact in a volatile container.
+
+    Read from `data/labels/first_funders.json`, which `resolve_first_funders.py`
+    maintains, so the fact survives whatever the graph happens to reach today.
+
+    An unresolved funder is "we could not tell", never a match: without the
+    explicit None check every wallet with an unresolved funder would match the
+    target on None == None and the vector would fire across the whole cache
+    (rule 5, and rule 6 by the same argument).
+
+    `excluded` is not optional politeness. A funder that is exchange
+    infrastructure links nobody — two Binance hot wallets with 15.8M and 30.5M
+    transactions are why `not_gcr` exists — and broadcasting a linkage vector
+    to everyone an exchange ever paid out to is rule 9 arriving at the tier
+    that feeds the close watch.
+    """
+    lowered = {(w or "").lower(): (f or "").lower() for w, f in (funders or {}).items()}
+    t = (target or "").lower()
+    excluded = {(a or "").lower() for a in excluded}
+    tf = lowered.get(t)
+    # Funded straight out of the target's own wallet is the STRONGER half of
+    # the same signal — `linkage.evaluate` pays it 0.15 against 0.12 — so it
+    # counts even when the target's own funder is unresolved or excluded.
+    direct = {w: f for w, f in lowered.items() if w and w != t and f == t}
+    if not tf or tf in excluded:
+        return direct
+    return direct | {w: f for w, f in lowered.items()
+                     if w and w != t and f == tf}
+
+
 def _read(path: Path, key: str) -> list:
     """A detector's output, or an empty list if it never ran or is unreadable.
 
@@ -368,6 +408,25 @@ def build_roster(config: dict | None = None) -> dict:
             e["vectors"].add(VECTOR_LINKAGE)
         if ev.get("hl_native") and ev.get("bidirectional"):
             e["vectors"].add(VECTOR_HL_NATIVE)
+
+    # Linkage from its own source rather than only from a graph node. Runs
+    # after the graph loop because that loop ASSIGNS `reasons` where every
+    # other block appends, so running earlier would have the reason erased.
+    try:
+        with open(DATA_DIR / "labels" / "first_funders.json") as f:
+            funders = json.load(f)
+    except (OSError, ValueError):
+        funders = {}
+    excluded = set(config.get("excluded_addresses") or [])
+    excluded |= set(config.get("known_service_addresses") or [])
+    for addr, funder in linkage_from_first_funders(funders, target, excluded).items():
+        e = entry(addr)
+        e["vectors"].add(VECTOR_LINKAGE)
+        e["evidence"]["shared_first_funder"] = funder
+        reason = ("First funded directly by the target wallet" if funder == target
+                  else "Shares the target's original funding source (same CEX/funder)")
+        if reason not in e["reasons"]:
+            e["reasons"].append(reason)
 
     for party in _read(DATA_DIR / "hl_transfers" / "latest.json", "counterparties"):
         a = (party.get("wallet") or "").lower()

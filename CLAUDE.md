@@ -544,6 +544,54 @@ destinations. It is now under close watch automatically. **No transfer to or
 from the target has ever been observed** — the correlation re-linked it across a
 gap on amount and timing alone.
 
+**And that last sentence was the whole problem: one lapsing vector deleted the
+other (fixed 2026-09-16).** Of the eleven detector files `build_roster` reads,
+every vector had its own — correlation from `correlations/`, shared agent from
+`agent_links/`, dormancy from `dormancy/`, HL-native from `hl_transfers/`,
+behavioural from `candidates/`, an explicit link from `identity/`. **Linkage
+alone had none.** It was readable only off `transfer_graph/nodes[].evidence`,
+so a wallet the BFS did not reach could not carry it however true it was.
+
+This wallet reached the target at depth 1 through an inferred **correlation
+edge and nothing else**. When its amount-correlation decayed — 0.6346, 0.634,
+0.5513, then below `min_confidence` and gone at **2026-09-15 06:31** — the edge
+went with it, the wallet stopped being reachable, the node vanished, and the
+roster lost `linkage` AND `transfer` in the same run as `correlation`:
+**PROBABLE → WATCH with zero vectors**, and out of the close watch, which takes
+only CONFIRMED/PROBABLE. A $230M wallet stopped being watched and nothing said
+why.
+
+The shared funder had not changed and has not changed since. Both it and the
+target were first funded by **`0xf92402bb…`**, and `data/labels/first_funders.json`
+still says so. **A permanent fact was being stored in a volatile container.**
+
+That inverts the roster's premise. Tiers reward INDEPENDENT vectors agreeing,
+and `_read`'s own docstring says "the point of five vectors is that four still
+say something" — but here one detector lapsing silently deleted another
+detector's finding. **Two vectors that can fail together were never two
+vectors.** `roster.linkage_from_first_funders` now reads the funder cache
+directly, with an unresolved funder refusing to match (rule 5 — otherwise every
+wallet with an unresolved funder matches the target on `None == None`) and an
+excluded/service funder linking nobody (rule 9 — a Binance hot wallet would
+hand the vector to everyone it ever paid).
+
+Live: **four** wallets share that funder and regain linkage; the roster goes
+348 → 349, POSSIBLE 126 → 130, WATCH 47 → 44. `0x498216a2…` was not in the
+roster at all and is now surfaced by linkage alone.
+
+Two outcomes worth stating separately. `0x5b5d5120…` returns WATCH →
+**POSSIBLE, not PROBABLE** — its correlation genuinely lapsed, and restoring
+the tier by hand would be fitting the tier to the story, the same refusal this
+file already records for `0xdd53c529…`. And once the behavioural vector votes
+again, **`0x12e16e3dc4a4fb3c802be62105f15783eb95f92a` becomes PROBABLE on two
+genuinely independent vectors** — behavioural 0.702 with no style veto, plus
+the shared funder — and enters the close watch automatically. It was the top
+candidate feeding `risk.py` once the target was removed from that list.
+
+**When a detector's finding is only reachable through ANOTHER detector's
+output, the two are one vector wearing two names.** Ask what file a vector
+would be read from if every other detector were switched off.
+
 **The stored graph outgrew GitHub, so every trace run lost its work (fixed
 2026-09-12).** `data/transfer_graph/latest.json` reached **107 MB against a hard
 limit of 100 MiB**, and from **09:27 UTC every "Trace Fund Flows" run computed
