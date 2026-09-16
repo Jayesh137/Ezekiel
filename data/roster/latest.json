@@ -1,16 +1,16 @@
 {
-  "computed_at": "2026-09-16T18:14:35.862538+00:00",
+  "computed_at": "2026-09-16T18:50:17.187191+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 357,
+  "wallet_count": 358,
   "behavioural_counts_as_a_vector": true,
   "tier_counts": {
     "CONFIRMED": 2,
     "PROBABLE": 7,
     "POSSIBLE": 140,
-    "WATCH": 41,
+    "WATCH": 42,
     "INFRASTRUCTURE": 167
   },
-  "demoted_count": 2,
+  "demoted_count": 3,
   "demoted": [
     {
       "wallet": "0xfe7ce058edc7cfcde9ef8262ba51f8d4796ab7ae",
@@ -21,6 +21,11 @@
       "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
       "tier": "POSSIBLE",
       "was": "PROBABLE"
+    },
+    {
+      "wallet": "0x17c3c8fdbcb7d1b240ce08965e09b1fc91cba868",
+      "tier": "WATCH",
+      "was": "POSSIBLE"
     }
   ],
   "wallets": [
@@ -474,6 +479,10 @@
         "correlation_confidence": 0.656,
         "correlation_gap_hours": 171.2,
         "competing_deposits": 3,
+        "portfolio_overlap": 0.0001,
+        "shared_rare_markets": [
+          "xyz:SP500"
+        ],
         "hl_role": "user",
         "hl_account_value": 26951213.207038,
         "hl_birth_ms": 1760571600010,
@@ -514,10 +523,9 @@
         "correlation_confidence": 0.6466,
         "correlation_gap_hours": 257.7,
         "competing_deposits": 2,
-        "portfolio_overlap": 0.0429,
+        "portfolio_overlap": 0.0243,
         "shared_rare_markets": [
-          "CHIP",
-          "VVV"
+          "CHIP"
         ],
         "hl_role": "user",
         "hl_account_value": 1225526.810737,
@@ -538,51 +546,6 @@
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.6466
-    },
-    {
-      "wallet": "0x17c3c8fdbcb7d1b240ce08965e09b1fc91cba868",
-      "vectors": [
-        "correlation"
-      ],
-      "confidence": 0.1724,
-      "classification": "CORRELATION_LEAD",
-      "reasons": [
-        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
-        "Exit amount re-appears as a deposit (single amount, 62% match confidence)",
-        "Actively trading on Hyperliquid after receiving funds"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1,
-          "unvalued_edge_count": 0
-        },
-        "depth": 1,
-        "chains": [
-          "inferred"
-        ],
-        "correlation_confidence": 0.6162,
-        "correlation_gap_hours": 145.6,
-        "competing_deposits": 14,
-        "portfolio_overlap": 0.0221,
-        "shared_rare_markets": [
-          "FIL",
-          "xyz:SP500"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 669911.488036,
-        "hl_birth_ms": 1733352320060,
-        "frontend_agent": "0xfc44e3f51aeb9d7d17ab45ba2b233f6d85e770fe"
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.6162
     },
     {
       "wallet": "0xc745044ae202b60d3ef5ee89a5f6738011651464",
@@ -825,7 +788,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.219,
+      "confidence": 0.2189,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Sent funds to the target wallet",
@@ -855,7 +818,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.219
+      "rank_strength": 0.2189
     },
     {
       "wallet": "0x02745fb27d7cee999fccf295f9d4a897fd22a7f7",
@@ -2802,7 +2765,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (4 separate movements)",
-        "Last movement 875 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 876 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -3606,7 +3569,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3639,7 +3605,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3672,7 +3641,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3705,7 +3677,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3774,7 +3749,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3807,7 +3785,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3839,7 +3820,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3872,7 +3856,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -3940,7 +3927,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -4008,7 +3998,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -4041,7 +4034,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -4144,7 +4140,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -4211,7 +4210,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -4244,7 +4246,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "user",
+        "hl_account_value": 45.00418,
+        "hl_birth_ms": 1717023000001
       },
       "is_service": false,
       "known_self": false,
@@ -4277,7 +4282,10 @@
         "depth": 2,
         "chains": [
           "ethereum"
-        ]
+        ],
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
       },
       "is_service": false,
       "known_self": false,
@@ -4976,6 +4984,39 @@
       "rank_strength": 0.0
     },
     {
+      "wallet": "0x85d456b2dff1fd8245387c0bfb64dfb700e98ef3",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Last movement 519 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 2 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1,
+          "unvalued_edge_count": 0
+        },
+        "depth": 2,
+        "chains": [
+          "ethereum"
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
       "wallet": "0x87283edb0f12e7cd0ed3e18baeab20aaf43b5f6e",
       "vectors": [
         "transfer"
@@ -5345,6 +5386,31 @@
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.0
+    },
+    {
+      "wallet": "0x17c3c8fdbcb7d1b240ce08965e09b1fc91cba868",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "portfolio_overlap": 0.0221,
+        "shared_rare_markets": [
+          "FIL",
+          "xyz:SP500"
+        ],
+        "hl_role": "user",
+        "hl_account_value": 669911.488036,
+        "hl_birth_ms": 1733352320060,
+        "frontend_agent": "0xfc44e3f51aeb9d7d17ab45ba2b233f6d85e770fe"
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "WATCH",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": "POSSIBLE",
+      "rank_strength": 0.0221
     },
     {
       "wallet": "0x001ac3f0972b620cd6be82ba54d111614d7d48fb",
