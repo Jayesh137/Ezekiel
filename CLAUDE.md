@@ -1316,6 +1316,28 @@ watch on the wrong wallets and teaches the operator that PROBABLE means nothing.
   chains, which looks like gas funding by him. It has 1.4M Arbitrum and 3.6M
   Ethereum transactions: an exchange gas feeder.
 
+**$31.8M of his went to Monad in the month to 2026-09-15, and nothing could see
+it (found 2026-09-16).** `0xf078969e…` (CONFIRMED) burned USDC through Circle to
+**domain 15** five times — 08-15 $5.0M, 08-27 $6.8M, 08-28 $7.0M, 09-11 $7.0M,
+09-15 $6.0M — each minted to its own address. Nothing decoded that wallet's
+bridging (config wallets only) and the decoder's hand-kept domain map stopped
+at "domain-15". **Domain 15 is Monad** (Circle's own table). Read straight from
+`rpc.monad.xyz` (chain id 143): the wallet holds **0 USDC and 217,812 MON** and
+has signed **18 transactions** there — so the money was moved on inside Monad,
+to somewhere this project cannot yet see. Earlier it used Unichain (domain 10,
+2025-04/05) and Socket the same way.
+
+What this is for the mission, stated carefully: it is his capital leaving the
+chains we watch, in size, recently and repeatedly — either on its way back to a
+Hyperliquid account through a route not yet decoded, or trading on a Monad
+venue the owner cannot copy. Both matter; neither is established. Built the
+same day: the full Circle domain table, bridge decoding for CONFIRMED wallets
+(history as a baseline), foreign landings alerting once instead of every 72h,
+and Monad in `config.chains` with its USDC contract registered FIRST (read
+on-chain) so a counterfeit there cannot be priced at par. **Whether Etherscan's
+free tier serves chain 143 is measured by the first sweep** — read
+`unsupported_sources` before assuming the Monad substrate is complete.
+
 **When a rule is enforced in one branch, check the branch beside it** — the
 funder beside the destination, the scorer beside the backtest, the reach beside
 the transfer. All three were found by asking why a PROBABLE was PROBABLE.
