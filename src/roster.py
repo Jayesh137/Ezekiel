@@ -53,6 +53,10 @@ VECTOR_EXPLICIT = "explicit_link"
 # weeks, and independently an amount-correlation match — sat at POSSIBLE on
 # one vector.
 VECTOR_DORMANCY = "dormancy_handoff"
+# A quiet referral code joining a wallet to a cluster wallet. The code is chosen
+# by whoever types it, so it is an association and never stands alone — one
+# vote, and only when few accounts use the code (see `hl_surface`).
+VECTOR_REFERRAL = "referral"
 
 TIER_CONFIRMED = "CONFIRMED"
 TIER_PROBABLE = "PROBABLE"
@@ -367,6 +371,98 @@ def carry_peak_tier(rows: list, previous: dict | None) -> None:
         row["tier_dropped_from"] = best if dropped else None
 
 
+def read_hl_surface(doc: dict, entry, wallets: dict, target: str) -> dict:
+    """Fold what Hyperliquid declares about accounts into the roster.
+
+    Returns the sub-account map for `apply_operator_groups`. See
+    `src/hl_surface.py` for how each link was derived and why it counts.
+    """
+    from src.hl_surface import MIN_SUB_VALUE_USD, QUIET_REFERRALS
+
+    subaccounts = doc.get("subaccounts") if isinstance(doc.get("subaccounts"), dict) else {}
+    for link in doc.get("links") or []:
+        kind = link.get("kind")
+        a, b = (link.get("address") or "").lower(), (link.get("linked_to") or "").lower()
+        if not a or not b:
+            continue
+        if kind in ("subaccount", "referral"):
+            vector = VECTOR_EXPLICIT if kind == "subaccount" else VECTOR_REFERRAL
+            for side, other in ((a, b), (b, a)):
+                if side == target:
+                    continue
+                e = entry(side)
+                e["vectors"].add(vector)
+                key = "explicit_links" if kind == "subaccount" else "referral_links"
+                e["evidence"].setdefault(key, []).append({"kind": kind, "with": other})
+        elif kind == "referral_pair":
+            size = link.get("code_accounts")
+            if not isinstance(size, int) or size > QUIET_REFERRALS:
+                continue
+            for side, other, role in ((a, b, "referred"), (b, a, "referrer")):
+                if side == target:
+                    continue
+                entry(side)["evidence"].setdefault("referral_pairs", []).append(
+                    {"with": other, "role": role, "code_accounts": size})
+
+    for sub, detail in subaccounts.items():
+        sub = (sub or "").lower()
+        value = (detail or {}).get("account_value")
+        if sub and sub != target and (sub in wallets or (
+                isinstance(value, (int, float)) and value >= MIN_SUB_VALUE_USD)):
+            entry(sub)["evidence"]["subaccount_of"] = (detail.get("master") or "").lower()
+
+    for wallet, vaults in (doc.get("vault_deposits") or {}).items():
+        wallet = (wallet or "").lower()
+        if wallet in wallets and vaults:
+            wallets[wallet]["evidence"]["vault_deposits"] = list(vaults)[:10]
+    return subaccounts
+
+
+def apply_operator_groups(wallets: dict, subaccounts: dict, entry, target: str) -> None:
+    """A master and its sub-accounts are one operator: tier each on their union.
+
+    Hyperliquid lets only a master create a sub-account, so a vector found on
+    any account in the group is a vector found on the person running all of
+    them. This is not double counting — each vector still comes from its own
+    detector — it is attributing independent findings to accounts one person
+    provably controls. A service neither lends nor borrows: an exchange's
+    sub-account says nothing about a trader.
+
+    A group we already believe is his (PROBABLE or better) gets a row for EVERY
+    sub-account, funded or not: an empty sub-account of his is where he would
+    move next, and it only needs to be on the list to be read.
+    """
+    groups: dict[str, set] = {}
+    for sub, detail in subaccounts.items():
+        master = ((detail or {}).get("master") or "").lower()
+        if master and sub:
+            groups.setdefault(master, set()).add(sub.lower())
+
+    for master, subs in groups.items():
+        members = [m for m in [master, *sorted(subs)] if m != target]
+        if any(wallets.get(m, {}).get("is_service") for m in members):
+            continue
+        present = [m for m in members if m in wallets]
+        if not present:
+            continue
+        union = set().union(*(wallets[m]["vectors"] for m in present))
+        confidence = max(wallets[m]["confidence"] for m in present)
+        known = any(wallets[m]["known_self"] for m in present)
+        if assign_tier(union, confidence, False, known) in (TIER_CONFIRMED, TIER_PROBABLE):
+            for m in members:
+                if m not in wallets:
+                    entry(m)["evidence"]["subaccount_of"] = master
+            present = [m for m in members if m in wallets]
+        if len(present) < 2:
+            continue
+        for m in present:
+            e = wallets[m]
+            e["evidence"]["operator_group"] = {"master": master, "subaccounts": sorted(subs)}
+            e["evidence"]["vectors_via_group"] = sorted(union - e["vectors"])
+            e["evidence"]["group_confidence"] = confidence
+            e["vectors"] |= union
+
+
 def build_roster(config: dict | None = None) -> dict:
     """Merge every detector's output into one ranked roster."""
     config = config or load_config()
@@ -570,11 +666,24 @@ def build_roster(config: dict | None = None) -> dict:
         e = entry(a)
         e["evidence"]["hyperevm_nonce"] = acct.get("nonce")
 
+    # Sub-accounts, referral and vault deposits, as Hyperliquid declares them.
+    # After every other vector, because operator groups union what the rest found.
+    try:
+        with open(DATA_DIR / "hl_surface" / "latest.json") as f:
+            surface = json.load(f)
+    except (OSError, ValueError):
+        surface = {}
+    if isinstance(surface, dict):
+        subaccounts = read_hl_surface(surface, entry, wallets, target)
+        apply_operator_groups(wallets, subaccounts, entry, target)
+
     rows = []
     for e in wallets.values():
         e["vectors"] = sorted(e["vectors"])
         e["vector_count"] = len(e["vectors"])
-        e["tier"] = assign_tier(set(e["vectors"]), e["confidence"],
+        confidence = max(e["confidence"],
+                         float(e["evidence"].get("group_confidence") or 0))
+        e["tier"] = assign_tier(set(e["vectors"]), confidence,
                                 e["is_service"], e["known_self"])
         rows.append(e)
 
