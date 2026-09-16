@@ -1233,3 +1233,74 @@ matrix with measured recall (C-8), the blindness page (E-10), the stale
 "no"s (E-11), the vectors with zero ROI (D-5), rendered as one page and
 pushed to the operator on Mondays. The project's history is of blind spots
 found by accident; make finding them a schedule.
+
+---
+
+## Addendum G — methodology, throughput, ownership
+
+### Change
+
+**G-1. Control the false-discovery rate.** A hundred signals over 350
+wallets is thousands of hypothesis tests a day; some will match by chance
+("18 competing deposits" is that in one place). Apply FDR control
+(Benjamini–Hochberg) inside the correlator, block co-occurrence and
+self-cross, with the number of comparisons reported beside each score.
+A match's confidence should already carry how many other things could have
+matched.
+
+**G-2. Changepoints, not thresholds, for silence and drift.** "p90 gap" and
+"±X% drift" are fixed cuts on a moving human. Bayesian online changepoint
+detection over his activity rate, slice size and session times gives a
+posterior that a regime changed, calibrated on his own history, and it
+degrades gracefully when he simply gets busier. Same for B-5/B-6.
+
+**G-3. Survival model for the account.** With C-4's data on his previous
+account(s) — how long each lived, what preceded its end — fit a survival
+curve and show the hazard on the dashboard: "accounts of his at this age
+have migrated with probability p". It turns a vague expectation into a
+number that sets cadence.
+
+**G-4. Concurrency in the sweeps.** Lookups run sequentially at 1.3–7s each
+against a walk budget of 150s. A rate-limited `asyncio` pool of four gives
+three to four times the frontier per run within the same budget and the
+same API quota. Also send HL info requests over the websocket `post`
+channel where the per-IP limits differ (**VERIFY-API**).
+
+**G-5. Schemas with versions for every stored file.** The `pools` dict vs
+legacy `matches` list, `agents: []` meaning two things, `null` vs `[]` —
+shape bugs recur because files have no declared shape. Pydantic (or
+dataclass) models per file with a `schema_version` and explicit migrations;
+a reader that meets an unknown version fails loudly (rule 5).
+
+**G-6. One time module.** Block time, API time, ledger time, Solana slot
+time and the local clock are normalised ad hoc across modules; the 4.4-hour
+correlation match and every timing vector depend on them agreeing. One
+`timebase.py`, UTC milliseconds everywhere, and an NTP sanity check on the
+dispatcher host.
+
+### Add
+
+**G-7. Delivery canaries.** A synthetic INFO-grade test alert through every
+channel weekly, asserting receipt (ntfy has a read API). The health model
+catches sends that fail; it cannot catch a channel that accepts and drops.
+
+**G-8. Escalation on unacknowledged CRITICALs.** If a CRITICAL is not
+acknowledged within 15 minutes (ntfy action button or a Telegram reply),
+re-send at ntfy priority `urgent` and, if configured, a Telegram voice-call
+bot. The alert exists so the owner acts within minutes; a phone on silent
+defeats every vector in this file.
+
+**G-9. Module ownership map, then prune.** `links.py` and `linkage.py`;
+`tracer.py` (740 lines) beside `transfer_graph.py`; `continuity.py`;
+`heartbeat.yml`; `reports/`; the 2026-09-10 audit under `docs/superpowers`
+(superseded by this file). Generate a table: module → the one file it
+writes → who reads it. Anything with no reader is removed; any file with two
+writers is a bug (the single-writer rule).
+
+**G-10. Automated copying with a kill-switch — a scope question.** The
+owner's outcome is set by copy latency as much as by detection. An
+executor that mirrors the cluster's fills at a size ratio, wired to F-8's
+SUSPEND COPYING, would be the largest improvement to the *outcome* this
+project could make. It is out of the stated scope and carries real money
+risk; it is listed so the decision is taken deliberately rather than by
+default.
