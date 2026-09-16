@@ -204,6 +204,8 @@ def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
     monkeypatch.setattr(check, "sweep", lambda addr, cfg, **kw: None)
     monkeypatch.setattr(check, "target_world", lambda cfg: {})
     monkeypatch.setattr(check, "_previous", lambda: {})
+    monkeypatch.setattr(check, "_previous_doc", lambda: {})
+    monkeypatch.setattr(check, "records_for", lambda addr: [])
     monkeypatch.setattr(check, "busy_flags", lambda hits: {})
     monkeypatch.setattr(check, "save", lambda report: None)
 
@@ -293,6 +295,11 @@ def _silent_loop(monkeypatch, tmp_path, entries, counterparties):
     monkeypatch.setattr(utils, "DATA_DIR", tmp_path)
     monkeypatch.setattr(check, "DATA_DIR", tmp_path)
     monkeypatch.setattr(wl, "WATCHLIST_DIR", tmp_path / "watchlist")
+    # check_watchlist imports WATCHLIST_DIR by name, and records_for derives the
+    # substrate path at import: without these the loop read the real watch
+    # report and walked the real substrate.
+    monkeypatch.setattr(check, "WATCHLIST_DIR", tmp_path / "watchlist")
+    monkeypatch.setattr(check, "records_for", lambda addr: [])
     monkeypatch.setattr(check, "load_config", lambda: {"target_wallet": T})
     monkeypatch.setattr(check, "_roster", lambda: {})
     monkeypatch.setattr(check, "watched", lambda cfg, roster=None: entries)

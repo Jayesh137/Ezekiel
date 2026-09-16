@@ -26,7 +26,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import utils
 from src.agent_links import normalise_agents
-from src.alerts import alert_explicit_link, alert_watchlist_change, alert_watchlist_contact
+from src.alerts import (
+    alert_explicit_link,
+    alert_settled_wallet_new_payee,
+    alert_watchlist_change,
+    alert_watchlist_contact,
+)
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
 from src.chain.collect import records_for, sweep_wallet
@@ -42,7 +47,11 @@ from src.watchlist import (
     contact_severity,
     contacts,
     contacts_are_news,
+    counterparties_of,
     explicit_links,
+    novel_payments,
+    novelty_severity,
+    outbound_payments,
     save,
     shared_infrastructure,
     snapshot,
@@ -134,6 +143,49 @@ def _previous() -> dict:
                     if w.get("address")}
     except (OSError, ValueError, KeyError, TypeError):
         return {}
+
+
+def _previous_doc() -> dict:
+    try:
+        with open(WATCHLIST_DIR / "latest.json") as f:
+            doc = json.load(f)
+        return doc if isinstance(doc, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def check_new_payees(address: str, seen: set, cluster: set, readings, *,
+                     records=None, hl_reader=None, alert=None) -> set:
+    """A settled wallet's payments to addresses no cluster wallet has touched.
+
+    Returns the destinations still HELD — unmeasured, or alerted without
+    delivery — which must not be marked seen, so the next run asks again.
+    A contract or a busy address is infrastructure and is simply seen. See
+    watchlist.outbound_payments for what counts as a payment.
+    """
+    from scripts.check_deposit_sentinels import hl_state
+    from src.deposit_sentinels import CLASS_QUIET, CLASS_UNMEASURED, classify
+
+    hl_reader = hl_reader or hl_state
+    alert = alert or alert_settled_wallet_new_payee
+    rows = records if records is not None else records_for(address)
+    held = set()
+    for dst, payment in sorted(novel_payments(outbound_payments(rows, address),
+                                              seen, cluster).items()):
+        cls = classify(readings.for_address(dst, payment["chains"]))
+        if cls == CLASS_UNMEASURED:
+            print(f"[watchlist]   new payee {dst} not yet measured — asked again next run")
+            held.add(dst)
+            continue
+        if cls != CLASS_QUIET:
+            continue
+        state = hl_reader(dst)
+        severity = novelty_severity(state)
+        print(f"[watchlist]   NEW PAYEE ({severity}) {dst} — {payment['count']} payment(s), "
+              f"${payment['usd']:,.0f}; HL {state}")
+        if not alert(address, dst, payment, state, severity):
+            held.add(dst)
+    return held
 
 
 def account_value(address: str, dexes: list) -> tuple[float, dict]:
@@ -372,6 +424,18 @@ def main() -> int:
 
     world = target_world(config)
     previous = _previous()
+    # Addresses any wallet of his has ever transacted with. Seeded from the whole
+    # substrate on the first run so history is never announced as news.
+    doc = _previous_doc()
+    seen_payees = {a.lower() for a in doc.get("l1_seen") or []}
+    seeding = "l1_seen" not in doc
+    from scripts.check_deposit_sentinels import Readings
+    payee_readings = Readings(doc.get("l1_readings") or {})
+    held_payees: set = set()
+    target = (config.get("target_wallet") or "").lower()
+    his = {target} | {(w or "").lower() for w in config.get("known_self_wallets") or []}
+    his |= {w["address"] for w in wallets if w.get("settled")}
+    his.discard("")
     snapshots, found_changes, found_contacts = [], {}, {}
 
     # Once per run, so every watched wallet is sized against the same moment of
@@ -390,6 +454,9 @@ def main() -> int:
         snap["why"] = entry.get("why")
         snap["source"] = entry.get("source") or "config"
         snapshots.append(snap)
+
+        if entry.get("settled") and not seeding:
+            held_payees |= check_new_payees(address, seen_payees, his, payee_readings)
 
         seen = contacts(counterparties, world, wallet=address)
         hits, infra = shared_infrastructure(seen, busy_flags(seen))
@@ -439,7 +506,16 @@ def main() -> int:
         if not previous.get(address):
             print("[watchlist]   first reading — baseline recorded, nothing alerted")
 
-    save(build_report(snapshots, {"changes": found_changes, "contacts": found_contacts}))
+    for wallet in sorted(his):
+        seen_payees |= counterparties_of(records_for(wallet), wallet) - held_payees
+    report = build_report(snapshots, {"changes": found_changes, "contacts": found_contacts})
+    report["l1_seen"] = sorted(seen_payees)
+    report["l1_pending"] = sorted(held_payees)
+    report["l1_readings"] = payee_readings.own
+    if seeding:
+        print(f"[watchlist] first reading of his payees — {len(seen_payees)} address(es) "
+              f"recorded as seen, nothing alerted")
+    save(report)
     return 0
 
 

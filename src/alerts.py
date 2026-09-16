@@ -1126,6 +1126,48 @@ def alert_deposit_address_shared(row: dict, hl_state: dict | None = None) -> boo
     return _send_with_cooldown(key, 168, subject, body)
 
 
+def alert_settled_wallet_new_payee(wallet: str, destination: str, payment: dict,
+                                   hl_state: dict | None, severity: str) -> bool:
+    """A wallet already believed to be his paid an address never seen before.
+
+    The target's own L1 outbound alerts through the tracer and every cluster
+    wallet's HL-native send through the explorer; his other L1 wallets had no
+    tripwire at all. Gas and then size to a fresh wallet is how one is funded.
+    CRITICAL when Hyperliquid already shows the new address in use (see
+    `watchlist.novelty_severity`), HIGH otherwise.
+    """
+    subject = f"[EZEKIEL] {severity}: A Wallet Of His Paid An Address Never Seen Before"
+    when = "unknown"
+    try:
+        if payment.get("last_ts"):
+            when = datetime.fromtimestamp(int(payment["last_ts"]), tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+    except (TypeError, ValueError, OSError):
+        pass
+    hl = hl_state or {}
+    if hl.get("read_ok"):
+        hl_line = (f"Hyperliquid at the new address: role {hl.get('role')}, account value "
+                   f"${float(hl.get('account_value') or 0):,.0f}, born "
+                   f"{hl.get('birth') or 'never funded'}, {hl.get('fills', 0)} recent fill(s)\n")
+    else:
+        hl_line = f"Hyperliquid at the new address: could not be read ({hl.get('error') or 'not asked'})\n"
+    value = (f"${float(payment.get('usd') or 0):,.2f}"
+             + (f" plus {payment['unvalued']} unpriced native payment(s)" if payment.get("unvalued") else ""))
+    body = (
+        f"{address_line(wallet, 'His wallet')}\n"
+        f"{address_line(destination, 'New address')}\n"
+        f"Paid: {value} in {payment.get('count')} payment(s) of "
+        f"{', '.join(sorted(payment.get('assets') or [])) or 'unknown'} on "
+        f"{', '.join(sorted(payment.get('chains') or [])) or 'unknown'}\n"
+        f"Most recent: {when} (tx {payment.get('tx_hash') or 'n/a'})\n"
+        f"{hl_line}\n"
+        f"No cluster wallet has ever transacted with this address, and it is a quiet\n"
+        f"EOA on the whole chain. Funding a fresh wallet looks exactly like this -\n"
+        f"so does paying someone. Check it on Hyperliquid, then what it does next.\n"
+    )
+    key = f"settled_new_payee_{(wallet or '').lower()}_{(destination or '').lower()}"
+    return _send_with_cooldown(key, 168, subject, body)
+
+
 def alert_watchlist_change(wallet: str, changes: list, why: str | None = None) -> bool:
     """Fire when a watched wallet's state changes materially."""
     kinds = ", ".join(sorted({c.get("kind", "?") for c in changes}))

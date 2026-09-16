@@ -425,6 +425,104 @@ def contact_severity(what: str) -> str:
     return "HIGH" if str(what or "").startswith("roster:") else "CRITICAL"
 
 
+# --- A wallet of his paying an address nobody has seen ------------------------------
+#
+# The target's own L1 outbound has alerted CRITICAL at any amount since the
+# tracer was built, and every cluster wallet's HL-native send alerts through the
+# explorer. His OTHER L1 wallets had nothing: the treasury and `0xf078969e…` hold
+# his money on-chain, and a fresh wallet funded from either — gas first, then
+# size — reached the roster only as an INFO graph node that never buzzes.
+# Measured over their whole stored history (2026-09-16): the treasury has paid
+# 6 never-before-seen destinations ever (5 contracts), `0xf078969e…` 181 (81
+# contracts, 10 EOAs, 90 unclassified). A new EOA is rare, and it is news.
+
+NOVEL_MIN_USD = 100.0
+# Native value moves by `native` and `internal` records. Gas to a fresh wallet is
+# the first step of funding one, and poisoners do not pay in real ETH, so a
+# native payment counts at any amount — its dollar value is often unknown.
+NATIVE_KINDS = frozenset({"native", "internal"})
+
+
+def counterparties_of(records, address: str) -> set:
+    """Everyone this wallet has transacted with, either direction. Pure."""
+    a = (address or "").lower()
+    out = set()
+    for rec in records or []:
+        for side in ("src", "dst"):
+            other = (rec.get(side) or "").lower()
+            if other and other != a:
+                out.add(other)
+    return out
+
+
+def outbound_payments(records, address: str) -> dict[str, dict]:
+    """Payments this wallet made that could fund a wallet. Pure.
+
+    Spam never counts. A token payment needs a measured `NOVEL_MIN_USD`; a
+    native one counts at any amount (see NATIVE_KINDS).
+    """
+    a = (address or "").lower()
+    out: dict[str, dict] = {}
+    for rec in records or []:
+        if (rec.get("src") or "").lower() != a or rec.get("spam"):
+            continue
+        dst = (rec.get("dst") or "").lower()
+        if not dst or dst == a:
+            continue
+        usd = rec.get("amount_usd")
+        try:
+            usd = None if usd is None else float(usd)
+        except (TypeError, ValueError):
+            usd = None
+        if rec.get("kind") in NATIVE_KINDS:
+            try:
+                raw = float(rec.get("amount") or 0)
+            except (TypeError, ValueError):
+                raw = 0.0
+            if raw <= 0 and not (usd and usd > 0):
+                continue
+        elif usd is None or usd < NOVEL_MIN_USD:
+            continue
+        entry = out.setdefault(dst, {"usd": 0.0, "unvalued": 0, "count": 0, "chains": set(),
+                                     "assets": set(), "last_ts": 0, "tx_hash": None})
+        if usd is None:
+            entry["unvalued"] += 1
+        else:
+            entry["usd"] += usd
+        entry["count"] += 1
+        if rec.get("chain"):
+            entry["chains"].add(rec["chain"])
+        if rec.get("asset"):
+            entry["assets"].add(rec["asset"])
+        try:
+            ts = int(rec.get("ts") or 0)
+        except (TypeError, ValueError):
+            ts = 0
+        if ts >= entry["last_ts"]:
+            entry["last_ts"], entry["tx_hash"] = ts, rec.get("tx_hash")
+    return out
+
+
+def novel_payments(payments: dict, seen: set, cluster: set) -> dict[str, dict]:
+    """Payments to an address no cluster wallet has ever been seen with. Pure."""
+    skip = {(a or "").lower() for a in seen} | {(a or "").lower() for a in cluster}
+    return {dst: p for dst, p in payments.items() if dst not in skip}
+
+
+def novelty_severity(hl_state: dict | None) -> str:
+    """CRITICAL when the new address already has a Hyperliquid account in use —
+    that is the deliverable itself. HIGH otherwise: money moved to a stranger,
+    which is the first step of a migration and also of paying a bill."""
+    s = hl_state or {}
+    if not s.get("read_ok"):
+        return "HIGH"
+    try:
+        value = float(s.get("account_value") or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+    return "CRITICAL" if value > 0 or int(s.get("fills") or 0) > 0 else "HIGH"
+
+
 def build_report(snapshots: list[dict], findings: dict) -> dict:
     return {
         "computed_at": datetime.now(UTC).isoformat(),
