@@ -274,6 +274,8 @@ def test_the_reading_budget_starts_at_the_first_live_reading():
     r = script.Readings({}, lambda address, chain: QUIET, max_live=5, seconds=45,
                         clock=lambda: now[0])
     now[0] = 90.0                      # the watch loop ran for a minute and a half
-    assert r.for_address(STRANGER, {"arbitrum"}) == [QUIET], "budget spent before it began"
+    got = r.for_address(STRANGER, {"arbitrum"})
+    assert len(got) == 1 and got[0]["txs"] == QUIET["txs"], "budget spent before it began"
+    assert "checked_at" in got[0], "a live reading records when it was taken"
     now[0] = 200.0                     # and the bound still holds once it has started
     assert r.for_address("0x" + "ab" * 20, {"arbitrum"}) == []
