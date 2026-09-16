@@ -43,7 +43,53 @@ HOSTS = {
     "polygon": "https://polygon.blockscout.com",
 }
 
+# Chains with no Blockscout instance but a public JSON-RPC. The reading is
+# thinner — bytecode, and the NONCE (transactions the address sent) standing in
+# for activity — but it is the difference between "a contract" and "could not
+# tell". Without it, every Monad address stayed unmeasured for ever: measured
+# 2026-09-16, the new-payee tripwire held the aMonUSDC token as "not yet
+# measured" run after run, and a genuinely new wallet there could never alert.
+# A receive-only deposit address has a low nonce and reads quiet, which for the
+# vectors that ask (a new payee, a sentinel sender) is the interesting answer.
+RPC_HOSTS = {
+    "monad": "https://rpc.monad.xyz",
+}
+
+# Every chain a reading can be taken on, for callers that iterate them.
+MEASURABLE_CHAINS = tuple(HOSTS) + tuple(RPC_HOSTS)
+
 CACHE_NAME = "address_activity.json"
+
+
+def fetch_rpc_activity(address: str, chain: str, *, post=None,
+                       timeout: float = 30.0) -> dict | None:
+    """Bytecode and nonce over JSON-RPC, for a chain with no Blockscout host.
+
+    None when the chain has no RPC here or the call failed — never a guessed
+    reading. `token_transfers` is 0 because JSON-RPC cannot count them, and
+    the reading says where it came from so nobody mistakes it for a full count.
+    """
+    url = RPC_HOSTS.get((chain or "").lower())
+    if not url:
+        return None
+    post = post or requests.post
+    a = (address or "").lower()
+    body = [{"jsonrpc": "2.0", "id": 1, "method": "eth_getCode", "params": [a, "latest"]},
+            {"jsonrpc": "2.0", "id": 2, "method": "eth_getTransactionCount",
+             "params": [a, "latest"]}]
+    try:
+        r = post(url, json=body, timeout=timeout)
+        if r.status_code != 200:
+            return None
+        got = {x.get("id"): x.get("result") for x in r.json() if isinstance(x, dict)}
+        code, nonce = got.get(1), got.get(2)
+        if not isinstance(code, str) or not isinstance(nonce, str):
+            return None
+        return {"is_contract": code not in ("0x", "0x0", ""),
+                "txs": int(nonce, 16), "token_transfers": 0, "name": None,
+                "source": "rpc"}
+    except Exception:                                 # noqa: BLE001 - transport
+        return None
 
 
 def fetch_activity(address: str, chain: str, *, get=None, timeout: float = 30.0) -> dict | None:
@@ -55,7 +101,7 @@ def fetch_activity(address: str, chain: str, *, get=None, timeout: float = 30.0)
     """
     host = HOSTS.get((chain or "").lower())
     if not host:
-        return None
+        return fetch_rpc_activity(address, chain) if (chain or "").lower() in RPC_HOSTS else None
     get = get or requests.get
     a = (address or "").lower()
     headers = {"accept": "application/json"}

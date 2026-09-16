@@ -163,3 +163,38 @@ def test_no_time_budget_means_unbounded_as_before(tmp_path):
     for i in range(5):
         cache.get(f"0x{i:040x}", "arbitrum")
     assert cache.lookups == 3 and cache.out_of_time is False
+
+
+class _Resp:
+    def __init__(self, status, payload):
+        self.status_code, self._payload = status, payload
+
+    def json(self):
+        return self._payload
+
+
+def test_a_chain_without_blockscout_is_read_over_rpc():
+    """Monad has no Blockscout host; without this every address there stayed
+    unmeasured and the new-payee tripwire held the aMonUSDC token for ever."""
+    def post(url, json=None, timeout=None):
+        assert "monad" in url
+        return _Resp(200, [{"id": 1, "result": "0x6080604052"}, {"id": 2, "result": "0x1"}])
+
+    got = act.fetch_rpc_activity("0x35a73bacb179d3740395a3cecc87ff2e581d6042", "monad", post=post)
+    assert got["is_contract"] is True and got["txs"] == 1 and got["source"] == "rpc"
+
+
+def test_an_rpc_eoa_reads_its_nonce_and_a_failure_is_none():
+    ok = act.fetch_rpc_activity("0xAAA", "monad", post=lambda url, json=None, timeout=None:
+                                _Resp(200, [{"id": 1, "result": "0x"}, {"id": 2, "result": "0x12"}]))
+    assert ok == {"is_contract": False, "txs": 18, "token_transfers": 0, "name": None,
+                  "source": "rpc"}
+    assert act.fetch_rpc_activity("0xAAA", "monad", post=lambda url, json=None, timeout=None:
+                                  _Resp(500, {})) is None
+    assert act.fetch_rpc_activity("0xAAA", "monad", post=lambda url, json=None, timeout=None:
+                                  _Resp(200, [{"id": 1, "error": "x"}])) is None
+    assert act.fetch_rpc_activity("0xAAA", "bsc") is None
+
+
+def test_measurable_chains_include_the_rpc_only_ones():
+    assert "monad" in act.MEASURABLE_CHAINS and "arbitrum" in act.MEASURABLE_CHAINS

@@ -22,9 +22,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import deposit_sentinels as ds
 from src import utils
+from src.chain.activity import MEASURABLE_CHAINS
 from src.utils import load_config
 
-CHAINS = ("arbitrum", "ethereum", "base", "optimism", "polygon")
+# Every chain a reading can be taken on: Blockscout hosts plus RPC-only chains.
+CHAINS = MEASURABLE_CHAINS
+
 # Live readings per run and a wall-clock bound on them. One reading is two
 # HTTP calls at a 30s timeout; nesting: this < the step's timeout in watch.yml.
 MAX_LIVE_READINGS = 8
