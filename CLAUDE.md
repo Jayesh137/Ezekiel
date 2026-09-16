@@ -911,6 +911,49 @@ slows.
 substrate yet — nothing re-fetches what the cursor has passed. The +277,208 is
 entirely `price_unavailable` majors already on disk.
 
+**A day's substrate is a SET of files now, because one file could not be
+bounded (fixed 2026-09-16).** Run 35082536547 swept 25 wallets, stored 345,100
+genuinely new records — the `known_ids` dedupe correctly held back all 615,375
+already held — and then died in `Commit and push`:
+
+    [size] OVER LIMIT data/transfers/ethereum/2026-09-16.json is 233.74 MiB
+
+`check_repo_size.py` refused the push, nothing was committed, and **1,229 API
+calls and 25 minutes were lost**. The guard did its job; the design behind it
+did not. A day's collection was one file, so the only bound on that file was
+how much the sweep happened to collect — and `--reset` collects everything.
+
+`append_transfer_records` rolls to `<day>.p2.json`, `<day>.p3.json` at
+**40 MiB**, which leaves room for a further whole append on top of a shard
+already at the bar. Nothing downstream changed: `substrate_files` keys a day
+off the filename, so a shard is just another day to every reader, and
+`compact_transfers` rolls each to its own `.jsonl.gz`.
+
+Two properties, either of which re-creates the bug if missed:
+
+- **A single append is itself split.** Rolling only BETWEEN appends leaves the
+  hole open — one wallet-chain can legitimately return
+  `max_pages_per_kind` x `page_size` x 3 kinds = 150,000 rows, ~102 MB at the
+  measured 683 bytes a record, on a fresh empty shard.
+- **Dedupe covers the whole DAY.** `append_records` dedupes against the one
+  file it writes, so a naive split re-stores into `<day>.p2` a record already
+  in `<day>.json` — the duplication `known_ids` had just removed, one layer
+  down.
+
+**And the volume estimate that led here was wrong, which is the lesson worth
+keeping.** The frontier re-sweep was sized from the quarantine ledger's 332,636
+`unpriced_token` count — but that ledger only ever recorded what INCREMENTAL
+sweeps encountered. A full-history re-read hits far more: 25 wallets alone
+exceeded the estimate for all 229. Extrapolated, the frontier is ~3.2M records
+and roughly 2.2 GB. **A number measured under one access pattern does not size
+a different one.**
+
+Measured per wallet the distribution is heavily skewed: a single-wallet reset
+of `0xf078969e…` (CONFIRMED) cost **27 API calls and stored 1,930 records** in
+two minutes, where the 25-wallet batch stored 345,100. Re-sweeping is cheap
+per wallet and expensive in aggregate, so **target it rather than sweeping the
+frontier wholesale.**
+
 **A classifier that destroys its input needs the same evidence bar as an
 alert.** Both defects were invisible for months because the only trace left
 behind was an address and a count, in a file nothing read.

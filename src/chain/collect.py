@@ -29,7 +29,7 @@ from src.chain.client import (
     probe_activity,
     unsupported_for_plan,
 )
-from src.utils import DATA_DIR, append_records, atomic_write_json, save_latest
+from src.utils import DATA_DIR, atomic_write_json, save_latest, today_str
 
 TRANSFERS_DIR = DATA_DIR / "transfers"
 SPAM_DIR = DATA_DIR / "transfers_spam"
@@ -226,6 +226,101 @@ def write_records(path: Path, records: list) -> None:
         if tmp.exists():
             tmp.unlink()
 
+
+
+# Ceiling for one stored substrate file. GitHub refuses a blob over 100 MiB and
+# check_repo_size.py fails the push step before the commit, so an oversized file
+# costs the whole run's work: run 35082536547 swept 25 wallets, stored 345,100
+# genuinely new records, and lost every one of them because
+# ethereum/2026-09-16.json had reached 233.74 MiB.
+#
+# 40 MiB leaves room for a further whole append on top of a shard already at
+# the bar and still lands under the limit, which matters because the check is
+# made per record batch rather than per byte.
+SHARD_MAX_BYTES = 40 * 1024 * 1024
+
+
+def _day_shards(directory: Path, day: str) -> list[Path]:
+    """Today's files, in write order: `<day>.json`, `<day>.p2.json`, ..."""
+    first = directory / f"{day}.json"
+    rest = sorted(directory.glob(f"{day}.p*.json"),
+                  key=lambda p: int(p.name.split(".p")[1].split(".")[0]))
+    return ([first] if first.exists() else []) + rest
+
+
+def append_transfer_records(directory: str, records: list[dict],
+                            key_field: str = "id") -> int:
+    """`append_records` for the substrate, sharded so no file nears the limit.
+
+    A day is a SET of files rather than one. `substrate_files` already keys a
+    day off the filename, so a shard is just another day to every reader, and
+    nothing downstream needed changing.
+
+    Two things this must get right, because either one re-creates the bug:
+
+      * a SINGLE append is split. Rolling only between appends leaves the hole
+        open — one wallet-chain can legitimately return
+        `max_pages_per_kind` x `page_size` x 3 kinds = 150,000 rows, ~102 MB at
+        the measured 683 bytes a record, on a fresh empty shard;
+      * dedupe covers the whole DAY. `append_records` dedupes against the one
+        file it writes, so splitting naively would re-store into `<day>.p2` a
+        record already in `<day>.json` — the duplication `known_ids` had just
+        removed, one layer down.
+    """
+    if not records:
+        return 0
+    dir_path = Path(directory)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    day = today_str()
+
+    shards = _day_shards(dir_path, day)
+    held: set[str] = set()
+    for shard in shards:
+        for rec in read_records(shard):
+            key = str(rec.get(key_field, "")) if isinstance(rec, dict) else ""
+            if key:
+                held.add(key)
+
+    fresh = []
+    for rec in records:
+        key = str(rec.get(key_field, ""))
+        if key and key in held:
+            continue
+        if key:
+            held.add(key)
+        fresh.append(rec)
+    if not fresh:
+        return 0
+
+    # Start at the newest shard that still has room, else a new one.
+    index = len(shards) if shards else 1
+    if shards and shards[-1].stat().st_size < SHARD_MAX_BYTES:
+        index = len(shards)
+    elif shards:
+        index = len(shards) + 1
+
+    written = 0
+    pending = list(fresh)
+    while pending:
+        path = dir_path / (f"{day}.json" if index == 1 else f"{day}.p{index}.json")
+        existing = read_records(path) if path.exists() else []
+        room = SHARD_MAX_BYTES - (path.stat().st_size if path.exists() else 0)
+        take = []
+        size = 0
+        for rec in pending:
+            weight = len(json.dumps(rec)) + 8      # +8 for indent and separators
+            if take and size + weight > max(room, 0):
+                break
+            take.append(rec)
+            size += weight
+        if not take:                                # shard already full
+            index += 1
+            continue
+        atomic_write_json(path, existing + take)
+        written += len(take)
+        pending = pending[len(take):]
+        index += 1
+    return written
 
 def _load_cached(path: Path) -> list:
     """Records from one stored file, parsed at most once per version of it."""
@@ -623,7 +718,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             clean = fresh
 
         if clean:
-            append_records(str(Path(TRANSFERS_DIR) / name), clean, key_field="id")
+            append_transfer_records(str(Path(TRANSFERS_DIR) / name), clean,
+                                    key_field="id")
         if quarantined:
             _merge_spam_rollup(spam_mod.rollup(quarantined, addr))
 

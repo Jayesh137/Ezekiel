@@ -160,7 +160,7 @@ def test_the_sweep_passes_ground_truth_to_the_classifier(monkeypatch):
     monkeypatch.setattr(collect, "fetch_kind", lambda *a, **k: (walk, None))
     monkeypatch.setattr(collect, "normalise_row",
                         lambda *a, **k: _record(TWIN, TARGET))
-    monkeypatch.setattr(collect, "append_records", lambda *a, **k: 0)
+    monkeypatch.setattr(collect, "append_transfer_records", lambda *a, **k: 0)
     monkeypatch.setattr(collect, "newest_block", lambda *a, **k: (None, None))
     monkeypatch.setattr(collect, "write_cursors", lambda *a, **k: None)
     monkeypatch.setattr(collect, "read_cursors", lambda *a, **k: {})
