@@ -1078,6 +1078,54 @@ def alert_watchlist_contact(wallet: str, contact: str, what: str,
                                168, subject, body)
 
 
+def alert_deposit_address_shared(row: dict, hl_state: dict | None = None) -> bool:
+    """A wallet outside the cluster paid one of his private deposit addresses.
+
+    A CEX deposit address belongs to one exchange account, so this is his
+    account being funded by an address the project did not know: a new wallet
+    of his, or someone paying him. Read from the deposit address's own sweep,
+    which is the side `linkage.py` never looked at — see src/deposit_sentinels.py
+    for the 2024 payment that nothing surfaced.
+
+    CRITICAL when the sender is a measured quiet EOA; HIGH when it could not be
+    measured, because an unmeasured sender might be an exchange sweeper.
+    """
+    from src.deposit_sentinels import severity
+
+    level = severity(row)
+    subject = f"[EZEKIEL] {level}: A New Wallet Paid His Private Deposit Address"
+    when = "unknown"
+    try:
+        if row.get("last_ts"):
+            when = datetime.fromtimestamp(int(row["last_ts"]), tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+    except (TypeError, ValueError, OSError):
+        pass
+    hl = hl_state or {}
+    if hl.get("read_ok"):
+        hl_line = (f"Hyperliquid: role {hl.get('role')}, account value "
+                   f"${float(hl.get('account_value') or 0):,.0f}, "
+                   f"born {hl.get('birth') or 'never funded'}, "
+                   f"{hl.get('fills', 0)} recent fill(s)\n")
+    else:
+        hl_line = f"Hyperliquid: could not be read ({hl.get('error') or 'not asked'})\n"
+    body = (
+        f"{address_line(row.get('address') or '', 'New sender')}\n"
+        f"{address_line(row.get('sentinel') or '', 'His deposit address')}\n"
+        f"Paid: ${float(row.get('usd') or 0):,.2f} in {row.get('count')} transfer(s) "
+        f"of {', '.join(row.get('assets') or []) or 'unknown'} on "
+        f"{', '.join(row.get('chains') or []) or 'unknown'}\n"
+        f"Most recent: {when}\n"
+        f"Sender measured: {row.get('class')}\n"
+        f"{hl_line}\n"
+        f"A deposit address belongs to one exchange account. Money arriving from\n"
+        f"an address outside the cluster is his account funded by a wallet this\n"
+        f"project did not know - check it on Hyperliquid first, then who funded it.\n"
+        f"A transfer is still not ownership: someone may simply have paid him.\n"
+    )
+    key = f"deposit_shared_{(row.get('sentinel') or '').lower()}_{(row.get('address') or '').lower()}"
+    return _send_with_cooldown(key, 168, subject, body)
+
+
 def alert_watchlist_change(wallet: str, changes: list, why: str | None = None) -> bool:
     """Fire when a watched wallet's state changes materially."""
     kinds = ", ".join(sorted({c.get("kind", "?") for c in changes}))

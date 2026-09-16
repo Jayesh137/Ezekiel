@@ -49,8 +49,11 @@ jobs:
     # response cannot cancel the job before it commits what it read.
     # A backstop only; the step below carries its own. Raised from 8 when the
     # watch stopped being one hand-picked wallet and started covering every
-    # roster CONFIRMED/PROBABLE too (up to watchlist.MAX_WATCHED = 6).
-    timeout-minutes: 12
+    # roster CONFIRMED/PROBABLE too (up to watchlist.MAX_WATCHED = 6). Raised
+    # to 20 when the deposit-address step joined: the job ceiling must stay
+    # above the sum of its step timeouts (8 + 3 + 5), or a slow run is
+    # CANCELLED and the commit step never persists what the others read.
+    timeout-minutes: 20
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -62,8 +65,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-      - run: pip install -r requirements.txt
+      - id: deps
+        run: pip install -r requirements.txt
       - name: Watch the watchlist
+        # Every detector step runs whatever its SIBLINGS did — see
+        # tests/test_workflow_step_independence.py. HyperEVM used to be skipped
+        # whenever the watchlist step failed.
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
@@ -79,13 +87,35 @@ jobs:
       # The tripwire that cannot be reconstructed after the fact: HyperEVM
       # history is unsweepable, so a nonce that moves has to be caught live.
       - name: Watch HyperEVM
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
+        # A few nonce reads; bounded so a hung RPC costs only this step.
+        timeout-minutes: 3
         run: python scripts/check_hyperevm.py
+      # His private exchange deposit addresses, read from their OWN side: a
+      # deposit address belongs to one exchange account, so a new outside
+      # sender is his account funded by a wallet nobody knew. linkage.py only
+      # compared swept wallets' outbound and never saw the one outsider that
+      # ever paid 0x8570c2ae (0xda0932d2, $249,994, 2024-07-31). The shared
+      # activity cache is read-only here: its writer is trace.yml's graph step.
+      - name: Watch his private deposit addresses
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        # Measured locally: 7s cold substrate walk, 0.4s warm; the sweeps are
+        # incremental. Bounded well above that so a hung endpoint costs only
+        # this step.
+        timeout-minutes: 5
+        run: python scripts/check_deposit_sentinels.py
       # ALWAYS: a step that failed costs its own reading, not the whole run's.
       # Every writer rewrites its own file whole, so a file not updated this
       # run keeps the previous value. (Job CANCELLATION still skips this — only

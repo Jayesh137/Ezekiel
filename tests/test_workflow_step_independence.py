@@ -29,7 +29,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parent.parent
-WORKFLOWS = ("trace.yml", "scan.yml", "analyze.yml")
+WORKFLOWS = ("trace.yml", "scan.yml", "analyze.yml", "watch.yml")
 
 # Steps whose whole job is to run after a failure, or to report one.
 TERMINAL = {"Commit and push": "always()", "Open failure issue": "failure()"}

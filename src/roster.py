@@ -599,6 +599,29 @@ def build_roster(config: dict | None = None) -> dict:
         if reason not in e["reasons"]:
             e["reasons"].append(reason)
 
+    # Paid one of his private deposit addresses — read from that address's own
+    # sweep by scripts/check_deposit_sentinels.py, its own file, because linkage
+    # from the graph only ever compared SWEPT wallets' outbound and so could not
+    # see a wallet nobody swept. Quiet EOAs only: an exchange hot wallet paying
+    # in is him moving between his own exchange accounts, not a new wallet.
+    try:
+        with open(DATA_DIR / "deposit_sentinels" / "latest.json") as f:
+            sentinel_report = json.load(f)
+    except (OSError, ValueError):
+        sentinel_report = {}
+    from src.deposit_sentinels import roster_sharers
+    for addr, row in roster_sharers(sentinel_report if isinstance(sentinel_report, dict)
+                                    else {}).items():
+        if not addr or addr == target:
+            continue
+        e = entry(addr)
+        e["vectors"].add(VECTOR_LINKAGE)
+        e["evidence"]["shared_private_deposit_address"] = {
+            k: row.get(k) for k in ("sentinel", "usd", "count", "first_ts", "last_ts", "chains")}
+        reason = f"Paid his private deposit address {str(row.get('sentinel'))[:10]}..."
+        if reason not in e["reasons"]:
+            e["reasons"].append(reason)
+
     for party in _read(DATA_DIR / "hl_transfers" / "latest.json", "counterparties"):
         a = (party.get("wallet") or "").lower()
         if not a or a == target:
