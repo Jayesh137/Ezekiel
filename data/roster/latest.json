@@ -1,15 +1,15 @@
 {
-  "computed_at": "2026-09-16T21:04:34.928078+00:00",
+  "computed_at": "2026-09-16T21:39:11.477235+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 354,
+  "wallet_count": 356,
   "behavioural_counts_as_a_vector": true,
   "tier_counts": {
     "CONFIRMED": 2,
     "POSSIBLE": 26,
-    "WATCH": 158,
-    "INFRASTRUCTURE": 168
+    "WATCH": 159,
+    "INFRASTRUCTURE": 169
   },
-  "demoted_count": 120,
+  "demoted_count": 119,
   "demoted": [
     {
       "wallet": "0x3b2d7db2e70b4f4ea83043a8dc00f7e40198b5cc",
@@ -114,21 +114,73 @@
   ],
   "wallets": [
     {
-      "wallet": "0x1419e75330c71ce463102e6a1eb62fe80b412d5f",
+      "wallet": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "vectors": [
-        "hl_native",
         "linkage",
         "transfer"
       ],
-      "confidence": 0.88,
+      "confidence": 0.84,
+      "classification": "MIGRATION_CANDIDATE",
+      "reasons": [
+        "Received funds directly from the target wallet",
+        "Sent funds to the target wallet",
+        "Repeated transfers (2068 separate movements)",
+        "Two-way flow \u2014 funds move both to and from this wallet",
+        "Sends to the same deposit address as the target (address reuse)",
+        "Actively trading on Hyperliquid after receiving funds",
+        "Paid his private deposit address 0x8570c2ae..."
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 161407904.22,
+          "sent_to_target_usd": 140884798.87,
+          "edge_count": 2068,
+          "unvalued_edge_count": 6
+        },
+        "depth": 1,
+        "chains": [
+          "arbitrum",
+          "ethereum",
+          "monad",
+          "polygon"
+        ],
+        "shared_private_deposit_address": {
+          "sentinel": "0x8570c2aebf16ebe51690674cc7116dac6f0eb68e",
+          "usd": 114768239.49,
+          "count": 33,
+          "first_ts": 1717577027,
+          "last_ts": 1769971103,
+          "chains": [
+            "ethereum"
+          ]
+        },
+        "hl_role": "user",
+        "hl_account_value": 54.0,
+        "hl_birth_ms": 1735768080050
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 2,
+      "tier": "CONFIRMED",
+      "peak_tier": "CONFIRMED",
+      "tier_dropped_from": null,
+      "rank_strength": 0.84
+    },
+    {
+      "wallet": "0x1419e75330c71ce463102e6a1eb62fe80b412d5f",
+      "vectors": [
+        "hl_native",
+        "transfer"
+      ],
+      "confidence": 0.7,
       "classification": "MIGRATION_CANDIDATE",
       "reasons": [
         "Received funds directly from the target wallet",
         "Sent funds to the target wallet",
         "Repeated transfers (240 separate movements)",
         "Two-way flow \u2014 funds move both to and from this wallet",
-        "Transfer happened entirely inside Hyperliquid (no L1 trace)",
-        "Sends to the same deposit address as the target (address reuse)"
+        "Transfer happened entirely inside Hyperliquid (no L1 trace)"
       ],
       "evidence": {
         "service_reason": null,
@@ -153,64 +205,11 @@
       },
       "is_service": false,
       "known_self": true,
-      "vector_count": 3,
-      "tier": "CONFIRMED",
-      "peak_tier": "CONFIRMED",
-      "tier_dropped_from": null,
-      "rank_strength": 0.88
-    },
-    {
-      "wallet": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "vectors": [
-        "linkage",
-        "transfer"
-      ],
-      "confidence": 0.84,
-      "classification": "MIGRATION_CANDIDATE",
-      "reasons": [
-        "Received funds directly from the target wallet",
-        "Sent funds to the target wallet",
-        "Repeated transfers (2052 separate movements)",
-        "Two-way flow \u2014 funds move both to and from this wallet",
-        "Sends to the same deposit address as the target (address reuse)",
-        "Actively trading on Hyperliquid after receiving funds",
-        "Paid his private deposit address 0x8570c2ae..."
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 161407904.22,
-          "sent_to_target_usd": 140884798.87,
-          "edge_count": 2052,
-          "unvalued_edge_count": 6
-        },
-        "depth": 1,
-        "chains": [
-          "arbitrum",
-          "ethereum",
-          "polygon"
-        ],
-        "shared_private_deposit_address": {
-          "sentinel": "0x8570c2aebf16ebe51690674cc7116dac6f0eb68e",
-          "usd": 114768239.49,
-          "count": 33,
-          "first_ts": 1717577027,
-          "last_ts": 1769971103,
-          "chains": [
-            "ethereum"
-          ]
-        },
-        "hl_role": "user",
-        "hl_account_value": 54.0,
-        "hl_birth_ms": 1735768080050
-      },
-      "is_service": false,
-      "known_self": false,
       "vector_count": 2,
       "tier": "CONFIRMED",
       "peak_tier": "CONFIRMED",
       "tier_dropped_from": null,
-      "rank_strength": 0.84
+      "rank_strength": 0.7
     },
     {
       "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
@@ -389,9 +388,10 @@
         "correlation_confidence": 0.6466,
         "correlation_gap_hours": 257.7,
         "competing_deposits": 2,
-        "portfolio_overlap": 0.0239,
+        "portfolio_overlap": 0.0435,
         "shared_rare_markets": [
-          "CHIP"
+          "CHIP",
+          "VVV"
         ],
         "hl_role": "user",
         "hl_account_value": 1225526.810737,
@@ -962,7 +962,7 @@
       "reasons": [
         "Sent funds to the target wallet",
         "Transfer happened entirely inside Hyperliquid (no L1 trace)",
-        "Last movement 607 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 608 days ago \u2014 transfer evidence aged to 40%",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
@@ -1227,7 +1227,10 @@
           "chains": [
             "arbitrum"
           ]
-        }
+        },
+        "hl_role": "user",
+        "hl_account_value": 6.0,
+        "hl_birth_ms": 1722465840090
       },
       "is_service": false,
       "known_self": false,
@@ -1670,11 +1673,11 @@
     {
       "wallet": "0x7a4b676af7002e45322437d140517b8dc6303dc2",
       "vectors": [],
-      "confidence": 0.0828,
+      "confidence": 0.0827,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (203 separate movements)",
-        "Last movement 186 days ago \u2014 transfer evidence aged to 74%",
+        "Last movement 187 days ago \u2014 transfer evidence aged to 74%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -1702,7 +1705,7 @@
       "tier": "WATCH",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": "POSSIBLE",
-      "rank_strength": 0.0828
+      "rank_strength": 0.0827
     },
     {
       "wallet": "0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
@@ -3687,7 +3690,14 @@
         "hl_role": "user",
         "hl_account_value": 332710.182645,
         "hl_birth_ms": 1720047720089,
-        "frontend_agent": "0xb3f335e103e6b5bc735434bcf41abdef19453c02"
+        "frontend_agent": "0xb3f335e103e6b5bc735434bcf41abdef19453c02",
+        "referral_pairs": [
+          {
+            "with": "0xda23ab0b2636c3f9806a868278d73aef2439ab60",
+            "role": "referred",
+            "code_accounts": 5
+          }
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -4125,7 +4135,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 623 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 624 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -4205,7 +4215,14 @@
         "hl_role": "user",
         "hl_account_value": 574836.633769,
         "hl_birth_ms": 1724278320118,
-        "frontend_agent": "0x8e90c47bc42e12514bb838b3c9ad2b01bd5a87a4"
+        "frontend_agent": "0x8e90c47bc42e12514bb838b3c9ad2b01bd5a87a4",
+        "referral_pairs": [
+          {
+            "with": "0x88b2448328f4335ad2a8cac06485c378ebe66fe3",
+            "role": "referred",
+            "code_accounts": 2
+          }
+        ]
       },
       "is_service": false,
       "known_self": false,
@@ -4477,14 +4494,7 @@
         "hl_role": "user",
         "hl_account_value": 113966783.368841,
         "hl_birth_ms": 1740612360037,
-        "frontend_agent": "0xb0e57c727bf855e6e0d0fc0bdd72d71f65b06b9c",
-        "referral_pairs": [
-          {
-            "with": "0xb83de012dba672c76a7dbbbf3e459cb59d7d6e36",
-            "role": "referred",
-            "code_accounts": 3
-          }
-        ]
+        "frontend_agent": "0xb0e57c727bf855e6e0d0fc0bdd72d71f65b06b9c"
       },
       "is_service": false,
       "known_self": false,
@@ -5065,6 +5075,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
+        "Last movement 90 days ago \u2014 transfer evidence aged to 100%",
         "Reached at 2 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -5320,41 +5331,6 @@
       "rank_strength": 0.0
     },
     {
-      "wallet": "0x85d456b2dff1fd8245387c0bfb64dfb700e98ef3",
-      "vectors": [],
-      "confidence": 0.0,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Last movement 519 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 2 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1,
-          "unvalued_edge_count": 0
-        },
-        "depth": 2,
-        "chains": [
-          "ethereum"
-        ],
-        "graph_reach_only": true,
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 0,
-      "tier": "WATCH",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": "POSSIBLE",
-      "rank_strength": 0.0
-    },
-    {
       "wallet": "0x87283edb0f12e7cd0ed3e18baeab20aaf43b5f6e",
       "vectors": [],
       "confidence": 0.0,
@@ -5386,6 +5362,29 @@
       "tier": "WATCH",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": "POSSIBLE",
+      "rank_strength": 0.0
+    },
+    {
+      "wallet": "0x88b2448328f4335ad2a8cac06485c378ebe66fe3",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "referral_pairs": [
+          {
+            "with": "0x3bcae23e8c380dab4732e9a159c0456f12d866f3",
+            "role": "referrer",
+            "code_accounts": 2
+          }
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
       "rank_strength": 0.0
     },
     {
@@ -5722,14 +5721,7 @@
         "hl_role": "user",
         "hl_account_value": 70049965.560851,
         "hl_birth_ms": 1740613800204,
-        "frontend_agent": "0xbd56c05616876e57f57c9383c97d6a8ec55190d1",
-        "referral_pairs": [
-          {
-            "with": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
-            "role": "referrer",
-            "code_accounts": 3
-          }
-        ]
+        "frontend_agent": "0xbd56c05616876e57f57c9383c97d6a8ec55190d1"
       },
       "is_service": false,
       "known_self": false,
@@ -5976,6 +5968,29 @@
       "rank_strength": 0.0
     },
     {
+      "wallet": "0xda23ab0b2636c3f9806a868278d73aef2439ab60",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "referral_pairs": [
+          {
+            "with": "0x250b6caa76cf8c72b8ecd546d78dc096fa8eb824",
+            "role": "referrer",
+            "code_accounts": 5
+          }
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
       "wallet": "0xe326375742cf703a3e7037bb7fed1e01e33609e8",
       "vectors": [],
       "confidence": 0.0,
@@ -6139,7 +6154,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 415 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 416 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -6381,13 +6396,14 @@
         "totals": {
           "received_from_target_usd": 136642577.09,
           "sent_to_target_usd": 416668544.01,
-          "edge_count": 17770,
+          "edge_count": 17778,
           "unvalued_edge_count": 0
         },
         "depth": 1,
         "chains": [
           "arbitrum",
           "ethereum",
+          "monad",
           "polygon"
         ]
       },
@@ -7799,10 +7815,10 @@
       "confidence": 0.0,
       "classification": "SERVICE",
       "reasons": [
-        "Excluded: configured service address (exchange/bridge/contract)"
+        "Excluded: global activity: 2,282,992 txs, 1,031 token transfers"
       ],
       "evidence": {
-        "service_reason": "configured service address (exchange/bridge/contract)",
+        "service_reason": "global activity: 2,282,992 txs, 1,031 token transfers",
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
@@ -7837,13 +7853,14 @@
         "totals": {
           "received_from_target_usd": 57760728.95,
           "sent_to_target_usd": 0,
-          "edge_count": 44203,
+          "edge_count": 44206,
           "unvalued_edge_count": 0
         },
         "depth": 1,
         "chains": [
           "arbitrum",
           "ethereum",
+          "monad",
           "polygon"
         ]
       },
@@ -8869,6 +8886,36 @@
         "depth": 2,
         "chains": [
           "ethereum"
+        ],
+        "graph_reach_only": true
+      },
+      "is_service": true,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "INFRASTRUCTURE",
+      "peak_tier": "INFRASTRUCTURE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
+      "wallet": "0x35a73bacb179d3740395a3cecc87ff2e581d6042",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": "SERVICE",
+      "reasons": [
+        "Excluded: configured service address (exchange/bridge/contract)"
+      ],
+      "evidence": {
+        "service_reason": "configured service address (exchange/bridge/contract)",
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 5,
+          "unvalued_edge_count": 0
+        },
+        "depth": 2,
+        "chains": [
+          "monad"
         ],
         "graph_reach_only": true
       },
