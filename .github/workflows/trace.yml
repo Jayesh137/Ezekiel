@@ -44,6 +44,34 @@ jobs:
     # successful runs that day totalled 347-534s, so 20 minutes is roughly 2x
     # the worst healthy run and is only reachable if several steps hang at once.
     #
+    # That reasoning only got as far as the COMMIT step, and the gap cost six
+    # detectors a run (2026-09-16). A step with no `if:` carries an implicit
+    # `success()`, so ONE failing step skips every step after it — when the
+    # graph step timed out on 4 of 10 runs, each failure also silently took
+    # down the identities, agents, dormancy, portfolio-overlap, roster and
+    # accounting steps that follow it. A step timeout is only "survivable" if
+    # the steps behind it actually survive.
+    #
+    # So every detector below carries `!cancelled()`: a sibling failing is not
+    # its business. Three things this deliberately is NOT:
+    #
+    #   - NOT `always()`, which also runs while the job is being CANCELLED.
+    #     On cancellation the runner is tearing down and the remaining time
+    #     belongs to "Commit and push" (which keeps `always()`, because
+    #     persisting what exists IS the thing worth doing in every state).
+    #   - NOT unconditional: each is gated on `steps.deps`, because if
+    #     `pip install` failed the environment is broken and sixteen
+    #     ImportErrors is noise, not resilience. A sibling detector failing is
+    #     independent; a missing interpreter is not.
+    #   - NOT a way to hide failures. A step that runs and fails still fails
+    #     the JOB, so `failure()` still opens the issue and the run still shows
+    #     red. Only the cascade is removed.
+    #
+    # Safe because `utils.save_latest` is write-then-rename: a killed step
+    # leaves latest.json wholly old or wholly new, never truncated, so a later
+    # step reads a stale-but-valid file — which is the documented
+    # "a file not updated this run keeps the previous value" case.
+    #
     # BUDGETED worst case, which is what the timeout has to cover:
     #
     #   config.collection.time_budget_seconds  150   cluster sweep (tracer)
@@ -97,9 +125,11 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-      - run: pip install -r requirements.txt
+      - id: deps
+        run: pip install -r requirements.txt
       - name: Investigate a specific wallet
-        if: inputs.investigate_wallet != ''
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success'
+            && inputs.investigate_wallet != '' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           INVESTIGATE_WALLET: ${{ inputs.investigate_wallet }}
@@ -109,6 +139,7 @@ jobs:
         run: python scripts/backfill_transfers.py --wallet "$INVESTIGATE_WALLET" --time-budget-seconds 9
       # 3x its internal budgets (150s sweep + 240s trace loop). Observed 13-14s.
       - run: python src/tracer.py
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 8
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
@@ -123,6 +154,7 @@ jobs:
       # transaction decoded once and cached. A recipient outside the cluster
       # alerts.
       - name: Decode bridge destinations
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -134,6 +166,7 @@ jobs:
       # address; an unpaired one is a withdrawal to a foreign address, which
       # the ledger cannot show. Resolving one costs a few Etherscan calls.
       - name: Pair withdrawals with their payouts
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
@@ -150,6 +183,7 @@ jobs:
       # from Ethereum or Base enters the correlator here and nowhere else.
       # Budgeted at config.correlation.cctp_time_budget_seconds (120s).
       - name: Correlate Circle deposits
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -160,6 +194,7 @@ jobs:
       # One public-RPC call per cluster Solana address (the CCTP recipient of
       # $22.75M of his). Solana reaches Hyperliquid through Circle too.
       - name: Watch cluster Solana addresses
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -180,6 +215,7 @@ jobs:
       # account run by the same hand moves with them or before. One fills call
       # per roster candidate over the scanner's 21-day window.
       - name: Score lead/lag co-movement
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -189,6 +225,7 @@ jobs:
         run: python scripts/check_comovement.py
       # A vault led by a cluster wallet is a tradeable address of his. One call.
       - name: Watch vault leadership
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -198,12 +235,14 @@ jobs:
       # Does the Etherscan key serve HyperEVM (chain 999)? Recorded, so the
       # answer to "can HyperEVM be swept" comes from CI rather than a guess.
       - name: Probe the HyperEVM index
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: python scripts/probe_hyperevm_index.py
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
       - name: Rebuild transfer graph
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
@@ -246,6 +285,7 @@ jobs:
       # Runs before the agent check so the frontend agents are on record, and
       # before the roster so an explicit link lands in the same run.
       - name: Resolve Hyperliquid identities
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -254,6 +294,7 @@ jobs:
         timeout-minutes: 3          # observed 38s
         run: python scripts/check_identity.py
       - name: Check authorised agents
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -266,6 +307,7 @@ jobs:
       # so a fixed "dormant after a week" rule cannot cry wolf. Runs before the
       # roster so a handoff lands in the same run.
       - name: Check dormancy and handoffs
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -277,12 +319,15 @@ jobs:
       # Writes evidence and raises no alert: a copy-trader holds the same basket
       # by definition, which is indistinguishable here from being the same person.
       - name: Score portfolio overlap
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_portfolio_overlap.py
       - name: Build wallet roster
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/roster.py
       # After the roster, because it classifies each destination using the tiers
       # the roster just assigned. Pure file reads.
       - name: Reconcile outbound funds
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/accounting.py
       # ALWAYS, so a step that timed out or failed costs only its own reading
       # rather than the whole run's. Partial data beats no data: every writer

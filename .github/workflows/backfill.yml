@@ -32,7 +32,16 @@ jobs:
           cache: 'pip'
       - run: pip install -r requirements.txt
       - run: python src/backfill.py
+      # ALWAYS: this job is the longest in the repo and it advances CURSORS.
+      # A step that failed costs its own reading, not the whole sweep's —
+      # every writer rewrites its own file whole, so a file not updated this
+      # run keeps the previous value. Without this, a failure 50 minutes in
+      # discards every cursor the sweep advanced and the next run restarts
+      # from block 0: the same livelock `--reset` was fixed for, reached
+      # through a step failure instead of a cancellation. (Job CANCELLATION
+      # still skips this — only a step-level failure is survivable.)
       - name: Commit and push
+        if: always()
         run: |
           # Before anything else: a blob over 100 MiB is refused by GitHub's
           # pre-receive hook, which fails the push AFTER the work is done and

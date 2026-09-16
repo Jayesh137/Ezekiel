@@ -29,13 +29,15 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-      - run: pip install -r requirements-analysis.txt
+      - id: deps
+        run: pip install -r requirements-analysis.txt
       # Roll closed days into archives and drop cross-file duplicates. Without a
       # scheduled run the storage bound is a one-off: per-minute snapshots and
       # re-polled historicalOrders regrow data/ to ~800MB within weeks, which is
       # what pushed job checkout past the collect timeout in the first place.
       # Runs before the fingerprint so the rebuild reads the compacted tree.
       - name: Compact data
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/compact_data.py --apply
       # Records collected while the price cache was cold sit on disk as
       # price_unavailable and are dropped before they reach the graph. The
@@ -49,8 +51,30 @@ jobs:
       # contract for another (chain, symbol) pair — it is idempotent and only
       # judges pairs whose real contract is known.
       - name: Quarantine impostor tokens
+        id: quarantine
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/quarantine_impostor_tokens.py --apply
+      # THE exception to the step-independence rule above, and the reason each
+      # `if:` here was reasoned about rather than pasted in: this step is gated
+      # on the QUARANTINE step, not merely on the environment.
+      #
+      # `reprice_stored_records` prices by SYMBOL (src/chain/reprice.py), and
+      # its only defence against a counterfeit is `_needs_price`'s
+      # `not rec.get("spam")` — the flag the quarantine step above is what
+      # sets. Let this run after a FAILED quarantine and impostor records that
+      # should have been marked are instead looked up by ticker and booked as
+      # real money. That is rule 2 ("a token is its contract, not its ticker"),
+      # which once booked $3.07B of counterfeit value, reached by way of a
+      # workflow condition.
+      #
+      # Every other step here loses only its own freshness when a predecessor
+      # fails — "runs after repricing so exits are valued" is degradation, and
+      # a correlator that sees fewer priced exits is the previous day's answer,
+      # not a wrong one. This one loses CORRECTNESS, so it keeps the gate that
+      # the implicit `success()` used to give it for free.
       - name: Reprice stored transfers
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success'
+            && steps.quarantine.conclusion == 'success' }}
         env:
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
         run: python scripts/reprice_transfers.py
@@ -58,6 +82,7 @@ jobs:
       # that job's 600s ceiling (see src/tracer.py's main). Runs after repricing
       # so exits are valued, and budgeted at 300s of this 30-minute job.
       - name: Correlate deposits and withdrawals
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
@@ -74,10 +99,12 @@ jobs:
       # job because a first funder never changes: each wallet costs at most one
       # lookup ever, and the cache converges over a few runs.
       - name: Resolve first funders
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: python scripts/resolve_first_funders.py 40
       - name: Rebuild fingerprint
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
@@ -89,6 +116,7 @@ jobs:
       # directions. Evidence only, no alert: a style resemblance is not a
       # discovery. Daily is plenty - the source material is from 2021-2023.
       - name: Test the GCR hypothesis
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_gcr_hypothesis.py
       # The only GCR vector that is flow rather than style. His own tweet led to
       # a confirmed Ethereum address; none of that cluster has ever touched
@@ -96,12 +124,15 @@ jobs:
       # in the day one of them moves. Cheap: five HL calls against addresses
       # already on disk. This one DOES alert.
       - name: Watch GCR's Ethereum addresses
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_gcr_wallets.py
       - name: Build trader profile
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/profile_builder.py
       # Refresh the manifest so the dashboard sees the archived days and the
       # compact account series produced above.
       - name: Refresh data index
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python -c "from src.utils import update_index; update_index()"
       # ALWAYS: a step that failed costs its own reading, not the whole run's.
       # Every writer rewrites its own file whole, so a file not updated this

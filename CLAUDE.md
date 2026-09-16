@@ -653,6 +653,73 @@ makes no external calls at all, which is exactly why it was invisible for eight
 minutes. It is now timed. **Time a phase because it can be slow, not because it
 can block.**
 
+
+**One failing step took five others down with it, and the reasoning to prevent
+that was already written one step away (fixed 2026-09-16).** A workflow step
+with no `if:` carries an implicit `success()`, so a single failure skips the
+whole remainder of the job. While the graph step was timing out on 4 of
+trace.yml's last 10 runs, **each failure also skipped the six detectors behind
+it** — identities, agents, dormancy, portfolio overlap, the roster and the
+accounting. `Commit and push` already carried the right rule in its own
+comment — "a step that failed costs its own reading, not the whole run's" —
+and it had never been extended to the detectors it was written about.
+
+That is the stalled-frontier shape again: nothing in a run summary says "six
+detectors did not run". The job goes red for the one step that failed, and the
+five silent absences look like nothing happening.
+
+Every detector step in `trace.yml` (16), `scan.yml` (3) and `analyze.yml` (10)
+now carries `!cancelled() && steps.deps.conclusion == 'success'`. Three
+deliberate choices:
+
+- **`!cancelled()`, not `always()`.** `always()` also runs while the job is
+  being CANCELLED, when the runner is tearing down and the seconds left belong
+  to `Commit and push` — which keeps `always()`, because persisting what
+  exists is the thing worth doing in every state.
+- **Still gated on the environment.** A failed `pip install` is not an
+  independent sibling, it is a broken interpreter, and sixteen ImportErrors is
+  noise rather than resilience. Hence `id: deps` and a named gate.
+- **Failures are not hidden.** A step that runs and fails still fails the JOB,
+  so `failure()` still opens the issue and the run still shows red. Only the
+  cascade is removed — and `continue-on-error`, which WOULD hide it, is
+  asserted absent.
+
+Safe because `utils.save_latest` is write-then-rename: a killed step leaves
+`latest.json` wholly old or wholly new, never truncated, so a later step reads
+a stale-but-valid file — the documented "a file not updated this run keeps the
+previous value" case. **Had the write not been atomic this fix would have been
+wrong**, and that is the thing to check first next time.
+
+**One step is deliberately NOT independent, and it is the reason to reason
+about each one rather than paste the condition in.** `analyze.yml`'s
+`Reprice stored transfers` prices by SYMBOL, and its only defence against a
+counterfeit is `_needs_price`'s `not rec.get("spam")` — **the flag the
+Quarantine step immediately above it sets.** Run it after a FAILED quarantine
+and impostor records are looked up by ticker and booked as real money: rule 2,
+which once booked $3.07B of counterfeit value, reached this time through a CI
+condition. It stays gated on `steps.quarantine`.
+
+The distinction worth keeping: every other step here loses only FRESHNESS when
+a predecessor fails — "runs after repricing so exits are valued" means a
+correlator that sees fewer priced exits, which is yesterday's answer, not a
+wrong one. That one loses CORRECTNESS. **Ask which of the two a step loses
+before making it independent.**
+
+**Looking for the cascade found the same rule broken at the other end, in the
+two most expensive places.** `backfill.yml` and `substrate-backfill.yml` were
+the only committing workflows whose `Commit and push` lacked `if: always()` —
+and they are the LONGEST jobs in the repo (48-60 minutes) and the ones that
+advance sweep CURSORS. A step failure fifty minutes in therefore discarded
+every cursor the sweep had advanced, so the next run restarted from block 0.
+That is the livelock `--reset` was fixed for and that
+`test_chain_budget.py` reasons about for job CANCELLATION, still wide open for
+the ordinary step failure. All seven committing workflows now persist what
+they finished.
+
+`tests/test_workflow_step_independence.py` pins all of it — and every
+assertion was checked by breaking the thing it guards and confirming it names
+the offender, because a workflow test that has never failed is only a claim.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
