@@ -242,6 +242,28 @@ def candidate_current_score(candidate: dict) -> float:
     # A value that is not a real number is no evidence, not perfect evidence.
     return value if math.isfinite(value) else 0.0
 
+
+def candidate_scored_by_current_scorer(candidate: dict) -> bool:
+    """Whether this stored score was produced by the scorer the backtest validates.
+
+    A candidate file outlives the scorer that wrote it, and nothing re-scores a
+    wallet that has left the scan population. Measured 2026-09-16, the moment the
+    backtest first passed and the behavioural vector began to vote: **all seven
+    wallets voting did so on a single scan from 2026-06-30 or 07-01**, under a
+    scorer with no `order_profile` dimension and before the flat-wallet leverage
+    fix — five PROBABLE rows, the top `risk.py` candidate, and a "trades like the
+    target" line inside the graph's CRITICAL email, all on a number the
+    validated scorer never produced.
+
+    The backtest proves ONE scorer, named by `thresholds.SCORING_SCHEMA`. A score
+    carrying no schema predates schema tracking and cannot be shown to be that
+    scorer's, the same rule `thresholds.schema_compatible` already applies to a
+    backtest report. Such a score stays on disk and on the dashboard as history;
+    it just may not decide anything.
+    """
+    from src.thresholds import schema_compatible
+    return schema_compatible((candidate or {}).get("latest_scoring_schema"))
+
 # --- File I/O ---
 
 def deduplicate_by_key(records: list[dict], key_field: str) -> list[dict]:

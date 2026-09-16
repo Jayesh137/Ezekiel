@@ -18,6 +18,7 @@ from src.utils import (
     DATA_DIR,
     account_value_components,
     candidate_current_score,
+    candidate_scored_by_current_scorer,
     load_all_records,
     load_config,
     now_ms,
@@ -215,6 +216,10 @@ def _gather_signals() -> dict:
     if cand_path.exists():
         try:
             cands = json.load(open(cand_path)).get("candidates", [])
+            # A score from a scorer the backtest does not validate is history,
+            # not a present-tense match. Measured 2026-09-16: the top candidate
+            # here was a single scan from 2026-06-30, paid 22 points.
+            cands = [c for c in cands if candidate_scored_by_current_scorer(c)]
             # Rank on the CURRENT score, not the all-time best. This question is
             # present-tense — "is he migrating right now" — and best_score only
             # ratchets up, so it both named the wrong strongest lead and quoted a

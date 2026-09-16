@@ -235,8 +235,10 @@ def test_risk_signals_use_the_candidates_current_score(tmp_path, monkeypatch):
     monkeypatch.setattr(risk, "load_all_records", lambda d: [])
     (tmp_path / "candidates").mkdir(parents=True)
     (tmp_path / "candidates" / "latest.json").write_text(json.dumps({"candidates": [
-        {"wallet": W1, "best_score": 0.7505, "latest_score": 0.6117},
-        {"wallet": W2, "best_score": 0.7019, "latest_score": 0.7019},
+        {"wallet": W1, "best_score": 0.7505, "latest_score": 0.6117,
+         "latest_scoring_schema": th.SCORING_SCHEMA},
+        {"wallet": W2, "best_score": 0.7019, "latest_score": 0.7019,
+         "latest_scoring_schema": th.SCORING_SCHEMA},
     ]}))
 
     signals = risk._gather_signals()
@@ -293,7 +295,7 @@ def test_combined_alert_fires_for_a_clean_current_match(tmp_path, monkeypatch,
     """The route must still work — this is the strongest signal the system has."""
     _write_candidates(tmp_path, monkeypatch, [{
         "wallet": W1, "best_score": 0.75, "latest_score": 0.70,
-        "latest_evidence": {"vetoes": []},
+        "latest_evidence": {"vetoes": []}, "latest_scoring_schema": th.SCORING_SCHEMA,
     }])
     tracer._crossref_findings_with_candidates(
         [{"destination": W1, "deposited_to_hl": True, "amount_usdc": "500000"}], eff)
@@ -531,7 +533,8 @@ def test_transfer_graph_reads_the_candidates_current_score(tmp_path, monkeypatch
     monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
     (tmp_path / "candidates").mkdir(parents=True)
     (tmp_path / "candidates" / "latest.json").write_text(json.dumps({"candidates": [
-        {"wallet": W1, "best_score": 0.7505, "latest_score": 0.6117, "status": "ACTIVE"},
+        {"wallet": W1, "best_score": 0.7505, "latest_score": 0.6117, "status": "ACTIVE",
+         "latest_scoring_schema": th.SCORING_SCHEMA},
     ]}))
     scores, active = tg._load_behavioural_scores()
     assert scores[W1] == pytest.approx(0.6117)

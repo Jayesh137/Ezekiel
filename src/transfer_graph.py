@@ -42,6 +42,7 @@ from src.utils import (
     DATA_DIR,
     atomic_write_json,
     candidate_current_score,
+    candidate_scored_by_current_scorer,
     load_all_records,
     load_config,
     now_ms,
@@ -1471,8 +1472,10 @@ def _load_behavioural_scores() -> tuple[dict, set]:
                     continue
                 # Current score, not the all-time high-water mark: the graph
                 # asserts "Trades like the target (behavioural similarity
-                # X%)" inside a CRITICAL email, so X has to be true now.
-                scores[w] = candidate_current_score(c)
+                # X%)" inside a CRITICAL email, so X has to be true now — and
+                # true of the scorer the backtest validates, not one retired.
+                if candidate_scored_by_current_scorer(c):
+                    scores[w] = candidate_current_score(c)
                 if c.get("status") == "ACTIVE":
                     active.add(w)
         except (OSError, ValueError) as e:

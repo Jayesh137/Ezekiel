@@ -1089,6 +1089,10 @@ def persist_candidate(result: dict) -> None:
         "score": result["score"],
         "tier": result.get("evidence", {}).get("tier"),
         "dimensions": result.get("dimensions", {}),
+        # Which scorer produced this number. The backtest validates exactly one,
+        # and a score from any other may not vote — see
+        # utils.candidate_scored_by_current_scorer.
+        "scoring_schema": th.SCORING_SCHEMA,
     })
     history = history[-100:]
 
@@ -1109,6 +1113,7 @@ def persist_candidate(result: dict) -> None:
         "last_seen": result["scanned_at"],
         "best_score": best_score,
         "latest_score": result["score"],
+        "latest_scoring_schema": th.SCORING_SCHEMA,
         "latest_tier": result.get("evidence", {}).get("tier"),
         "latest_evidence": result.get("evidence", {}),
         "score_history": history,

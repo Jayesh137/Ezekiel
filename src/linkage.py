@@ -469,16 +469,33 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
     # And measured against the whole chain, not just our substrate: a router
     # or exchange contract is excluded however few of OUR wallets touched it,
     # and a destination nobody has measured yet is excluded until it is.
+    #
+    # The target's FIRST FUNDER is held to the same rule, and measured first.
+    # It went unmeasured until 2026-09-16 while every destination beside it was
+    # checked, and it was an exchange hot wallet with 2,282,986 Arbitrum
+    # transactions: five wallets were paid a linkage vote for having withdrawn
+    # from the same exchange as the target once. First, because one funder
+    # reading decides the vote for every wallet sharing it, where a destination
+    # decides one — it must not be the reading a bounded budget never reaches.
+    funders_to_measure = [target_funder] if target_funder else []
     try:
-        busy, pending = activity_exclusions(
-            target_out, outbound_chains(target),
-            activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN,
-                           seconds=ACTIVITY_SECONDS_PER_RUN))
+        cache = activity_cache(max_lookups=ACTIVITY_LOOKUPS_PER_RUN,
+                               seconds=ACTIVITY_SECONDS_PER_RUN)
+        funder_excluded, funder_pending = activity_exclusions(
+            funders_to_measure, {}, cache)
+        busy, pending = activity_exclusions(target_out, outbound_chains(target), cache)
     except Exception as exc:                          # noqa: BLE001
         print(f"[linkage] activity readings unavailable ({type(exc).__name__}: "
-              f"{exc}) — every shared destination treated as unmeasured")
+              f"{exc}) — every shared destination and funder treated as unmeasured")
+        funder_excluded, funder_pending = set(funders_to_measure), list(funders_to_measure)
         busy, pending = set(target_out), sorted(target_out)
-    excluded = excluded | busy
+    if funder_pending:
+        print(f"[linkage] the target's first funder {target_funder[:12]}... has no "
+              f"global-activity reading yet; it cannot link anyone until measured")
+    elif funder_excluded:
+        print(f"[linkage] the target's first funder {target_funder[:12]}... is busy "
+              f"infrastructure; sharing it links nobody")
+    excluded = excluded | busy | funder_excluded
     if pending:
         print(f"[linkage] {len(pending)} of the target's destinations have no "
               f"global-activity reading yet; they cannot count as shared "
@@ -519,13 +536,17 @@ def check_candidate(wallet: str, target: str, profile: dict) -> dict:
     config = load_config()
     excluded = set(config.get("excluded_addresses", [])) | set(config.get("known_self_wallets", []))
     target_out = profile.get("out_addrs", set())
-    # Cached readings only: the graph job measures the target's destinations,
-    # and an unmeasured destination is no evidence here either.
+    target_funder = (profile.get("first_funder") or "").lower()
+    funders = [target_funder] if target_funder else []
+    # Cached readings only: the graph job measures the target's destinations
+    # and his first funder, and an unmeasured one is no evidence here either.
     try:
-        busy, _pending = activity_exclusions(target_out, outbound_chains(target),
-                                             activity_cache(max_lookups=0))
+        cache = activity_cache(max_lookups=0)
+        busy, _pending = activity_exclusions(target_out, outbound_chains(target), cache)
+        funder_busy, _ = activity_exclusions(funders, {}, cache)
+        busy = busy | funder_busy
     except Exception:                                 # noqa: BLE001
-        busy = set(target_out)
+        busy = set(target_out) | set(funders)
     return compute_linkage(
         wallet,
         get_first_funder(wallet),

@@ -25,7 +25,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import DATA_DIR, load_config, save_latest
+from src.utils import (
+    DATA_DIR,
+    candidate_scored_by_current_scorer,
+    load_config,
+    save_latest,
+)
 
 ROSTER_DIR = DATA_DIR / "roster"
 
@@ -106,6 +111,64 @@ def linkage_from_first_funders(funders: dict, target: str,
         return direct
     return direct | {w: f for w, f in lowered.items()
                      if w and w != t and f == tf}
+
+
+def transfer_touches_cluster(node: dict, evidence: dict, known_self: set) -> bool:
+    """Whether a graph node moved money WITH one of his wallets. Pure.
+
+    The transfer vector used to be `transfer_count > 0`, which is true of every
+    node the walk reaches at any depth: a wallet two hops out, through somebody
+    else's wallet, with $0 ever moved to or from the target, carried the same
+    vote as his treasury. Measured 2026-09-16: 110 roster rows held a transfer
+    vote on depth 2 with no direct flow, and two of them were PROBABLE — both
+    accounts of a market maker (referral code `MMREFCSI`, agents `XYZ_SET11` and
+    `APTS`, 100% client order ids) that the target had paid once, $1M, on
+    2026-09-10. Paired with a dormancy handoff (a market maker opens accounts
+    constantly, so some land inside his silences), a hop through a stranger was
+    promoted into a second independent vote.
+
+    Counts: an observed transfer with the target in either direction (the
+    graph's own `direct_from_target` / `funded_target`, which read observed
+    edges only), or a path whose previous hop is a config `known_self_wallet`.
+    Deliberately NOT "the path's previous hop is the target": a node joined to
+    him by an inferred correlation edge has that path too, and must not earn a
+    transfer vote from it. Deliberately config only, not a roster tier — ground
+    truth is the operator's, and one inference must not mint another's vote.
+
+    A node that is merely reached keeps `graph_reach_only` as evidence: rule 7,
+    reach is never thrown away, it just does not vote.
+    """
+    if evidence.get("direct_from_target") or evidence.get("funded_target"):
+        return True
+    path = [(p or "").lower() for p in (node.get("path") or [])]
+    return len(path) >= 3 and path[-2] in (known_self or set())
+
+
+def funder_exclusions(funders: dict, target: str, cache) -> set:
+    """The target's first funder, if it cannot be ownership evidence. Pure given `cache`.
+
+    `linkage_from_first_funders` refuses an excluded funder, and until
+    2026-09-16 "excluded" meant only the hand-kept config lists — so a funder
+    nobody had named stayed eligible however busy it was. The target's was an
+    exchange hot wallet with 2,282,986 Arbitrum transactions, and five wallets
+    carried a linkage vote for sharing it. This is rule 9 applied where the
+    shared-destination half of linkage already applied it: busy is excluded,
+    and unmeasured is excluded until measured.
+
+    `cache` answers `get(address, chain)` and is read without spending lookups
+    (the graph step measures the funder before the roster runs). A cache that
+    cannot be read is "we could not tell", never "quiet".
+    """
+    tf = ((funders or {}).get((target or "").lower()) or "").lower()
+    if not tf:
+        return set()
+    try:
+        from src.chain.activity import is_busy
+        reading = cache.get(tf, "arbitrum") if cache is not None else None
+        busy = is_busy(reading)
+    except Exception:                                 # noqa: BLE001 - disk, schema
+        busy = None
+    return set() if busy is False else {tf}
 
 
 def _read(path: Path, key: str) -> list:
@@ -498,7 +561,12 @@ def build_roster(config: dict | None = None) -> dict:
         # not count as the transfer vector — that would let one detector supply
         # two supposedly independent votes.
         if ev.get("transfer_count"):
-            e["vectors"].add(VECTOR_TRANSFER)
+            if transfer_touches_cluster(node, ev, known_self):
+                e["vectors"].add(VECTOR_TRANSFER)
+            else:
+                # Reached, and recorded as such — but being two hops away
+                # through someone else's wallet is not money moving with his.
+                e["evidence"]["graph_reach_only"] = True
         if (ev.get("shared_deposit_address") or ev.get("shared_funder")
                 or ev.get("gas_funded_by_target")):
             e["vectors"].add(VECTOR_LINKAGE)
@@ -515,6 +583,13 @@ def build_roster(config: dict | None = None) -> dict:
         funders = {}
     excluded = set(config.get("excluded_addresses") or [])
     excluded |= set(config.get("known_service_addresses") or [])
+    try:
+        from src.chain.activity import ActivityCache
+        activity = ActivityCache(DATA_DIR / "labels" / "address_activity.json",
+                                 max_lookups=0)
+    except Exception:                                 # noqa: BLE001
+        activity = None
+    excluded |= funder_exclusions(funders, target, activity)
     for addr, funder in linkage_from_first_funders(funders, target, excluded).items():
         e = entry(addr)
         e["vectors"].add(VECTOR_LINKAGE)
@@ -554,12 +629,17 @@ def build_roster(config: dict | None = None) -> dict:
         score = float(cand.get("latest_score") or 0)
         e["evidence"]["behavioural_score"] = score
         e["evidence"]["behavioural_tier"] = cand.get("latest_tier")
+        e["evidence"]["behavioural_scored_at"] = cand.get("last_seen")
+        # Recorded either way, so a reader can see WHY a high score is not voting.
+        current = candidate_scored_by_current_scorer(cand)
+        e["evidence"]["behavioural_scorer_current"] = current
         vetoes = ((cand.get("latest_evidence") or {}).get("vetoes")) or []
         e["evidence"]["style_vetoes"] = vetoes
         # A style veto is a positive finding that this is a DIFFERENT human, so
         # a vetoed wallet must not also cast a behavioural vote for being the
-        # same one.
-        if score >= 0.65 and not vetoes and trust_behavioural:
+        # same one. And the backtest validates one scorer: a score from any
+        # other is history, not evidence.
+        if score >= 0.65 and not vetoes and trust_behavioural and current:
             e["vectors"].add(VECTOR_BEHAVIOURAL)
 
     # Wallets sharing an authorised agent with the target.

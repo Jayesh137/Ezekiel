@@ -13,6 +13,7 @@ current scorer rejects.
 import json
 
 import src.roster as roster
+from src import thresholds as th
 
 TARGET = "0x" + "11" * 20
 W = "0x" + "22" * 20
@@ -87,7 +88,8 @@ def test_transfer_plus_linkage_confirms(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch,
            transfer_graph=("nodes", [_node(
                confidence=0.88,
-               evidence={"transfer_count": 376, "shared_deposit_address": True})]))
+               evidence={"transfer_count": 376, "direct_from_target": True,
+                         "shared_deposit_address": True})]))
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert set(row["vectors"]) == {"transfer", "linkage"}
     assert row["tier"] == roster.TIER_CONFIRMED
@@ -123,6 +125,7 @@ def test_an_unvalidated_scorer_casts_no_behavioural_vote(tmp_path, monkeypatch):
 def test_a_validated_scorer_does_vote(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch, passed=True,
            candidates=("candidates", [{"wallet": W, "latest_score": 0.9,
+                                       "latest_scoring_schema": th.SCORING_SCHEMA,
                                        "latest_evidence": {"vetoes": []}}]))
     out = roster.build_roster({"target_wallet": TARGET})
     assert out["behavioural_counts_as_a_vector"] is True
@@ -156,7 +159,8 @@ def test_rows_are_ordered_by_tier_then_vector_count(tmp_path, monkeypatch):
            transfer_graph=("nodes", [
                _node(wallet=other, confidence=0.2),
                _node(confidence=0.88,
-                     evidence={"transfer_count": 5, "shared_deposit_address": True}),
+                     evidence={"transfer_count": 5, "direct_from_target": True,
+                                   "shared_deposit_address": True}),
            ]))
     rows = roster.build_roster({"target_wallet": TARGET})["wallets"]
     assert rows[0]["wallet"] == W
@@ -243,3 +247,49 @@ def test_a_dormancy_handoff_counts_as_an_independent_vector(tmp_path, monkeypatc
     assert row["evidence"]["dormancy_handoff"]["gap_length"] == 6
     # A scored-zero handoff is "did not happen", not a vector.
     assert all(w["wallet"] != "0xzero" for w in out["wallets"])
+
+
+# --- the transfer vote is money moved WITH him, not reach ---------------------------
+
+def test_a_two_hop_reach_through_a_stranger_casts_no_transfer_vote(tmp_path, monkeypatch):
+    """Measured 2026-09-16: 110 rows voted `transfer` on depth 2 with $0 direct
+    flow, and two were PROBABLE — a market maker's accounts, reached through a
+    hub the target paid once. Reach is kept as evidence; it does not vote."""
+    hub = "0x" + "44" * 20
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(depth=2, path=[TARGET, hub, W],
+                                           evidence={"transfer_count": 4})]),
+           dormancy=("handoffs", {W: {"score": 0.71}}))
+    row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
+    assert "transfer" not in row["vectors"]
+    assert row["evidence"]["graph_reach_only"] is True
+    assert row["tier"] == roster.TIER_POSSIBLE
+
+
+def test_a_direct_transfer_with_the_target_still_votes(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(evidence={"transfer_count": 1,
+                                                     "funded_target": True})]))
+    row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
+    assert row["vectors"] == ["transfer"]
+
+
+def test_a_hop_through_his_own_config_wallet_votes(tmp_path, monkeypatch):
+    """A counterparty of his treasury moved money with a wallet of his."""
+    treasury = "0x" + "55" * 20
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(depth=2, path=[TARGET, treasury, W],
+                                           evidence={"transfer_count": 3})]))
+    row = roster.build_roster({"target_wallet": TARGET,
+                               "known_self_wallets": [treasury]})["wallets"][0]
+    assert "transfer" in row["vectors"]
+
+
+def test_a_correlation_edge_path_to_the_target_is_not_a_transfer(tmp_path, monkeypatch):
+    """A node joined to him only by an inferred edge has the path [target, node]
+    and observed transfers with OTHER wallets. The path must not vote."""
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(depth=1, path=[TARGET, W],
+                                           evidence={"transfer_count": 9})]))
+    row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
+    assert "transfer" not in row["vectors"]

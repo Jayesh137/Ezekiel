@@ -21,6 +21,7 @@ from src.utils import (
     append_records,
     atomic_write_json,
     candidate_current_score,
+    candidate_scored_by_current_scorer,
     etherscan_get,
     load_config,
     save_latest,
@@ -700,6 +701,12 @@ def _crossref_findings_with_candidates(findings: list[dict],
         if dest not in candidates:
             continue
         c = candidates[dest]
+        if not candidate_scored_by_current_scorer(c):
+            # A score the validated scorer never produced cannot back an email
+            # asserting "matches the behavioral fingerprint".
+            print(f"[tracer] {dest} is a fund-flow destination, but its stored "
+                  f"behavioural score predates the current scorer — no alert")
+            continue
         score = candidate_current_score(c)
         vetoes = (c.get("latest_evidence") or {}).get("vetoes")
         if not th.combined_alert_ok(score, eff, vetoes, route="deposited_to_hl"):
