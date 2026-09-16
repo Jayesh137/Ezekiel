@@ -716,6 +716,16 @@ That is the livelock `--reset` was fixed for and that
 the ordinary step failure. All seven committing workflows now persist what
 they finished.
 
+**And the suite's own CI had the same cascade, which is how it was found.**
+`test.yml` ran `Lint` before `Tests` with no condition, so **one unused import
+failed Lint and the 1362-test suite was skipped — on two consecutive pushes,
+including the one fixing all of the above.** Both went red for a lint error
+while nothing in CI had run the tests at all. "Fail fast" saves about three
+minutes of runner time and costs the answer to the only question CI is asked;
+`Lint`, `Tests`, the dashboard's `Unit tests` and its `Build` now all report
+independently. **Run `python -m ruff check src/ tests/ scripts/` before
+pushing — the suite passing locally is not the same as CI being green.**
+
 `tests/test_workflow_step_independence.py` pins all of it — and every
 assertion was checked by breaking the thing it guards and confirming it names
 the offender, because a workflow test that has never failed is only a claim.

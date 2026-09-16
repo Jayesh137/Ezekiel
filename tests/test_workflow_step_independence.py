@@ -118,6 +118,30 @@ def test_every_committing_workflow_persists_what_it_finished():
         f"{missing}")
 
 
+def test_ci_reports_lint_and_tests_independently():
+    """The suite's own CI had the cascade this file is about, and it bit twice.
+
+    `Lint` ran before `Tests` with no condition, so on 2026-09-16 a single
+    unused import failed Lint and `Tests` was SKIPPED by the implicit
+    `success()` — two consecutive pushes went red without the 1362-test suite
+    ever having run in CI. "Fail fast" saves about three minutes of runner
+    time and costs the answer to the only question CI is asked.
+
+    Both still fail the job, so nothing is hidden; they simply both report.
+    Same for the dashboard's unit tests and its build, which are two separate
+    answers about the same code.
+    """
+    text = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
+    steps = dict(_steps("test.yml"))
+    for name in ("Lint", "Tests", "Unit tests", "Build"):
+        assert name in steps, f"test.yml lost its {name!r} step"
+        assert "!cancelled()" in steps[name], (
+            f"test.yml: {name!r} is skipped when a sibling step fails, so a "
+            f"trivial failure hides the result it exists to report")
+    assert re.search(r"^      - id: deps$", text, re.MULTILINE)
+    assert re.search(r"^        id: npm$", text, re.MULTILINE)
+
+
 def test_a_failing_step_still_fails_the_run():
     """`!cancelled()` changes which steps RUN, never whether the job goes red —
     a step that runs and fails still fails the job. Pinned by the fact that no

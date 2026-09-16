@@ -33,10 +33,19 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-      - run: pip install -r requirements.txt pytest ruff
+      - id: deps
+        run: pip install -r requirements.txt pytest ruff
+      # Both report independently. A lint error is not a reason to withhold
+      # the answer to "do the tests pass" — and on 2026-09-16 it did exactly
+      # that twice in a row: one unused import failed Lint, Tests was skipped
+      # by the implicit success(), and two pushes went red without the suite
+      # ever having run in CI. Three minutes of runner time is not worth not
+      # knowing. Both still fail the job, so nothing is hidden.
       - name: Lint
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python -m ruff check src/ tests/ scripts/
       - name: Tests
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python -m pytest -q
 
   dashboard:
@@ -52,6 +61,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: dashboard/package-lock.json
       - name: Install dependencies
+        id: npm
         working-directory: dashboard
         run: npm ci
       # node's built-in runner, so this costs no dependency. Only the pure
@@ -59,8 +69,12 @@ jobs:
       # decides whether the operator is told alerting is dead, and email
       # cannot report its own failure, so a wrong branch there is silent.
       - name: Unit tests
+        if: ${{ !cancelled() && steps.npm.conclusion == 'success' }}
         working-directory: dashboard
         run: npm test
+      # Same rule: a failing unit test must not hide whether the build is
+      # broken. They are two separate answers about the dashboard.
       - name: Build
+        if: ${{ !cancelled() && steps.npm.conclusion == 'success' }}
         working-directory: dashboard
         run: npm run build

@@ -31,8 +31,6 @@ six, and the file reads must come out equal.
 
 import json
 
-import pytest
-
 
 def _write_substrate(root, chains=("arbitrum", "ethereum"), days=("2026-09-15", "2026-09-16")):
     """A small substrate shaped like the real one: chain dir / day file."""
