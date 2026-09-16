@@ -14,8 +14,23 @@ be expanded again to rediscover it. So retention order IS chase coverage.
 import json
 import time
 
+import pytest
+
 from src import transfer_graph as tg
 from src.transfer_graph import normalise_l1_transfer
+
+
+@pytest.fixture(autouse=True)
+def _no_live_linkage(monkeypatch):
+    """These tests are about frontier and alert accounting, not linkage.
+
+    `run_transfer_graph` reaches `linkage.substrate_linkage`, which measures the
+    target's destinations and first funder against Blockscout. Unstubbed, the
+    pipeline tests made live network calls and wrote a reading into the real
+    activity cache (2026-09-16).
+    """
+    monkeypatch.setattr(tg, "_substrate_linkage", lambda target, edges, config: {})
+
 
 T = "0x45d26f28196d226497130c4bac709d808fed4029"
 NOW = time.time()

@@ -59,6 +59,14 @@ _PROBES = {
     # reaches the real feed walks thirty days of a live ledger and writes the
     # result here; it happened once (2026-09-12, 1.3MB) before this probe.
     "the Circle deposit pool": REAL_DATA_DIR / "correlations" / "cctp_pool.json",
+    # chain/activity.ActivityCache: whole-chain transaction counts that decide
+    # what is infrastructure (rule 9). A reading written by a test is a
+    # fabricated measurement the roster then trusts for 30 days, and one taken
+    # live from a test is a network call. A live reading of the target's first
+    # funder appeared in this file during a local test session on 2026-09-16.
+    "the whole-chain activity cache": REAL_DATA_DIR / "labels" / "address_activity.json",
+    # linkage.FIRST_FUNDER_PATH: permanent facts, cached forever once written.
+    "the first-funder cache": REAL_DATA_DIR / "labels" / "first_funders.json",
 }
 
 
@@ -87,6 +95,15 @@ def _never_write_to_real_data(tmp_path, monkeypatch):
     sandbox.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(utils, "DATA_DIR", sandbox)
     monkeypatch.setattr(alerts, "DATA_DIR", sandbox)
+    # src.linkage captured DATA_DIR at import and derives its caches from it at
+    # call time (activity readings) or at import (first funders), so a test that
+    # reaches linkage through the graph read production caches and wrote a live
+    # Blockscout reading into the real activity cache — found 2026-09-16 when
+    # the target's first funder began to be measured.
+    from src import linkage
+    monkeypatch.setattr(linkage, "DATA_DIR", sandbox)
+    monkeypatch.setattr(linkage, "FIRST_FUNDER_PATH",
+                        sandbox / "labels" / "first_funders.json")
     yield sandbox
 
 
