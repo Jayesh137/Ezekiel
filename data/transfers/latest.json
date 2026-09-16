@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-16T05:30:14.635640+00:00",
+  "computed_at": "2026-09-16T06:02:30.208471+00:00",
   "wallets": 1,
   "records": 2,
   "spam_suppressed": 5,
@@ -9,10 +9,12 @@
     "zero_value": 3,
     "unpriced_token": 1
   },
-  "calls": 21,
+  "calls": 20,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "polygon"
+  ],
   "unsupported_sources": [
     "base",
     "bsc",
@@ -44,7 +46,10 @@
             "internal": 303288471
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {
+            "native": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          }
         },
         "ethereum": {
           "records": 1,
@@ -107,17 +112,19 @@
         "polygon": {
           "records": 0,
           "spam": 1,
-          "calls": 6,
+          "calls": 5,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {
             "unpriced_token": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 79283383,
             "native": 0,
@@ -145,7 +152,9 @@
           "unverified_kinds": {}
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "polygon"
+      ],
       "unsupported_sources": [
         "base",
         "optimism",
