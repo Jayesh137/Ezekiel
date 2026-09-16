@@ -1336,6 +1336,54 @@ CORROBORATING_SOURCES = {"fund_flow", "hl_transfer", "known_linked", "correlatio
 # first. Bounded so the sweep's runtime stays predictable.
 MAX_NEWBORN_PRIORITY = 30
 
+# Roster leads and stale high scores re-scored per sweep. A targeted scan costs a
+# few seconds; the sweep ran 780-1347s against a 30-minute job on 2026-09-16.
+MAX_ROSTER_PRIORITY = 25
+MAX_STALE_RESCORE = 10
+
+
+def roster_rescore_targets(config: dict, roster: dict | None, candidates,
+                           limit: int = MAX_ROSTER_PRIORITY,
+                           stale_limit: int = MAX_STALE_RESCORE) -> dict[str, dict]:
+    """Wallets other vectors already flag, and high scores no validated scorer made.
+
+    The six sources above never include a wallet found by dormancy, linkage,
+    identity or a deposit-address sentinel, and the leaderboard sweep takes the
+    largest accounts — so a fresh wallet those vectors found could never collect
+    a behavioural score, and a second vector is what promotes a lead into the
+    close watch. Since 2026-09-16 a score only votes if the current scorer
+    produced it (`utils.candidate_scored_by_current_scorer`), and every one of the
+    seven wallets voting that evening was a June scan nothing had re-scored. This
+    source re-measures both populations instead of letting them age out.
+
+    Neither source is corroboration on its own (`CORROBORATING_SOURCES`), so a
+    re-score cannot promote a wallet by itself; the roster decides from vectors.
+    Config ground truth is skipped: it needs no behavioural vote.
+    """
+    from src.roster import detector_candidates
+    from src.utils import candidate_current_score, candidate_scored_by_current_scorer
+
+    target = (config.get("target_wallet") or "").lower()
+    known_self = {(w or "").lower() for w in config.get("known_self_wallets") or []}
+    out: dict[str, dict] = {}
+    for addr in detector_candidates(config, roster, limit):
+        if addr and addr != target and addr not in known_self:
+            out[addr] = {"source": "roster_lead"}
+
+    stale = []
+    for c in candidates or []:
+        if not isinstance(c, dict) or candidate_scored_by_current_scorer(c):
+            continue
+        if (c.get("latest_evidence") or {}).get("vetoes"):
+            continue
+        score = candidate_current_score(c)
+        addr = (c.get("wallet") or "").lower()
+        if score >= 0.65 and addr and addr != target and addr not in known_self:
+            stale.append((score, addr))
+    for score, addr in sorted(stale, reverse=True)[:stale_limit]:
+        out.setdefault(addr, {"source": "stale_score", "stale_score": score})
+    return out
+
 
 def _is_corroborated(result: dict, source: str | None = None) -> bool:
     """Independent (non-behavioural) evidence tying this wallet to the target.
@@ -1577,6 +1625,27 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
                                       "account_value": b.get("account_value")}
         except Exception as e:
             print(f"[scanner] Could not load newborn accounts: {e}")
+
+    # 7. Roster leads and stale high scores — see roster_rescore_targets.
+    def _doc(name: str) -> dict:
+        path = DATA_DIR / name / "latest.json"
+        if not path.exists():
+            return {}
+        with open(path) as f:
+            loaded = json.load(f)
+        return loaded if isinstance(loaded, dict) else {}
+
+    try:
+        roster_doc, cand_doc = _doc("roster"), _doc("candidates")
+        added = 0
+        for addr, meta in roster_rescore_targets(config, roster_doc,
+                                                 cand_doc.get("candidates")).items():
+            if addr not in priority:
+                priority[addr] = meta
+                added += 1
+        print(f"[scanner] {added} roster lead(s) / stale score(s) queued for re-scoring")
+    except Exception as e:
+        print(f"[scanner] Could not load roster leads: {e}")
 
     # The target is not a candidate for being himself. Six sources feed this
     # dict and any of them can name him: he deposits to the bridge, he is a
