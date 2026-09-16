@@ -1,17 +1,21 @@
 {
-  "computed_at": "2026-09-16T10:57:00.224040+00:00",
+  "computed_at": "2026-09-16T11:31:24.238184+00:00",
   "wallets": 1,
-  "records": 3,
-  "spam_suppressed": 4,
-  "unpriced": 2,
+  "records": 1,
+  "spam_suppressed": 3,
+  "unpriced": 0,
   "spam_by_reason": {
     "dust": 1,
-    "zero_value": 3
+    "zero_value": 2
   },
-  "calls": 21,
+  "calls": 16,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "arbitrum",
+    "ethereum",
+    "polygon"
+  ],
   "unsupported_sources": [
     "base",
     "bsc",
@@ -23,20 +27,22 @@
       "status": "ok",
       "chains": {
         "arbitrum": {
-          "records": 1,
+          "records": 0,
           "spam": 2,
-          "calls": 6,
+          "calls": 5,
           "cursor": 505591221,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
             "dust": 1,
             "zero_value": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 505591221,
             "native": 505559729,
@@ -46,19 +52,22 @@
           "unverified_kinds": {}
         },
         "ethereum": {
-          "records": 1,
-          "spam": 2,
-          "calls": 6,
+          "records": 0,
+          "spam": 1,
+          "calls": 4,
           "cursor": 25809339,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
-            "zero_value": 2
+            "zero_value": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 25809339,
             "native": 25807766,
@@ -106,15 +115,18 @@
         "polygon": {
           "records": 1,
           "spam": 0,
-          "calls": 6,
+          "calls": 4,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 79283383,
             "native": 0,
@@ -142,7 +154,11 @@
           "unverified_kinds": {}
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "arbitrum",
+        "ethereum",
+        "polygon"
+      ],
       "unsupported_sources": [
         "base",
         "optimism",
