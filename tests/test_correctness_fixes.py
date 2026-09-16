@@ -476,3 +476,32 @@ def test_failed_backtest_never_lowers_thresholds():
     eff = th.resolve(raw, failed)
     assert (eff["high"], eff["medium"], eff["low"]) == (0.90, 0.80, 0.65)
     assert eff["source"] == "config"
+
+
+def test_l1_outbound_to_his_own_wallets_has_not_left_him(tmp_path, monkeypatch):
+    """Measured 2026-09-16: the factor was held on by his own Circle round trip —
+    transfers to `0xf078969e…` (CONFIRMED) that park idle capital in Aave on
+    Monad and come back to the same account. Money moving to himself has not
+    left him; a stranger or an exchange still counts."""
+    from datetime import datetime, timedelta
+    monkeypatch.setattr(risk, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(risk, "load_config", lambda: {
+        "target_wallet": "0x" + "aa" * 20, "known_self_wallets": ["0x" + "bb" * 20]})
+    (tmp_path / "fund_flows").mkdir(parents=True)
+    (tmp_path / "roster").mkdir(parents=True)
+    (tmp_path / "roster" / "latest.json").write_text(json.dumps({"wallets": [
+        {"wallet": "0x" + "cc" * 20, "tier": "CONFIRMED"},
+        {"wallet": "0x" + "dd" * 20, "tier": "POSSIBLE"}]}))
+    ts = (datetime.now(UTC) - timedelta(days=1)).isoformat()
+
+    def to(dest):
+        (tmp_path / "fund_flows" / "latest.json").write_text(json.dumps(
+            {"findings": [{"amount_usdc_raw": 7_000_000.0, "detected_at": ts,
+                           "destination": dest}]}))
+        return risk._gather_signals()["l1_outbound"]
+
+    assert to("0x" + "CC" * 20) is False, "a CONFIRMED wallet of his"
+    assert to("0x" + "bb" * 20) is False, "a known_self wallet"
+    assert to("0x" + "aa" * 20) is False, "the target himself"
+    assert to("0x" + "dd" * 20) is True, "a POSSIBLE wallet is not his"
+    assert to("0x" + "ee" * 20) is True, "a stranger"

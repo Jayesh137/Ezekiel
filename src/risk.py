@@ -144,6 +144,22 @@ def _xyz_abandoned(fills: list[dict], days: float = 10) -> bool:
     return age_days >= days
 
 
+def _his_wallets() -> set:
+    """The target, `known_self_wallets` and every roster CONFIRMED wallet."""
+    config = load_config()
+    his = {(config.get("target_wallet") or "").lower()}
+    his |= {(w or "").lower() for w in config.get("known_self_wallets") or []}
+    try:
+        with open(DATA_DIR / "roster" / "latest.json") as f:
+            rows = json.load(f).get("wallets") or []
+        his |= {(r.get("wallet") or "").lower() for r in rows
+                if isinstance(r, dict) and r.get("tier") == "CONFIRMED" and not r.get("is_service")}
+    except (OSError, ValueError, AttributeError):
+        pass
+    his.discard("")
+    return his
+
+
 def _gather_signals() -> dict:
     signals = {}
 
@@ -191,8 +207,17 @@ def _gather_signals() -> dict:
         try:
             findings = json.load(open(ff_path)).get("findings", [])
             cutoff = datetime.now(UTC).timestamp() - RECENT_SIGNAL_DAYS * 86400
+            # Money moving to a wallet that is provably his has not left him.
+            # Measured 2026-09-16: of 21 recent findings, the factor was held on
+            # by transfers to `0xf078969e…` (CONFIRMED) and the treasury and by
+            # two-hop paths back to the target — the Circle round trip that
+            # parks idle capital in Aave on Monad and returns it to the same HL
+            # account. A factor that is always on reports nothing. Exchanges and
+            # strangers still count: a CEX deposit is where the gap route begins.
+            his = _his_wallets()
             signals["l1_outbound"] = any(
                 f.get("amount_usdc_raw", 0) and _detected_ts(f) >= cutoff
+                and (f.get("destination") or "").lower() not in his
                 for f in findings
             )
         except Exception:
