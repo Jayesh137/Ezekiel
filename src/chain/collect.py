@@ -59,7 +59,8 @@ def write_cursors(cursors: dict) -> None:
 
 
 def normalise_row(row: dict, chain: dict, kind: str, price_lookup,
-                  canonical: dict | None = None) -> dict | None:
+                  canonical: dict | None = None,
+                  par_contracts: set | None = None) -> dict | None:
     """One raw Etherscan row into the Phase 1 normalised record."""
     src = (row.get("from") or "").lower()
     dst = (row.get("to") or "").lower()
@@ -83,7 +84,8 @@ def normalise_row(row: dict, chain: dict, kind: str, price_lookup,
     contract = (row.get("contractAddress") or "").lower() or None
     amount_usd, basis = value_usd(symbol, amount, date_str, price_lookup,
                                   contract=contract, chain=chain["name"],
-                                  canonical=canonical)
+                                  canonical=canonical,
+                                  par_contracts=par_contracts)
 
     index = str(row.get("logIndex") or row.get("traceId") or "0")
     tx_hash = row.get("hash", "")
@@ -420,7 +422,9 @@ def unreadability(chain_result: dict) -> str | None:
 def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = False,
                  price_lookup=None, canonical: dict | None = None,
                  dust_usd: float = 1.0, page_size: int = 1000,
-                 max_pages: int = 50, plan_refused: dict | None = None) -> dict:
+                 max_pages: int = 50, plan_refused: dict | None = None,
+                 protected: set | None = None,
+                 par_contracts: set | None = None) -> dict:
     """Collect every transfer for one wallet across `chains`.
 
     `canonical` maps (chain, SYMBOL) to the one contract that really is that
@@ -529,7 +533,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
 
             for row in walk.rows:
                 rec = normalise_row(row, chain, kind, price_lookup,
-                                    canonical=canonical)
+                                    canonical=canonical,
+                                    par_contracts=par_contracts)
                 if rec is not None:
                     collected.append(rec)
 
@@ -579,7 +584,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             # forging its own counterparty and quarantined — the whole sweep
             # lost, permanently, while the run still reports itself healthy.
             reason = spam_mod.classify_spam(rec, volume, wallet=addr,
-                                            dust_usd=dust_usd)
+                                            dust_usd=dust_usd,
+                                            protected=protected)
             if reason is None:
                 clean.append(rec)
                 continue
@@ -589,7 +595,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 chain_result["spam_by_reason"].get(reason, 0) + 1)
             if reason == "lookalike":
                 found = spam_mod.forged_side(rec, volume, wallet=addr,
-                                             dust_usd=dust_usd)
+                                             dust_usd=dust_usd,
+                                             protected=protected)
                 if found:
                     rec["forged"], rec["mimics"] = found
             quarantined.append(rec)

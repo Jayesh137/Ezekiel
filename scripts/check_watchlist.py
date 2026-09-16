@@ -320,13 +320,17 @@ def sweep(address: str, config: dict, plan_refused: dict | None = None) -> None:
         print(f"[watchlist] no Etherscan key — {address[:12]}... not swept, so a "
               f"shared deposit address cannot be seen")
         return
-    from src.chain.assets import load_canonical_contracts
+    from src.chain.assets import load_canonical_contracts, load_par_contracts
+    from src.chain.spam import ground_truth_addresses
     budget = CallBudget(max_calls=SWEEP_CALLS, seconds=SWEEP_SECONDS)
     try:
         result = sweep_wallet(address, enabled_chains(config), budget, cluster=True,
                               canonical=load_canonical_contracts(
                                   config, DATA_DIR / "labels" / "token_contracts.json"),
-                              plan_refused=plan_refused)
+                              plan_refused=plan_refused,
+                              protected=ground_truth_addresses(config),
+                              par_contracts=load_par_contracts(
+                                  DATA_DIR / "labels" / "token_contracts.json"))
     except Exception as exc:                          # noqa: BLE001
         print(f"[watchlist] sweep failed for {address[:12]}...: {type(exc).__name__}: {exc}")
         return

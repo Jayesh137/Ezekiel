@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import thresholds as th
 from src.alerts import alert_combined_match, alert_fund_movement, alert_new_wallet_found
+from src.chain import spam as spam_mod
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
 from src.chain.collect import records_for, save_sweep_health, sweep_wallet
@@ -73,6 +74,14 @@ def _canonical(config: dict) -> dict:
     from src.chain.assets import load_canonical_contracts
     return load_canonical_contracts(
         config, DATA_DIR / "labels" / "token_contracts.json")
+
+
+def _par_contracts() -> set:
+    """Contracts the registry declares dollar-par. Rule 2, affirmatively: par
+    attaches to the verified contract, never to the ticker a sender chooses.
+    See src/chain/assets.load_par_contracts."""
+    from src.chain.assets import load_par_contracts
+    return load_par_contracts(DATA_DIR / "labels" / "token_contracts.json")
 
 
 def _traced_path() -> Path:
@@ -348,7 +357,9 @@ def trace_outbound_transfers(wallet: str) -> list[dict]:
     price_lookup = coingecko_price_lookup(Path(DATA_DIR) / "prices")
     result = sweep_wallet(wallet, enabled_chains(config), budget, cluster=True,
                           canonical=_canonical(config),
-                          price_lookup=price_lookup)
+                          price_lookup=price_lookup,
+                          protected=spam_mod.ground_truth_addresses(config),
+                          par_contracts=_par_contracts())
     # data/transfers/latest.json is the only place a chain outage is reported —
     # spec section 4's storage record, section 10's degradation record, and the
     # README's "blindness is reported, never inferred". It was written by the

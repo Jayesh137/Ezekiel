@@ -96,7 +96,8 @@ def derive_real_counterparties(records: list[dict], wallet: str,
 
 def forged_side(record: dict, volume, *, wallet: str | None = None,
                 dust_usd: float = 1.0, prefix: int = 4,
-                suffix: int = 4) -> tuple[str, str] | None:
+                suffix: int = 4,
+                protected: set | None = None) -> tuple[str, str] | None:
     """(the forgery on this record, the address it forges), or None.
 
     The single definition of "which side of this record is a forgery". The
@@ -111,11 +112,25 @@ def forged_side(record: dict, volume, *, wallet: str | None = None,
     swept wallet of forging its own counterparty, and quarantine every record
     of the sweep — real money silently reclassified as noise, with the cursor
     advancing past it and only an address-keyed count left behind.
+
+    `protected` is the operator's ground truth — `config.target_wallet` and
+    `known_self_wallets` — and extends that same immunity to an address that is
+    merely a COUNTERPARTY of this sweep. Guarding only the swept wallet was not
+    enough: on the live ledger the TARGET carried 796 quarantined records of
+    canonical Arbitrum USDC, convicted of forging `0x45d2e417…`, because the
+    twin outspent him inside somebody else's sweep. On the chain he has 9,625
+    token transfers against the twin's 698 — a local count answering a global
+    question, which is rule 9 reaching a different file.
+
+    One-sided on purpose: it stops a protected address being called the
+    forgery, and does nothing to stop the address forging IT from being caught.
+    These are precisely the addresses worth poisoning, so the net stays up.
     """
     w = (wallet or "").lower()
+    safe = {(a or "").lower() for a in (protected or ())}
     for side in ((record.get("src") or ""), (record.get("dst") or "")):
         s = side.lower()
-        if not s or s == w:
+        if not s or s == w or s in safe:
             continue
         mimicked = is_lookalike(s, volume, prefix=prefix, suffix=suffix,
                                 dust_usd=dust_usd)
@@ -124,9 +139,25 @@ def forged_side(record: dict, volume, *, wallet: str | None = None,
     return None
 
 
+def ground_truth_addresses(config: dict) -> set[str]:
+    """Addresses the OPERATOR has declared, lowercased. Never an inference.
+
+    `config.target_wallet` plus `config.known_self_wallets`, and deliberately
+    nothing else. A roster CONFIRMED tier is measurement, not the operator
+    speaking — `roster.assign_tier` draws exactly that line, "known_self is
+    operator ground truth from config and outranks measurement" — and letting
+    a tier grant forgery immunity would let one detector's inference silence
+    another detector.
+    """
+    out = {(config.get("target_wallet") or "").lower()}
+    out |= {(a or "").lower() for a in (config.get("known_self_wallets") or ())}
+    return {a for a in out if a}
+
+
 def classify_spam(record: dict, volume, *, wallet: str | None = None,
                   dust_usd: float = 1.0,
-                  prefix: int = 4, suffix: int = 4) -> str | None:
+                  prefix: int = 4, suffix: int = 4,
+                  protected: set | None = None) -> str | None:
     """Why this record is noise, or None if it is real money.
 
     Order is deliberate. The lookalike check runs before the dust check because
@@ -137,7 +168,7 @@ def classify_spam(record: dict, volume, *, wallet: str | None = None,
     of its own counterparty. See forged_side.
     """
     if forged_side(record, volume, wallet=wallet, dust_usd=dust_usd,
-                   prefix=prefix, suffix=suffix):
+                   prefix=prefix, suffix=suffix, protected=protected):
         return "lookalike"
 
     amount = record.get("amount")

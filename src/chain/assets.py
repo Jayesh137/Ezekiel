@@ -17,6 +17,13 @@ STABLES = {
     "USDBC", "TUSD", "USDD", "FDUSD", "LUSD", "USDS",
 }
 
+# Deliberately NOT extended for the dollar tokens recovered on 2026-09-16
+# (Aave aUSDC, Axelar axlUSDC, GHO, PYUSD). Adding a ticker here prices ANY
+# contract reporting it at par on every chain with no registry row, which is
+# rule 2's own failure mode — $3.07B of counterfeit value — reintroduced by
+# the fix for rule 2's opposite direction. Par for those is keyed on the
+# verified CONTRACT instead; see load_par_contracts.
+
 # Symbol -> price-source id. Only assets we are willing to value.
 #
 # Verified live against CoinGecko on 2026-08-31 (see
@@ -113,6 +120,33 @@ def load_canonical_contracts(config: dict | None = None,
     return out
 
 
+def load_par_contracts(registry_path) -> set[str]:
+    """Contracts the registry declares dollar-par, lowercased.
+
+    A row is par only when it says `"par": true`. Existing rows are protective
+    entries — they name the one real contract for a ticker so a forgery can be
+    caught — and must not become pricing instructions by merely existing.
+
+    This is rule 2 stated affirmatively: par attaches to the contract, which is
+    the token's identity, never to the ticker, which the sender chooses.
+    """
+    import json as _json
+
+    try:
+        with open(registry_path) as f:
+            rows = _json.load(f).get("tokens", [])
+    except (OSError, ValueError, AttributeError):
+        return set()
+    out = set()
+    for row in rows:
+        if not row.get("par"):
+            continue
+        addrs = row.get("contracts") or (
+            [row["contract"]] if row.get("contract") else [])
+        out |= {str(a).lower() for a in addrs if a}
+    return out
+
+
 def is_impostor(symbol: str, contract: str | None, chain: str | None,
                 canonical: dict | None) -> bool:
     """True only when we KNOW this token's real contract and this is not it.
@@ -133,10 +167,64 @@ def is_impostor(symbol: str, contract: str | None, chain: str | None,
     return contract.lower() not in known
 
 
+# Homoglyphs a token's own `tokenSymbol` uses where a registry entry has ASCII.
+# Added only as they are MEASURED, never speculatively: a wrong fold here maps
+# a forgery onto a genuine ticker, which is rule 2 pointed the expensive way.
+#
+# U+20AE, TUGRIK SIGN, is what Etherscan returns for Tether: the symbol is
+# `USD₮0`, not `USDT0`. `.upper()` does not fold it, so the registry entry —
+# which is correct — never matched, and 97,662 records of real Tether were
+# quarantined as `unpriced_token` and dropped from the substrate by one glyph.
+SYMBOL_HOMOGLYPHS = {"₮": "T"}
+
+
+def normalise_symbol(symbol: str) -> str:
+    """A token's reported ticker, folded to the form the registries use.
+
+    NFKC first, which settles fullwidth and other compatibility forms, then the
+    measured homoglyph map, then the strip/upper every lookup here already did.
+    """
+    import unicodedata
+
+    s = unicodedata.normalize("NFKC", symbol or "")
+    for bad, good in SYMBOL_HOMOGLYPHS.items():
+        s = s.replace(bad, good)
+    return s.strip().upper()
+
+
+def canonical_symbol(contract: str | None, chain: str | None,
+                     canonical: dict | None) -> str | None:
+    """The symbol the registry files this CONTRACT under, or None.
+
+    The affirmative half of rule 2. `is_impostor` has always used this registry
+    to reject a token wearing a known ticker from the wrong contract; nothing
+    used it to accept a genuine contract reporting an unexpected ticker. Aave's
+    aToken calls itself `aArbUSDCn`, which is in no ticker registry and never
+    will be, so 33,245 of its records were dropped although the contract is
+    catalogued and verified.
+
+    Called only after the ticker path has failed, so the scan costs nothing on
+    the hot USDC path and runs only for a token that was about to be discarded.
+    """
+    if not canonical or not contract or not chain:
+        return None
+    c = contract.lower()
+    ch = chain.lower()
+    for (row_chain, row_symbol), known in canonical.items():
+        if row_chain != ch:
+            continue
+        if isinstance(known, str):
+            known = {known}
+        if c in {k.lower() for k in known}:
+            return row_symbol
+    return None
+
+
 def value_usd(symbol: str, amount: float, date_str: str,
               price_lookup, *, contract: str | None = None,
               chain: str | None = None,
-              canonical: dict | None = None) -> tuple[float | None, str]:
+              canonical: dict | None = None,
+              par_contracts: set | None = None) -> tuple[float | None, str]:
     """USD value of `amount` of `symbol` on `date_str`, and the basis used.
 
     Returns (None, "unpriced") for a token we do not price at all, and
@@ -148,12 +236,34 @@ def value_usd(symbol: str, amount: float, date_str: str,
     ETH transfer on the strength of a price-source hiccup — the classifier
     could not tell "worthless" from "worth unknown right now."
     """
-    sym = (symbol or "").strip().upper()
+    sym = normalise_symbol(symbol)
     if is_impostor(sym, contract, chain, canonical):
         # A token wearing a stablecoin's ticker from the wrong contract. Not
         # "unpriced" (that means we do not price this token) and never a dollar
         # figure: it is a forgery, and saying so is the point.
         return None, "impostor_token"
+    priced = _price_as(sym, amount, date_str, price_lookup)
+    if priced is not None:
+        return priced
+
+    # The ticker is unknown, so ask what this CONTRACT is before discarding it.
+    # Only a registry-VERIFIED contract gets a second chance — an unknown token
+    # is still `unpriced`, because pricing one at par on the strength of a
+    # plausible ticker is how $3.07B of counterfeit value was booked as real.
+    c = (contract or "").lower()
+    if c and par_contracts and c in {a.lower() for a in par_contracts}:
+        return round(float(amount), 2), "stable_par"
+    known = canonical_symbol(contract, chain, canonical)
+    if known and known != sym:
+        priced = _price_as(known, amount, date_str, price_lookup)
+        if priced is not None:
+            return priced
+    return None, "unpriced"
+
+
+def _price_as(sym: str, amount: float, date_str: str,
+              price_lookup) -> tuple[float | None, str] | None:
+    """Value `amount` as `sym`, or None if `sym` is not a token we price."""
     if sym in STABLES:
         return round(float(amount), 2), "stable_par"
     if sym in MAJORS:
@@ -161,7 +271,7 @@ def value_usd(symbol: str, amount: float, date_str: str,
         if price is None:
             return None, "price_unavailable"
         return round(float(amount) * float(price), 2), "daily_close"
-    return None, "unpriced"
+    return None
 
 
 class PriceCache:

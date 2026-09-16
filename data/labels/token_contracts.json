@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-10",
+  "updated": "2026-09-16",
   "_comment": [
     "The contract(s) that really are each token on each chain. A transfer is",
     "priced from its tokenSymbol, which the SENDER chooses, so anyone can",
@@ -34,14 +34,14 @@
       "chain": "ethereum",
       "symbol": "USDC",
       "contract": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-      "verified": "etherscan.io \u2014 label \"Circle\", source code verified, exact match",
+      "verified": "etherscan.io — label \"Circle\", source code verified, exact match",
       "substrate_support": "25314 records across 5288 distinct addresses"
     },
     {
       "chain": "polygon",
       "symbol": "USDC",
       "contract": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
-      "verified": "polygonscan.com / blockscan.com \u2014 label \"Circle: USDC Token\", native USDC issued by Circle",
+      "verified": "polygonscan.com / blockscan.com — label \"Circle: USDC Token\", native USDC issued by Circle",
       "substrate_support": "20434 records across 644 distinct addresses; no other polygon USDC contract appears at all"
     },
     {
@@ -85,6 +85,46 @@
       ],
       "verified": "both read on-chain via optimism.drpc.org and BOTH report symbol 'USDC': native (supply 174,407,187.25) and bridged USDC.e (supply 19,988,193.42). Both are legitimate, hence two contracts.",
       "substrate_support": "none - chain unreadable on the free tier; protective entry"
+    },
+    {
+      "chain": "arbitrum",
+      "symbol": "USDT0",
+      "contract": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+      "verified": "read via arbitrum.blockscout.com/api/v2/tokens 2026-09-16 - name 'USDT0', symbol 'USDT0', 4,352,450 holders. Etherscan reports the symbol as 'USD₮0' (U+20AE TUGRIK SIGN), which is why normalise_symbol exists",
+      "substrate_support": "97,662 records quarantined as unpriced_token before this entry - the largest single loss in the ledger",
+      "par": true
+    },
+    {
+      "chain": "arbitrum",
+      "symbol": "AXLUSDC",
+      "contract": "0xeb466342c4d449bc9f53a865d5cb90586f405215",
+      "verified": "read via arbitrum.blockscout.com/api/v2/tokens 2026-09-16 - name 'Axelar Bridged USDC', symbol 'AXLUSDC', 5,320 holders",
+      "substrate_support": "72,667 records quarantined as unpriced_token before this entry",
+      "par": true
+    },
+    {
+      "chain": "arbitrum",
+      "symbol": "AUSDC",
+      "contract": "0x724dc807b04555b71ed48a6896b6f41593b8c637",
+      "verified": "read via arbitrum.blockscout.com/api/v2/tokens 2026-09-16 - name 'Aave v3 USDC', symbol 'AUSDC', 28,618 holders. Reports itself as 'aArbUSDCn' in transfer rows, which no ticker registry would carry - this is the case canonical_symbol exists for",
+      "substrate_support": "33,245 records quarantined as unpriced_token before this entry; the target's Aave position is documented at $152.6M",
+      "par": true
+    },
+    {
+      "chain": "ethereum",
+      "symbol": "GHO",
+      "contract": "0x40d16fc0246ad3160ccc09b8d0d3a2cd28ae6c2f",
+      "verified": "read via eth.blockscout.com/api/v2/tokens 2026-09-16 - name 'GHO', symbol 'GHO', 7,963 holders, 18 decimals",
+      "substrate_support": "302 records quarantined on 0x1419e75... , a CONFIRMED wallet of the target's",
+      "par": true
+    },
+    {
+      "chain": "ethereum",
+      "symbol": "PYUSD",
+      "contract": "0x6c3ea9036406852006290770bedfcaba0e23a0e8",
+      "verified": "read via eth.blockscout.com/api/v2/tokens 2026-09-16 - name 'PayPal USD', symbol 'PYUSD', 104,138 holders, 6 decimals",
+      "substrate_support": "159 records quarantined on 0xf078969e... , a CONFIRMED wallet of the target's",
+      "par": true
     }
   ]
 }

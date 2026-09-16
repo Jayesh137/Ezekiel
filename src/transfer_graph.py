@@ -1902,6 +1902,14 @@ def _canonical(config: dict) -> dict:
         config, DATA_DIR / "labels" / "token_contracts.json")
 
 
+def _par_contracts() -> set:
+    """Contracts the registry declares dollar-par. Rule 2, affirmatively: par
+    attaches to the verified contract, never to the ticker a sender chooses.
+    See src/chain/assets.load_par_contracts."""
+    from src.chain.assets import load_par_contracts
+    return load_par_contracts(DATA_DIR / "labels" / "token_contracts.json")
+
+
 def expand_frontier(edges: list[dict], target: str, budget: dict,
                     resume: list | None = None,
                     now_ts: float | None = None,
@@ -1959,6 +1967,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     from src.chain.budget import CallBudget
     from src.chain.chains import enabled_chains
     from src.chain.collect import records_for, sweep_wallet
+    from src.chain.spam import ground_truth_addresses as spam_ground_truth
 
     sweep_chains = enabled_chains(load_config())
     # Expansion spans every enabled chain. "arbitrum_l1" was the honest label
@@ -2117,10 +2126,13 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     # properly. See docs/superpowers/price-source-report.md
                     # for the full arithmetic and the repricing-pass gap this
                     # leaves (out of scope here; recorded as a follow-up).
-                    sweep = sweep_wallet(wallet, sweep_chains, sweep_budget,
-                                         canonical=_canonical(load_config()),
-                                         cluster=False,
-                                         plan_refused=plan_refused)
+                    sweep = sweep_wallet(
+                        wallet, sweep_chains, sweep_budget,
+                        canonical=_canonical(load_config()),
+                        cluster=False,
+                        plan_refused=plan_refused,
+                        protected=spam_ground_truth(load_config()),
+                        par_contracts=_par_contracts())
                     rows = records_for(wallet)
                 except Exception as exc:
                     # One address failing must not abandon the rest of the walk.

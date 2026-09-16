@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.chain.assets import load_par_contracts
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
 from src.chain.collect import (
@@ -32,6 +33,7 @@ from src.chain.collect import (
     write_cursors,
 )
 from src.chain.prices import coingecko_price_lookup
+from src.chain.spam import ground_truth_addresses
 from src.utils import DATA_DIR, load_config
 
 # This job's own CoinGecko allowance, deliberately larger than
@@ -123,6 +125,9 @@ def main(argv=None) -> int:
     # Canonical token contracts, so a token merely CALLED "USDC" is not priced
     # as USDC. See src/chain/assets.is_impostor.
     from src.chain.assets import load_canonical_contracts
+    protected = ground_truth_addresses(config)
+    par_contracts = load_par_contracts(
+        DATA_DIR / "labels" / "token_contracts.json")
     canonical = load_canonical_contracts(
         config, Path(DATA_DIR) / "labels" / "token_contracts.json")
 
@@ -134,7 +139,9 @@ def main(argv=None) -> int:
         results.append(sweep_wallet(wallet, enabled_chains(config), budget,
                                     canonical=canonical, cluster=True,
                                     price_lookup=price_lookup,
-                                    plan_refused=plan_refused))
+                                    plan_refused=plan_refused,
+                                    protected=protected,
+                                    par_contracts=par_contracts))
 
     # Merging rather than clobbering: the trace job writes this same file every
     # 30 minutes for the target alone, and a --wallet run here sweeps something

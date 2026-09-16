@@ -718,6 +718,81 @@ graph declares `edges_truncated`.
 total computed from the collection you are about to trim is not a total any
 more, and it will not complain.
 
+
+**Real money was being quarantined, and it had been since 2024 (fixed
+2026-09-16).** Reading the ledger above answered the question it exists for.
+Quarantined records **never reach `data/transfers/` and the cursor advances
+past them**, so every one of these is a permanently lost edge.
+
+**Two independent defects, both found in one file.**
+
+**1. Pricing decided by TICKER, so genuine tokens were called noise.**
+`value_usd` matched `symbol` against 25 entries (14 `STABLES`, 11 `MAJORS`);
+anything else returned `(None, "unpriced")`, which `classify_spam` turns into
+`unpriced_token`. **332,636 records went that way, and 61.2% are three
+contracts verified on Blockscout as genuine**: Tether USDT0 (4,352,450
+holders), Axelar Bridged USDC, Aave v3 USDC — **33.2% of all 613,578
+suppressions**. Only 5.2% of the bucket carries an advertising-shaped symbol,
+which is the actual junk.
+
+**The largest single case is one character.** Etherscan returns Tether's symbol
+as **`USD₮0` — U+20AE, TUGRIK SIGN**, not ASCII `T`. The registry entry `USDT0`
+is CORRECT and `.upper()` does not fold `₮`, so **97,662 records of real Tether
+were dropped by a glyph.** `normalise_symbol` now folds NFKC plus a homoglyph
+map that is extended **only as cases are measured** — a speculative fold maps a
+forgery onto a genuine ticker, which is rule 2 pointed the expensive way.
+
+Rule 2 had only ever been enforced in the REJECTING direction: `is_impostor`
+uses `token_contracts.json` to refuse a token wearing a known ticker from the
+wrong contract. Nothing used it to ACCEPT a genuine contract reporting an
+unexpected ticker — and Aave's aToken calls itself `aArbUSDCn`, which no ticker
+registry could ever carry. `canonical_symbol` and `load_par_contracts` are that
+missing direction.
+
+**Par is keyed on the CONTRACT, and the first attempt got this wrong.** Adding
+`AXLUSDC`/`AUSDC`/`GHO`/`PYUSD` to `STABLES` passed every test and was caught
+only by replaying the fix against the live ledger: a counterfeit `GHO` at
+`0x7dff7269…` priced at par, because a ticker in `STABLES` prices **any**
+contract reporting it on **any** chain with no registry row. That is rule 2's
+own $3.07B failure mode, reintroduced by the fix for rule 2's opposite
+direction. Par now attaches to a contract carrying `"par": true` in the
+registry, verified on-chain per row, and `STABLES` was left alone.
+
+Replayed against the live ledger: **204,563 of 332,636 records (61.5%) would
+now be kept**, and the counterfeit GHO is not among them.
+
+**2. The classifier convicted the TARGET himself.** The ledger held
+`address: 0x45d26f28…, reason: lookalike, mimics: 0x45d2e417…, asset: USDC`,
+token `0xaf88d065…` — **the canonical Arbitrum USDC named in our own
+config.json** — **796 records, 2024-06-13 to 2026-08**. On Arbitrum he has 688
+transactions and 9,625 token transfers against the twin's 59 and 698: he is
+14x the more active address, and the twin is the poisoner.
+
+`is_lookalike` ranks by volume **inside one sweep's `counterparty_volume`** — a
+local count answering a global question about identity, which is rule 9 in a
+different file, and `chain/activity.py` exists to answer it whole-chain.
+`forged_side` already refused to convict the SWEPT wallet and says why at
+length; but when a third wallet is swept the target is merely a counterparty
+and becomes eligible again. `spam.ground_truth_addresses` now makes
+`config.target_wallet` and `known_self_wallets` immune, threaded through all
+four `sweep_wallet` call sites.
+
+**Ground truth is CONFIG only, never a roster tier** — a tier is measurement,
+and letting one detector's inference silence another is the coupling the
+linkage fix was about. And the immunity is **one-sided**: it stops a protected
+address being called the forgery and still catches whatever forges it, because
+these are precisely the addresses worth poisoning.
+
+**Neither fix recovers what was lost.** The records are gone and the cursors
+advanced past them, so this is forward-looking only. Recovering the ~204,000
+records and the 796 needs a re-sweep with `--reset` on the affected chains, or
+a targeted backfill of the cluster — an API-budget decision for the operator,
+deliberately **not** taken here.
+
+**A classifier that destroys its input needs the same evidence bar as an
+alert.** Both defects were invisible for months because the only trace left
+behind was an address and a count, in a file nothing read.
+
 **Still not fixed, and made worse by this:** `_load_cached`'s 256 MiB ceiling
 counts FILE bytes while holding PARSED objects. With the substrate 6x smaller
 on disk the ceiling stops being protective — 68 MB of `.gz` parses to the same
