@@ -175,16 +175,35 @@ def classify_spam(record: dict, volume, *, wallet: str | None = None,
     if amount is not None and float(amount) == 0.0:
         return "zero_value"
 
-    if record.get("value_basis") == "price_unavailable":
-        # A known major we could not price is not noise. Quarantining it would
-        # discard a potentially large real transfer on the strength of a price
-        # outage — and quarantined records never reach the substrate at all,
-        # so the loss is permanent once the cursor has advanced past them.
+    # WHY there is no number decides this, never the absence of the number.
+    # Three different states used to collapse into one `amount_usd is None`
+    # test, and two of them are real money:
+    #
+    #   price_unavailable — a known major we could not price today. A price
+    #     outage is not evidence about the transfer.
+    #   unpriced          — a token we do not value at all. Still an observed
+    #     movement between two addresses, and discovery runs on edges, not on
+    #     dollars. Measured: 332,636 records were destroyed this way, only 14%
+    #     of them carrying an advertising-shaped symbol.
+    #   impostor_token    — we have PROVEN this is a forgery wearing a
+    #     stablecoin's ticker. That is a finding, and it is quarantined.
+    #
+    # Keeping the first two is rule 6 at the other end of the pipe: a missing
+    # value must not be priced as 0.0, and must not be grounds for deletion
+    # either. Quarantined records never reach the substrate and the cursor
+    # advances past them, so the loss is permanent.
+    basis = record.get("value_basis")
+    if basis == "impostor_token":
+        return "impostor_token"
+    if basis in ("price_unavailable", "unpriced"):
         return None
 
     usd = record.get("amount_usd")
     if usd is None:
-        return "unpriced_token"
+        # No basis recorded at all — an older record, or a caller that did not
+        # go through value_usd. Kept for the same reason as `unpriced`: we
+        # cannot tell, and "we cannot tell" is not "it is not there" (rule 5).
+        return None
     if float(usd) < dust_usd:
         return "dust"
     return None

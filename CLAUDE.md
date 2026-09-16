@@ -835,6 +835,64 @@ settled it, and the commit landed, but a `gh run view` of the last fifteen
 commits did not show it because automated commits had already stacked on top.
 **Check `merge-base --is-ancestor`, not a log window.**
 
+**"We could not price it" no longer means "destroy it" (2026-09-16, operator
+decision).** Quarantining `unpriced_token` was rule 6 at the wrong end of the
+pipe: the rule forbids pricing a missing value as 0.0 because zero is invisible
+to every threshold, and the same reasoning forbids deleting the record. A
+transfer between two addresses is an observed edge whether or not we know what
+it was worth, and discovery — the only vector that reaches an address nobody
+has seen — runs on edges, not on dollars.
+
+**The decision is made on `value_basis`, never on the absence of a number.**
+Three states used to collapse into one `amount_usd is None` test and two of
+them are real money:
+
+| basis | meaning | now |
+|---|---|---|
+| `price_unavailable` | a major we could not price today | kept (already was) |
+| `unpriced` | a token we do not value at all | **kept** |
+| `impostor_token` | PROVEN forgery wearing a ticker | still quarantined |
+
+**That third row is the trap.** The old test covered both "we cannot value it"
+and "we have proven it counterfeit", so admitting the first by that test would
+have admitted forgeries too — rule 2's $3.07B lesson undone through the door
+opened for rule 6.
+
+**Two gates had to move, not one.** `classify_spam` decides what is STORED;
+`normalise_transfer_record` independently dropped `amount_usd is None` before
+the graph ever saw it, so fixing only the first would have changed nothing
+visible. The invariant that made dropping look necessary — "an unpriced token
+must never satisfy a value threshold" — is preserved by the value STAYING None:
+every consumer reads `or 0`, which is the right reading for a minimum.
+
+**`edge_passes_dust` is the one place `or 0` was wrong.** Dust means MEASURED
+and tiny; unknown is a different statement, and collapsing them would have
+deleted from the graph exactly what the substrate had just stopped deleting,
+one function later.
+
+**Measured, and larger than the change that prompted it.** Edges went
+**326,886 → 619,877**, and 203,279 of the 277,208 newcomers are **ETH**. Those
+are `price_unavailable` majors that were always STORED and always dropped at
+the graph gate — so the graph had been blind to frontier ETH movement all
+along. The node budget did not degrade: 299 nodes before and after, all three
+key wallets retained, and every one of the 82 nodes that swapped out had **$0
+direct flow** with the target. Graph build 42.7s, stored file 16.7 → 22.1 MB.
+
+**One deliberate divergence, written down so it is not "fixed" by accident.**
+`_expandable_edges` says it must match `build_graph`'s filter, and it no longer
+does: an unvalued edge is a graph edge but is **not walkable**. Keeping it
+costs nothing; WALKING it spends an Etherscan lookup, and the frontier sweep
+passes no `price_lookup` by design, so every frontier major returns
+`price_unavailable` — making those walkable would aim the whole lookup budget
+at ETH counterparties indiscriminately. The divergence is in the SAFE
+direction: the graph knows more than the frontier walks, where the 2026-07-28
+bug was the frontier walking more than the graph knew. **Whether to spend
+lookups on ETH edges is an open budget question, not a bug.**
+
+**The classifier change is forward-looking.** `unpriced` tokens are not in the
+substrate yet — nothing re-fetches what the cursor has passed. The +277,208 is
+entirely `price_unavailable` majors already on disk.
+
 **A classifier that destroys its input needs the same evidence bar as an
 alert.** Both defects were invisible for months because the only trace left
 behind was an address and a count, in a file nothing read.

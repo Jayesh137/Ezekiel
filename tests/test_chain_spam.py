@@ -109,10 +109,40 @@ def test_sub_dust_transfer_is_quarantined():
     assert reason == "dust"
 
 
-def test_unpriced_token_is_quarantined():
+def test_an_unpriced_token_is_kept_rather_than_quarantined():
+    """A transfer we cannot value is still a transfer.
+
+    This asserted quarantine until 2026-09-16. Quarantined records never reach
+    the substrate and the cursor advances past them, so 332,636 records were
+    destroyed for the sole crime of using a token we do not price — only 14% of
+    them carrying an advertising-shaped symbol. Rule 6 says a missing value must
+    not be priced as 0.0; the same reasoning says it must not be grounds for
+    deletion.
+
+    The scam airdrop in this fixture IS now stored, deliberately. It is a real
+    observed movement between two addresses, and the thing that stops its
+    1,000,000,000 units being read as money is that its value stays None —
+    rule 11, a token quantity is never a dollar value.
+    """
     r = record("0xtarget", "0xsomebody", usd=None, basis="unpriced", amount=1e9)
     r["asset"] = "SCAMAIRDROP"
-    assert spam.classify_spam(r, {}) == "unpriced_token"
+
+    assert spam.classify_spam(r, {}) is None
+
+
+def test_a_proven_impostor_is_still_quarantined():
+    """The forgery case must not ride in through the door opened above.
+
+    `impostor_token` also has no dollar value, and the old code tested for the
+    ABSENCE of a number rather than the reason for it — so admitting unpriced
+    tokens by that test would have admitted proven counterfeits too, undoing
+    rule 2's $3.07B lesson.
+    """
+    r = record("0xtarget", "0xsomebody", usd=None, basis="impostor_token",
+               amount=1e9)
+    r["asset"] = "USDC"
+
+    assert spam.classify_spam(r, {}) == "impostor_token"
 
 
 def test_a_price_unavailable_major_is_not_spam():

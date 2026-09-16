@@ -1344,6 +1344,21 @@ def alert_risk_level(score: float, level: str, factors: list, wallet: str | None
     return _send_with_cooldown(f"risk_{level.lower()}", 12, subject, body)
 
 
+def _edge_value(edge: dict) -> str:
+    """An edge value for an alert body, or "unvalued" when we do not know.
+
+    Never a dollar zero for an unpriced edge. The substrate now keeps
+    transfers of tokens we do not price, and rendering an unknown as zero
+    would tell the operator the movement was worthless when what we mean is
+    that we cannot say - rule 6, in the one place a human actually reads.
+    """
+    usd = edge.get("amount_usd")
+    if usd is None:
+        asset = edge.get("asset") or "token"
+        return f"{asset} (unvalued)"
+    return f"${float(usd):,.2f}"
+
+
 def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
                                    edges: list) -> bool:
     """Fire on a meaningful transfer-graph discovery.
@@ -1366,7 +1381,7 @@ def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
     edge_lines = [
         f"  {e.get('timestamp') or 'unknown time'}  "
         f"{e.get('chain')}/{e.get('asset')}  "
-        f"${float(e.get('amount_usd', 0)):,.2f}\n"
+        f"{_edge_value(e)}\n"
         f"      {e.get('src')} -> {e.get('dst')}\n"
         f"      ref: {e.get('ref') or 'n/a'}  via: {e.get('discovery_source')}"
         for e in edges[:15]

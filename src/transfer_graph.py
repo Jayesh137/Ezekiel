@@ -230,13 +230,39 @@ def normalise_l1_transfer(tx: dict, decimals: int = 6) -> dict | None:
     }
 
 
+
+def edge_passes_dust(edge: dict, dust_usd: float) -> bool:
+    """Is this edge above the dust bar — or simply unmeasured?
+
+    Dust means MEASURED and tiny: a poisoning transfer that moved no funds.
+    An edge we could not value is a different statement, and collapsing the two
+    deletes from the graph precisely the records the substrate now keeps, one
+    function after it kept them.
+
+    So an unknown value passes. It still cannot satisfy a value threshold
+    anywhere else, because it stays None and every threshold reads `or 0` —
+    which is the correct reading for a minimum and the wrong one here.
+    """
+    usd = edge.get("amount_usd")
+    if usd is None:
+        return True
+    return float(usd) >= dust_usd
+
 def normalise_transfer_record(rec: dict) -> dict | None:
     """A src/chain normalised record into a graph edge.
 
-    Quarantined and unpriced records are dropped here rather than filtered by
-    the caller, so there is exactly one place that decides what the graph is
-    allowed to reason over. An unpriced token must never be able to satisfy a
-    value threshold; a poisoning forgery must never become a node.
+    Quarantined records are dropped here rather than filtered by the caller, so
+    there is exactly one place that decides what the graph is allowed to reason
+    over. A poisoning forgery must never become a node.
+
+    An UNPRICED record is kept, carrying `amount_usd: None`. "We could not
+    value it" is not "it did not happen": the movement and the two addresses
+    are observed facts, and discovery — the only vector that reaches an address
+    nobody has seen — runs on edges, not on dollars. The invariant that made
+    dropping them look necessary is preserved instead by the value itself
+    staying None, so an unpriced edge can never SATISFY a value threshold;
+    every comparison here reads `or 0`, which is exactly right for a minimum
+    and exactly wrong for the dust filter (see edge_passes_dust).
 
     The edge id is chain-scoped and hash-scoped, so a movement that arrives both
     from data/l1_transactions and from data/transfers collapses to one edge.
@@ -244,8 +270,6 @@ def normalise_transfer_record(rec: dict) -> dict | None:
     if rec.get("spam"):
         return None
     amount_usd = rec.get("amount_usd")
-    if amount_usd is None:
-        return None
     src = (rec.get("src") or "").lower()
     dst = (rec.get("dst") or "").lower()
     if not src or not dst or src == dst:
@@ -262,7 +286,9 @@ def normalise_transfer_record(rec: dict) -> dict | None:
         "dst": dst,
         "chain": chain,
         "asset": rec.get("asset") or "UNKNOWN",
-        "amount_usd": round(float(amount_usd), 2),
+        # None stays None. A 0.0 here would read as a real transfer worth
+        # nothing and sink below every threshold silently (rule 6).
+        "amount_usd": None if amount_usd is None else round(float(amount_usd), 2),
         "ref": ref,
         "ts": ts,
         "timestamp": _iso(ts),
@@ -636,7 +662,10 @@ def find_split_correlation(exit_amount: float, inbound: list[dict],
     """
     if exit_amount <= 0 or not inbound:
         return None
-    parts = sorted((d for d in inbound if float(d.get("amount_usd", 0)) > 0),
+    # An unpriced deposit cannot be part of an AMOUNT match: there is no amount.
+    parts = sorted((d for d in inbound
+                    if d.get("amount_usd") is not None
+                    and float(d["amount_usd"]) > 0),
                    key=lambda d: -float(d["amount_usd"]))[:max_parts * 3]
 
     best = None
@@ -945,7 +974,7 @@ def build_graph(edges: list[dict], target: str, *,
     for e in edges:
         if e.get("bridge_event"):
             continue
-        if float(e.get("amount_usd", 0)) < dust_usd and e["discovery_source"] != SRC_GAS_FUNDING:
+        if not edge_passes_dust(e, dust_usd) and e["discovery_source"] != SRC_GAS_FUNDING:
             continue  # address-poisoning dust moves no funds
         wallet_edges.append(e)
         adj.setdefault(e["src"], []).append(e)
@@ -1007,8 +1036,16 @@ def build_graph(edges: list[dict], target: str, *,
         gas = [e for e in incident
                if e["discovery_source"] == SRC_GAS_FUNDING and e["dst"] == addr]
 
-        out_usd = round(sum(float(e["amount_usd"]) for e in from_target), 2)
-        in_usd = round(sum(float(e["amount_usd"]) for e in to_target), 2)
+        # Valued edges only. An unpriced edge is COUNTED in edge_count and
+        # never valued — folding it in as 0 would report a total that omits
+        # real money while looking complete, which is the posture
+        # accounting.py's `unpriced` bucket already takes.
+        out_usd = round(sum(float(e["amount_usd"]) for e in from_target
+                            if e.get("amount_usd") is not None), 2)
+        in_usd = round(sum(float(e["amount_usd"]) for e in to_target
+                           if e.get("amount_usd") is not None), 2)
+        unvalued = sum(1 for e in from_target + to_target
+                       if e.get("amount_usd") is None)
         stamps = [e["ts"] for e in observed if e["ts"]]
         link = linkage.get(addr, {})
         corr = correlations.get(addr, {})
@@ -1053,6 +1090,11 @@ def build_graph(edges: list[dict], target: str, *,
                 "received_from_target_usd": out_usd,
                 "sent_to_target_usd": in_usd,
                 "edge_count": len(incident),
+                # The two USD figures above omit transfers of tokens we do not
+                # price. Saying how many, rather than folding them in as zero,
+                # is the posture accounting.py's `unpriced` bucket takes:
+                # counted, never valued, and never silently absent.
+                "unvalued_edge_count": unvalued,
             },
             "chains": sorted({e["chain"] for e in incident}),
             "assets": sorted({e["asset"] for e in incident if e.get("asset")}),
@@ -1870,12 +1912,30 @@ def _frontier_priority(wallet: str, depth: int, edges: "list[dict] | EdgeIndex",
 def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
     """The edges the frontier is allowed to walk.
 
-    Must match build_graph's filter. When it did not, the frontier seeded itself
-    from raw edges while build_graph discarded sub-dust ones, so lookups were
-    spent on address-poisoning clones that never entered the graph: on the live
-    2026-07-28 run, 6 of 11 lookups went to six such addresses (770 of the
-    target's 874 recorded out-edges are sub-dollar poisoning transfers) and one
-    of them contributed zero edges to the finished graph.
+    Matched build_graph's filter exactly until 2026-09-16. When it did not, the
+    frontier seeded itself from raw edges while build_graph discarded sub-dust
+    ones, so lookups were spent on address-poisoning clones that never entered
+    the graph: on the live 2026-07-28 run, 6 of 11 lookups went to six such
+    addresses (770 of the target's 874 recorded out-edges are sub-dollar
+    poisoning transfers) and one contributed zero edges to the finished graph.
+
+    **The two now differ in exactly one case, deliberately: an UNVALUED edge is
+    a graph edge but is not walkable.** `edge_passes_dust` keeps it in the
+    graph, because a transfer we cannot price is still an observed link and
+    deleting it was destroying 332,636 records; the `or 0` below keeps it out
+    of the frontier, because walking it SPENDS a lookup.
+
+    That is a budget decision already made and written down twenty lines from
+    here: the frontier sweep deliberately passes no `price_lookup`, so every
+    frontier major comes back `price_unavailable`, and admitting those to the
+    walk would point the whole lookup budget at ETH counterparties
+    indiscriminately. Measured when the graph gate opened: edges went 326,886 ->
+    619,877, and 203,279 of the 277,208 newcomers are ETH.
+
+    The divergence is therefore in the SAFE direction — the graph knows more
+    than the frontier walks, where the 2026-07-28 bug was the frontier walking
+    more than the graph knew. Do not "fix" this by matching them without
+    deciding the budget question first.
     """
     keep = []
     for e in edges:

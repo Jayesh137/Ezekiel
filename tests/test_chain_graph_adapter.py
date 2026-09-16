@@ -31,10 +31,22 @@ def test_a_quarantined_record_never_becomes_an_edge():
     assert tg.normalise_transfer_record(record(spam=True, spam_reason="lookalike")) is None
 
 
-def test_an_unpriced_record_never_becomes_an_edge():
-    """An unpriced token must not be able to satisfy a value threshold."""
-    assert tg.normalise_transfer_record(
-        record(amount_usd=None, value_basis="unpriced", asset="SCAM")) is None
+def test_an_unpriced_record_becomes_an_edge_that_carries_no_value():
+    """The invariant is unchanged; what enforces it moved.
+
+    This used to assert the record produced NO edge, on the reasoning that an
+    unpriced token must never satisfy a value threshold. That reasoning still
+    holds and is still enforced — by the value staying None, which no minimum
+    can be cleared by — but the edge itself is now kept, because "we could not
+    value it" is not "it did not happen" and discovery runs on edges.
+    """
+    edge = tg.normalise_transfer_record(
+        record(amount_usd=None, value_basis="unpriced", asset="SCAM"))
+
+    assert edge is not None
+    assert edge["amount_usd"] is None      # never 0.0 — rule 6
+    # The threshold reading every consumer uses, on an unpriced edge.
+    assert float(edge.get("amount_usd") or 0) < 1.0
 
 
 def test_a_self_transfer_never_becomes_an_edge():
