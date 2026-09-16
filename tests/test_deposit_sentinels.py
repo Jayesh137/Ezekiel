@@ -262,3 +262,18 @@ def test_the_alert_renders_and_routes(monkeypatch):
     assert alerts.alert_deposit_address_shared({**row, "class": ds.CLASS_UNMEASURED}, None)
     assert alerts._severity_of(sent[1][1]) == "HIGH"
     assert "could not be read" in sent[1][2]
+
+
+def test_the_reading_budget_starts_at_the_first_live_reading():
+    """The watch builds its readings before the wallet loop and reaches the
+    payee check a minute later. A deadline set at construction had always
+    expired, so no live reading was ever taken (2026-09-16)."""
+    import scripts.check_deposit_sentinels as script
+
+    now = [0.0]
+    r = script.Readings({}, lambda address, chain: QUIET, max_live=5, seconds=45,
+                        clock=lambda: now[0])
+    now[0] = 90.0                      # the watch loop ran for a minute and a half
+    assert r.for_address(STRANGER, {"arbitrum"}) == [QUIET], "budget spent before it began"
+    now[0] = 200.0                     # and the bound still holds once it has started
+    assert r.for_address("0x" + "ab" * 20, {"arbitrum"}) == []

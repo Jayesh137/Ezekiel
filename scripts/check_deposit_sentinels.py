@@ -66,7 +66,13 @@ class Readings:
         self.own = {a: dict(v) for a, v in (stored or {}).items() if isinstance(v, dict)}
         self._fetch = fetch or fetch_activity
         self._left = max_live
-        self._deadline = clock() + seconds
+        # The wall-clock bound starts at the FIRST live reading, not here. The
+        # watch builds this before its wallet loop and reaches the payee check
+        # a minute later; a deadline set at construction had always expired by
+        # then, so on 2026-09-16 no live reading was ever taken and the
+        # aMonUSDC token was held as "not yet measured" run after run.
+        self._seconds = seconds
+        self._deadline = None
         self._clock = clock
         self.live = 0
 
@@ -78,7 +84,9 @@ class Readings:
             mine = (self.own.get(a) or {}).get(chain)
             reading = shared or mine
             if reading is None and chain in (chains or ()) and self._left > 0 \
-                    and self._clock() < self._deadline:
+                    and (self._deadline is None or self._clock() < self._deadline):
+                if self._deadline is None:
+                    self._deadline = self._clock() + self._seconds
                 self._left -= 1
                 self.live += 1
                 got = self._fetch(a, chain)
