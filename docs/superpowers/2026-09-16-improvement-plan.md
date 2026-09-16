@@ -46,6 +46,36 @@ next session building on them.
   take no slot.
 
 Replay: PROBABLE 7 → 0, POSSIBLE 140 → 25, WATCH 41 → 159, CONFIRMED unchanged.
+**Verified in production** (trace run 35149575324, 21:04 UTC): CONFIRMED 2,
+PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
+57.0 ELEVATED → 35.2 GUARDED once the June score stopped earning 22 points.
+
+- **DONE-5 Private-deposit-address sentinels (was P1-3).** `src/deposit_sentinels.py`,
+  `scripts/check_deposit_sentinels.py` in watch.yml. Live: sentinels `0x8570c2ae…`
+  and `0x499662e0…`; `0xda0932d2…` now POSSIBLE on linkage from this file.
+- **DONE-6 Roster leads re-scored (was P1-6).** `scanner.roster_rescore_targets`.
+- **DONE-7 New payee of his (was P1-1, re-scoped).** `check_watchlist.check_new_payees`;
+  first CI run seeded 615 addresses and alerted nothing.
+- **DONE-8 Bridge decoding for CONFIRMED wallets, Monad.** The full Circle domain
+  table; `0xf078969e…` sent **$31.8M to Monad (domain 15)** 2026-08-15 → 09-15 and
+  holds 0 USDC there (218K MON, 18 txs); Monad joined `config.chains` with its USDC
+  contract registered first. Foreign bridge landings now alert once, not every 72h.
+- **DONE-9 Test isolation.** Linkage caches sandboxed; graph pipeline tests no
+  longer call Blockscout (suite 171s → 90s).
+
+## Route matrix additions (found by measurement, 2026-09-16)
+
+| # | Route | Watched now |
+|---|---|---|
+| R20 | A CONFIRMED wallet bridges to a chain the substrate does not sweep (Monad, Unichain) | decoded and named (DONE-8); the far side is swept only if Etherscan's free tier serves it — read `unsupported_sources` |
+| R21 | A fresh wallet pays his private exchange deposit address | DONE-5 |
+| R22 | His treasury or `0xf078969e…` pays a never-seen EOA | DONE-7 |
+
+**Next, in order:** (1) follow the $31.8M inside Monad — if chain 143 is refused
+on the free tier, scan `eth_getLogs` on rpc.monad.xyz (capped at 100 blocks) in a
+window after each known mint for USDC leaving `0xf078969e…`, and ask Hyperliquid
+about every recipient; (2) P1-7 market-maker classification; (3) P2-1/P2-3 Circle
+source and Solana burn decoding.
 
 ---
 
