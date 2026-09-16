@@ -580,6 +580,12 @@ Live: **four** wallets share that funder and regain linkage; the roster goes
 348 → 349, POSSIBLE 126 → 130, WATCH 47 → 44. `0x498216a2…` was not in the
 roster at all and is now surfaced by linkage alone.
 
+**RETRACTED the same evening: that funder is an exchange hot wallet.**
+`0xf92402bb…` has **2,282,986 transactions on Arbitrum** — nobody had measured
+it, and "excluded" meant only the hand-kept config lists. The container fix
+above stands; the fact it protected was never evidence. See "The first
+PROBABLEs after the backtest passed were all false" below.
+
 Two outcomes worth stating separately. `0x5b5d5120…` returns WATCH →
 **POSSIBLE, not PROBABLE** — its correlation genuinely lapsed, and restoring
 the tier by hand would be fitting the tier to the story, the same refusal this
@@ -588,6 +594,9 @@ again, **`0x12e16e3dc4a4fb3c802be62105f15783eb95f92a` becomes PROBABLE on two
 genuinely independent vectors** — behavioural 0.702 with no style veto, plus
 the shared funder — and enters the close watch automatically. It was the top
 candidate feeding `risk.py` once the target was removed from that list.
+**RETRACTED: neither vector was real.** The 0.702 is a single scan from
+2026-06-30 under a scorer the backtest never validated, and the funder is an
+exchange hot wallet. It is WATCH with no vectors. Details below.
 
 **When a detector's finding is only reachable through ANOTHER detector's
 output, the two are one vector wearing two names.** Ask what file a vector
@@ -1228,6 +1237,85 @@ any of them to the target: he has no code and no referrer, and a habit shared
 by strangers is not identity. But **`0xb83de012…` is a ~$177M Hyperliquid
 account almost certainly run by whoever runs `0x5b5d5120…`**, and nothing
 watched it. Whether it joins `config.watch_wallets` is the operator's call.
+(Correction, same day: the "funder" these three share is an exchange hot wallet
+with 2.28M transactions — so the population is "withdrew from the same exchange",
+not "linked to him". The same-day referral habit is still real; its link to the
+target was never there.)
+
+**The first PROBABLEs after the backtest passed were all false (fixed
+2026-09-16).** The backtest passed at 17:10 and the 20:17 roster counted the
+behavioural vector for the first time: **PROBABLE 1 → 7**, and those seven
+filled the close watch. Every one of them was false, for three independent
+reasons — each a rule this file already states, broken one call away from where
+it was enforced.
+
+1. **A shared funder was never measured (rule 9).** `compute_linkage` checked
+   every shared DESTINATION against whole-chain activity and never checked the
+   shared FUNDER beside it. The target's first funder `0xf92402bb…` has
+   **2,282,986 Arbitrum transactions**; five wallets held a linkage vote for
+   having withdrawn from the same exchange. Now both `substrate_linkage` (which
+   measures the funder FIRST, because one reading decides a vote for every
+   wallet sharing it) and the roster's `funder_exclusions` require a measured
+   quiet funder; unmeasured is excluded until measured. Funded directly BY the
+   target needs no measurement.
+2. **The behavioural vote read scores the validated scorer never produced.**
+   All seven voting wallets carried a **single scan from 2026-06-30 or 07-01**
+   — no `order_profile` dimension, before the flat-wallet leverage fix — never
+   re-scored because a wallet that leaves the scan population never is. The
+   same June number was `risk.py`'s top candidate and the "trades like the
+   target" line in the graph's CRITICAL email. `persist_candidate` now stamps
+   `scoring_schema`; `utils.candidate_scored_by_current_scorer` gates the
+   roster vote, risk's top candidate, the graph's behavioural evidence and the
+   tracer's combined alert. The stored scores stay on disk and on the
+   dashboard; they just decide nothing.
+3. **Two hops through a stranger voted `transfer`.** The vector was
+   `transfer_count > 0`, true of every node the walk reaches. **110 rows** held
+   it at depth 2 with $0 direct flow, two of them PROBABLE: `0x3b2d7db2…` and
+   `0xddea9827…`, paired with a dormancy handoff. Both are accounts of **a
+   market maker** — referred through code `MMREFCSI`, running code `XYZSET9`,
+   agents `XYZ_SET11`/`APTS`, 100% client order ids, quoting `xyz` equity
+   perps — reached through its hub `0x84abc08c…`, which the target paid
+   **$999,999.80 once, on 2026-09-10**. Every one of the group's 123 decoded
+   CctpExtension deposits credits its own account. A market maker opens
+   accounts constantly, so some are born inside his silences.
+   `roster.transfer_touches_cluster` now requires an observed transfer with the
+   target, or a path whose previous hop is a config `known_self_wallet`; reach
+   alone is kept as `graph_reach_only` evidence (rule 7) and does not vote.
+
+Replayed on the live data before landing: **PROBABLE 7 → 0, POSSIBLE 140 → 25,
+WATCH 41 → 159**; both CONFIRMED wallets unchanged; `0x12e16e3d…` → WATCH with
+no vectors and its four sub-accounts leave the roster. The close watch also now
+ranks with `roster.rank_key` rather than graph confidence (0.0 by construction
+for any non-graph vector — the defect `evidence_strength` fixed, left standing
+in `watched()`) and gives an operator group one slot, not five.
+
+**The honest state is that nothing outside the config cluster is PROBABLE.**
+That is a finding, not a failure: a tier nobody can defend spends the close
+watch on the wrong wallets and teaches the operator that PROBABLE means nothing.
+
+**Two leads worth keeping from the same investigation.**
+
+- **`0xda0932d2a880bafa82bc2ac41ab0caafc5544f52` is the only outsider ever to pay
+  his private Binance deposit address `0x8570c2ae…`** — $249,993.84 on
+  2024-07-31. Its whole life is that day: gas and $249,999.84 USDC from two
+  exchange hot wallets (~2.8M transactions each), five `buyExactShares` calls to
+  a FixedERC20Pool, a **$6 deposit into Hyperliquid** (its HL account is born
+  that day and has never traded), then everything to his deposit address. A
+  deposit address belongs to one exchange account, so this is his account being
+  funded — by him through a fresh wallet, or by someone paying him. It never
+  traded, so it is not a copy target. **Nothing surfaced it** because
+  `0x8570c2ae…` is graded a conduit SERVICE and linkage scores only SWEPT
+  wallets' outbound — the deposit address's own sweep holds every sender, and
+  nobody reads that side. A sentinel on his private deposit addresses (new
+  sender → CRITICAL) is the vector this points at; the treasury paid into
+  `0x8570c2ae…` as recently as 2026-08-15, so the address is live.
+- **Settled no: `0x9430801e…`** sends ETH to five of his conduits across three
+  chains, which looks like gas funding by him. It has 1.4M Arbitrum and 3.6M
+  Ethereum transactions: an exchange gas feeder.
+
+**When a rule is enforced in one branch, check the branch beside it** — the
+funder beside the destination, the scorer beside the backtest, the reach beside
+the transfer. All three were found by asking why a PROBABLE was PROBABLE.
 
 ## Vectors collected but NOT wired into detection — pursue these
 
