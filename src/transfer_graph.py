@@ -1012,7 +1012,15 @@ def build_graph(edges: list[dict], target: str, *,
     order: list[str] = []
     frontier = [target]
     while frontier and len(depths) < max_nodes:
-        nxt = []
+        # Offer every unseen neighbour of this level first, then admit them in
+        # order of the value that moved between them and the level: when the
+        # node budget binds, that order decides who gets in. Admitting in
+        # adjacency order let FILE order decide — measured 2026-09-16, of the
+        # depth-2 wallets carrying $1M+ of flow 3 were admitted and 89 were not,
+        # while $0 airdrop senders held places. An edge we could not value ranks
+        # after one we could; the address only breaks ties. Each wallet's parent
+        # is the largest edge that reached it, so its path follows the money.
+        offers: dict[str, dict] = {}
         for node in frontier:
             if depths[node] >= max_depth:
                 continue
@@ -1022,14 +1030,25 @@ def build_graph(edges: list[dict], target: str, *,
                 other = e["dst"] if e["src"] == node else e["src"]
                 if other in depths or other == target:
                     continue
-                depths[other] = depths[node] + 1
-                parents[other] = (node, e)
-                order.append(other)
-                nxt.append(other)
-                if len(depths) >= max_nodes:
-                    break
+                usd = e.get("amount_usd")
+                offer = offers.setdefault(other, {"usd": 0.0, "valued": False,
+                                                  "best": -1.0, "parent": (node, e)})
+                value = float(usd or 0)
+                offer["usd"] += value
+                offer["valued"] = offer["valued"] or usd is not None
+                if value > offer["best"]:
+                    offer["best"] = value
+                    offer["parent"] = (node, e)
+        nxt = []
+        for other, offer in sorted(offers.items(),
+                                   key=lambda kv: (not kv[1]["valued"], -kv[1]["usd"], kv[0])):
             if len(depths) >= max_nodes:
                 break
+            parent = offer["parent"]
+            depths[other] = depths[parent[0]] + 1
+            parents[other] = parent
+            order.append(other)
+            nxt.append(other)
         frontier = nxt
 
     def path_to(addr: str) -> list[str]:
