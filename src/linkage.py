@@ -230,7 +230,8 @@ def _live_outbound_usdc(wallet: str, excluded: set, limit: int) -> set:
 
 
 def get_outbound_addresses(wallet: str, config: dict | None = None,
-                           limit: int = 300) -> set:
+                           limit: int = 300, *,
+                           records: list[dict] | None = None) -> set:
     """Every address this wallet has sent value to, excluding known
     infrastructure.
 
@@ -281,8 +282,12 @@ def get_outbound_addresses(wallet: str, config: dict | None = None,
     excluded.add(config["hl_bridge_contract"].lower())
     excluded.add(wl)
 
+    # `records` lets a caller scoring many wallets read the substrate once and
+    # hand each wallet its own rows — see records_by_wallet. An empty list is a
+    # real answer ("nothing stored touching it") and must not fall back to a
+    # fresh walk, so the test is `is None`, never truthiness.
     out = set()
-    for rec in records_for(wl):
+    for rec in (records_for(wl) if records is None else records):
         if (rec.get("src") or "").lower() != wl:
             continue
         usd = rec.get("amount_usd")
@@ -483,15 +488,26 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
               f"global-activity reading yet; they cannot count as shared "
               f"deposit addresses until measured")
 
+    # One walk of the substrate for every wallet scored, rather than one walk
+    # per wallet inside get_outbound_addresses. The loop below is unchanged in
+    # what it decides; only where the rows come from moved. See
+    # records_by_wallet for the measurement that forced it.
+    from src.chain.collect import records_by_wallet
+    scorable = sorted(
+        ({(w or "").lower() for w in wallets} & swept) - {target, ""})
+    rows = records_by_wallet(scorable)
+
     out: dict[str, dict] = {}
-    for wallet in wallets:
-        w = (wallet or "").lower()
-        if not w or w == target or w not in swept:
-            continue
+    for w in scorable:
         link = compute_linkage(
             w,
             funders.get(w),
-            get_outbound_addresses(w, config),
+            # pop, not get: holding every wallet's rows at once pins records
+            # the LRU would otherwise evict, and the substrate is larger than
+            # the cache. Measured 2026-09-16 at 775 MB peak held against 740 MB
+            # still held at the end; draining as each wallet is scored lets the
+            # evicted ones be collected during the loop instead of after it.
+            get_outbound_addresses(w, config, records=rows.pop(w, [])),
             target,
             target_funder,
             target_out,

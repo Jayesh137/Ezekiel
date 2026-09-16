@@ -46,10 +46,17 @@ def test_substrate_linkage_skips_wallets_that_were_never_swept(monkeypatch):
     import src.linkage as lk
 
     monkeypatch.setattr(lk, "swept_wallets", lambda cfg: {"0xswept"})
+    # substrate_linkage reads the substrate once up front now. These tests
+    # stub get_outbound_addresses, so the rows are unused — but collect
+    # derives TRANSFERS_DIR at import time and conftest's DATA_DIR patch
+    # does not reach it, so without this the walk hits the real 394 MB
+    # data/transfers tree and the unit test depends on production data.
+    monkeypatch.setattr("src.chain.collect.records_by_wallet",
+                        lambda wallets, **kw: {})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": None, "out_addrs": {"0xdeposit"}})
     monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300: {"0xdeposit"})
+                        lambda w, cfg=None, limit=300, records=None: {"0xdeposit"})
     # Measured quiet on the whole chain; an unmeasured destination is excluded
     # (see test_service_verification), which is not what this test is about.
     monkeypatch.setattr(lk, "activity_exclusions", lambda addrs, chains, cache: (set(), []))
@@ -65,10 +72,17 @@ def test_substrate_linkage_omits_wallets_with_no_evidence(monkeypatch):
     import src.linkage as lk
 
     monkeypatch.setattr(lk, "swept_wallets", lambda cfg: {"0xswept"})
+    # substrate_linkage reads the substrate once up front now. These tests
+    # stub get_outbound_addresses, so the rows are unused — but collect
+    # derives TRANSFERS_DIR at import time and conftest's DATA_DIR patch
+    # does not reach it, so without this the walk hits the real 394 MB
+    # data/transfers tree and the unit test depends on production data.
+    monkeypatch.setattr("src.chain.collect.records_by_wallet",
+                        lambda wallets, **kw: {})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": None, "out_addrs": {"0xaaa"}})
     monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300: {"0xbbb"})
+                        lambda w, cfg=None, limit=300, records=None: {"0xbbb"})
 
     assert lk.substrate_linkage("0xtarget", ["0xswept"],
                                 config={"excluded_addresses": [],
@@ -82,10 +96,17 @@ def test_substrate_linkage_never_claims_a_shared_funder(monkeypatch):
     import src.linkage as lk
 
     monkeypatch.setattr(lk, "swept_wallets", lambda cfg: {"0xswept"})
+    # substrate_linkage reads the substrate once up front now. These tests
+    # stub get_outbound_addresses, so the rows are unused — but collect
+    # derives TRANSFERS_DIR at import time and conftest's DATA_DIR patch
+    # does not reach it, so without this the walk hits the real 394 MB
+    # data/transfers tree and the unit test depends on production data.
+    monkeypatch.setattr("src.chain.collect.records_by_wallet",
+                        lambda wallets, **kw: {})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": "0xfunder", "out_addrs": {"0xdep"}})
     monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300: {"0xdep"})
+                        lambda w, cfg=None, limit=300, records=None: {"0xdep"})
     monkeypatch.setattr(lk, "activity_exclusions", lambda addrs, chains, cache: (set(), []))
 
     got = lk.substrate_linkage("0xtarget", ["0xswept"],
@@ -102,7 +123,7 @@ def test_substrate_linkage_excludes_the_target_itself(monkeypatch):
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": None, "out_addrs": {"0xdep"}})
     monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300: {"0xdep"})
+                        lambda w, cfg=None, limit=300, records=None: {"0xdep"})
 
     assert lk.substrate_linkage("0xtarget", ["0xtarget"],
                                 config={"excluded_addresses": [],

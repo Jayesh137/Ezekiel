@@ -2671,6 +2671,14 @@ def _phase(name: str):
     running there was no line to say which of them had the time, so a budget
     overrun was indistinguishable from a hang. `finally` rather than a plain
     exit because the phase most likely to be killed is the slow one.
+
+    Substrate linkage was added to this list on 2026-09-16, having been left
+    out because it makes no external calls — and it was then the phase that
+    failed the step, at 344-472s of a 600s cap while the four measured phases
+    together cost ~130s. For eight minutes the log said nothing at all, which
+    is the exact condition this helper exists to prevent; the original scoping
+    rule quietly assumed slow means network. **Time a phase because it can be
+    slow, not because it can block.**
     """
     @contextmanager
     def _timed():
@@ -2852,9 +2860,10 @@ def run_transfer_graph(expand: bool = True) -> dict:
     # pass adds the graph's own wallets for free. Scanner evidence wins on a
     # clash: it is the only source that can establish a first funder, which
     # needs a live lookup the substrate pass deliberately does not make.
-    linkage_evidence = _substrate_linkage(target, edges, config)
-    scanner_linkage = _load_linkage_evidence()
-    linkage_evidence.update(scanner_linkage)
+    with _phase("substrate linkage"):
+        linkage_evidence = _substrate_linkage(target, edges, config)
+        scanner_linkage = _load_linkage_evidence()
+        linkage_evidence.update(scanner_linkage)
     if linkage_evidence:
         print(f"[graph] linkage evidence for {len(linkage_evidence)} wallet(s) "
               f"({len(scanner_linkage)} from the scanner)")

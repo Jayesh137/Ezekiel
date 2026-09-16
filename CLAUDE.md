@@ -597,6 +597,62 @@ before the push, not in a pre-receive hook's rejection. And when a file has to
 shrink, ask **who actually reads the part that is large**: here the answer was
 "nobody, across runs" and the 92% reduction cost no consumer anything.
 
+**The substrate outgrew its own cache, and the linkage phase was reading it
+once PER WALLET (fixed 2026-09-16).** `trace.yml` failed on 4 of its last 10
+runs — 2026-09-14 02:28, then 09-15 16:02, 19:44 and 09-16 00:53 — every one
+of them "Rebuild transfer graph has timed out after 10 minutes". A failed step
+SKIPS the steps behind it, so each failure also cost the six detectors that
+follow the graph: identities, agents, dormancy, portfolio overlap, the roster
+and the accounting.
+
+The log looked like a hang and was not. `_phase` timed expansion (99.3s),
+bytecode labelling (9.8s), activity verification (10.3s) and deposit inference
+(0.4s) — and then printed **nothing for seven minutes and fifty-two seconds**
+before the final summary, which it reached one second before the kill. The work
+was finishing and being thrown away on the line.
+
+The unmeasured phase is `_substrate_linkage`. It called
+`get_outbound_addresses` per wallet, which calls `records_for`, which walks
+**every record on every chain** to find the ones touching one address. So the
+cost is O(swept wallets x whole substrate) and **both terms grow on their
+own**: the frontier took swept wallets from 61 on 09-12 to **208** on 09-16,
+and `data/transfers/` gains a file a day per chain and is never pruned.
+
+What turned a slow phase into a failing one is a cliff. `_load_cached` holds
+parsed files under a **256 MiB** ceiling; the substrate reached **394 MB**, so
+the LRU can no longer hold a single pass and every wallet re-parses most of the
+files. Measured on the live data: **9.519s per wallet against 0.263s with
+eviction disabled, a 36x penalty.** The phase cost 344-472s of a 600s cap while
+every other phase together cost ~130s — so the step sat exactly on the boundary
+and crossed it as the substrate grew, which is why it failed intermittently
+rather than always.
+
+`collect.records_by_wallet` now answers for many wallets in ONE walk — a
+sibling of `records_for` rather than a second implementation, for the reason
+that function's docstring already gives about three spam rules. Measured
+end-to-end on live data: the phase goes **472s → 66.2s**, of which the walk
+itself is **5.5s for all 208 wallets**. Equivalence was checked against
+`records_for` on nine wallets including the target: identical record ids in
+identical order, identical outbound sets, 0 mismatches.
+
+**Raising the cache ceiling is NOT the fix, and that is the general rule here.**
+It buys one step against a substrate that grows daily, and the ceiling counts
+FILE bytes while holding parsed objects — 394 MB of JSON measured at **575 MB
+of heap**, so the real cost of the knob is not the number written on it.
+Reading the substrate once removes the wallet term instead, which is what makes
+the phase indifferent to how large the substrate gets. **This makes the
+un-compacted `data/transfers/` above less urgent for linkage and no less urgent
+for everything else** — the frontier, the tracer, the correlator and four
+scripts still call `records_for` in a loop, bounded by budgets rather than by
+being cheap.
+
+**And the instrumentation rule was scoped on the wrong property.** `_phase` was
+applied to the four phases that make external calls, on the reasoning that
+those are the ones that can block. The phase that actually failed the step
+makes no external calls at all, which is exactly why it was invisible for eight
+minutes. It is now timed. **Time a phase because it can be slow, not because it
+can block.**
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went

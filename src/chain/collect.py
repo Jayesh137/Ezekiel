@@ -216,6 +216,65 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
     return out
 
 
+def records_by_wallet(wallets, *, include_spam: bool = False) -> dict[str, list[dict]]:
+    """`records_for` for many wallets at once, in ONE walk of the substrate.
+
+    Same reader, same spam rule, same per-wallet dedupe by `id` — deliberately
+    a sibling of `records_for` rather than a second implementation, for the
+    reason that function's docstring gives: three spam rules is how a
+    quarantined forgery alerts through one path while being suppressed on
+    another.
+
+    It exists because calling `records_for` in a loop is O(wallets x whole
+    substrate), and BOTH terms grow on their own: the frontier adds swept
+    wallets (61 on 2026-09-12, 208 on 2026-09-16) and `data/transfers/` gains a
+    file a day per chain and is never pruned. That is what was failing the
+    trace workflow — the phase cost 344-472s of the graph step's 600s cap, and
+    a failed step skips the six detection steps behind it.
+
+    The `_FILE_CACHE` ceiling makes it worse rather than saving it: the
+    substrate (394 MB) has outgrown the 256 MiB limit, so the LRU cannot hold
+    one pass and every wallet re-parses most of the files. Measured per wallet
+    on the live substrate: 9.519s against 0.263s with eviction disabled, a 36x
+    penalty. Raising that ceiling is not the fix — it buys one step against a
+    substrate that grows daily, and it counts FILE bytes while holding parsed
+    objects (394 MB of JSON measured at 575 MB of heap). One walk removes the
+    wallet term instead: measured 5.5s for all 208 wallets.
+
+    Returns a bucket for every requested wallet, empty ones included: an
+    address with no records must read as "nothing stored for it", never as
+    absent (rule 5 — a missing answer must not look like a clean one).
+    """
+    wanted = {(w or "").lower() for w in wallets if w}
+    out: dict[str, list[dict]] = {w: [] for w in wanted}
+    if not wanted:
+        return out
+    root = Path(TRANSFERS_DIR)
+    if not root.exists():
+        return out
+    # Per wallet, exactly as records_for scopes its own `seen`: a record is a
+    # duplicate only of another record for the SAME wallet.
+    seen: dict[str, set[str]] = {w: set() for w in wanted}
+    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in sorted(chain_dir.glob("*.json")):
+            for rec in _load_cached(path):
+                if not isinstance(rec, dict):
+                    continue
+                if rec.get("spam") and not include_spam:
+                    continue
+                src = (rec.get("src") or "").lower()
+                dst = (rec.get("dst") or "").lower()
+                # A record can touch two requested wallets; it belongs to both.
+                for side in {src, dst} & wanted:
+                    rid = rec.get("id")
+                    if rid:
+                        if rid in seen[side]:
+                            continue
+                        seen[side].add(rid)
+                    out[side].append(rec)
+    return out
+
+
 def _blank_chain_result() -> dict:
     return {"records": 0, "spam": 0, "calls": 0, "cursor": 0, "gaps": [],
             "truncated": False, "error": None, "probed_inactive": False,
