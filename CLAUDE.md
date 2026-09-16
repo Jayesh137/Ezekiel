@@ -764,7 +764,23 @@ now be kept**, and the counterfeit GHO is not among them.
 **2. The classifier convicted the TARGET himself.** The ledger held
 `address: 0x45d26f28…, reason: lookalike, mimics: 0x45d2e417…, asset: USDC`,
 token `0xaf88d065…` — **the canonical Arbitrum USDC named in our own
-config.json** — **796 records, 2024-06-13 to 2026-08**. On Arbitrum he has 688
+config.json** — **796 records, 2024-06-13 to 2026-08**.
+
+**Correction, measured after the fix: those 796 were almost certainly NOT
+lost, and the first write-up here said they were.** `forged_side` has always
+protected the SWEPT wallet, so the target was never convicted in his own
+sweep — only in sweeps of third wallets, where he is a counterparty. But a
+transfer involving him is fetched by HIS sweep too, which stores it. The
+quarantined copy was the third-party duplicate. Verified after a full
+`--reset` re-read of the cluster: his USDC went 1,444 → 1,489, not 1,444 →
+2,240, and his ledger entry still reads exactly 796 with nothing added.
+
+The defect is real and the fix stands — a local per-sweep count must not
+settle a global question of identity, and the ledger now correctly records
+the TWIN as mimicking the target rather than the reverse. But the population
+it actually costs is **a counterparty that is never swept in its own right**,
+which is most of the frontier, not the cluster. **Do not quote the 796 as lost
+records.** On Arbitrum he has 688
 transactions and 9,625 token transfers against the twin's 59 and 698: he is
 14x the more active address, and the twin is the poisoner.
 
@@ -788,6 +804,36 @@ advanced past them, so this is forward-looking only. Recovering the ~204,000
 records and the 796 needs a re-sweep with `--reset` on the affected chains, or
 a targeted backfill of the cluster — an API-budget decision for the operator,
 deliberately **not** taken here.
+
+**The recovery re-sweep, and what it actually bought (2026-09-16).**
+`substrate-backfill.yml` dispatched with `full_reset=true` — the instrument
+already existed, so no new code. It reset cursors for the 2 cluster wallets,
+swept 6 chains, and cost **51 API calls in 2.5 minutes**, not the hour budgeted.
+
+Measured against a baseline taken before it ran:
+
+| wallet | records | counterparties | new assets |
+|---|---|---|---|
+| target `0x45d26f28…` | 1,490 → **1,623** | 53 → **54** | aArbUSDCn 82, GHO 2, PYUSD 3 |
+| `0x1419e75…` | 114 → **205** | 37 → **38** | aArbUSDCn 34, GHO 12 |
+
+**224 records and 2 previously unseen counterparties**, every one of them a
+token the contract-pricing fix admitted. Real, and an order of magnitude below
+what the ledger headline suggested.
+
+**The headline numbers were never the cluster's.** USDT0's 97,662 and
+axlUSDC's 72,667 are totals across **every wallet ever swept** — 208 and
+growing — so a cluster re-sweep could not have recovered them and it was wrong
+to imply otherwise. Recovering those means re-sweeping the frontier, which is
+a different and much larger spend.
+
+**Two bounds worth knowing before the next one.** `watch.yml` sits in its own
+concurrency group, so the fastest tripwire keeps running through a backfill;
+only collect/trace/scan queue, which is inside GitHub's measured 198-minute
+cron variance. And the run's FIRST push attempt failed — the retry loop
+settled it, and the commit landed, but a `gh run view` of the last fifteen
+commits did not show it because automated commits had already stacked on top.
+**Check `merge-base --is-ancestor`, not a log window.**
 
 **A classifier that destroys its input needs the same evidence bar as an
 alert.** Both defects were invisible for months because the only trace left

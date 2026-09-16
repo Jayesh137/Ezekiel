@@ -9,10 +9,19 @@ Found on the live quarantine ledger 2026-09-16:
     asset   : USDC  (0xaf88d065... - the canonical Arbitrum USDC in config.json)
     count   : 796            2024-06-13 -> 2026-08
 
-**796 records of genuine canonical USDC involving the target were destroyed**,
-because he was judged to be a forgery of his own vanity twin. Quarantined
-records never reach `data/transfers/` and the cursor advances past them, so the
-loss is permanent — those are 796 edges the transfer graph will never have.
+796 records of genuine canonical USDC were quarantined because the target was
+judged a forgery of his own vanity twin.
+
+Measured after the fix: those particular records were almost certainly NOT lost.
+`forged_side` has always protected the SWEPT wallet, so the target was only ever
+convicted in sweeps of THIRD wallets, and a transfer involving him is fetched by
+his own sweep too — the quarantined copy was the duplicate. A full `--reset`
+re-read of the cluster moved his USDC 1,444 → 1,489, not 1,444 → 2,240.
+
+The defect still matters, and costs real edges for the population that is never
+swept in its own right — most of the frontier. Quarantined records never reach
+`data/transfers/` and the cursor advances past them, so for those the loss IS
+permanent.
 
 On-chain the verdict is backwards: on Arbitrum the target has 688 transactions
 and 9,625 token transfers, the twin 59 and 698. He is 14x the more active
