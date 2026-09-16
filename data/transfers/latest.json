@@ -1,9 +1,9 @@
 {
-  "computed_at": "2026-09-16T13:56:25.712079+00:00",
+  "computed_at": "2026-09-16T14:31:57.829418+00:00",
   "wallets": 1,
-  "records": 3,
+  "records": 2,
   "spam_suppressed": 4,
-  "unpriced": 2,
+  "unpriced": 1,
   "spam_by_reason": {
     "dust": 1,
     "zero_value": 3
@@ -11,10 +11,12 @@
   "calls": 21,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "bsc",
+    "ethereum"
+  ],
   "unsupported_sources": [
     "base",
-    "bsc",
     "optimism"
   ],
   "per_wallet": [
@@ -46,26 +48,30 @@
           "unverified_kinds": {}
         },
         "ethereum": {
-          "records": 1,
+          "records": 0,
           "spam": 2,
-          "calls": 6,
+          "calls": 5,
           "cursor": 25809339,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
             "zero_value": 2
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 25809339,
             "native": 25807766,
             "internal": 20083520
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)"
+          }
         },
         "base": {
           "records": 0,
@@ -121,12 +127,14 @@
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)"
+          }
         },
         "bsc": {
           "records": 0,
           "spam": 0,
-          "calls": 1,
+          "calls": 2,
           "cursor": 0,
           "gaps": [],
           "truncated": false,
@@ -135,18 +143,23 @@
           "unpriced": 0,
           "spam_by_reason": {},
           "errors_by_kind": {
-            "erc20": "Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis"
+            "erc20": "HTTPSConnectionPool(host='api.etherscan.io', port=443): Read timed out. (read timeout=30)",
+            "native": "Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis"
           },
-          "cursor_by_kind": {},
+          "cursor_by_kind": {
+            "erc20": 0
+          },
           "incomplete_kinds": {},
           "unverified_kinds": {}
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "ethereum",
+        "bsc"
+      ],
       "unsupported_sources": [
         "base",
-        "optimism",
-        "bsc"
+        "optimism"
       ]
     },
     {
