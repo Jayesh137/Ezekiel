@@ -424,7 +424,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                  dust_usd: float = 1.0, page_size: int = 1000,
                  max_pages: int = 50, plan_refused: dict | None = None,
                  protected: set | None = None,
-                 par_contracts: set | None = None) -> dict:
+                 par_contracts: set | None = None,
+                 known_ids: set | None = None) -> dict:
     """Collect every transfer for one wallet across `chains`.
 
     `canonical` maps (chain, SYMBOL) to the one contract that really is that
@@ -600,6 +601,26 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
                 if found:
                     rec["forged"], rec["mimics"] = found
             quarantined.append(rec)
+
+        if known_ids is not None:
+            # A --reset sweep re-reads from block 0, so every record already on
+            # disk under an EARLIER date comes back; append_records dedupes
+            # against today's file only and would store it again. Frontier-wide
+            # that is ~640 MB landing in one day across three chain files, over
+            # GitHub's 100 MiB blob limit, and check_repo_size.py would fail
+            # the step before the commit — the re-sweep destroying its own
+            # output. Accepted ids join the set so two wallets sharing one
+            # transfer store it once.
+            fresh = []
+            for rec in clean:
+                rid = rec.get("id")
+                if rid and rid in known_ids:
+                    continue
+                if rid:
+                    known_ids.add(rid)
+                fresh.append(rec)
+            chain_result["already_held"] = len(clean) - len(fresh)
+            clean = fresh
 
         if clean:
             append_records(str(Path(TRANSFERS_DIR) / name), clean, key_field="id")

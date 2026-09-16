@@ -28,7 +28,9 @@ from src.chain.chains import enabled_chains
 from src.chain.collect import (
     TRANSFERS_DIR,
     read_cursors,
+    read_records,
     save_sweep_health,
+    substrate_files,
     sweep_wallet,
     write_cursors,
 )
@@ -60,6 +62,32 @@ def cluster_wallets(config: dict) -> list[str]:
     return out
 
 
+
+def swept_wallets_by_age(cluster: list[str]) -> list[str]:
+    """Every wallet with a stored cursor, cluster first, then least-recent.
+
+    229 wallets carry cursors on 2026-09-16. The cluster leads because a
+    bounded batch must never leave the target at the back of a queue, and the
+    rest follow in cursor order so repeated runs march through the list instead
+    of re-reading the same head every time — the `expanded_ledger` lesson, in
+    the one other place that walks a wallet list under a cap.
+    """
+    cursors = read_cursors()
+    seen: dict[str, int] = {}
+    for key, value in cursors.items():
+        parts = key.split(":")
+        if len(parts) < 2:
+            continue
+        addr = (parts[1] or "").lower()
+        try:
+            block = int(value or 0)
+        except (TypeError, ValueError):
+            block = 0
+        seen[addr] = max(seen.get(addr, 0), block)
+    lead = [w for w in cluster if w]
+    rest = sorted((w for w in seen if w not in set(lead)), key=lambda w: seen[w])
+    return lead + rest
+
 def reset_cursors(wallets: list[str]) -> None:
     """Drop the resume points for these wallets so the sweep starts at block 0."""
     targets = {(w or "").lower() for w in wallets}
@@ -73,6 +101,14 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wallet", action="append", default=None,
                         help="sweep this address instead of the cluster; repeatable")
+    parser.add_argument("--swept", action="store_true",
+                        help="sweep every wallet that already has a cursor, not just "
+                             "the cluster. Use with --batch to bound one run: a "
+                             "frontier-wide --reset re-reads ~640 MB into one day, "
+                             "over the 100 MiB blob limit, and loses its own work")
+    parser.add_argument("--batch", type=int, default=None,
+                        help="sweep at most this many wallets, least recently swept "
+                             "first, so repeated runs march through the list")
     parser.add_argument("--reset", action="store_true",
                         help="clear stored cursors first for a full re-read from block 0; "
                              "default is to resume from wherever the last run stopped")
@@ -88,7 +124,17 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     config = load_config()
-    wallets = [w.lower() for w in args.wallet] if args.wallet else cluster_wallets(config)
+    if args.wallet:
+        wallets = [w.lower() for w in args.wallet]
+    elif args.swept:
+        wallets = swept_wallets_by_age(cluster_wallets(config))
+    else:
+        wallets = cluster_wallets(config)
+    if args.batch:
+        # Bounded on purpose. One run must leave today's chain files under the
+        # 100 MiB blob limit, and the cluster is always swept first so the
+        # wallets that matter are never at the back of a queue.
+        wallets = wallets[:args.batch]
     collection = config.get("collection") or {}
     backfill_cfg = config.get("backfill") or {}
 
@@ -131,6 +177,27 @@ def main(argv=None) -> int:
     canonical = load_canonical_contracts(
         config, Path(DATA_DIR) / "labels" / "token_contracts.json")
 
+    # Only a --reset run needs this. It re-reads from block 0, so every record
+    # already on disk under an earlier date comes back and append_records --
+    # which dedupes against today's file alone -- would store it again. At
+    # frontier scale that is ~640 MB in one day across three chain files, past
+    # GitHub's 100 MiB blob limit, and check_repo_size.py fails the step before
+    # the commit: the re-sweep would destroy its own output. Built ONCE and
+    # shared across the wallets of the run, never per wallet, which is the
+    # O(wallets x substrate) shape that already failed the linkage phase.
+    known_ids = None
+    if args.reset:
+        known_ids = set()
+        for chain_dir in sorted(p for p in Path(TRANSFERS_DIR).iterdir()
+                                if p.is_dir()) if Path(TRANSFERS_DIR).exists() else []:
+            for path in substrate_files(chain_dir):
+                for rec in read_records(path):
+                    rid = rec.get("id") if isinstance(rec, dict) else None
+                    if rid:
+                        known_ids.add(rid)
+        print(f"[backfill] already hold {len(known_ids):,} record(s) — a "
+              f"re-read will store only what is genuinely new")
+
     results = []
     plan_refused: dict = {}
     for wallet in wallets:
@@ -141,7 +208,8 @@ def main(argv=None) -> int:
                                     price_lookup=price_lookup,
                                     plan_refused=plan_refused,
                                     protected=protected,
-                                    par_contracts=par_contracts))
+                                    par_contracts=par_contracts,
+                                    known_ids=known_ids))
 
     # Merging rather than clobbering: the trace job writes this same file every
     # 30 minutes for the target alone, and a --wallet run here sweeps something

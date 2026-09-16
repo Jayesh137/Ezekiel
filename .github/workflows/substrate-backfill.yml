@@ -26,6 +26,15 @@ on:
         description: 'Sweep only this address instead of the cluster (follows the money out of a counterparty)'
         required: false
         type: string
+      swept:
+        description: 'Sweep every wallet that already has a cursor (229 on 2026-09-16), not just the cluster. Use with batch.'
+        required: false
+        type: boolean
+        default: false
+      batch:
+        description: 'Max wallets this run. Bounds one day of output under the 100 MiB blob limit; repeated runs march through the list.'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -62,9 +71,19 @@ jobs:
           # Via env, never spliced into the run: text — an address arriving from
           # a manual dispatch is untrusted input.
           WALLET: ${{ inputs.wallet }}
+          SWEPT: ${{ inputs.swept }}
+          BATCH: ${{ inputs.batch }}
         run: |
           ARGS=""
           if [ -n "$WALLET" ]; then ARGS="--wallet $WALLET"; fi
+          if [ "$SWEPT" = "true" ]; then ARGS="$ARGS --swept"; fi
+          # Digits only: this arrives from a manual dispatch and is spliced
+          # into a command line, so it is validated rather than trusted.
+          case "$BATCH" in
+            '') ;;
+            *[!0-9]*) echo "batch must be a number, got: $BATCH" >&2; exit 1 ;;
+            *) ARGS="$ARGS --batch $BATCH" ;;
+          esac
           if [ "$FULL_RESET" = "true" ]; then ARGS="$ARGS --reset"; fi
           python scripts/backfill_transfers.py $ARGS
       # ALWAYS: this job is the longest in the repo and it advances CURSORS.
