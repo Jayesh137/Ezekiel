@@ -408,3 +408,49 @@ def test_an_unreadable_first_reading_reports_nothing():
     first = wl.snapshot(W, account_value=230_394_643.0, target_value=61_084_699.0)
     first["read_ok"] = False
     assert wl.changes(None, first) == []
+
+
+def test_the_cap_ranks_on_the_rosters_evidence_not_graph_confidence():
+    """Graph confidence is 0.0 by construction for a wallet found by any other
+    vector. Two vectors must outrank one, whatever the graph thought of it."""
+    weak = "0x" + "a1" * 20
+    strong = "0x" + "b2" * 20
+    roster = {"wallets": (
+        [{"wallet": f"0x{i:040x}", "tier": "PROBABLE", "confidence": 0.9, "vector_count": 2,
+          "is_service": False, "reasons": [], "evidence": {}} for i in range(1, 5)]
+        + [{"wallet": weak, "tier": "PROBABLE", "confidence": 0.17, "vector_count": 2,
+            "is_service": False, "reasons": [], "evidence": {}},
+           {"wallet": strong, "tier": "PROBABLE", "confidence": 0.0, "vector_count": 3,
+            "is_service": False, "reasons": [],
+            "evidence": {"correlation_confidence": 0.99}}])}
+    addrs = [w["address"] for w in wl.watched(CFG, roster=roster)]
+    assert strong in addrs, "three agreeing vectors were cut for graph confidence 0.0"
+    assert weak not in addrs
+
+
+def test_one_operator_takes_one_slot():
+    """2026-09-16: a PROBABLE master and its four sub-accounts filled five of
+    six slots. The watch reads a master's sub-accounts itself."""
+    master = "0x" + "c3" * 20
+    subs = [f"0x{i:040x}" for i in range(101, 105)]
+    group = {"master": master, "subaccounts": subs}
+    other = "0x" + "d4" * 20
+    roster = {"wallets": (
+        [{"wallet": master, "tier": "PROBABLE", "confidence": 0.0, "vector_count": 2,
+          "is_service": False, "reasons": [], "evidence": {"operator_group": group}}]
+        + [{"wallet": s, "tier": "PROBABLE", "confidence": 0.0, "vector_count": 2,
+            "is_service": False, "reasons": [],
+            "evidence": {"operator_group": group, "subaccount_of": master}} for s in subs]
+        + [{"wallet": other, "tier": "PROBABLE", "confidence": 0.0, "vector_count": 2,
+            "is_service": False, "reasons": [], "evidence": {}}])}
+    addrs = [w["address"] for w in wl.watched(CFG, roster=roster)]
+    assert master in addrs and other in addrs
+    assert not set(subs) & set(addrs)
+
+
+def test_a_sub_account_whose_master_is_not_a_candidate_keeps_its_slot():
+    sub = "0x" + "e5" * 20
+    roster = {"wallets": [{"wallet": sub, "tier": "PROBABLE", "confidence": 0.0,
+                           "vector_count": 2, "is_service": False, "reasons": [],
+                           "evidence": {"operator_group": {"master": "0x" + "f6" * 20}}}]}
+    assert sub in [w["address"] for w in wl.watched(CFG, roster=roster)]

@@ -149,17 +149,34 @@ def watched(config: dict, roster: dict | None = None) -> list[dict]:
             continue
         if tier not in WATCHED_TIERS or row.get("is_service"):
             continue
-        try:
-            confidence = float(row.get("confidence") or 0)
-        except (TypeError, ValueError):
-            confidence = 0.0
-        candidates.append((WATCHED_TIERS.index(tier), -confidence, address, row, tier))
+        candidates.append(row)
 
-    # CONFIRMED before PROBABLE, then by confidence, so the cap can only ever
-    # drop the weakest evidence.
-    for _tier_rank, _negconf, address, row, tier in sorted(candidates, key=lambda c: c[:3]):
+    # One slot per OPERATOR. A master and its sub-accounts share one vector set
+    # by construction (`roster.apply_operator_groups`), so a PROBABLE group of
+    # five filled five of six slots on 2026-09-16 while the watch already reads
+    # every master's sub-accounts itself. A sub-account is skipped only when its
+    # master is a candidate too; an orphaned one keeps its own slot.
+    candidate_addresses = {(r.get("wallet") or "").strip().lower() for r in candidates}
+
+    def _grouped_under_another(row: dict) -> bool:
+        group = (row.get("evidence") or {}).get("operator_group") or {}
+        master = (group.get("master") or "").strip().lower()
+        address = (row.get("wallet") or "").strip().lower()
+        return bool(master) and master != address and master in candidate_addresses
+
+    # The roster's own chase priority — tier, then agreeing vectors, then the
+    # strongest reading any vector gives — so the cap drops the weakest
+    # evidence. It used to sort on graph `confidence`, which is 0.0 by
+    # construction for a wallet found by any other vector: the ranking defect
+    # `roster.evidence_strength` was written to fix, left standing here.
+    from src.roster import rank_key
+    for row in sorted(candidates, key=rank_key):
         if len(out) >= MAX_WATCHED:
             break
+        if _grouped_under_another(row):
+            continue
+        address = (row.get("wallet") or "").strip().lower()
+        tier = row.get("tier")
         reasons = [r for r in (row.get("reasons") or []) if isinstance(r, str)]
         why = f"roster {tier} ({row.get('confidence')})"
         if reasons:
