@@ -681,7 +681,8 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             # lost, permanently, while the run still reports itself healthy.
             reason = spam_mod.classify_spam(rec, volume, wallet=addr,
                                             dust_usd=dust_usd,
-                                            protected=protected)
+                                            protected=protected,
+                                            canonical=canonical)
             if reason is None:
                 clean.append(rec)
                 continue

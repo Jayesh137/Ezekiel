@@ -954,6 +954,42 @@ two minutes, where the 25-wallet batch stored 345,100. Re-sweeping is cheap
 per wallet and expensive in aggregate, so **target it rather than sweeping the
 frontier wholesale.**
 
+**Keeping unpriced records opened a hole, and the fix is the same signal
+pointed the other way (2026-09-16).** Address-poisoning was always caught —
+`forged_side` compares addresses. SYMBOL poisoning never had to be: a token
+calling itself `UЅDС` with a Cyrillic Ѕ and С is in no registry, so it priced
+as `unpriced` and was quarantined for that reason. Once unpriced records became
+worth keeping, the forgeries came with them.
+
+Measured right after the first targeted re-sweeps: **314 records across 11
+forged symbols** — `USDС`, `UЅDС`, `ÚSDС`, `UЅDC`, `ÚЅDС`, `USḌC`, `EТH`,
+`ЕТН`, `UЅDT`, `WBТC`, and one padded with invisible U+180E. Their value stays
+None so rule 2's money protection held and no dollar figure moved, but they
+become graph EDGES linking a wallet to whoever sent the poison.
+
+**A confusable fold is WRONG for pricing and RIGHT for detection**, and each
+direction is only safe because the other exists:
+
+- **Pricing never folds.** `USDС` folded onto `USDC` prices a counterfeit at
+  par — the $3.07B lesson. `SYMBOL_HOMOGLYPHS` stays a measured map with its
+  one entry (U+20AE, Tether's own `USD₮0`), and a test pins that the Cyrillic
+  case must NOT fold there.
+- **Detection folds hard.** `confusable_fold` strips combining marks, maps
+  look-alike Cyrillic/Greek letters to Latin, and discards non-alphanumerics.
+  A symbol that folds onto a ticker we price while not BEING that ticker is
+  disguised on purpose.
+
+**Equality, never containment — an earlier version used a substring and flagged
+every legitimate DeFi token.** `aUSDC`, `gtUSDC`, `variableDebtEthUSDC`,
+`yDAI+yUSDC+yUSDT+yTUSD` and `vAMM-WETH/USDC` are real Aave, Morpho and Yearn
+tokens that merely CONTAIN a ticker; they fold to themselves. Replayed live:
+**314 caught, 34,373 genuine unpriced records kept** — full precision, nothing
+real lost.
+
+`quarantine_impostor_tokens` checks it too, because nothing re-reads a stored
+record's classification except that pass: without it the 314 already on disk
+stay graph edges for ever.
+
 **A classifier that destroys its input needs the same evidence bar as an
 alert.** Both defects were invisible for months because the only trace left
 behind was an address and a count, in a file nothing read.

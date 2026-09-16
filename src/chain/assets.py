@@ -220,6 +220,78 @@ def canonical_symbol(contract: str | None, chain: str | None,
     return None
 
 
+
+# Cyrillic and Greek letters that are visually identical to Latin ones. Used
+# ONLY to detect a disguise, never to price: folding `USDС` (Cyrillic С) onto
+# `USDC` for pricing would book a counterfeit at par, which is rule 2's $3.07B
+# lesson. See SYMBOL_HOMOGLYPHS above for the pricing side, which stays a
+# one-entry measured map for exactly that reason.
+_CONFUSABLES = {
+    "Ѕ": "S", "С": "C", "А": "A", "Е": "E", "О": "O",
+    "Р": "P", "Т": "T", "В": "B", "Н": "H", "М": "M",
+    "К": "K", "Х": "X", "І": "I", "Ј": "J", "а": "A",
+    "с": "C", "е": "E", "о": "O", "р": "P", "х": "X",
+    "у": "Y", "Β": "B", "Ε": "E", "Η": "H", "Ι": "I",
+    "Κ": "K", "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P",
+    "Τ": "T", "Χ": "X",
+}
+
+
+def confusable_fold(symbol: str) -> str:
+    """A ticker with every disguise stripped. For DETECTION only.
+
+    NFKD then drop combining marks (so `ÚSDС` loses its acute and `USḌC` its
+    dot), map look-alike Cyrillic/Greek letters to Latin, and discard anything
+    that is not alphanumeric — which removes the invisible formatting
+    characters a forger pads a symbol with, such as the U+180E in `Е᠎T᠎Н`.
+
+    Never use this to price. `value_usd` deliberately does not, and
+    tests/test_pricing_by_contract.py pins that the Cyrillic USDC must not fold
+    there.
+    """
+    import unicodedata
+
+    decomposed = unicodedata.normalize("NFKD", symbol or "")
+    mapped = "".join(_CONFUSABLES.get(ch, ch) for ch in decomposed
+                     if not unicodedata.combining(ch))
+    return "".join(ch for ch in mapped if ch.isalnum()).upper()
+
+
+def is_symbol_forgery(symbol: str, contract: str | None, chain: str | None,
+                      canonical: dict | None) -> bool:
+    """Is this token DISGUISED as one we price, from a contract that is not it?
+
+    Two conditions, and the pair is what keeps it tight:
+
+      * the symbol folds onto a ticker we price, and
+      * it is not already that ticker — a token that simply IS `USDC` folds
+        onto `USDC` too, and is not a forgery.
+
+    Equality, never containment. `aUSDC`, `gtUSDC`, `variableDebtEthUSDC` and
+    `yDAI+yUSDC+yUSDT+yTUSD` are real Aave, Morpho and Yearn tokens that merely
+    contain a ticker; an earlier substring version of this check flagged every
+    one of them on live data.
+
+    Silent without a registry, exactly as `is_impostor` is: unable to tell a
+    counterfeit from a token we have not catalogued, and guessing in that
+    direction discards real transfers.
+    """
+    if not canonical:
+        return False
+    plain = normalise_symbol(symbol)
+    if plain in STABLES or plain in MAJORS:
+        return False                      # it is the real ticker, priced above
+    folded = confusable_fold(symbol)
+    if folded not in STABLES and folded not in MAJORS:
+        return False                      # not pretending to be anything
+    known = canonical.get(((chain or "").lower(), folded))
+    if known:
+        if isinstance(known, str):
+            known = {known}
+        if (contract or "").lower() in {k.lower() for k in known}:
+            return False                  # genuinely that token, oddly labelled
+    return True
+
 def value_usd(symbol: str, amount: float, date_str: str,
               price_lookup, *, contract: str | None = None,
               chain: str | None = None,

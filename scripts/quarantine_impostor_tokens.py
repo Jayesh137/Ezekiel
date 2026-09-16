@@ -31,7 +31,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.chain.assets import is_impostor, load_canonical_contracts
+from src.chain.assets import (
+    is_impostor,
+    is_symbol_forgery,
+    load_canonical_contracts,
+)
 from src.chain.collect import (
     TRANSFERS_DIR,
     decode_records,
@@ -52,8 +56,18 @@ def scrub_records(records: list, canonical: dict) -> tuple[int, float]:
             continue
         if rec.get("value_basis") == IMPOSTOR_BASIS:
             continue                                   # already done
-        if not is_impostor(rec.get("asset"), rec.get("token_address"),
-                           rec.get("chain"), canonical):
+        # Two ways a token can be a forgery, and only one was checked here.
+        # `is_impostor` catches a wrong contract behind a RIGHT ticker;
+        # `is_symbol_forgery` catches a ticker DISGUISED as one we price —
+        # Cyrillic `UЅDС`, `EТH`. The second only started reaching the
+        # substrate when unpriced records stopped being destroyed, and 314 were
+        # stored before the check existed. Nothing re-reads a stored record's
+        # classification except this pass, so without it they stay graph edges
+        # for ever.
+        if not (is_impostor(rec.get("asset"), rec.get("token_address"),
+                            rec.get("chain"), canonical)
+                or is_symbol_forgery(rec.get("asset"), rec.get("token_address"),
+                                     rec.get("chain"), canonical)):
             continue
         removed += float(rec.get("amount_usd") or 0)
         # None, never 0.0: a forgery has no dollar value, and 0.0 is a number

@@ -17,6 +17,8 @@ self-wallet or the Hyperliquid bridge.
 Pure — no IO, no config reads.
 """
 
+from src.chain import assets as assets_mod
+
 
 def counterparty_volume(records: list[dict], wallet: str) -> dict[str, float]:
     """Total priced USD moved with `wallet`, per counterparty address.
@@ -157,7 +159,8 @@ def ground_truth_addresses(config: dict) -> set[str]:
 def classify_spam(record: dict, volume, *, wallet: str | None = None,
                   dust_usd: float = 1.0,
                   prefix: int = 4, suffix: int = 4,
-                  protected: set | None = None) -> str | None:
+                  protected: set | None = None,
+                  canonical: dict | None = None) -> str | None:
     """Why this record is noise, or None if it is real money.
 
     Order is deliberate. The lookalike check runs before the dust check because
@@ -192,6 +195,16 @@ def classify_spam(record: dict, volume, *, wallet: str | None = None,
     # value must not be priced as 0.0, and must not be grounds for deletion
     # either. Quarantined records never reach the substrate and the cursor
     # advances past them, so the loss is permanent.
+    # A token DISGUISED as one we price — Cyrillic `UЅDС`, `EТH` — is a
+    # forgery, not merely unpriceable. Keeping unpriced records let 314 of
+    # these into the substrate before this check existed: harmless to the
+    # dollar figures, since their value stays None, but they become graph
+    # EDGES linking a wallet to whoever sent the poison.
+    if assets_mod.is_symbol_forgery(record.get("asset"),
+                                    record.get("token_address"),
+                                    record.get("chain"), canonical):
+        return "symbol_forgery"
+
     basis = record.get("value_basis")
     if basis == "impostor_token":
         return "impostor_token"
