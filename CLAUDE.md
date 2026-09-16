@@ -681,6 +681,43 @@ analyze.yml and `git add data/` stages deletions (verified: 21 deletions and 21
 additions). **The next file to watch is `data/transfers_spam/latest.json` at
 38.4 MB**, now the largest single file in the repo.
 
+**The quarantine ledger was the largest file in the repo, and nothing read it
+(fixed 2026-09-16).** `data/transfers_spam/latest.json` held **130,099 address
+entries covering 611,811 suppressed records at 38.9 MB**, growing ~5 MB a day —
+about **thirteen days from the 100 MiB blob limit**. It is also rewritten WHOLE
+on every run, 200 commits so far, so each run added another ~38 MB blob. Read
+by nothing: not `src/`, not `scripts/`, not the dashboard, not
+`data/index.json`. The transfer-graph edges again — 212,457 carried to serve a
+maximum of 40 — in the file that replaced it at the top of the list.
+
+**61.5% of the entries had been seen exactly once** and the top 1,000 covered
+54.4% of all suppressions, so the tail paid for itself in nothing. Capped at
+the **2,000 loudest**, which is also the right axis for the file's one human
+purpose, stated in `spam.rollup`: a legitimate token the registry does not know
+yet should stay visible so it can be added to `assets.py` — and such a token is
+one that keeps turning up. Live: **38.86 MB → 0.61 MB, 63.7x**, with
+`suppressed_total` and every per-reason figure identical before and after.
+
+**The number that had to change shape first.** `suppressed_total` was
+`sum(e["count"] for e in merged)` — a sum over the STORED list, correct only
+while the list was complete. Trimming it as written would have silently shrunk
+the count of what we threw away, so the ledger of our own blindness would have
+started under-reporting **at the moment it started saving space**. It is a
+persisted running total now, with per-reason totals beside it, both seeded from
+the legacy file with no recount needed: the old sum WAS the running total,
+because it summed a complete list.
+
+**And one figure is deliberately absent: the number of distinct addresses ever
+seen.** Once an entry is evicted a re-sighting cannot be told from a first
+sighting, so it cannot be maintained exactly. Rule 5 cuts both ways — a number
+that cannot be exact is left out rather than published as fact. `entries_stored`,
+`entries_cap` and `entries_truncated` are declared instead, the same way the
+graph declares `edges_truncated`.
+
+**Ask what an aggregate is a sum OVER before capping the thing it sums.** A
+total computed from the collection you are about to trim is not a total any
+more, and it will not complain.
+
 **Still not fixed, and made worse by this:** `_load_cached`'s 256 MiB ceiling
 counts FILE bytes while holding PARSED objects. With the substrate 6x smaller
 on disk the ceiling stops being protective — 68 MB of `.gz` parses to the same

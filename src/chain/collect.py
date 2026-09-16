@@ -625,16 +625,62 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
     return result
 
 
+# Addresses kept in the quarantine ledger, highest count first. The file is
+# rewritten WHOLE on every run and read by nothing — not src/, not scripts/,
+# not the dashboard, not data/index.json — and it had reached 38.9 MB across
+# 130,099 entries, the largest file in the repo, growing ~5 MB a day: about
+# thirteen days from the 100 MiB blob limit that refuses a push after the run
+# has already done its work.
+#
+# 61.5% of those entries had been seen exactly once and the top 1,000 covered
+# 54.4% of all suppressions, so the tail was paying for itself in nothing.
+# Frequency is also the right thing to keep for the file's one human purpose,
+# which spam.rollup states: a legitimate token the registry does not know yet
+# should be visible so it can be added to assets.py, and such a token is one
+# that keeps turning up.
+MAX_SPAM_ENTRIES = 2000
+
+
 def _merge_spam_rollup(entries: list[dict]) -> None:
-    """Fold this run's quarantine into the persisted rollup."""
+    """Fold this run's quarantine into the persisted rollup, capped.
+
+    The aggregates are RUNNING TOTALS, not sums over the stored list. That
+    distinction is the whole reason this can be trimmed at all: the previous
+    `sum(e["count"] for e in merged)` was correct only while the list was
+    complete, so evicting the tail would have silently shrunk the count of what
+    we threw away. A ledger of our own blindness that under-reports to save
+    space has given up the only thing it is for (rule 5).
+
+    Deliberately NOT published: the number of distinct addresses ever seen.
+    Once an entry is evicted a re-sighting is indistinguishable from a first
+    sighting, so that figure cannot be maintained exactly — and rule 5 cuts
+    both ways, so it is absent rather than approximate and labelled as fact.
+    """
     path = Path(SPAM_DIR) / "latest.json"
     try:
-        existing = json.loads(path.read_text()).get("entries", [])
+        stored = json.loads(path.read_text())
     except (OSError, ValueError):
-        existing = []
+        stored = {}
+    if not isinstance(stored, dict):
+        stored = {}
+    existing = stored.get("entries") or []
+
+    # Migration needs no recount: the legacy `suppressed_total` was a sum over
+    # a COMPLETE list, which is exactly the running total to carry forward.
+    total = int(stored.get("suppressed_total") or 0)
+    by_reason: dict[str, int] = dict(stored.get("by_reason") or {})
+    if "by_reason" not in stored:
+        for e in existing:
+            by_reason[e.get("reason") or "unknown"] = (
+                by_reason.get(e.get("reason") or "unknown", 0) + int(e.get("count") or 0))
 
     by_addr = {e["address"]: e for e in existing if e.get("address")}
     for entry in entries:
+        # Counted before the merge, so eviction below can never reach them.
+        total += int(entry.get("count") or 0)
+        reason = entry.get("reason") or "unknown"
+        by_reason[reason] = by_reason.get(reason, 0) + int(entry.get("count") or 0)
+
         prior = by_addr.get(entry["address"])
         if prior is None:
             by_addr[entry["address"]] = entry
@@ -645,10 +691,17 @@ def _merge_spam_rollup(entries: list[dict]) -> None:
         prior["mimics"] = prior.get("mimics") or entry.get("mimics")
 
     merged = sorted(by_addr.values(), key=lambda e: -e["count"])
+    kept = merged[:MAX_SPAM_ENTRIES]
     save_latest(str(SPAM_DIR), {
         "last_updated": datetime.now(UTC).isoformat(),
-        "suppressed_total": sum(e["count"] for e in merged),
-        "entries": merged,
+        "suppressed_total": total,
+        "by_reason": dict(sorted(by_reason.items(), key=lambda kv: -kv[1])),
+        # Said plainly, so the kept list can never be mistaken for the whole —
+        # the rule the transfer graph's `edges_truncated` already follows.
+        "entries_stored": len(kept),
+        "entries_cap": MAX_SPAM_ENTRIES,
+        "entries_truncated": len(merged) > len(kept),
+        "entries": kept,
     })
 
 
