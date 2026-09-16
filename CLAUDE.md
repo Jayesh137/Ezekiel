@@ -1327,10 +1327,25 @@ has signed **18 transactions** there — so the money was moved on inside Monad,
 to somewhere this project cannot yet see. Earlier it used Unichain (domain 10,
 2025-04/05) and Socket the same way.
 
-What this is for the mission, stated carefully: it is his capital leaving the
-chains we watch, in size, recently and repeatedly — either on its way back to a
-Hyperliquid account through a route not yet decoded, or trading on a Monad
-venue the owner cannot copy. Both matter; neither is established. Built the
+**Followed the same evening, and it is a yield loop back into the SAME account —
+not a migration.** Monad's public RPC caps `eth_getLogs` at 100 blocks, so each
+tranche was followed from its known burn time: four of five were minted to
+`0xf078969e…` 16-25 minutes after the burn and **supplied in full to Aave V3 on
+Monad** within minutes (`Pool.supply`, pool `0x69a5f9ad…`, aToken `aMonUSDC`
+`0x35a73bac…`). The fifth (09-11) did not mint within the hour scanned. The
+wallet holds **$11.82M aMonUSDC** now, so ~$20M came back out. The substrate
+shows where: Circle mints back to `0xf078969e…` on Arbitrum/Ethereum, each
+followed within a minute by the TARGET's own CctpExtension deposit into his own
+Hyperliquid account — 08-27 16:49 **$5,005,143.73** back ($4,999,590.26 sent
+08-15 plus ~$5.5K of twelve days' interest), deposited 16:49:56 as $5,005,143.75;
+09-14 20:36 $6,000,000 back, deposited 20:37. The outbound legs start the same
+way: a Circle withdrawal from HL mints at the target's Arbitrum address
+(08-28 21:34, 09-11 03:16, 09-15 22:21) and `0xf078969e…` burns the same amount
+to Monad three to seven minutes later. **Idle trading capital parked in lending
+between trades, returning to the account the owner already copies.** The
+lesson for the risk score: capital leaving HL in size is his routine treasury
+management, so an outbound flow is not by itself a migration signal — follow
+it to where it lands. Built the
 same day: the full Circle domain table, bridge decoding for CONFIRMED wallets
 (history as a baseline), foreign landings alerting once instead of every 72h,
 and Monad in `config.chains` with its USDC contract registered FIRST (read
