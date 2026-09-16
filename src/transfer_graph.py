@@ -248,7 +248,14 @@ def edge_passes_dust(edge: dict, dust_usd: float) -> bool:
         return True
     return float(usd) >= dust_usd
 
-def normalise_transfer_record(rec: dict) -> dict | None:
+def _swept_for_graph() -> set:
+    """Wallets whose own sweep we hold — the senders an unpriced edge may name."""
+    from src.linkage import swept_wallets
+
+    return swept_wallets(load_config())
+
+
+def normalise_transfer_record(rec: dict, swept: set | None = None) -> dict | None:
     """A src/chain normalised record into a graph edge.
 
     Quarantined records are dropped here rather than filtered by the caller, so
@@ -264,6 +271,20 @@ def normalise_transfer_record(rec: dict) -> dict | None:
     every comparison here reads `or 0`, which is exactly right for a minimum
     and exactly wrong for the dust filter (see edge_passes_dust).
 
+    But an unpriced token's movement is only observed when we observed its
+    SENDER act. An ERC-20 Transfer event's `from` is whatever the token contract
+    writes, and for a token we know nothing about that is the contract's claim,
+    not a fact (rule 2). Spam contracts write famous addresses: on the first
+    trace run after unpriced records were kept, the Ethereum USDC contract,
+    vitalik.eth and Polygon's USDT/USDC/WETH contracts became "counterparties",
+    and 129 zero-confidence nodes hung off inbound airdrops to one CONFIRMED
+    wallet — 161 of 299 graph nodes replaced. So when `swept` is given, an
+    `unpriced` record is an edge only if its sender is a wallet we swept: that
+    wallet's own outbound. An airdrop pushed at a swept wallet by an address we
+    never read stays in the substrate and becomes an edge the day its sender is
+    swept. `price_unavailable` is a major we could not value — real money,
+    whoever sent it — and is never gated.
+
     The edge id is chain-scoped and hash-scoped, so a movement that arrives both
     from data/l1_transactions and from data/transfers collapses to one edge.
     """
@@ -273,6 +294,9 @@ def normalise_transfer_record(rec: dict) -> dict | None:
     src = (rec.get("src") or "").lower()
     dst = (rec.get("dst") or "").lower()
     if not src or not dst or src == dst:
+        return None
+    if (swept is not None and rec.get("value_basis") == "unpriced"
+            and src not in swept):
         return None
     chain = rec.get("chain") or CHAIN_ARBITRUM
     ref = rec.get("tx_hash", "")
@@ -1540,10 +1564,11 @@ def collect_known_edges() -> list[dict]:
 
     transfers_root = DATA_DIR / "transfers"
     if transfers_root.exists():
+        swept = _swept_for_graph()
         for chain_dir in sorted(p for p in transfers_root.iterdir() if p.is_dir()):
             for path in substrate_files(chain_dir):
                 for rec in read_records(path):
-                    e = normalise_transfer_record(rec)
+                    e = normalise_transfer_record(rec, swept)
                     if e:
                         edges.append(e)
 
@@ -2077,6 +2102,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
 
     edges = list(edges)
     known_ids = {e["id"] for e in edges}
+    swept_now = _swept_for_graph()
     dust_usd = budget.get("dust_usd", DEFAULTS["dust_usd"])
     # Configurable, but never unbounded: a missing or nonsensical config value
     # falls back to the module default rather than disabling the ceiling.
@@ -2238,8 +2264,11 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 explored[wallet] = None
                 expanded_now.add(wallet)
                 diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
+                # The wallet just swept is a sender we observed; see
+                # normalise_transfer_record for why an unpriced edge needs one.
+                swept_now.add(wallet)
                 for rec in rows:
-                    e = normalise_transfer_record(rec)
+                    e = normalise_transfer_record(rec, swept_now)
                     if not e or e["id"] in known_ids:
                         continue
                     known_ids.add(e["id"])

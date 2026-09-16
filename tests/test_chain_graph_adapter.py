@@ -158,3 +158,54 @@ def test_a_fund_flow_finding_still_dedupes_with_its_substrate_edge(tmp_path, mon
     edges = tg.collect_known_edges()
     assert len(edges) == 2                      # one substrate edge, one finding edge
     assert len(tg.dedupe_edges(edges)) == 1      # ...but they are the same movement
+
+
+# --- an unregistered token's `from` is the token contract's claim, not an act --
+#
+# Keeping unpriced records (2026-09-16) let unsolicited airdrops become edges.
+# An ERC-20 Transfer event's `from` is whatever the token contract writes, and
+# spam contracts write famous addresses: the Ethereum USDC contract, vitalik.eth,
+# Polygon's USDT/USDC/WETH contracts. Measured on the first trace run after:
+# 161 of 299 graph nodes replaced, 129 of them zero-confidence "counterparties"
+# of the CONFIRMED wallet 0xf078969e hanging off inbound airdrops like
+# "$ USDCNotice.com <- Visit to secure your wallet".
+#
+# The record stays in the substrate (that decision stands). What changes is
+# which unpriced movements the GRAPH asserts: one whose sender we swept — that
+# wallet's own outbound, an act we observed — and not one pushed at a swept
+# wallet by an address we have never read.
+
+def test_an_unpriced_token_pushed_at_a_swept_wallet_is_not_an_edge():
+    rec = record(src="0xspammer", dst="0xswept", amount_usd=None,
+                 value_basis="unpriced", asset="$ USDCNotice.com <- Visit")
+    assert tg.normalise_transfer_record(rec, swept={"0xswept"}) is None
+
+
+def test_an_unpriced_token_sent_by_a_swept_wallet_is_an_edge():
+    rec = record(src="0xswept", dst="0xdest", amount_usd=None,
+                 value_basis="unpriced", asset="PT-USDe-25SEP2025")
+    edge = tg.normalise_transfer_record(rec, swept={"0xswept"})
+    assert edge is not None and edge["amount_usd"] is None
+
+
+def test_a_major_we_could_not_price_is_never_gated_on_its_sender():
+    """price_unavailable is ETH we could not value: real money whoever sent it."""
+    rec = record(src="0xstranger", dst="0xswept", kind="native", asset="ETH",
+                 amount_usd=None, value_basis="price_unavailable")
+    assert tg.normalise_transfer_record(rec, swept={"0xswept"}) is not None
+
+
+def test_collect_known_edges_applies_the_sender_gate(tmp_path, monkeypatch):
+    monkeypatch.setattr(tg, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(tg, "_swept_for_graph", lambda: {"0xswept"})
+    chain_dir = tmp_path / "transfers" / "ethereum"
+    chain_dir.mkdir(parents=True)
+    (chain_dir / "2026-09-16.json").write_text(json.dumps([
+        record(id="a", tx_hash="0xa", src="0xspammer", dst="0xswept", amount_usd=None,
+               value_basis="unpriced", asset="SPAM"),
+        record(id="b", tx_hash="0xb", src="0xswept", dst="0xdest", amount_usd=None,
+               value_basis="unpriced", asset="PENDLE-LPT"),
+    ]))
+    pairs = {(e["src"], e["dst"]) for e in tg.collect_known_edges()}
+    assert ("0xswept", "0xdest") in pairs
+    assert ("0xspammer", "0xswept") not in pairs
