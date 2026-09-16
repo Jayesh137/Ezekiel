@@ -27,10 +27,18 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-# Circle CCTP domain ids -> chain names.
+# Circle CCTP domain ids -> chain names, from Circle's own table
+# (developers.circle.com/cctp/cctp-supported-blockchains, read 2026-09-16).
+# The earlier hand-kept map stopped at 19 with gaps, so `0xf078969e…`'s five
+# CCTP burns to domain 15 — $32.8M between 2026-08-15 and 09-15 — decoded as
+# "domain-15": a chain nobody could name was a chain nobody went to look at.
+# It is Monad.
 CCTP_DOMAINS = {0: "ethereum", 1: "avalanche", 2: "optimism", 3: "arbitrum",
-                5: "solana", 6: "base", 7: "polygon", 10: "unichain", 11: "linea",
-                12: "codex", 13: "sonic", 14: "worldchain", 16: "sei", 19: "hyperevm"}
+                5: "solana", 6: "base", 7: "polygon", 9: "aptos", 10: "unichain",
+                11: "linea", 12: "codex", 13: "sonic", 14: "worldchain", 15: "monad",
+                16: "sei", 17: "bsc", 18: "xdc", 19: "hyperevm", 21: "ink", 22: "plume",
+                25: "starknet", 26: "arc", 27: "stellar", 28: "edge", 29: "injective",
+                30: "morph", 31: "pharos", 32: "cronos", 33: "plasma", 37: "xlayer"}
 
 # Blockscout hosts per chain, as in src/chain/activity.py.
 HOSTS = {
