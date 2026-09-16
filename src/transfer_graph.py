@@ -1486,13 +1486,24 @@ def collect_known_edges() -> list[dict]:
     # keeps the first-seen edge for a given id); the legacy reader stays live because
     # data/l1_transactions is the only copy of history collected before the substrate
     # existed.
+    # Read through the substrate's own reader, not load_all_records: a sealed
+    # day is stored gzipped and `*.json` would see it as absent. Measured the
+    # moment compaction landed — a chain directory of seven sealed days plus
+    # today returned 26,001 records instead of ~300,000, silently, which would
+    # have rebuilt this graph from one day of history and reported it healthy.
+    # `record_key` returns None for a chain directory, so load_all_records was
+    # deduping nothing here and the swap loses no behaviour; edges are deduped
+    # downstream by `dedupe_edges` on their id, as they always were.
+    from src.chain.collect import read_records, substrate_files
+
     transfers_root = DATA_DIR / "transfers"
     if transfers_root.exists():
         for chain_dir in sorted(p for p in transfers_root.iterdir() if p.is_dir()):
-            for rec in load_all_records(str(chain_dir)):
-                e = normalise_transfer_record(rec)
-                if e:
-                    edges.append(e)
+            for path in substrate_files(chain_dir):
+                for rec in read_records(path):
+                    e = normalise_transfer_record(rec)
+                    if e:
+                        edges.append(e)
 
     for tx in load_all_records(str(DATA_DIR / "l1_transactions")):
         e = normalise_l1_transfer(tx)

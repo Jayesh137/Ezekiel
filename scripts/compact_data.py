@@ -141,6 +141,101 @@ def _account_summary_row(hhmm: str, payload: dict) -> dict | None:
         return None
 
 
+def _verify_archive(archive: Path, original: list) -> bool:
+    """Does the archive hold exactly the records the original did?
+
+    Compared by record `id`, not by count. The snapshot archiver above verifies
+    a count, which is right for opaque per-minute payloads; it is not enough
+    here, because these records are the substrate the whole transfer graph is
+    rebuilt from and a count match can hide a mangled one. Records with no `id`
+    are counted separately — `records_for` keeps them for the same reason, that
+    a record which cannot be judged a duplicate must not be silently dropped.
+    """
+    from src.chain.collect import read_records
+
+    back = read_records(archive)
+    if len(back) != len(original):
+        return False
+    ids_before = [r.get("id") for r in original if isinstance(r, dict)]
+    ids_after = [r.get("id") for r in back if isinstance(r, dict)]
+    return ids_before == ids_after
+
+
+def compact_transfers(dry_run: bool = True) -> dict:
+    """Roll every SEALED day of `data/transfers/` into gzipped JSONL, in place.
+
+    The substrate grows faster than anything else here — 416 MB in the seven
+    days from 2026-09-09, with `ethereum/2026-09-10.json` at 76.69 MB against
+    GitHub's 100 MiB hard blob limit. A file over that line is refused by the
+    pre-receive hook, which fails the push AFTER the run has done its work; the
+    transfer graph crossing it on 2026-09-12 cost twelve consecutive trace runs.
+    Measured: 416 MB -> 68.3 MB, and 14.8x on that largest file alone.
+
+    Three things this deliberately does NOT do.
+
+    It does not touch **today's** file: `utils.append_records` writes
+    `<today>.json` and only that, so every other day is sealed against the
+    collector, and compacting the file a sweep is appending to would race it.
+
+    It does not move anything to an `archive/` subdirectory, unlike the
+    snapshot roller. Sealed days are still AMENDED — `quarantine_impostor_tokens`
+    marks newly-found counterfeit contracts as spam on old records (rule 2) and
+    `reprice` fills in prices it could not resolve at sweep time. Both reach
+    these files through `substrate_files`, so the archive has to stay where the
+    day lives.
+
+    It does not delete anything it has not read back and compared. The
+    substrate cannot be re-derived from anything else in the repo and
+    re-sweeping it costs Etherscan budget nobody has, so a deletion that
+    outran its check is unrecoverable.
+    """
+    from src.chain.collect import ARCHIVE_SUFFIX, decode_records, write_records
+    from src.utils import today_str
+
+    root = DATA_DIR / "transfers"
+    out = {"files": 0, "failed": 0, "records": 0,
+           "before": _dir_size(root) if root.exists() else 0, "after": 0}
+    if not root.exists():
+        return out
+
+    today = today_str()
+    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in sorted(chain_dir.glob("*.json")):
+            day = path.name[: -len(".json")]
+            if day >= today:
+                continue
+            try:
+                records = decode_records(path)
+            except (OSError, ValueError, EOFError) as e:
+                # Not ours to rewrite, and never silently: a day we cannot read
+                # is blindness, not an empty day (rule 5).
+                print(f"  ! unreadable, left alone: {path} ({e})")
+                out["failed"] += 1
+                continue
+            if not isinstance(records, list):
+                print(f"  ! not a record list, left alone: {path}")
+                out["failed"] += 1
+                continue
+
+            out["files"] += 1
+            out["records"] += len(records)
+            if dry_run:
+                continue
+
+            archive = chain_dir / f"{day}{ARCHIVE_SUFFIX}"
+            write_records(archive, records)
+            if not _verify_archive(archive, records):
+                print(f"  ! verification FAILED, original kept: {path}")
+                archive.unlink(missing_ok=True)
+                out["files"] -= 1
+                out["failed"] += 1
+                continue
+            path.unlink()
+
+    out["after"] = _dir_size(root)
+    return out
+
+
 def archive_snapshot_type(data_type: str, dry_run: bool = True,
                           keep_days: int = KEEP_LIVE_DAYS) -> dict:
     """Roll dated snapshot subdirectories into one gzipped JSONL per day."""
@@ -405,6 +500,13 @@ def main():
             print(f"{data_type}: {d['removed']} cross-file duplicate(s) removed, "
                   f"{d['kept']} kept  {_fmt(d['before'])}"
                   + ("" if dry else f" -> {_fmt(d['after'])}"))
+
+    tr = compact_transfers(dry)
+    if tr["files"] or tr["failed"]:
+        print(f"transfers: {tr['files']} sealed day(s) / {tr['records']:,} records "
+              f"-> gzip  {_fmt(tr['before'])}"
+              + ("" if dry else f" -> {_fmt(tr['after'])}")
+              + (f"  [{tr['failed']} left alone]" if tr["failed"] else ""))
 
     for t in SNAPSHOT_TYPES:
         r = archive_snapshot_type(t, dry, args.keep_days)

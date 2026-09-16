@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.chain.collect import read_records, substrate_files
 from src.chain.labels import SERVICE_CATEGORIES
 from src.utils import DATA_DIR, etherscan_get, load_config
 
@@ -342,19 +343,14 @@ def high_fanin_addresses(threshold: int = 25) -> set:
     Counting distinct senders costs nothing: the substrate is already in memory.
     """
     import collections
-    import json as _json
 
     senders: dict[str, set] = collections.defaultdict(set)
     root = DATA_DIR / "transfers"
     if not root.exists():
         return set()
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for path in sorted(chain_dir.glob("*.json")):
-            try:
-                with open(path) as f:
-                    rows = _json.load(f)
-            except (OSError, ValueError):
-                continue
+        for path in substrate_files(chain_dir):
+            rows = read_records(path)
             for rec in rows if isinstance(rows, list) else []:
                 if not isinstance(rec, dict) or rec.get("spam"):
                     continue

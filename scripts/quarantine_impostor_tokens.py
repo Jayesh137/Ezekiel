@@ -26,15 +26,19 @@ it fixes, so anything uncatalogued is left exactly as it is.
 Idempotent: a record already marked stays marked, and nothing is re-counted.
 """
 
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.chain.assets import is_impostor, load_canonical_contracts
-from src.chain.collect import TRANSFERS_DIR
-from src.utils import DATA_DIR, atomic_write_json, load_config
+from src.chain.collect import (
+    TRANSFERS_DIR,
+    decode_records,
+    substrate_files,
+    write_records,
+)
+from src.utils import DATA_DIR, load_config
 
 IMPOSTOR_BASIS = "impostor_token"
 IMPOSTOR_REASON = "impostor_token"
@@ -78,11 +82,10 @@ def main() -> int:
 
     total_marked, total_removed, files = 0, 0.0, 0
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for path in sorted(chain_dir.glob("*.json")):
+        for path in substrate_files(chain_dir):
             try:
-                with open(path) as f:
-                    records = json.load(f)
-            except (OSError, ValueError):
+                records = decode_records(path)
+            except (OSError, ValueError, EOFError):
                 print(f"[impostor] unreadable, skipped: {path}")
                 continue
             if not isinstance(records, list):
@@ -94,7 +97,7 @@ def main() -> int:
             total_removed += removed
             files += 1
             if apply:
-                atomic_write_json(path, records)
+                write_records(path, records)
 
     verb = "quarantined" if apply else "would quarantine"
     print(f"[impostor] {verb} {total_marked} record(s) in {files} file(s), "

@@ -628,16 +628,63 @@ pointed the expensive way. The file declares
 takes its count from `totals` and says when it is showing only the most recent
 held on file.
 
-**The next file to watch is the substrate, and nothing compacts it.** Measured
-the same day: `data/transfers/ethereum/2026-09-10.json` is **76.69 MB (73.1
-MiB)** for one finished day, with today's arbitrum at 58.95 MB and ethereum at
-50.12 MB still growing at 15:00 UTC. That is roughly 27% of headroom on a full
-day, and a busy day could cross. `scripts/compact_data.py` covers `scans/` and
-the per-minute snapshots and **does not touch `data/transfers/`** — which is
-awkward, because these files are the substrate `collect_known_edges()` rebuilds
-from, so they cannot simply be dropped. The same gzipped-JSONL rolling that
-script already applies to old snapshot days is the obvious answer, with
-`collect_known_edges` taught to read `.gz`. **Not built yet.**
+**The substrate is compacted (2026-09-16).** `data/transfers/` was **416 MB
+in the seven days since 2026-09-09**, nothing pruned it, and
+`ethereum/2026-09-10.json` stood at **76.69 MB against GitHub's 100 MiB hard
+blob limit** — 27 MiB of headroom on a store growing ~59 MB a day. A file over
+that line is refused by the pre-receive hook, which fails the push AFTER the
+run has done its work; that is the failure that cost twelve consecutive trace
+runs when the graph file crossed it on 09-12.
+
+Sealed days now roll to `<date>.jsonl.gz` **in place**. Live: **416.1 MB →
+68.4 MB in 28.4s**, 21 days, 563,304 records, 0 unreadable, and the five
+wallets checked before and after return **byte-identical** records through
+`records_by_wallet`.
+
+Three decisions worth keeping:
+
+- **In place, not an `archive/` subdirectory** like the snapshot roller. Sealed
+  days are still AMENDED: `quarantine_impostor_tokens` marks newly-found
+  counterfeit contracts as spam on old records (rule 2) and `reprice` fills in
+  prices it could not resolve at sweep time. An archive out of the way would
+  have silently removed both abilities.
+- **A day holding BOTH encodings reads from the `.json`.** That pair is the
+  crash window between writing the archive and deleting the original, and the
+  original is authoritative. Reading both doubles every record in the day — and
+  amount matching is the correlator's whole basis, so a duplicated exit is one
+  that can be matched twice, against a deposit with no real exit behind it.
+- **`decode_records` raises where `read_records` returns `[]`.** The rewriters
+  need the distinction: reprice says it in its own comment — "a file we cannot
+  read is not a file we may rewrite" — and reports the path in
+  `files_unreadable`. A corrupt archive decoding to `[]` would look like an
+  empty day, be skipped silently, and vanish from the count that exists to say
+  we are blind. Rule 5, deciding whether a file gets rewritten.
+
+**The reader that nearly got missed is the whole lesson.** Four readers glob
+the substrate directly and were easy to find. The fifth, `collect_known_edges`
+— **the function that rebuilds the ENTIRE graph** — reached it through
+`utils.load_all_records`, a generic dated-file reader whose `*.json` glob makes
+no mention of transfers anywhere. Measured live the moment compaction landed:
+a chain directory of seven sealed days plus today returned **26,001 records
+instead of ~300,000**, with no error raised anywhere. The graph would have been
+rebuilt from one day of history and reported itself healthy — an absence
+wearing the clothes of an answer, which is rule 5 again at the largest possible
+scale. It is now read through `substrate_files`; `record_key` returns None for
+a chain directory, so `load_all_records` was deduping nothing there and the
+swap loses no behaviour.
+
+**When you change a storage format, grep for the readers that do not name the
+store.** The ones that say `transfers` are the easy half.
+
+No workflow change was needed: `compact_data.py --apply` already runs in
+analyze.yml and `git add data/` stages deletions (verified: 21 deletions and 21
+additions). **The next file to watch is `data/transfers_spam/latest.json` at
+38.4 MB**, now the largest single file in the repo.
+
+**Still not fixed, and made worse by this:** `_load_cached`'s 256 MiB ceiling
+counts FILE bytes while holding PARSED objects. With the substrate 6x smaller
+on disk the ceiling stops being protective — 68 MB of `.gz` parses to the same
+~575 MB of heap it always did.
 
 **Two general rules.** A repo that commits its own output on every run has a
 size budget, and nothing was watching it — the check is cheap and belongs in CI

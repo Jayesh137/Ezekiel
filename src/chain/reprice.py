@@ -45,14 +45,17 @@ What prevents it is that every workflow touching `data/` shares GitHub Actions'
 extend to a local invocation: do not run this by hand while a sweep is running.
 """
 
-import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
 
 from src.chain.assets import value_usd
-from src.chain.collect import TRANSFERS_DIR
-from src.utils import atomic_write_json
+from src.chain.collect import (
+    TRANSFERS_DIR,
+    decode_records,
+    substrate_files,
+    write_records,
+)
 
 # The basis a record carries when its asset is one we price but no price was
 # available at collection time. `unpriced` — an asset we do not price at all —
@@ -158,10 +161,10 @@ def reprice_stored_records(price_lookup, *, root=None) -> dict:
         return seen[key]
 
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for path in sorted(chain_dir.glob("*.json")):
+        for path in substrate_files(chain_dir):
             try:
-                records = json.loads(path.read_text())
-            except (OSError, ValueError):
+                records = decode_records(path)
+            except (OSError, ValueError, EOFError):
                 # A file we cannot read is not a file we may rewrite. Leave it
                 # exactly as it is — and say so, rather than skipping silently.
                 health["files_unreadable"].append(str(path))
@@ -204,7 +207,7 @@ def reprice_stored_records(price_lookup, *, root=None) -> dict:
                 changed = True
 
             if changed:
-                atomic_write_json(path, records)
+                write_records(path, records)
                 health["files_rewritten"] += 1
 
     return health

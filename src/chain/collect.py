@@ -15,6 +15,7 @@ Two rules this module exists to enforce:
     them turns an outage into a silent all-clear.
 """
 
+import gzip
 import json
 import os
 from datetime import UTC, datetime
@@ -28,7 +29,7 @@ from src.chain.client import (
     probe_activity,
     unsupported_for_plan,
 )
-from src.utils import DATA_DIR, append_records, save_latest
+from src.utils import DATA_DIR, append_records, atomic_write_json, save_latest
 
 TRANSFERS_DIR = DATA_DIR / "transfers"
 SPAM_DIR = DATA_DIR / "transfers_spam"
@@ -128,6 +129,102 @@ _FILE_CACHE: dict[str, tuple[int, int, list]] = {}
 _FILE_CACHE_MAX_BYTES = 256 * 1024 * 1024
 
 
+# A sealed day is stored gzipped: `<date>.jsonl.gz` beside the `<date>.json`
+# of the day still being written. Measured on ethereum/2026-09-10, 113,244
+# records: 76.69 MB -> 5.20 MB, 14.8x, read back in 0.25s. The substrate as a
+# whole goes 416 MB -> 68.3 MB, which matters because a single daily file was
+# within 27 MiB of GitHub's 100 MiB blob limit and a file over it fails the
+# push AFTER the run's work is done.
+ARCHIVE_SUFFIX = ".jsonl.gz"
+
+
+def substrate_files(chain_dir: Path) -> list[Path]:
+    """One file per stored day, newest encoding rules resolved.
+
+    A day holding BOTH encodings is the crash window between writing the
+    archive and deleting the original, and the **original wins**: it is the
+    authoritative copy, and reading both would double every record in that day.
+    That is not cosmetic here — amount matching is the correlator's whole
+    basis, so a duplicated exit is one that can be matched twice, against a
+    deposit with no real exit behind it (see `records_for`).
+    """
+    by_day: dict[str, Path] = {}
+    for path in chain_dir.glob("*.json"):
+        if path.name == "latest.json":
+            continue  # a rollup, not a day of records — load_all_records skips it too
+        by_day[path.name[: -len(".json")]] = path
+    for path in chain_dir.glob(f"*{ARCHIVE_SUFFIX}"):
+        by_day.setdefault(path.name[: -len(ARCHIVE_SUFFIX)], path)
+    return [by_day[day] for day in sorted(by_day)]
+
+
+def decode_records(path: Path) -> list:
+    """Records from one stored file in either encoding. RAISES on a bad file.
+
+    The raising variant exists for the rewriters. `reprice.py` puts it plainly
+    — "a file we cannot read is not a file we may rewrite" — and reports the
+    path in `files_unreadable`. If a corrupt archive decoded to `[]` it would
+    be indistinguishable from a day with nothing in it: skipped silently, and
+    absent from the health count that exists to say we are blind (rule 5).
+
+    A truncated archive raises EOFError, not OSError, so callers catching by
+    type must name it; `gzip.BadGzipFile` is an OSError subclass and needs no
+    special case.
+    """
+    path = Path(path)
+    if path.name.endswith(ARCHIVE_SUFFIX):
+        with gzip.open(path, "rt", encoding="utf-8") as gz:
+            return [json.loads(line) for line in gz if line.strip()]
+    return json.loads(path.read_text())
+
+
+def read_records(path: Path) -> list:
+    """Records from one stored file in either encoding, `[]` if unreadable.
+
+    The forgiving variant, for readers walking every day: one corrupt file must
+    not take down a walk over all the others. Callers that go on to REWRITE the
+    file want `decode_records` instead.
+    """
+    try:
+        records = decode_records(path)
+    except (OSError, ValueError, EOFError):
+        return []
+    return records if isinstance(records, list) else []
+
+
+def write_records(path: Path, records: list) -> None:
+    """Rewrite one stored day, keeping whatever encoding its name implies.
+
+    `reprice.py` and `quarantine_impostor_tokens.py` amend SEALED days — the
+    first fills in prices it could not resolve at sweep time, the second marks
+    newly-discovered counterfeit contracts as spam on records already stored
+    (rule 2, which once booked $3.07B of forgery as real money). Both must keep
+    working after a day is compacted, which is why the archive stays in place
+    rather than moving to an `archive/` subdirectory.
+
+    Writing a `.json` back beside an existing `.gz` would silently manufacture
+    the doubled-day state `substrate_files` exists to resolve, on a file nobody
+    is watching — so the encoding is taken from the path, never chosen here.
+    """
+    path = Path(path)
+    if not path.name.endswith(ARCHIVE_SUFFIX):
+        atomic_write_json(path, records)
+        return
+    # Write-then-rename, for the reason atomic_write_json gives: a kill during
+    # a plain write leaves a truncated file, and this one is the substrate the
+    # whole graph is rebuilt from.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.parent / f".{path.name}.{os.getpid()}.tmp"
+    try:
+        with gzip.open(tmp, "wt", encoding="utf-8") as gz:
+            for rec in records:
+                gz.write(json.dumps(rec, separators=(",", ":")) + "\n")
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
 def _load_cached(path: Path) -> list:
     """Records from one stored file, parsed at most once per version of it."""
     try:
@@ -139,14 +236,13 @@ def _load_cached(path: Path) -> list:
     if hit and hit[0] == stat.st_mtime_ns and hit[1] == stat.st_size:
         _FILE_CACHE[key] = _FILE_CACHE.pop(key)      # mark most-recently-used
         return hit[2]
-    try:
-        records = json.loads(path.read_text())
-    except (OSError, ValueError):
-        # Same posture as load_all_records: an unreadable file is skipped, not
-        # fatal. It is deliberately not cached, so a transient read failure
-        # does not stick for the life of the process.
-        return []
-    if not isinstance(records, list):
+    # Same posture as load_all_records: an unreadable file is skipped, not
+    # fatal, and deliberately not cached, so a transient read failure does not
+    # stick for the life of the process. read_records returns [] for both an
+    # unreadable file and a genuinely empty one; caching [] for the second is
+    # harmless and the stat guard re-reads either way once the bytes change.
+    records = read_records(path)
+    if not records:
         return []
     _FILE_CACHE[key] = (stat.st_mtime_ns, stat.st_size, records)
     # dict preserves insertion order and a hit re-inserts, so the first key is
@@ -195,7 +291,7 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
     out = []
     seen: set[str] = set()
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for path in sorted(chain_dir.glob("*.json")):
+        for path in substrate_files(chain_dir):
             for rec in _load_cached(path):
                 if not isinstance(rec, dict):
                     continue
@@ -256,7 +352,7 @@ def records_by_wallet(wallets, *, include_spam: bool = False) -> dict[str, list[
     # duplicate only of another record for the SAME wallet.
     seen: dict[str, set[str]] = {w: set() for w in wanted}
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for path in sorted(chain_dir.glob("*.json")):
+        for path in substrate_files(chain_dir):
             for rec in _load_cached(path):
                 if not isinstance(rec, dict):
                     continue
