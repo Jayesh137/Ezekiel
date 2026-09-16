@@ -188,6 +188,21 @@ def orders_in_window(orders: list[dict], window_fills: list[dict]) -> list[dict]
     return out
 
 
+def stranger_results(scan: dict, target: str) -> list[dict]:
+    """Scan rows eligible to be strangers — everything except the target.
+
+    The lineup is drawn from a file this module does not write, so the guard
+    belongs here as well as in the scanner that fills it. The self-match is
+    built from a 12-day WINDOW while a scan row is fingerprinted from the
+    wallet's whole recent history, so the target-as-stranger is not merely a
+    duplicate entry: it is a better-resourced copy of the same trader, and it
+    beat the self-match on all four days it was present (0.6985 against
+    0.6593), taking rank 1 off him and reporting the scorer as FAILING.
+    """
+    t = (target or "").lower()
+    return [r for r in scan.get("results", []) if (r.get("wallet") or "").lower() != t]
+
+
 def run_backtest() -> dict:
     from src.fingerprint import load_fills, load_positions_latest
     from src.scanner import _effective_thresholds, build_candidate_fingerprint, compute_similarity
@@ -265,7 +280,8 @@ def run_backtest() -> dict:
         positions = positions.get("perp", positions)
     # Resolved once and threaded through: compute_similarity would otherwise
     # re-read backtest.json for every stranger it scores.
-    eff = _effective_thresholds(load_config()["alert_thresholds"])
+    config = load_config()
+    eff = _effective_thresholds(config["alert_thresholds"])
 
     # Orders split by the SAME calendar days as the fills, so the two sides
     # share none. Both windows drawing from the whole order history would make
@@ -287,7 +303,7 @@ def run_backtest() -> dict:
         try:
             with open(scans_path) as f:
                 scan = json.load(f)
-            for r in scan.get("results", []):
+            for r in stranger_results(scan, config["target_wallet"]):
                 cand_fp = r.get("fingerprint")
                 if not cand_fp:
                     continue

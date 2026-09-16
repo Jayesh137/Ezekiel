@@ -873,6 +873,8 @@ the next session rebuilding them:
    | 2026-09-10 09:58 | 0.5864 | 0.5495 | +0.0369 | `0x5b5d5120…` | 1 |
    | 2026-09-11 02:11 | 0.5880 | 0.5783 | **+0.0097** | `0x97cc9bb5…` | 1 |
    | 2026-09-12 00:06 | 0.5880 | 0.5965 | **−0.0085** | `0xe2ad3768…` | **2** |
+   | 2026-09-13 → 09-16 | 0.588-0.6593 | ~0.698 | negative | **the TARGET** | 2-3 |
+   | 2026-09-16 (fixed) | 0.6593 | 0.5924 | **+0.0669** | `0xc435249d…` | **1** |
 
    His own score moved +0.0016 then stopped moving entirely. The margin fell by
    two thirds and then **went negative** because a closer-matching stranger
@@ -882,10 +884,48 @@ the next session rebuilding them:
    never a trend. That is exactly why chasing it with weights would be fitting
    to the draw.
 
-   **It now fails on BOTH conditions again** (rank 2, negative margin), which is
-   worse than the "one condition rather than two" above. Nothing regressed in
-   the scorer to cause it; `0xe2ad3768…` simply scores 0.5965. Read the file,
-   never this table, for the current number.
+   **It PASSES as of 2026-09-16, and it was the lineup all along — the target
+   was in it.** For four days the "closer-matching stranger" beating him was
+   **himself**, at ~0.698 against a windowed self-match of 0.588-0.6593. The
+   reading above that a shrinking margin says nothing about the scorer was
+   right, and understated: on 09-13 the margin stopped being a measurement at
+   all. Removing that one row — changing no weight and no threshold, which
+   rule 4 forbids — gives **self 0.6593, rank 1 of 20, margin +0.0669** against
+   the required +0.05. `passed: true` for the first time.
+
+   How he got in: `scan_priority_targets` had no target exclusion while the
+   leaderboard sweep one screen below it did. Six sources feed that priority
+   set and any can name him; what actually did was **three fund-flow findings
+   whose source and destination are both him, worth $0.00004 each**. The cost
+   was three deep, and none of it looked like a bug:
+
+   - `backtest.py` scores every row of `data/scans/latest.json` as a stranger,
+     so the validator ranked him behind himself and reported FAILING;
+   - `roster.behavioural_is_trustworthy()` reads that verdict, so **a whole
+     vector stopped casting a vote** while nothing said so;
+   - `risk.py` takes the top candidate's score, so he paid the **full 22 of 22
+     points for trading like himself** — a third of the 64.7 ELEVATED standing
+     on 09-16, and the `CRITICAL: Migration Risk 75/100` that fired on 09-15.
+
+   Three guards, because the contamination is durable at a different stage in
+   each: the priority set (where he gets in), `persist_candidate` (whose
+   per-wallet file outlives the scan that wrote it — `latest.json` is re-globbed
+   and sorted on a `best_score` that only ratchets, so one contaminated scan
+   pins him at the top for ever), and the backtest's stranger loop (the
+   instrument that validates the scorer must not be fooled by a file it did not
+   write). The stored `0x45d26f28….json` — 27 entries, every one 1.0 — was
+   deleted and the rollup rebuilt.
+
+   **A validator drawing its lineup from a shared file must be told who it is
+   looking for.** Nothing here was a scoring error; the scorer was being asked
+   to tell the target apart from the target. And the asymmetry was visible in
+   two adjacent loops for four days — **when one loop is guarded, ask what
+   guards the other**, the same rule `extraAgents` and `webData2` already cost.
+
+   Expect 7 wallets to move WATCH → POSSIBLE when the behavioural vector starts
+   voting again (one vector each, confidence 0.0). None reaches PROBABLE, so
+   none enters the close watch. Read the file, never this table, for the
+   current number.
 5. **A failed read must never serialise as a clean result.** Distinguish
    "we could not tell" from "there is nothing there", everywhere.
 6. **Never price a missing value as `0.0`** — zero is invisible to every

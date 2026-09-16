@@ -1063,7 +1063,17 @@ def _summarize_fingerprint(fp: dict) -> dict:
 
 
 def persist_candidate(result: dict) -> None:
-    """Save a promoted candidate for persistent review across scan runs."""
+    """Save a promoted candidate for persistent review across scan runs.
+
+    Never the target. This file outlives the scan that wrote it: `latest.json`
+    is rebuilt by globbing every `0x*.json` and sorting on `best_score`, which
+    only ratchets up. So one contaminated scan pins him at the top of the
+    operator's candidate list, and at the full 22 of 22 `risk.py` points, on
+    every run for ever after — which is what happened, and why the caller being
+    fixed is not on its own enough.
+    """
+    if result["wallet"].lower() == load_config()["target_wallet"].lower():
+        return
     candidate_dir = DATA_DIR / "candidates"
     candidate_dir.mkdir(parents=True, exist_ok=True)
     path = candidate_dir / f"{result['wallet'].lower()}.json"
@@ -1555,6 +1565,21 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
                                       "account_value": b.get("account_value")}
         except Exception as e:
             print(f"[scanner] Could not load newborn accounts: {e}")
+
+    # The target is not a candidate for being himself. Six sources feed this
+    # dict and any of them can name him: he deposits to the bridge, he is a
+    # CCTP depositor, and the tracer books fund-flow findings whose source and
+    # destination are both him — three of those, worth $0.00004 each, are how
+    # he actually got in on 2026-09-13. Dropped once here rather than guarded
+    # six times, and filtered on the lowercased key because only five of the
+    # six sources normalise the case they store.
+    #
+    # The leaderboard sweep below has always refused him; a priority source is
+    # not a different question, and the cost of the asymmetry was three vectors
+    # deep — see tests/test_target_not_a_candidate.py.
+    target_lower = config["target_wallet"].lower()
+    priority = {addr: meta for addr, meta in priority.items()
+                if addr.lower() != target_lower}
 
     if not priority:
         print("[scanner] No priority targets to scan")
