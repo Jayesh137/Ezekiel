@@ -226,3 +226,28 @@ def test_the_sweep_threads_par_contracts_into_valuation(monkeypatch):
         canonical=CANONICAL, par_contracts={AAVE_USDC})
 
     assert seen.get("par_contracts") == {AAVE_USDC}
+
+
+def test_a_cyrillic_usdc_is_NOT_folded_onto_the_real_one():
+    """The reason SYMBOL_HOMOGLYPHS is a measured map and not a confusable fold.
+
+    Live on the substrate: `USDС` at 0xb4094bd2..., 5,134 records, where the
+    final character is U+0421 CYRILLIC CAPITAL LETTER ES, not Latin C. It is a
+    forgery, and it is the exact mirror of the Tether case that motivated
+    normalisation — same trick, opposite intent.
+
+    A general "fold confusables to ASCII" rule would turn it into USDC, which
+    is in STABLES, and price a counterfeit at par: rule 2's $3.07B failure
+    reached through the fix for rule 2's other direction. So homoglyphs are
+    added one at a time, each with the measurement that justified it, and this
+    test fails the moment somebody generalises it.
+    """
+    cyrillic = "USDС"
+
+    assert assets.normalise_symbol(cyrillic) != "USDC"
+
+    usd, basis = assets.value_usd(cyrillic, 1_000_000.0, "2026-09-10", _no_price,
+                                  contract="0xb4094bd2ba706361ee9064f97a3bfaaf9b2f7715",
+                                  chain="arbitrum", canonical=CANONICAL)
+    assert usd is None
+    assert basis == "unpriced"
