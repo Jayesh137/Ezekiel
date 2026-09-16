@@ -1258,59 +1258,66 @@ def _load_target_vault_addresses() -> set:
 
 
 def _load_target_referral_addresses() -> set:
-    """Load wallet addresses in the target's referral network."""
+    """The target's referral network: who referred him, and who used his code.
+
+    Read through `src/referral.py`, which parses the payload the API actually
+    returns. This used to read `referrerAddress`/`referredUsers` — keys the
+    endpoint never sends — so the network was always empty.
+    """
+    from src import referral
+
     ref_path = DATA_DIR / "referral" / "latest.json"
-    if not ref_path.exists():
-        return set()
     try:
         with open(ref_path) as f:
             data = json.load(f)
-        addrs = set()
-        if isinstance(data, dict):
-            if data.get("referrerAddress"):
-                addrs.add(data["referrerAddress"].lower())
-            for r in data.get("referredUsers", []):
-                addr = r.get("address", "") or r.get("wallet", "")
-                if addr:
-                    addrs.add(addr.lower())
-        return addrs
-    except Exception:
+    except (OSError, ValueError):
         return set()
+    addrs = {r["address"] for r in referral.referred(data)}
+    if referral.referred_by(data):
+        addrs.add(referral.referred_by(data))
+    return addrs
 
 
 def _check_vault_overlap(wallet: str, target_vaults: set) -> list:
-    """Return shared vault addresses between candidate and target. Empty list = no overlap."""
+    """Shared non-public vaults between candidate and target. Empty list = no overlap.
+
+    Shared destinations (HLP) are removed first: a vault everyone deposits
+    into identifies nobody (rule 9).
+    """
     if not target_vaults:
         return []
+    shared = {(a or "").lower() for a in load_config().get("hl_shared_destinations") or []}
     try:
         raw = hl_post({"type": "userVaultEquities", "user": wallet})
         if not isinstance(raw, list):
             return []
         candidate_vaults = {v.get("vaultAddress", "").lower() for v in raw if v.get("vaultAddress")}
-        return list(target_vaults & candidate_vaults)
-    except Exception:
+        return sorted((target_vaults & candidate_vaults) - shared)
+    except Exception as exc:                          # noqa: BLE001 - transport
+        print(f"[scanner] vault read for {wallet[:10]}... unreadable: {exc}")
         return []
 
 
 def _check_referral_link(wallet: str, target_referral_addrs: set) -> bool:
-    """Return True if candidate has a referral link to/from the target's network."""
+    """True if the candidate is in, was referred by, or referred someone in the
+    target's referral network. A failed read is reported, never silently "no"."""
+    from src import referral
+
     if not target_referral_addrs:
         return False
     if wallet.lower() in target_referral_addrs:
         return True
     try:
         ref = hl_post({"type": "referral", "user": wallet})
-        if isinstance(ref, dict):
-            referrer = (ref.get("referrerAddress") or "").lower()
-            if referrer and referrer in target_referral_addrs:
-                return True
-            for r in ref.get("referredUsers", []):
-                addr = (r.get("address", "") or r.get("wallet", "")).lower()
-                if addr in target_referral_addrs:
-                    return True
-    except Exception:
-        pass
-    return False
+    except Exception as exc:                          # noqa: BLE001 - transport
+        ref = None
+        print(f"[scanner] referral read for {wallet[:10]}... raised: {exc}")
+    if not isinstance(ref, dict) or not ref:
+        print(f"[scanner] referral read for {wallet[:10]}... unreadable")
+        return False
+    if referral.referred_by(ref) in target_referral_addrs:
+        return True
+    return any(r["address"] in target_referral_addrs for r in referral.referred(ref))
 
 
 # Priority sources that constitute independent, non-behavioural evidence: the
