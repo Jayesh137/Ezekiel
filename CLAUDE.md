@@ -77,6 +77,7 @@ trading style. Never promote a wallet on one vector alone.
 | Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated — see below** |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
+| HL account surface | `hl_surface.py`, `scripts/check_hl_surface.py` | `subAccounts`, `referral`, `userVaultEquities` for every detector candidate. A sub-account on either side of a cluster wallet CONFIRMs alone; a master and its sub-accounts are ONE operator in the roster; a quiet referral (≤10 accounts on the code) with the cluster is one vote (`referral`) |
 | Dormancy handoff | `dormancy.py` | One wallet goes quiet, another is born. The only vector needing NO connection between them |
 | HyperEVM watch | `scripts/check_hyperevm.py`, `scripts/probe_hyperevm_index.py` | Nonce tripwire, plus a survey: chain 999 IS readable through the Etherscan key |
 | Identity | `hl_identity.py`, `scripts/check_identity.py` | `userRole` (agent → owner, sub-account → master), `webData2` (frontend agent), `stakingLink`, delegations, `portfolio` birth. An explicit link CONFIRMs alone |
@@ -1005,6 +1006,37 @@ before the push, not in a pre-receive hook's rejection. And when a file has to
 shrink, ask **who actually reads the part that is large**: here the answer was
 "nobody, across runs" and the 92% reduction cost no consumer anything.
 
+**Keeping unpriced records let airdrop spam become graph edges (fixed
+2026-09-16, the same day).** The first trace run after `ea1c20f2c` (11:02 UTC)
+replaced **161 of 299 graph nodes** and graded the Ethereum USDC contract,
+vitalik.eth and Polygon's USDT/USDC/WETH contracts as OPERATIONAL_COUNTERPARTY,
+with 129 zero-confidence nodes hanging off inbound airdrops to the CONFIRMED
+`0xf078969e…` (swept with `--reset` that morning) — `$ USDCNotice.com <- Visit
+to secure your wallet`, `BITLORD`, `SPXDOG`. At ~0.1 confidence they
+outranked genuine zero-confidence leads in `detector_candidates`.
+
+**An ERC-20 Transfer's `from` is whatever the token contract writes.** For a
+token we know nothing about that is the contract's claim, not an observed act —
+rule 2 at the level of an edge. `normalise_transfer_record` now admits an
+`unpriced` record only when its SENDER is a swept wallet (its own outbound).
+The substrate keeps every record, so the operator decision stands, and an edge
+returns the day its sender is swept. `price_unavailable` majors are never
+gated. Replayed: those contracts leave the graph and nodes backed only by
+unpriced tokens halve, **157 → 79**. The write-up above that "every node that
+swapped out had $0 direct flow" was true and was the wrong question: what came
+IN was the harm.
+
+**And the node budget was admitting by FILE ORDER (fixed 2026-09-16).** Found
+while measuring the above: `build_graph` walked each BFS level in adjacency
+order, so once `max_nodes` bit, the order edges were read off disk decided who
+entered the graph — and the roster, and every detector budget behind it. Each
+level is now offered whole and admitted by value moved with the level above,
+unvalued after valued, address last. Replayed old vs new with production
+inputs: **depth-2 value $1.84B → $2.25B, wallets at $1M+ 50 → 73, $0 wallets
+114 → 73**, key wallets unchanged, 0 alerts selected either way. **The
+`expanded_ledger` rule, fourth time: when a cap trims a collection, ask what
+the sort order MEANS.**
+
 **The substrate outgrew its own cache, and the linkage phase was reading it
 once PER WALLET (fixed 2026-09-16).** `trace.yml` failed on 4 of its last 10
 runs — 2026-09-14 02:28, then 09-15 16:02, 19:44 and 09-16 00:53 — every one
@@ -1138,6 +1170,65 @@ pushing — the suite passing locally is not the same as CI being green.**
 assertion was checked by breaking the thing it guards and confirming it names
 the offender, because a workflow test that has never failed is only a claim.
 
+**The HL account surface: three endpoints nobody asked the candidates (built
+2026-09-16).** `subAccounts`, `referral` and `userVaultEquities` were read for
+the target (collector) and the ≤6 watched wallets, and nowhere else. Measured
+over the 25 strongest roster wallets before building: **31 sub-account
+addresses under 5 of them, none in the roster, the graph or the identity
+cache**, one — "funding-test" under `0x7fdafde5…` — holding $1.26M. A
+sub-account is an address the owner can copy on Hyperliquid directly: the
+deliverable's exact shape, and nothing read it. Live first run: **120 wallets
+in 172.6s, 0 unreadable, 35 sub-accounts, 7 referral pairs.**
+
+What each finding is worth, decided on rules already in this file:
+
+- **A sub-account** exists only because its master created it. Between a
+  cluster wallet (config only — target + `known_self_wallets`) and anyone
+  else, it is `explicit_link` and CONFIRMs alone, alerting CRITICAL. Among
+  candidates, `roster.apply_operator_groups` tiers a master and its
+  sub-accounts on the UNION of their vectors — each vector still comes from
+  its own detector, attributed to accounts one person provably runs. Services
+  neither lend nor borrow. A sub-account gets a roster row at ≥$1,000, and
+  EVERY sub-account of a PROBABLE-or-better group gets one: an empty
+  sub-account of his is where he would move next.
+- **A referral** is chosen by whoever types the code: association, never
+  control. With the cluster it is ONE vote (`VECTOR_REFERRAL`), alerting HIGH,
+  and only on a QUIET code — ≤10 accounts, **measured, never assumed**; an
+  influencer's code links everyone who used it (rule 9), and one of the seven
+  referrers had 5,000. Between two strangers it is `referral_pair` evidence,
+  and on a quiet code the other side gets a roster row, so every per-wallet
+  detector starts asking about it.
+- **A vault deposit** is evidence only, HLP and `hl_shared_destinations` removed.
+
+**Reads go through `cctp_feed.strict_post`, never `utils.hl_post`.**
+`hl_post`'s failure sentinel for `userVaultEquities` is `[]` — byte-identical
+to "deposits into no vault" — so a timeout would have serialised as a measured
+absence. A failed read is `null` in `readings` and counted; `[]` is a real
+none. A failed alert is queued in `undelivered_alerts` and retried, because
+diffing against the previous report alone would lose it — the link is already
+on file by the next run. An absent previous report counts as EMPTY (the
+size-ratio decision, not the `extraAgents` one): the cluster had no such link
+when this was built, so there is nothing to seed and nothing to swallow.
+
+**What its first run found — a habit, not the target.** Five of the seven
+referral codes have ≤3 accounts on them, and in **three pairs the referrer and
+the referred account were born on the SAME DAY**:
+
+| referred (roster) | referrer | born | code users | referrer holds |
+|---|---|---|---|---|
+| `0x5b5d5120…` (the $230M ex-PROBABLE) | `0xb83de012…` | 2025-02-26 | 3 | **$77.7M perp + $99.1M spot** |
+| `0x12e16e3d…` (top risk candidate) | `0x264fe26f…` | 2025-09-17 | 1 | $8K spot |
+| `0x498216a2…` | `0x498255da…` (same `0x4982` prefix) | 2026-07-29 | 1 | $4K |
+
+**All three referred wallets are the ones sharing the target's original funder
+`0xf92402bb…`** — three of the four wallets on that vector. Opening two
+accounts on one day and referring one from the other is an operator's habit,
+and it recurs across exactly the population linked to him. It does NOT link
+any of them to the target: he has no code and no referrer, and a habit shared
+by strangers is not identity. But **`0xb83de012…` is a ~$177M Hyperliquid
+account almost certainly run by whoever runs `0x5b5d5120…`**, and nothing
+watched it. Whether it joins `config.watch_wallets` is the operator's call.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
@@ -1175,8 +1266,12 @@ the offender, because a workflow test that has never failed is only a claim.
   and ToS-questionable, so it is not being built. The free equivalent of the
   same idea — a human-chosen label that travels between accounts — is agent
   NAMING SCHEMES, now in `agent_links.naming_families`.
-- `data/vaults/`, `data/referral/`, `data/subaccounts/` reach `scanner.py` but
-  only for leaderboard candidates, not for graph-discovered wallets.
+- ~~`data/vaults/`, `data/referral/`, `data/subaccounts/`~~ — **wired
+  2026-09-16** as the HL account surface (see above). They were asked about the
+  target alone, and for him all three are empty, so the scanner's overlap checks
+  returned early for every wallet — and `_check_referral_link` read
+  `referrerAddress`/`referredUsers`, keys the endpoint never sends, so it could
+  not have found a link anyway.
 
 ## Vectors worth inventing
 
@@ -1225,8 +1320,17 @@ the next session rebuilding them:
   nearly everyone adds no separation and dilutes the ones that do. The target
   is mixed (51 cross + 1 isolated on perp, 3 isolated + 1 cross on `xyz`) and so
   was 1 of the 8 — n is far too small to call that rare. Revisit only with a
-  population measured in hundreds. **Liquidation-distance habits** are still
-  unbuilt and still worth having.
+  population measured in hundreds.
+- ~~**Liquidation-distance habits**~~ — **measured 2026-09-16 and rejected, on
+  the same grounds.** Of the 120 largest leaderboard accounts (>$5M), **95 hold
+  no perp book** on the main dex, so only 23 carry a liquidation distance at
+  all. His closest position sits 65–98% from liquidation across 98 snapshots,
+  and **57% of that population also sits ≥65%** — the middle of the pack. His
+  median distance (~300x) is top-22%, but on n=23 and dominated by shorts,
+  whose liquidation price sits far above a falling market by construction. A
+  dimension nearly everyone scores alike dilutes the ones that separate. It
+  stays useful exactly where it already is: `gcr_hypothesis`'s
+  `liquidation_distance`, the one check that can DISconfirm.
 - **A flat wallet is unknown, not dissimilar (fixed 2026-09-12).** Looking for
   the above found rule 6 inside the scorer: `compare_leverage` returned **0.0**
   when either side held no open positions, and leverage is computed FROM open
