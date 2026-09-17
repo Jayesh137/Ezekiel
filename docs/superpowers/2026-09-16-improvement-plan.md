@@ -90,8 +90,13 @@ PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
 - *Market-maker classification (P1-7):* after DONE-1..3 only 4 POSSIBLE rows rest on
   dormancy alone, 2 of them the market maker's; not worth a classifier today.
 
+- *P5-9 "find the account he migrated from", within the known cluster:* the target is
+  the oldest (HL since 2024-03-06, $759M lifetime volume). The treasury has been on HL
+  since 2024-08-14 but traded only $939K (held up to $55.0M, staked, vaulted);
+  `0xf078969e…` since 2025-01-01, $549 of volume. No known wallet is a predecessor.
+
 **Remaining, in order:** P3 real-time stream (needs a host decision), P4 self-cross /
-OI conservation, P5-1 likelihood ratios, P5-9 find his previous account.
+OI conservation, P5-1 likelihood ratios.
 
 ## Route matrix additions (found by measurement, 2026-09-16)
 
