@@ -223,3 +223,20 @@ def test_the_roster_gives_a_circle_counterparty_a_transfer_vote(tmp_path, monkey
     assert rows["0x" + "ac" * 20]["vectors"] == ["transfer"]
     assert rows["0x" + "ac" * 20]["evidence"]["circle_flows"][0]["chain"] == "monad"
     assert T not in rows
+
+
+def test_a_walk_says_how_many_blocks_it_read():
+    """Feed health needs the span: a long read with no transfers is blind, a short one is not."""
+    def get(params, chain_id=None):
+        if params.get("action") == "eth_blockNumber":
+            return {"result": hex(1_300)}
+        return {"status": "0", "message": "No records found", "result": []}
+
+    _rows, summary = script.walk_etherscan({"last_block": 999}, get=get)
+    assert summary["blocks_read"] == 301 and summary["last_block"] == 1_300
+
+    def call(method, params):
+        return hex(999) if method == "eth_blockNumber" else []
+
+    _rows, summary = script.walk({"last_block": 999}, call=call, sleep=lambda s: None)
+    assert summary["blocks_read"] == 0 and summary["windows_read"] == 0

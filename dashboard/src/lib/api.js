@@ -695,15 +695,46 @@ export function feedFreshness(doc, key, limitMin, nowMs = Date.now()) {
 	return { status: ageMin > limitMin ? 'stale' : 'fresh', ageMin };
 }
 
+/**
+ * Feeds that are writing on time but blind (src/feed_health.py `blind`), as
+ * lower-cased feed name -> ISO time the blindness was first seen. Each workflow
+ * keeps its own group file; a missing file means nothing is known to be blind.
+ */
+export function blindSince(...groups) {
+	const out = {};
+	for (const g of groups) {
+		for (const [name, since] of Object.entries(g?.blind_since || {})) {
+			out[name.toLowerCase()] = since;
+		}
+	}
+	return out;
+}
+
+/**
+ * Freshness, then blindness: a fresh file from a detector whose reads all fail
+ * is not a healthy detector. Pure.
+ */
+export function feedStatus(doc, feed, blind = {}, nowMs = Date.now()) {
+	const fresh = feedFreshness(doc, feed.key, feed.limitMin, nowMs);
+	const since = blind[feed.name.toLowerCase()];
+	if (fresh.status !== 'fresh' || !since) return fresh;
+	const t = Date.parse(since);
+	const blindMin = Number.isNaN(t) ? null : Math.max(0, Math.round((nowMs - t) / 60000));
+	return { ...fresh, status: 'blind', blindMin };
+}
+
 export async function fetchTripwires() {
-	const [feeds, sentinels, circle, watch] = await Promise.all([
+	const [feeds, sentinels, circle, watch, blindWatch, blindOther] = await Promise.all([
 		Promise.all(DETECTOR_FEEDS.map((f) => fetchJSON(f.path))),
 		fetchJSON('data/deposit_sentinels/latest.json'),
 		fetchJSON('data/circle_flows/latest.json'),
-		fetchJSON('data/watchlist/latest.json')
+		fetchJSON('data/watchlist/latest.json'),
+		fetchJSON('data/feed_health/watch.json'),
+		fetchJSON('data/feed_health/other.json')
 	]);
+	const blind = blindSince(blindWatch, blindOther);
 	return {
-		feeds: DETECTOR_FEEDS.map((f, i) => ({ ...f, ...feedFreshness(feeds[i], f.key, f.limitMin) })),
+		feeds: DETECTOR_FEEDS.map((f, i) => ({ ...f, ...feedStatus(feeds[i], f, blind) })),
 		sentinels,
 		circle,
 		watch

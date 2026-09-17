@@ -160,6 +160,7 @@ def walk_etherscan(previous: dict | None, *, get=None, clock=time.monotonic,
     head = etherscan_head(get=get)
     cursor = (previous or {}).get("last_block")
     start = (int(cursor) + 1) if cursor else max(0, head - FIRST_RUN_BLOCKS)
+    first = start
     deadline = clock() + seconds
     rows, chunks, error = [], 0, None
     while start <= head and chunks < max_chunks and clock() < deadline:
@@ -173,6 +174,7 @@ def walk_etherscan(previous: dict | None, *, get=None, clock=time.monotonic,
         rows.extend(row for row in (cf.decode(log) for log in logs) if row)
         cursor, start, chunks = end, end + 1, chunks + 1
     return rows, {"head_block": head, "last_block": cursor, "windows_read": chunks,
+                  "blocks_read": (int(cursor) - first + 1) if chunks else 0,
                   "lag_blocks": head - int(cursor or head), "error": error,
                   "source": "etherscan"}
 
@@ -183,6 +185,7 @@ def walk(previous: dict | None, *, call=rpc, clock=time.monotonic, sleep=time.sl
     head = int(call("eth_blockNumber", []), 16)
     cursor = (previous or {}).get("last_block")
     start = (int(cursor) + 1) if cursor else max(0, head - FIRST_RUN_BLOCKS)
+    first = start
     deadline = clock() + seconds
     rows, windows, error = [], 0, None
     while start <= head and windows < max_windows and clock() < deadline:
@@ -197,6 +200,7 @@ def walk(previous: dict | None, *, call=rpc, clock=time.monotonic, sleep=time.sl
         windows += 1
         sleep(PACE_SECONDS)
     return rows, {"head_block": head, "last_block": cursor, "windows_read": windows,
+                  "blocks_read": (int(cursor) - first + 1) if windows else 0,
                   "lag_blocks": head - int(cursor or head), "error": error, "source": "rpc"}
 
 

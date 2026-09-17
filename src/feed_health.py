@@ -44,6 +44,103 @@ GROUPS = {"watch": WATCH_FEEDS, "other": OTHER_FEEDS}
 # HyperEVM blocks.
 CIRCLE_MAX_LAG_BLOCKS = 30_000
 
+# A FRESH file can still be blind: a detector whose every read fails, or whose
+# parser no longer understands an endpoint, keeps writing `computed_at` on
+# time and reports nothing, which is the staleness check's blind spot. One bad
+# run heals itself on the next, so a blind reading is reported only once it
+# has lasted this long; an endpoint, key or parser broken for six hours is not
+# coming back by itself.
+BLIND_HOURS = 6.0
+# Below this many wallets a detector's zero is not surprising enough to act on.
+MIN_WALLETS = 20
+# ~50 minutes of HyperEVM blocks. Circle transfers into and out of Hyperliquid
+# ran at 26-45 per ~2,400 blocks when this was written, so a read this long
+# with none at all is a decoder or a feed that has stopped understanding.
+CIRCLE_MIN_BLOCKS_FOR_ZERO = 3_000
+
+
+def _unreadable_share(doc: dict, checked_key: str, unreadable_key: str = "unreadable"):
+    checked = doc.get(checked_key)
+    unreadable = doc.get(unreadable_key)
+    if isinstance(unreadable, list):
+        unreadable = len(unreadable)
+    if not isinstance(checked, int) or checked < MIN_WALLETS or not isinstance(unreadable, int):
+        return None
+    if unreadable * 2 >= checked:
+        return f"{unreadable} of {checked} reads failed"
+    return None
+
+
+def _agents(doc: dict):
+    failed = _unreadable_share(doc, "wallets_checked")
+    if failed:
+        return failed
+    if (doc.get("wallets_checked") or 0) >= MIN_WALLETS and doc.get("agents_seen") == 0:
+        return f"0 agents across {doc['wallets_checked']} wallets (214 when this was written)"
+    return None
+
+
+def _surface(doc: dict):
+    failed = _unreadable_share(doc, "wallets_checked")
+    if failed:
+        return failed
+    if (doc.get("wallets_checked") or 0) >= MIN_WALLETS and doc.get("subaccounts") == {}:
+        return (f"0 sub-accounts across {doc['wallets_checked']} wallets "
+                f"(56 when this was written)")
+    return None
+
+
+def _identities(doc: dict):
+    return _unreadable_share(doc, "known")
+
+
+def _watch(doc: dict):
+    watched, unreadable = doc.get("watched"), doc.get("unreadable")
+    if isinstance(watched, int) and watched > 0 and isinstance(unreadable, list) \
+            and len(unreadable) >= watched:
+        return f"every one of {watched} watched wallet(s) unreadable"
+    return None
+
+
+def _circle(doc: dict):
+    if doc.get("error"):
+        return f"reads failing: {str(doc['error'])[:120]}"
+    blocks = doc.get("blocks_read")
+    if isinstance(blocks, int) and blocks >= CIRCLE_MIN_BLOCKS_FOR_ZERO and \
+            (doc.get("deposits_read") or 0) + (doc.get("withdrawals_read") or 0) == 0:
+        return f"0 Circle transfers decoded in {blocks:,} blocks"
+    return None
+
+
+def _scan(doc: dict):
+    return "scanned 0 wallets" if doc.get("wallets_scanned") == 0 else None
+
+
+def _correlation(doc: dict):
+    return "0 candidate deposits considered" if doc.get("candidates_considered") == 0 else None
+
+
+def _roster(doc: dict):
+    return "the roster holds no wallets" if doc.get("wallet_count") == 0 else None
+
+
+def _dormancy(doc: dict):
+    return "0 candidates scored" if doc.get("candidates_scored") == 0 else None
+
+
+# feed name -> a function answering "is this fresh reading blind?" with a reason.
+BLIND_CHECKS = {
+    "close watch": _watch,
+    "Circle flows": _circle,
+    "roster": _roster,
+    "HL account surface": _surface,
+    "identities": _identities,
+    "shared agents": _agents,
+    "dormancy handoff": _dormancy,
+    "behavioural scan": _scan,
+    "amount correlation": _correlation,
+}
+
 
 def _age_minutes(stamp, now: datetime) -> float | None:
     try:
@@ -86,3 +183,37 @@ def assess(feeds: dict, data_dir: Path, now: datetime | None = None) -> list[dic
                 problems.append({"feed": name, "problem": f"cursor {lag:,} blocks behind "
                                  f"the chain head", "path": rel})
     return problems
+
+
+def blind(feeds: dict, data_dir: Path, since: dict | None,
+          now: datetime | None = None) -> tuple[list[dict], dict]:
+    """Fresh readings that have been blind for `BLIND_HOURS`. Pure given the files.
+
+    `since` maps feed -> when its blindness was first seen, as returned by the
+    previous run; the updated map is returned for the caller to store. A feed
+    that reads normally again is dropped from it, so the clock restarts.
+    """
+    import json
+
+    now = now or datetime.now(UTC)
+    since = dict(since or {})
+    problems, still = [], {}
+    for name, (rel, _key, _limit) in feeds.items():
+        check = BLIND_CHECKS.get(name)
+        if check is None:
+            continue
+        try:
+            with open(Path(data_dir) / rel) as f:
+                doc = json.load(f)
+        except (OSError, ValueError):
+            continue          # assess() reports a missing or unreadable file
+        reason = check(doc) if isinstance(doc, dict) else None
+        if not reason:
+            continue
+        first = since.get(name) or now.isoformat()
+        still[name] = first
+        hours = (_age_minutes(first, now) or 0.0) / 60.0
+        if hours >= BLIND_HOURS:
+            problems.append({"feed": name, "path": rel,
+                             "problem": f"writing on time but blind for {hours:.1f}h: {reason}"})
+    return problems, still

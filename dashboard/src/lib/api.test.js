@@ -86,3 +86,24 @@ test('every detector feed names a data path, a key and a limit above cadence', (
 		assert.ok(f.key && f.limitMin >= 360, f.name);
 	}
 });
+
+import { blindSince, feedStatus } from './api.js';
+
+test('a fresh feed whose reads are failing is blind, not healthy', () => {
+	const now = Date.parse('2026-09-17T09:00:00Z');
+	const feed = { name: 'Shared agents', key: 'computed_at', limitMin: 720 };
+	const doc = { computed_at: '2026-09-17T08:30:00+00:00' };
+	const blind = blindSince({ blind_since: { 'shared agents': '2026-09-17T02:00:00+00:00' } }, null);
+	assert.deepEqual(feedStatus(doc, feed, blind, now), { status: 'blind', ageMin: 30, blindMin: 420 });
+	assert.equal(feedStatus(doc, feed, {}, now).status, 'fresh');
+	// Staleness outranks blindness: a feed that stopped writing is reported as stopped.
+	assert.equal(feedStatus({ computed_at: '2026-09-16T00:00:00+00:00' }, feed, blind, now).status, 'stale');
+});
+
+test('every detector the watch or trace job checks for blindness has a dashboard row', () => {
+	const names = new Set(DETECTOR_FEEDS.map((f) => f.name.toLowerCase()));
+	for (const n of ['close watch', 'circle flows', 'roster', 'hl account surface', 'identities',
+		'shared agents', 'dormancy handoff', 'behavioural scan', 'amount correlation']) {
+		assert.ok(names.has(n), n);
+	}
+});

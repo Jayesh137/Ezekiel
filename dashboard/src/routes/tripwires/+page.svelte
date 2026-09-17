@@ -11,7 +11,7 @@
 		loading = false;
 	});
 
-	const STATUS_BADGE = { fresh: 'badge-green', stale: 'badge-red', missing: 'badge-red' };
+	const STATUS_BADGE = { fresh: 'badge-green', stale: 'badge-red', missing: 'badge-red', blind: 'badge-red' };
 
 	const KIND_LABEL = {
 		his_wallet_funded_outside_account: 'His wallet funded an outside account',
@@ -45,7 +45,8 @@
 <p class="lede">
 	The detectors that catch a move <strong>as it happens</strong>, and whether each is still
 	producing readings. A dead detector writes the same nothing as a quiet target, so its
-	freshness is shown first.
+	freshness is shown first — and a detector that writes on time while every read fails is
+	shown as <strong>blind</strong>.
 </p>
 
 {#if loading}
@@ -68,7 +69,10 @@
 						<td>{f.name}</td>
 						<td>{age(f.ageMin)}</td>
 						<td>{age(f.limitMin)}</td>
-						<td><span class="badge {STATUS_BADGE[f.status]}">{f.status}</span></td>
+						<td>
+							<span class="badge {STATUS_BADGE[f.status]}">{f.status}</span>
+							{#if f.status === 'blind'}<span class="text-muted">reads failing for {age(f.blindMin)}</span>{/if}
+						</td>
 					</tr>
 				{/each}
 			</tbody>
