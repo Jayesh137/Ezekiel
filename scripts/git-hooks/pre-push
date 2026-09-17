@@ -1,0 +1,42 @@
+#!/bin/sh
+# Blocks a push whose code would fail CI's lint or test job.
+#
+# On 2026-09-16 a commit was pushed with a failing test because the command that
+# decided whether to commit checked grep's output rather than pytest's exit
+# status, and the "Tests" workflow went red on main. CI is the second line of
+# defence, not the first. Data-only and docs-only pushes skip the suite.
+#
+# Install (once per clone):  cp scripts/git-hooks/pre-push .git/hooks/pre-push
+remote="$1"
+zero=0000000000000000000000000000000000000000
+while read local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then
+        # A new remote branch: compare with main, or failing that list the tip
+        # commit's own files. Diffing the bare sha compared the WORKING TREE with
+        # it, saw nothing, and let a failing test through - caught by testing
+        # this hook against a scratch remote before relying on it.
+        base=$(git merge-base origin/main "$local_sha" 2>/dev/null)
+        if [ -n "$base" ] && [ "$base" != "$local_sha" ]; then
+            changed=$(git diff --name-only "$base" "$local_sha" 2>/dev/null)
+        else
+            changed=$(git diff-tree --no-commit-id --name-only -r "$local_sha" 2>/dev/null)
+        fi
+    else
+        changed=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)
+    fi
+    if echo "$changed" | grep -Eq '^(src|scripts|tests)/|\.py$|^config\.json$|^requirements'; then
+        py=".venv/Scripts/python.exe"; [ -x "$py" ] || py=".venv/bin/python"; [ -x "$py" ] || py="python"
+        echo "[pre-push] code changed - running ruff and the test suite before pushing"
+        "$py" -m ruff check src/ tests/ scripts/ || { echo "[pre-push] ruff failed - push blocked"; exit 1; }
+        "$py" -m pytest -q -p no:cacheprovider -x >/tmp/ezekiel-prepush.log 2>&1 \
+            || { tail -20 /tmp/ezekiel-prepush.log; echo "[pre-push] tests failed - push blocked"; exit 1; }
+        tail -1 /tmp/ezekiel-prepush.log
+    fi
+    if echo "$changed" | grep -Eq '^dashboard/'; then
+        echo "[pre-push] dashboard changed - running its tests"
+        (cd dashboard && npm test >/tmp/ezekiel-prepush-dash.log 2>&1) \
+            || { tail -20 /tmp/ezekiel-prepush-dash.log; echo "[pre-push] dashboard tests failed - push blocked"; exit 1; }
+    fi
+done
+exit 0

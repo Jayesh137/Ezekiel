@@ -71,9 +71,8 @@ PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
 - **DONE-11 `0xf078969e…` in `known_self_wallets`,** with the hop-through-a-config-wallet
   transfer vote now requiring >= $1,000 of valued flow (`self_flow_usd`) — 56 of the
   72 wallets beside it were $0 poisoners.
-- **DONE-12 `config.owner_wallets`.** The operator's own copy-trading accounts are
-  refused by every candidate path (scan, priority set, candidate files, backtest
-  lineup, roster). Ships empty: **paste your wallet addresses into it.**
+- *(Scrapped 2026-09-17 at the operator's request: `config.owner_wallets` — they will not
+  maintain a list of their own wallets, so the exclusion was reverted.)*
 - **DONE-13 Circle flows, both ends (supersedes P2-1 and P2-3).** Circle's
   MessageTransmitterV2 events on HyperEVM name source chain, source sender and
   credited account for every deposit, and withdrawing account plus recipient for every
