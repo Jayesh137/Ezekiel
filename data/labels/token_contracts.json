@@ -19,11 +19,13 @@
     "Deliberately ABSENT, and why:",
     "  bsc USDC - could not be verified. Every public BSC RPC tried refused the",
     "    call, and the explorers 403. Unverified is left unmapped.",
-    "  polygon USDT - no canonical contract could be established. The only one",
-    "    in the substrate (0x26c68e12..., 6 records) reads name 'Tether USD'",
-    "    symbol 'USDT' but declares a supply of 1,000,000,000,000 - the",
-    "    counterfeit signature. The commonly cited 0xc2132D05... is NOT polygon",
-    "    USDT: on-chain it is name 'USDT0' symbol 'USDT0', a different token.",
+    "  (RESOLVED 2026-09-16) polygon USDT was left absent because",
+    "    0xc2132D05... reads name/symbol 'USDT0'. That contract IS Tether's",
+    "    Polygon USDT after its USDT0 migration (supply 771M), so a token",
+    "    reporting plain 'USDT' on Polygon is not Tether's. Absent, the ticker",
+    "    priced at par from ANY contract: 15 of them, $54.3M, 0x26c68e12...",
+    "    (supply 1,000,000,000,000) alone $53.7M. 0xc2132D05... is now filed",
+    "    under both tickers.",
     "",
     "base, bsc and optimism carry NO records: the free Etherscan tier does not",
     "serve account endpoints for them. These entries are protective, correct",
@@ -132,6 +134,13 @@
       "contract": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
       "verified": "read on-chain via rpc.monad.xyz (chain id 143) 2026-09-16 - name() 'USDC', symbol() 'USDC', decimals() 6, totalSupply 220,222,657.73; the address Circle lists for Monad at developers.circle.com/stablecoins/usdc-contract-addresses",
       "substrate_support": "none yet - protective entry added BEFORE Monad joined the sweep, so a counterfeit USDC there is caught instead of priced at par"
+    },
+    {
+      "chain": "polygon",
+      "symbol": "USDT",
+      "contract": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+      "verified": "Tether's own Polygon contract - the same address this registry already files as USDT0, read on-chain via polygon.drpc.org (name/symbol USDT0 since the USDT0 migration; it reported USDT before it). Registered under USDT too so any OTHER Polygon token calling itself USDT is an impostor",
+      "substrate_support": "2026-09-16: 15 other contracts on Polygon report USDT, $54.3M priced at par - 0x26c68e12... alone $53.7M (name Tether USD, supply 1,000,000,000,000: the counterfeit signature), others in identical $5,090 batches - none of them Tether"
     }
   ]
 }

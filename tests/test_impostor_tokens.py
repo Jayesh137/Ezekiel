@@ -77,8 +77,10 @@ def test_load_canonical_contracts_seeds_from_config():
 
 
 def test_load_canonical_contracts_survives_a_missing_registry(tmp_path):
+    """A missing file adds nothing: only the built-in native-ticker rows remain."""
+    from src.chain.assets import CANONICAL_CONTRACTS
     canon = load_canonical_contracts({}, tmp_path / "nope.json")
-    assert canon == {}
+    assert canon == {k: set(v) for k, v in CANONICAL_CONTRACTS.items()}
 
 
 def test_load_canonical_contracts_reads_a_registry_file(tmp_path):

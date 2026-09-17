@@ -86,7 +86,23 @@ def decimals_of(row: dict, kind: str) -> int:
 # WRONG would quarantine a real stablecoin transfer, which is worse than the bug
 # it fixes, so unknown (chain, symbol) pairs stay unverified rather than guessed.
 # Extend via data/labels/token_contracts.json.
-CANONICAL_CONTRACTS: dict[tuple[str, str], str] = {}
+# A token wearing its chain's OWN native ticker from a contract is a forgery:
+# native ETH has no contract on Ethereum, Arbitrum, Base or Optimism, so an
+# ERC-20 calling itself "ETH" there is a poisoner's token priced at ETH's close.
+# Measured 2026-09-16: 25 such contracts, ~$30.5M booked as real, each with a
+# single sender — one of them "paid" $5.26M from `0xf078969e…` to
+# `0x8579b784…0eb68e`, a vanity look-alike of his own deposit address.
+#
+# "native" is the only genuine form, so every contract is an impostor under
+# `is_impostor`, and a native record (no contract) never is. Optimism's legacy
+# OVM ETH predeploy really did move ETH as a token before Bedrock.
+NATIVE_ONLY = "native"
+CANONICAL_CONTRACTS: dict[tuple[str, str], set] = {
+    ("ethereum", "ETH"): {NATIVE_ONLY},
+    ("arbitrum", "ETH"): {NATIVE_ONLY},
+    ("base", "ETH"): {NATIVE_ONLY},
+    ("optimism", "ETH"): {NATIVE_ONLY, "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0000"},
+}
 
 
 def load_canonical_contracts(config: dict | None = None,
@@ -94,7 +110,9 @@ def load_canonical_contracts(config: dict | None = None,
     """Canonical token contracts, from config plus an optional label file."""
     import json as _json
 
-    out = dict(CANONICAL_CONTRACTS)
+    # A copy of every SET, not just the dict: a registry row naming a key the
+    # defaults already carry would otherwise add to the module constant itself.
+    out = {key: set(addrs) for key, addrs in CANONICAL_CONTRACTS.items()}
     config = config or {}
     arb_usdc = (config.get("usdc_contract_arbitrum") or "").lower()
     if arb_usdc:

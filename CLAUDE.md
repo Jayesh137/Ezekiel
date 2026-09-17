@@ -1353,6 +1353,28 @@ on-chain) so a counterfeit there cannot be priced at par. **Whether Etherscan's
 free tier serves chain 143 is measured by the first sweep** — read
 `unsupported_sources` before assuming the Monad substrate is complete.
 
+**$84.6M of counterfeit value was still priced as real (fixed 2026-09-17).**
+Found by asking what `0xf078969e…`'s large EOA counterparties were: several
+were vanity look-alikes of the real ones (`0x5c2ccbdf…a210f` beside
+`0x5c2c1aa8…a210f`, `0xffd6d9df…91636` beside `0xffd62ae3…91636`,
+`0x8579b784…0eb68e` beside his own deposit address `0x8570c2ae…0eb68e`) — and
+the substrate booked them as paying or being paid millions. Two holes in rule 2:
+
+- **Polygon "USDT" had no registry row**, so the ticker priced at par from any
+  contract: 15 contracts, $54.3M, `0x26c68e12…` (supply one trillion — the
+  counterfeit signature the registry's own comment already named) alone $53.7M.
+  It was left out because Tether's contract reads `USDT0`; that contract IS
+  Tether's Polygon USDT after the migration, so it is now filed under both
+  tickers and everything else is an impostor.
+- **An ERC-20 calling itself "ETH" priced at ETH's close.** Native ETH has no
+  contract on Ethereum, Arbitrum, Base or Optimism: 25 contracts, ~$30.5M, one
+  sender each. `assets.CANONICAL_CONTRACTS` now files ETH there as `native`
+  only (Optimism's legacy OVM ETH predeploy excepted), so `is_impostor` catches
+  every contract and never a native record.
+
+Dry run of `quarantine_impostor_tokens.py`: **316 records, $84,635,116.82**.
+The same stored-record pass analyze.yml runs daily applies it.
+
 **When a rule is enforced in one branch, check the branch beside it** — the
 funder beside the destination, the scorer beside the backtest, the reach beside
 the transfer. All three were found by asking why a PROBABLE was PROBABLE.
