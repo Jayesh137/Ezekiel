@@ -1,10 +1,10 @@
 #!/bin/sh
-# Blocks a push whose code would fail CI's lint or test job.
+# Blocks a push whose code would fail CI's lint or test jobs.
 #
 # On 2026-09-16 a commit was pushed with a failing test because the command that
 # decided whether to commit checked grep's output rather than pytest's exit
 # status, and the "Tests" workflow went red on main. CI is the second line of
-# defence, not the first. Data-only and docs-only pushes skip the suite.
+# defence, not the first. Data-only and docs-only pushes skip the suites.
 #
 # Install (once per clone):  cp scripts/git-hooks/pre-push .git/hooks/pre-push
 remote="$1"
@@ -25,16 +25,18 @@ while read local_ref local_sha remote_ref remote_sha; do
     else
         changed=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)
     fi
-    # The code this push would put on main, by content. Automated data commits
-    # land on main every few minutes; rebasing onto them changes nothing here,
-    # so a suite that already passed for this exact code need not run again -
-    # re-running it (~100s) is what let a data commit win the race and reject
-    # the push on 2026-09-17.
-    key=$(for p in src tests scripts config.json requirements.txt; do git rev-parse "$local_sha:$p" 2>/dev/null; done | tr '
-' ' ')
+    # Everything this push would put on main that any suite reads, by content.
+    # Automated data commits land on main every few minutes; rebasing onto them
+    # changes none of it, so suites that already ALL passed for this exact
+    # content need not run again - re-running them (~100s) is what let a data
+    # commit win the race and reject the push on 2026-09-17. The stamp is
+    # written only after every suite below has passed: written earlier, a
+    # failing relay or dashboard test would be skipped on the retry.
+    key=$(for p in src tests scripts dashboard config.json requirements.txt; do
+              git rev-parse "$local_sha:$p" 2>/dev/null; done | tr '\n' ' ')
     stamp="$(git rev-parse --git-dir)/ezekiel-prepush-passed"
     if [ -n "$key" ] && [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$key" ]; then
-        echo "[pre-push] this exact code already passed ruff and the suite - not re-running"
+        echo "[pre-push] this exact code already passed every suite - not re-running"
         continue
     fi
     if echo "$changed" | grep -Eq '^(src|scripts|tests)/|\.py$|^config\.json$|^requirements'; then
@@ -44,15 +46,17 @@ while read local_ref local_sha remote_ref remote_sha; do
         "$py" -m pytest -q -p no:cacheprovider -x >/tmp/ezekiel-prepush.log 2>&1 \
             || { tail -20 /tmp/ezekiel-prepush.log; echo "[pre-push] tests failed - push blocked"; exit 1; }
         tail -1 /tmp/ezekiel-prepush.log
-        printf '%s' "$key" > "$stamp"
     fi
     if echo "$changed" | grep -Eq '^scripts/apps_script/'; then
-        node --test scripts/apps_script/relay.test.mjs >/tmp/ezekiel-prepush-relay.log 2>&1             || { tail -20 /tmp/ezekiel-prepush-relay.log; echo "[pre-push] relay tests failed - push blocked"; exit 1; }
+        echo "[pre-push] relay changed - running its tests"
+        node --test scripts/apps_script/relay.test.mjs >/tmp/ezekiel-prepush-relay.log 2>&1 \
+            || { tail -20 /tmp/ezekiel-prepush-relay.log; echo "[pre-push] relay tests failed - push blocked"; exit 1; }
     fi
     if echo "$changed" | grep -Eq '^dashboard/'; then
         echo "[pre-push] dashboard changed - running its tests"
         (cd dashboard && npm test >/tmp/ezekiel-prepush-dash.log 2>&1) \
             || { tail -20 /tmp/ezekiel-prepush-dash.log; echo "[pre-push] dashboard tests failed - push blocked"; exit 1; }
     fi
+    [ -n "$key" ] && printf '%s' "$key" > "$stamp"
 done
 exit 0
