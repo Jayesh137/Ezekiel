@@ -382,3 +382,25 @@ def test_empty_graph_is_safe():
     assert graph["node_count"] == 0
     assert graph["edge_count"] == 0
     assert select_alerts(graph, None) == []
+
+
+def test_self_flow_counts_valued_movement_with_his_config_wallets_only():
+    """The roster's transfer vote through a config wallet needs real money:
+    56 of 72 wallets beside `0xf078969e…` had moved $0 or dust with it."""
+    treasury = W1
+    graph = build_graph(edges_from(
+        l1(T, treasury, 900_000, BASE_TS),
+        l1(treasury, W2, 250_000, BASE_TS + 3600),
+        l1(W3, treasury, 0, BASE_TS + 7200),              # a poisoner's zero transfer
+    ), T, self_wallets={treasury.upper(), T})
+    assert node_for(graph, W2)["evidence"]["self_flow_usd"] == 250_000.0
+    poisoner = node_for(graph, W3)
+    assert poisoner is None or poisoner["evidence"]["self_flow_usd"] == 0.0
+    # The target is not "self" for this figure: direct flow has its own flags.
+    assert node_for(graph, treasury)["evidence"]["self_flow_usd"] == 0.0
+
+
+def test_self_flow_is_zero_without_config_wallets():
+    graph = build_graph(edges_from(l1(T, W1, 500_000, BASE_TS),
+                                   l1(W1, W2, 100_000, BASE_TS + 60)), T)
+    assert node_for(graph, W2)["evidence"]["self_flow_usd"] == 0.0

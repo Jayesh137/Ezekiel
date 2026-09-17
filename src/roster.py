@@ -113,6 +113,12 @@ def linkage_from_first_funders(funders: dict, target: str,
                      if w and w != t and f == tf}
 
 
+# Real money moved with one of his config wallets, before a hop through that
+# wallet may vote. Poisoners move $0; the smallest genuine counterparty of
+# `0xf078969e…` measured on 2026-09-17 moved $97,430.
+SELF_FLOW_MIN_USD = 1_000.0
+
+
 def transfer_touches_cluster(node: dict, evidence: dict, known_self: set) -> bool:
     """Whether a graph node moved money WITH one of his wallets. Pure.
 
@@ -123,25 +129,27 @@ def transfer_touches_cluster(node: dict, evidence: dict, known_self: set) -> boo
     vote on depth 2 with no direct flow, and two of them were PROBABLE — both
     accounts of a market maker (referral code `MMREFCSI`, agents `XYZ_SET11` and
     `APTS`, 100% client order ids) that the target had paid once, $1M, on
-    2026-09-10. Paired with a dormancy handoff (a market maker opens accounts
-    constantly, so some land inside his silences), a hop through a stranger was
-    promoted into a second independent vote.
+    2026-09-10.
 
     Counts: an observed transfer with the target in either direction (the
     graph's own `direct_from_target` / `funded_target`, which read observed
-    edges only), or a path whose previous hop is a config `known_self_wallet`.
-    Deliberately NOT "the path's previous hop is the target": a node joined to
-    him by an inferred correlation edge has that path too, and must not earn a
-    transfer vote from it. Deliberately config only, not a roster tier — ground
+    edges only), or at least `SELF_FLOW_MIN_USD` of VALUED flow with one of his
+    config wallets (`self_flow_usd`). Adjacency alone does not: 56 of the 72
+    wallets beside `0xf078969e…` had moved $0 or dust with it — poisoners,
+    including vanity look-alikes of the target — and a hop rule keyed on the
+    path voted for every one of them. Config only, never a roster tier: ground
     truth is the operator's, and one inference must not mint another's vote.
 
     A node that is merely reached keeps `graph_reach_only` as evidence: rule 7,
-    reach is never thrown away, it just does not vote.
+    reach is never thrown away, it just does not vote. `node` and `known_self`
+    are kept in the signature for the callers that pass them.
     """
     if evidence.get("direct_from_target") or evidence.get("funded_target"):
         return True
-    path = [(p or "").lower() for p in (node.get("path") or [])]
-    return len(path) >= 3 and path[-2] in (known_self or set())
+    try:
+        return float(evidence.get("self_flow_usd") or 0) >= SELF_FLOW_MIN_USD
+    except (TypeError, ValueError):
+        return False
 
 
 def funder_exclusions(funders: dict, target: str, cache) -> set:

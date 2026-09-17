@@ -948,7 +948,8 @@ def build_graph(edges: list[dict], target: str, *,
                 now_ts: float | None = None,
                 expansion: dict | None = None,
                 thresholds: dict | None = None,
-                never_services: set | None = None) -> dict:
+                never_services: set | None = None,
+                self_wallets: set | None = None) -> dict:
     """Walk outward from the target, classifying and scoring every wallet reached.
 
     Pure function — every external input is passed in, so traversal and scoring
@@ -960,6 +961,12 @@ def build_graph(edges: list[dict], target: str, *,
     target = target.lower()
     thresholds = thresholds if thresholds is not None else _resolved_thresholds()
     now_ts = now_ts if now_ts is not None else time.time()
+    # His config wallets other than the target. What a node moved WITH them is
+    # recorded per node, so the roster's transfer vote can require real money
+    # rather than mere adjacency: measured 2026-09-17, 56 of the 72 wallets
+    # adjacent to `0xf078969e…` moved $0 or dust with it — address poisoners,
+    # including vanity look-alikes of the target himself.
+    self_wallets = {(w or "").lower() for w in (self_wallets or ())} - {target, ""}
     known_services = {a.lower() for a in (known_services or set())}
     not_exits = {a.lower() for a in (not_exits or set())}
     behavioural = {k.lower(): v for k, v in (behavioural or {}).items()}
@@ -1090,6 +1097,11 @@ def build_graph(edges: list[dict], target: str, *,
                            if e.get("amount_usd") is not None), 2)
         unvalued = sum(1 for e in from_target + to_target
                        if e.get("amount_usd") is None)
+        with_self = [e for e in observed
+                     if (e["src"] in self_wallets and e["dst"] == addr)
+                     or (e["dst"] in self_wallets and e["src"] == addr)]
+        self_usd = round(sum(float(e["amount_usd"]) for e in with_self
+                             if e.get("amount_usd") is not None), 2)
         stamps = [e["ts"] for e in observed if e["ts"]]
         link = linkage.get(addr, {})
         corr = correlations.get(addr, {})
@@ -1101,6 +1113,8 @@ def build_graph(edges: list[dict], target: str, *,
             "service_reason": services.get(addr),
             "direct_from_target": bool(from_target),
             "funded_target": bool(to_target),
+            # Valued flow with his other config wallets, either direction.
+            "self_flow_usd": self_usd,
             "bidirectional": bool(from_target and to_target),
             "transfer_count": len(observed),
             "only_single_transfer": len(observed) == 1,
@@ -3015,6 +3029,7 @@ def run_transfer_graph(expand: bool = True) -> dict:
         dust_usd=cfg["dust_usd"],
         expansion=expansion,
         never_services=never_services,
+        self_wallets=set(config.get("known_self_wallets") or []),
     )
 
     previous = previous_graph or None

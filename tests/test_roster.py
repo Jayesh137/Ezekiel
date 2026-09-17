@@ -274,15 +274,30 @@ def test_a_direct_transfer_with_the_target_still_votes(tmp_path, monkeypatch):
     assert row["vectors"] == ["transfer"]
 
 
-def test_a_hop_through_his_own_config_wallet_votes(tmp_path, monkeypatch):
-    """A counterparty of his treasury moved money with a wallet of his."""
+def test_real_money_with_his_own_config_wallet_votes(tmp_path, monkeypatch):
+    """A counterparty that moved real money with his treasury moved it with him."""
     treasury = "0x" + "55" * 20
     _setup(tmp_path, monkeypatch,
            transfer_graph=("nodes", [_node(depth=2, path=[TARGET, treasury, W],
-                                           evidence={"transfer_count": 3})]))
+                                           evidence={"transfer_count": 3,
+                                                     "self_flow_usd": 97_430.0})]))
     row = roster.build_roster({"target_wallet": TARGET,
                                "known_self_wallets": [treasury]})["wallets"][0]
     assert "transfer" in row["vectors"]
+
+
+def test_a_poisoner_beside_his_config_wallet_casts_no_vote(tmp_path, monkeypatch):
+    """Measured 2026-09-17: 56 of 72 wallets adjacent to `0xf078969e…` moved $0
+    or dust with it. Adjacency is where a poisoner lives, not evidence."""
+    treasury = "0x" + "55" * 20
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(depth=2, path=[TARGET, treasury, W],
+                                           evidence={"transfer_count": 34,
+                                                     "self_flow_usd": 0.0})]))
+    row = roster.build_roster({"target_wallet": TARGET,
+                               "known_self_wallets": [treasury]})["wallets"][0]
+    assert "transfer" not in row["vectors"]
+    assert row["evidence"]["graph_reach_only"] is True
 
 
 def test_a_correlation_edge_path_to_the_target_is_not_a_transfer(tmp_path, monkeypatch):

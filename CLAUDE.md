@@ -1375,6 +1375,23 @@ the substrate booked them as paying or being paid millions. Two holes in rule 2:
 Dry run of `quarantine_impostor_tokens.py`: **316 records, $84,635,116.82**.
 The same stored-record pass analyze.yml runs daily applies it.
 
+**`0xf078969e…` joined `known_self_wallets` (2026-09-17, operator-delegated).**
+The evidence is no longer an inference stack: two-way with the target at
+$135M/$148M, pays the same private Binance deposit address as the target and
+the treasury ($114.8M), and runs the Circle round trip that parks his idle HL
+capital in Aave on Monad and returns it to his own account. As config ground
+truth it gets the collector's explorer read (a send or withdrawal to an outside
+address alerts CRITICAL), spam immunity, Circle-withdrawal pairing, and the
+hop-through-a-config-wallet transfer vote.
+
+**That vote now needs real money (`self_flow_usd` ≥ $1,000).** Replayed before
+the promotion, the path-based rule would have lifted 72 wallets WATCH →
+POSSIBLE; 56 of them had moved $0 or dust with `0xf078969e…` — poisoners,
+including vanity look-alikes of the target (`0x45d27089…`, `0x45dc921e…`,
+`0x45dd380d…`). The graph now records each node's valued flow with his config
+wallets and the roster requires $1K; the smallest genuine counterparty moved
+$97,430. Adjacency is where a poisoner lives, not evidence.
+
 **When a rule is enforced in one branch, check the branch beside it** — the
 funder beside the destination, the scorer beside the backtest, the reach beside
 the transfer. All three were found by asking why a PROBABLE was PROBABLE.
