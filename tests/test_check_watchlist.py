@@ -34,7 +34,8 @@ AGENT = "0x1e8695b7261ff0b422ccf46f0ccf093fad308c3a"
 FRONTEND = "0x98cf3fee01cb61905a79b63c4d7662cc638c72e2"
 
 
-def _stub(monkeypatch, *, extra_agents, frontend_agent=None):
+def _stub(monkeypatch, *, extra_agents, frontend_agent=None, signers=None,
+          subaccounts=()):
     """Everything read_wallet touches, answered from memory. No network."""
     asked = []
 
@@ -44,12 +45,17 @@ def _stub(monkeypatch, *, extra_agents, frontend_agent=None):
             if isinstance(extra_agents, Exception):
                 raise extra_agents
             return extra_agents
+        if body.get("type") == "userToMultiSigSigners":
+            return signers
+        if body.get("type") == "clearinghouseState":
+            return {"marginSummary": {"accountValue": "53616202.18"}, "assetPositions": []}
         if body.get("type") == "spotClearinghouseState":
             return {"balances": []}
         if body.get("type") == "userFills":
             return []
         if body.get("type") == "subAccounts":
-            return []
+            # utils.hl_post's failure answer for this request type is {}.
+            return list(subaccounts) if subaccounts is not None else {}
         return {}
 
     monkeypatch.setattr(check, "hl_post", fake_hl_post)
@@ -58,8 +64,6 @@ def _stub(monkeypatch, *, extra_agents, frontend_agent=None):
         "owner": None, "agent_address": frontend_agent, "leading_vaults": [],
         "staking_link": None})
     monkeypatch.setattr(check, "live_hip3_dexes", lambda: [])
-    monkeypatch.setattr(check, "merged_clearinghouse_state", lambda addr, **kw: {
-        "marginSummary": {"accountValue": "53616202.18"}, "assetPositions": []})
     monkeypatch.setattr(check, "fetch_actions", lambda addr: ([], None))
     monkeypatch.setattr(check, "own_actions", lambda rows, addr: [])
     monkeypatch.setattr(check, "record", lambda addr, acts: None)
@@ -101,6 +105,49 @@ def test_an_unreadable_agent_endpoint_never_serialises_as_no_agents(monkeypatch)
     assert any("extraAgents" in e for e in snap["errors"])
 
 
+def test_a_failed_agent_read_is_not_no_agents_even_when_it_does_not_raise(monkeypatch):
+    """`utils.hl_post` never raises: when every retry fails it answers {} for
+    this request type, and normalise_agents({}) is []."""
+    _stub(monkeypatch, extra_agents={})
+
+    snap, _ = check.read_wallet(W, {})
+
+    assert snap["read_ok"] is False
+    assert any("extraAgents" in e for e in snap["errors"])
+
+
+def test_a_failed_subaccount_read_is_not_no_subaccounts(monkeypatch):
+    _stub(monkeypatch, extra_agents=[], subaccounts=None)
+
+    snap, _ = check.read_wallet(W, {})
+
+    assert snap["read_ok"] is False
+    assert any("subAccounts" in e for e in snap["errors"])
+
+
+def test_multisig_signers_are_control_handed_out_and_reported_as_agents(monkeypatch):
+    """A signer can act for the account, exactly as an agent can."""
+    signer = "0x" + "ab" * 20
+    asked = _stub(monkeypatch, extra_agents=[],
+                  signers={"authorizedUsers": ["0x" + "AB" * 20, W], "threshold": 1})
+
+    snap, _ = check.read_wallet(W, {})
+
+    assert "userToMultiSigSigners" in asked
+    assert signer in snap["agents"]
+    assert snap["read_ok"] is True
+
+
+def test_an_unreadable_multisig_answer_is_an_error_not_no_signers(monkeypatch):
+    """`hl_post` answers [] for this request type when every retry fails."""
+    _stub(monkeypatch, extra_agents=[], signers=[])
+
+    snap, _ = check.read_wallet(W, {})
+
+    assert snap["read_ok"] is False
+    assert any("userToMultiSigSigners" in e for e in snap["errors"])
+
+
 def test_an_account_with_no_agents_reads_clean(monkeypatch):
     """The target's own answer. An empty list is a real 'none', not an outage."""
     _stub(monkeypatch, extra_agents=[])
@@ -129,30 +176,73 @@ def test_the_targets_value_is_read_the_same_way_the_watched_wallet_is(monkeypatc
     read across every LIVE dex would divide two different quantities and could
     manufacture a crossing out of a stale file.
     """
-    seen = {}
+    seen = []
 
-    def fake_merged(addr, **kw):
-        seen[addr] = kw.get("dexes")
-        return {"marginSummary": {"accountValue": "17357742.18"}, "assetPositions": []}
+    def fake_hl_post(body):
+        seen.append((body["type"], body["user"], body.get("dex")))
+        if body["type"] == "spotClearinghouseState":
+            return {"balances": [{"coin": "USDC", "total": "45013138.0"}]}
+        margin = {None: "14607066.0", "xyz": "6670839.0", "flx": "0.0"}[body.get("dex")]
+        return {"marginSummary": {"accountValue": margin}, "assetPositions": []}
 
-    monkeypatch.setattr(check, "merged_clearinghouse_state", fake_merged)
     monkeypatch.setattr(check, "live_hip3_dexes", lambda: ["xyz", "flx"])
-    monkeypatch.setattr(check, "hl_post", lambda body: {
-        "balances": [{"coin": "USDC", "total": "6747796.94"}]})
+    monkeypatch.setattr(check, "hl_post", fake_hl_post)
 
     value = check.target_account_value({"target_wallet": T.upper()})
 
-    assert seen[T] == ["xyz", "flx"], "the target was not read across the live dexes"
-    assert value == 17357742.18 + 6747796.94
+    assert {dex for kind, _user, dex in seen if kind == "clearinghouseState"} == {
+        None, "xyz", "flx"}, "the target was not read across the live dexes"
+    assert {user for _kind, user, _dex in seen} == {T}
+    assert value == 14607066.0 + 6670839.0 + 45013138.0
+
+
+def test_margin_held_on_a_hip3_dex_is_part_of_the_account(monkeypatch):
+    """Measured 2026-09-17: $6.67M of the target's $66.3M sat on `xyz`.
+
+    A HIP-3 dex keeps its own margin, so reading the main dex's margin plus
+    spot put him at $59.6M and inflated every watched wallet's ratio ~11%
+    towards the band.
+    """
+    def fake_hl_post(body):
+        if body["type"] == "spotClearinghouseState":
+            return {"balances": []}
+        if body.get("dex"):
+            return {"marginSummary": {"accountValue": "100.0"},
+                    "assetPositions": [{"position": {"coin": f"{body['dex']}:SP500"}}]}
+        return {"marginSummary": {"accountValue": "0.0"}, "assetPositions": []}
+
+    monkeypatch.setattr(check, "hl_post", fake_hl_post)
+
+    value, state = check.account_value(T, ["xyz"])
+
+    assert value == 100.0
+    assert [p["position"]["coin"] for p in state["assetPositions"]] == ["xyz:SP500"]
+
+
+def test_a_failed_read_anywhere_in_the_account_is_no_value_not_a_smaller_one(monkeypatch):
+    """`hl_post` answers {} when every retry fails. Read as an empty dex, that
+    dropped part of the account silently; now it is a failure."""
+    for broken in (None, "xyz", "spot"):
+        def fake(body, broken=broken):
+            if body["type"] == "spotClearinghouseState":
+                return {} if broken == "spot" else {"balances": []}
+            if body.get("dex") == broken:
+                return {}
+            return {"marginSummary": {"accountValue": "1.0"}, "assetPositions": []}
+
+        monkeypatch.setattr(check, "hl_post", fake)
+        try:
+            check.account_value(T, ["xyz"])
+        except RuntimeError:
+            continue
+        raise AssertionError(f"a failed {broken or 'perp'} read produced a value")
 
 
 def test_an_unreadable_target_is_none_not_zero(monkeypatch):
     """Rule 6. A target priced at 0.0 makes every watched wallet infinitely
     larger than him, which would fire the crossing on an outage."""
-    def boom(addr, **kw):
-        raise RuntimeError("503")
-
-    monkeypatch.setattr(check, "merged_clearinghouse_state", boom)
+    # utils.hl_post's own failure answer, which is not an exception.
+    monkeypatch.setattr(check, "hl_post", lambda body: {})
     monkeypatch.setattr(check, "live_hip3_dexes", lambda: [])
 
     assert check.target_account_value({"target_wallet": T}) is None

@@ -2,6 +2,8 @@
 """The explorer's action ledger: destinations, approvals, and what counts as
 the account's own. Shapes captured live from the treasury on 2026-09-10."""
 
+import json
+
 from src import hl_actions as ha
 
 TR = "0x1419e75330c71ce463102e6a1eb62fe80b412d5f"
@@ -172,3 +174,57 @@ def test_summary_carries_the_chain_of_a_foreign_cctp_send():
     s = ha.summarise(T, acts, foreign, None)
     assert s["foreign_destinations"][0]["chain"] == "base"
     assert s["kinds"] == {"sendToEvmWithData": 1}
+
+
+# --- multi-sig: signers and co-signed accounts are control, like agents ------
+#
+# Shapes from the Hyperliquid API: `convertToMultiSigUser.signers` is a JSON
+# STRING, and a `multiSig` action names the account inside `payload`.
+
+SIGNER = "0x" + "5a" * 20
+OTHER = "0x" + "6b" * 20
+
+CONVERT = {
+    "time": 20, "user": TR, "block": 20, "hash": "0x20", "error": None,
+    "action": {"type": "convertToMultiSigUser", "signatureChainId": "0xa4b1",
+               "hyperliquidChain": "Mainnet",
+               "signers": json.dumps({"authorizedUsers": [T, "0x" + SIGNER[2:].upper()],
+                                      "threshold": 1}),
+               "nonce": 20}}
+COSIGN = {
+    "time": 21, "user": TR, "block": 21, "hash": "0x21", "error": None,
+    "action": {"type": "multiSig", "signatureChainId": "0xa4b1", "signatures": [],
+               "payload": {"multiSigUser": OTHER, "outerSigner": TR,
+                           "action": {"type": "usdSend"}}}}
+
+
+def test_a_multisig_conversion_names_every_signer():
+    act = ha.own_actions([CONVERT], TR)[0]
+    assert act["parties"] == [T, SIGNER]
+    assert act["destination"] == T
+
+
+def test_an_outside_signer_is_foreign_even_behind_a_signer_of_his():
+    """One cluster signer listed first must not hide a stranger listed second."""
+    foreign = ha.foreign_destinations(ha.own_actions([CONVERT], TR), cluster={TR, T})
+    assert [(f["type"], f["destination"]) for f in foreign] == [
+        ("convertToMultiSigUser", SIGNER)]
+
+
+def test_signing_for_another_account_is_foreign():
+    act = ha.own_actions([COSIGN], TR)[0]
+    assert act["parties"] == [OTHER]
+    foreign = ha.foreign_destinations([act], cluster={TR, T})
+    assert [(f["type"], f["destination"]) for f in foreign] == [("multiSig", OTHER)]
+
+
+def test_a_multisig_among_his_own_wallets_is_not_foreign():
+    row = {**COSIGN, "action": {**COSIGN["action"],
+                                "payload": {"multiSigUser": T, "outerSigner": TR}}}
+    assert ha.foreign_destinations(ha.own_actions([row], TR), cluster={TR, T}) == []
+
+
+def test_an_unparseable_signer_list_names_nobody_and_does_not_raise():
+    row = {**CONVERT, "action": {**CONVERT["action"], "signers": "not json"}}
+    act = ha.own_actions([row], TR)[0]
+    assert act["parties"] == [] and act["destination"] is None

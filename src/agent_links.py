@@ -76,6 +76,33 @@ def normalise_agents(payload) -> list[dict]:
     return out
 
 
+def multisig_signers(payload) -> list[str] | None:
+    """The addresses authorised to sign for a multi-sig account, or None if unreadable.
+
+    `userToMultiSigSigners` answers `null` for an ordinary account and
+    `{"authorizedUsers": [...], "threshold": n}` once the account has been
+    converted. A signer controls the account the way an agent does, so a
+    signer outside the cluster is an address he holds. The collector asked
+    for this from 2026-09-10 and read the answer as a LIST, which it never
+    is, so a conversion would have been thrown away without a word.
+
+    None means we could not tell: `utils.hl_post` answers `[]` for this
+    request type when every retry fails, and a dict without `authorizedUsers`
+    is not an answer we understand (rule 5).
+    """
+    if payload is None:
+        return []
+    users = payload.get("authorizedUsers") if isinstance(payload, dict) else None
+    if not isinstance(users, list):
+        return None
+    out = []
+    for user in users:
+        addr = (user if isinstance(user, str) else "").strip().lower()
+        if addr.startswith("0x") and len(addr) == 42 and addr not in out:
+            out.append(addr)
+    return out
+
+
 def agent_index(by_wallet: dict) -> dict:
     """agent address -> the set of accounts that authorised it.
 

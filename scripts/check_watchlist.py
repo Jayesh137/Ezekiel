@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import utils
-from src.agent_links import normalise_agents
+from src.agent_links import multisig_signers, normalise_agents
 from src.alerts import (
     alert_explicit_link,
     alert_settled_wallet_new_payee,
@@ -38,7 +38,7 @@ from src.chain.collect import records_for, sweep_wallet
 from src.chain.hyperevm import account_activity
 from src.hl_actions import fetch_actions, own_actions, record
 from src.hl_identity import probe
-from src.scanner import live_hip3_dexes, merged_clearinghouse_state
+from src.scanner import live_hip3_dexes
 from src.utils import DATA_DIR, hl_post, load_config
 from src.watchlist import (
     WATCHLIST_DIR,
@@ -198,14 +198,37 @@ def account_value(address: str, dexes: list) -> tuple[float, dict]:
 
     Raises rather than returning a number it could not compute: the callers
     disagree about what to do with a failure and neither may see a 0.0.
+
+    The total is `utils.account_value_components`' — perp + EVERY HIP-3 dex +
+    spot USDC, the collector's own definition. Until 2026-09-17 this summed
+    the main dex's margin and spot only: a HIP-3 dex keeps its own margin, so
+    the target's $6.67M on `xyz` was left out ($59.6M read against $66.3M
+    held), which inflated every watched wallet's size ratio by ~11% towards
+    the band. And a failed read counted as $0.00, because `hl_post` answers
+    `{}` rather than raising and the old code read that as an empty account.
     """
-    state = merged_clearinghouse_state(address, dexes=dexes)
-    value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
-    spot = hl_post({"type": "spotClearinghouseState", "user": address}) or {}
-    for b in spot.get("balances") or []:
-        if str(b.get("coin", "")).upper() == "USDC":
-            value += float(b.get("total") or 0)
-    return value, state
+    def answer(body: dict, understood) -> dict:
+        resp = hl_post(body)
+        if not understood(resp):
+            where = f"[{body['dex']}]" if body.get("dex") else ""
+            raise RuntimeError(f"{body['type']}{where}: no answer")
+        return resp
+
+    def is_state(resp) -> bool:
+        return isinstance(resp, dict) and isinstance(resp.get("marginSummary"), dict)
+
+    perp = answer({"type": "clearinghouseState", "user": address}, is_state)
+    hip3 = {dex: answer({"type": "clearinghouseState", "user": address, "dex": dex},
+                        is_state) for dex in dexes or []}
+    spot = answer({"type": "spotClearinghouseState", "user": address},
+                  lambda r: isinstance(r, dict) and isinstance(r.get("balances"), list))
+    value = utils.account_value_components({"perp": perp, "hip3": hip3, "spot": spot})["total"]
+    if value is None:
+        raise RuntimeError("clearinghouseState: account value unparseable")
+    positions = list(perp.get("assetPositions") or [])
+    for state in hip3.values():
+        positions.extend(state.get("assetPositions") or [])
+    return value, {"marginSummary": perp["marginSummary"], "assetPositions": positions}
 
 
 def target_account_value(config: dict) -> float | None:
@@ -259,6 +282,10 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
     subaccounts = []
     try:
         subs = hl_post({"type": "subAccounts", "user": address})
+        # A real answer is a list or null; `hl_post` answers {} when every
+        # retry fails, which read as "no sub-accounts" until 2026-09-17.
+        if subs is not None and not isinstance(subs, list):
+            raise RuntimeError(f"no answer ({str(subs)[:40]})")
         subaccounts = [(s.get("user") or s.get("address") or "") for s in subs or []
                        if isinstance(s, dict)]
     except Exception as exc:                          # noqa: BLE001 - transport
@@ -291,10 +318,25 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
     # rolled out of it. `extraAgents` is the only endpoint that still answers.
     # Measured on the watched wallet: agentAddress None, extraAgents one entry.
     try:
-        agents.extend(a["address"] for a in normalise_agents(
-            hl_post({"type": "extraAgents", "user": address})))
+        named = hl_post({"type": "extraAgents", "user": address})
+        # Always a list when it answers; `hl_post` answers {} on failure, and
+        # normalise_agents({}) is [] — an outage wearing "no agents" (rule 5).
+        if not isinstance(named, list):
+            raise RuntimeError(f"no answer ({str(named)[:40]})")
+        agents.extend(a["address"] for a in normalise_agents(named))
     except Exception as exc:                          # noqa: BLE001 - transport
         errors.append(f"extraAgents: {type(exc).__name__}: {exc}")
+
+    # Multi-sig signers. Converting an account to multi-sig names every
+    # address allowed to sign for it, so a signer is control handed out
+    # exactly as an agent is, and it is reported as one.
+    try:
+        signers = multisig_signers(hl_post({"type": "userToMultiSigSigners", "user": address}))
+        if signers is None:
+            raise RuntimeError("no answer")
+        agents.extend(signers)
+    except Exception as exc:                          # noqa: BLE001 - transport
+        errors.append(f"userToMultiSigSigners: {type(exc).__name__}: {exc}")
 
     activity = account_activity(address)
     if activity.get("errors"):

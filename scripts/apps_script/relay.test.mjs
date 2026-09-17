@@ -215,3 +215,21 @@ test('staking and shared venues like HLP are routine, not early warnings', () =>
   assert.deepEqual([...got.filter((a) => a.alert).map((a) => a.hash)], ['0xc']);
   assert.equal(got.find((a) => a.hash === '0xa'), undefined, 'staking delegation was treated as news');
 });
+
+test('multi-sig names the outside signer or co-signed account, never hiding it behind his own', () => {
+  const { sandbox } = load();
+  const SIGNER = '0x' + '5a'.repeat(20);
+  const txs = [
+    { hash: '0xm1', user: T, time: NOW, action: { type: 'convertToMultiSigUser',
+      signers: JSON.stringify({ authorizedUsers: [TREASURY, SIGNER.toUpperCase().replace('0X', '0x')], threshold: 1 }) } },
+    { hash: '0xm2', user: T, time: NOW, action: { type: 'multiSig', payload: { multiSigUser: OUTSIDE, outerSigner: T } } },
+    { hash: '0xm3', user: T, time: NOW, action: { type: 'multiSig', payload: { multiSigUser: TREASURY, outerSigner: T } } }
+  ];
+  const got = [...sandbox.newActions(txs, T, [], [T, TREASURY])];
+  assert.deepEqual(got.map((a) => [a.hash, a.destination, a.alert]), [
+    ['0xm1', SIGNER, true],
+    ['0xm2', OUTSIDE, true],
+    ['0xm3', TREASURY, false]
+  ]);
+  assert.deepEqual([...got[0].parties], [TREASURY, SIGNER]);
+});

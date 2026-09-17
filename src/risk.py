@@ -134,14 +134,47 @@ def compute_risk_score(signals: dict, thresholds: dict | None = None) -> dict:
     }
 
 
-def _xyz_abandoned(fills: list[dict], days: float = 10) -> bool:
-    """True if the target used to trade xyz: markets but has not in `days` days."""
+def _xyz_abandoned(fills: list[dict], days: float = 10, holds_xyz: bool | None = None) -> bool:
+    """True if the target used to trade xyz: markets but has not in `days` days.
+
+    Never while he still HOLDS an xyz: book in this account: holding is not
+    leaving. Measured 2026-09-17: last xyz fill 2026-08-14, while four xyz
+    positions (~$13.2M notional, $6.67M margin) sat open, so the factor added
+    5 migration points for a book he had not moved. `holds_xyz` None (the
+    account reading could not be understood) keeps the fill-only answer.
+    """
+    if holds_xyz:
+        return False
     xyz_times = [f.get("time", 0) for f in fills if str(f.get("coin", "")).startswith("xyz:")]
     if not xyz_times:
         return False
     last_xyz = max(xyz_times)
     age_days = (now_ms() - last_xyz) / 86_400_000
     return age_days >= days
+
+
+def _holds_xyz(account) -> bool | None:
+    """Whether data/account/latest.json shows an open xyz: position. None if unreadable.
+
+    The collector stores a HIP-3 dex only when it carries value or positions,
+    so a readable `hip3` map without `xyz` is a real "none".
+    """
+    hip3 = account.get("hip3") if isinstance(account, dict) else None
+    if not isinstance(hip3, dict):
+        return None
+    state = hip3.get("xyz")
+    if state is None:
+        return False
+    positions = state.get("assetPositions") if isinstance(state, dict) else None
+    if not isinstance(positions, list):
+        return None
+    for entry in positions:
+        try:
+            if float(((entry or {}).get("position") or {}).get("szi") or 0) != 0:
+                return True
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return False
 
 
 def _his_wallets() -> set:
@@ -272,7 +305,13 @@ def _gather_signals() -> dict:
             pass
 
     # xyz: signature-market abandonment
-    signals["xyz_abandoned"] = _xyz_abandoned(load_all_records(str(DATA_DIR / "fills")))
+    try:
+        with open(DATA_DIR / "account" / "latest.json") as f:
+            holds = _holds_xyz(json.load(f))
+    except (OSError, ValueError):
+        holds = None
+    signals["xyz_abandoned"] = _xyz_abandoned(load_all_records(str(DATA_DIR / "fills")),
+                                              holds_xyz=holds)
     return signals
 
 

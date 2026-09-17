@@ -953,6 +953,16 @@ def alert_foreign_destination(wallet: str, kind: str, destination: str,
         lead = ("A cluster wallet approved a new agent — a fresh address that now\n"
                 "signs for the account. Any other account approving the same one is\n"
                 "the same person.\n\n")
+    elif kind == "convertToMultiSigUser":
+        subject = "[EZEKIEL] CRITICAL: Cluster Wallet Made Multi-Sig With an Outside Signer"
+        lead = ("A cluster wallet converted itself to a multi-sig account. Every\n"
+                "signer can act for the account, so a signer outside the cluster is\n"
+                "an address he controls until shown otherwise.\n\n")
+    elif kind == "multiSig":
+        subject = "[EZEKIEL] CRITICAL: Cluster Wallet Signed For Another Account"
+        lead = ("A cluster wallet took part in a multi-sig action tied to an account\n"
+                "outside the cluster. Only an authorised signer can, so that account\n"
+                "is run with his keys.\n\n")
     elif kind == "sendToEvmWithData":
         subject = (f"[EZEKIEL] CRITICAL: Circle/CCTP withdrawal to an address outside "
                    f"the cluster on {chain or 'an unknown chain'}")

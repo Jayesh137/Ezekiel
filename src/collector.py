@@ -271,6 +271,8 @@ def collect_agents(wallet: str) -> None:
     we asked and he has none, and a later non-empty list is a NEW address he
     controls.
     """
+    from src.agent_links import multisig_signers
+
     out = {"wallet": wallet.lower(), "agents": [], "sources": {}, "errors": []}
     for req_type in ("extraAgents", "userToMultiSigSigners"):
         try:
@@ -279,7 +281,21 @@ def collect_agents(wallet: str) -> None:
             out["errors"].append(f"{req_type}: {type(exc).__name__}: {exc}")
             continue
         out["sources"][req_type] = resp
-        for entry in resp if isinstance(resp, list) else []:
+        if req_type == "userToMultiSigSigners":
+            # An object, never a list: read as a list, a conversion to
+            # multi-sig was discarded without a word. See multisig_signers.
+            signers = multisig_signers(resp)
+            if signers is None:
+                out["errors"].append(f"{req_type}: unreadable answer {str(resp)[:80]}")
+            for addr in signers or []:
+                out["agents"].append({"address": addr, "name": None, "valid_until": None,
+                                      "source": req_type})
+            continue
+        if not isinstance(resp, list):
+            # A real answer is always a list; `hl_post` answers {} on failure.
+            out["errors"].append(f"{req_type}: unreadable answer {str(resp)[:80]}")
+            continue
+        for entry in resp:
             addr = (entry.get("address") if isinstance(entry, dict) else entry)
             if isinstance(addr, str) and addr.startswith("0x"):
                 out["agents"].append({

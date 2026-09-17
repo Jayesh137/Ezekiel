@@ -9,7 +9,8 @@ Every 5 minutes it:
    (queueing into a busy queue is what gets runs cancelled);
 2. **watches his wallets** — the target, the treasury and `0xf078969e…` — and
    pushes an **urgent** ntfy within ~5 minutes of a withdrawal or send to an
-   address that is not his, a new agent, a sub-account or a vault. His routine
+   address that is not his, a new agent, a sub-account, a vault or a multi-sig
+   signer. His routine
    moves between his own wallets are not alerted. Measured over his history:
    about one alert a month.
 

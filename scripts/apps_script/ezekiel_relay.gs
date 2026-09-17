@@ -111,6 +111,31 @@ function decideDispatch(schedule, newest, nowMs, watchMinutes) {
 }
 
 /**
+ * The other addresses a multi-sig action ties `wallet` to (src/hl_actions.py
+ * multisig_parties): every signer named by convertToMultiSigUser (a JSON
+ * string), or the account a multiSig action was signed for.
+ */
+function multisigParties(action, wallet) {
+  var found = [];
+  if (action.type === 'convertToMultiSigUser') {
+    var signers = action.signers;
+    if (typeof signers === 'string') {
+      try { signers = JSON.parse(signers); } catch (e) { signers = null; }
+    }
+    found = (signers && Array.isArray(signers.authorizedUsers)) ? signers.authorizedUsers : [];
+  } else if (action.type === 'multiSig') {
+    var inner = action.payload || {};
+    found = [inner.multiSigUser || action.multiSigUser, inner.outerSigner || action.outerSigner];
+  }
+  var out = [];
+  found.forEach(function (value) {
+    var a = String(value || '').toLowerCase();
+    if (/^0x[0-9a-f]{40}$/.test(a) && a !== wallet && out.indexOf(a) < 0) out.push(a);
+  });
+  return out;
+}
+
+/**
  * Non-trading actions `wallet` performed that are not in `seen`, each marked
  * with whether it reaches outside the cluster or hands out control.
  */
@@ -126,10 +151,20 @@ function newActions(txs, wallet, seen, cluster, ignore) {
         seen.indexOf(short_(tx.hash)) >= 0) return;
     var field = DESTINATION_FIELDS[type];
     var dest = field ? String(action[field] || '').toLowerCase() : '';
+    var parties = multisigParties(action, w);
+    if (!dest && parties.length) {
+      // Name the stranger if there is one: a signer of his listed first must
+      // not hide an outside signer listed second.
+      var strangers = parties.filter(function (a) {
+        return cluster.indexOf(a) < 0 && shared.indexOf(a) < 0;
+      });
+      dest = strangers.length ? strangers[0] : parties[0];
+    }
     var outside = !!dest && /^0x[0-9a-f]{40}$/.test(dest) && cluster.indexOf(dest) < 0 &&
       shared.indexOf(dest) < 0;
     var control = CONTROL.indexOf(type) >= 0;
     out.push({
+      parties: parties,
       hash: tx.hash, time: tx.time, type: type, destination: dest || null,
       amount: action.amount || action.usd || action.wei || null,
       chain: action.destinationChainId !== undefined ? action.destinationChainId : null,
@@ -259,6 +294,7 @@ function checkClusterActions() {
         var title = 'Ezekiel EARLY WARNING: ' + a.type + ' by a wallet of his';
         var msg = 'Wallet: ' + wallet + '\nAction: ' + a.type +
           (a.destination ? '\nTo: ' + a.destination : '') +
+          (a.parties.length > 1 ? '\nAll parties: ' + a.parties.join(', ') : '') +
           (a.amount ? '\nAmount: ' + a.amount : '') +
           (a.chain !== null ? '\nCircle domain: ' + a.chain : '') +
           '\nWhen: ' + new Date(Number(a.time)).toISOString() +

@@ -32,6 +32,7 @@ Three things this module is careful about:
     with `destination: None` and never alerted.
 """
 
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -72,7 +73,18 @@ DESTINATION_FIELDS = {
     "agentSetAbstraction": None,
     "usdClassTransfer": None,
     "vaultCreate": None,
+    # Multi-sig. `convertToMultiSigUser` names its signers inside a JSON
+    # string and `multiSig` names the account inside `payload`, so both are
+    # read by `multisig_parties`, not by a field name.
+    "convertToMultiSigUser": None,
+    "multiSig": None,
 }
+
+# Kinds that hand value or control to another address, and so alert when
+# that address is outside the cluster.
+FOREIGN_KINDS = {"withdraw3", "sendToEvmWithData", "usdSend", "spotSend", "sendAsset",
+                 "subAccountTransfer", "subAccountSpotTransfer", "vaultTransfer",
+                 "approveAgent", "linkStakingUser", "convertToMultiSigUser", "multiSig"}
 
 
 def fetch_actions(address: str, *, post=None, timeout: float = 30.0) -> tuple[list, str | None]:
@@ -117,6 +129,41 @@ def cctp_destination(action: dict) -> tuple[int | None, str | None]:
     return domain, CCTP_DOMAINS.get(domain, f"domain-{domain}")
 
 
+def multisig_parties(action: dict, address: str) -> list[str]:
+    """The OTHER addresses a multi-sig action ties this account to. Pure.
+
+    `convertToMultiSigUser` carries `signers` as a JSON string,
+    `{"authorizedUsers": [...], "threshold": n}` (the string "null" converts
+    back), and every signer can act for the account. `multiSig` is an action
+    executed FOR `payload.multiSigUser` and signed by `payload.outerSigner`;
+    whichever of the two is not this account is an account he acts with.
+    Either way the answer is an address holding control, which is what an
+    agent is and what the shared-agent vector already treats as identity.
+    """
+    a = (address or "").lower()
+    kind = action.get("type")
+    found = []
+    if kind == "convertToMultiSigUser":
+        signers = action.get("signers")
+        if isinstance(signers, str):
+            try:
+                signers = json.loads(signers)
+            except ValueError:
+                signers = None
+        users = signers.get("authorizedUsers") if isinstance(signers, dict) else None
+        found = [u for u in users or [] if isinstance(u, str)]
+    elif kind == "multiSig":
+        inner = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+        found = [inner.get("multiSigUser") or action.get("multiSigUser"),
+                 inner.get("outerSigner") or action.get("outerSigner")]
+    out = []
+    for value in found:
+        addr = normalise_address(value) if isinstance(value, str) else ""
+        if addr.startswith("0x") and len(addr) == 42 and addr != a and addr not in out:
+            out.append(addr)
+    return out
+
+
 def own_actions(rows: list, address: str) -> list[dict]:
     """Normalised non-trading actions the account itself performed. Pure."""
     a = (address or "").lower()
@@ -134,6 +181,10 @@ def own_actions(rows: list, address: str) -> list[dict]:
         dest = action.get(field) if field else None
         if isinstance(dest, str):
             dest = normalise_address(dest)
+        parties = multisig_parties(action, a) if kind in ("convertToMultiSigUser",
+                                                          "multiSig") else []
+        if parties and not dest:
+            dest = parties[0]
         domain, chain = cctp_destination(action) if kind == "sendToEvmWithData" else (None, None)
         out.append({
             "hash": tx.get("hash"),
@@ -147,6 +198,9 @@ def own_actions(rows: list, address: str) -> list[dict]:
             # or Arbitrum and needs neither.
             "destination_chain": chain,
             "destination_domain": domain,
+            # Every address a multi-sig action ties the account to; the first
+            # is also `destination`, so the rest are not lost.
+            "parties": parties,
             "signature_chain_id": action.get("signatureChainId"),
             "amount": action.get("amount") if action.get("amount") is not None
             else action.get("usd") if action.get("usd") is not None
@@ -167,19 +221,19 @@ def foreign_destinations(actions: list[dict], cluster: set,
     """
     cluster = {normalise_address(c) for c in cluster if c}
     ignore = {normalise_address(c) for c in (ignore or set()) if c}
-    kinds = {"withdraw3", "sendToEvmWithData", "usdSend", "spotSend", "sendAsset",
-             "subAccountTransfer", "subAccountSpotTransfer", "vaultTransfer",
-             "approveAgent", "linkStakingUser"}
     out = []
     for act in actions or []:
-        if act.get("type") not in kinds or act.get("error"):
-            continue
-        dest = normalise_address(act.get("destination") or "")
-        if not dest or dest in cluster or dest in ignore:
+        if act.get("type") not in FOREIGN_KINDS or act.get("error"):
             continue
         if act.get("type") == "vaultTransfer" and not (act.get("action") or {}).get("isDeposit", True):
             continue  # a withdrawal FROM a vault comes back to the account
-        out.append(act)
+        # A multi-sig action can name several addresses; each outside the
+        # cluster is its own finding, so one of his cannot hide a stranger.
+        for dest in act.get("parties") or [act.get("destination") or ""]:
+            dest = normalise_address(dest)
+            if not dest or dest in cluster or dest in ignore:
+                continue
+            out.append({**act, "destination": dest})
     return out
 
 

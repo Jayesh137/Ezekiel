@@ -542,6 +542,24 @@ def test_xyz_abandoned_detection():
     assert risk._xyz_abandoned([{"coin": "BTC", "time": old}]) is False  # never traded xyz
 
 
+def test_an_open_xyz_book_is_not_abandoned():
+    """Measured 2026-09-17: no xyz fill for 34 days, four xyz positions open."""
+    import time
+
+    from src import risk
+    old = int(time.time() * 1000) - 34 * 86_400_000
+    fills = [{"coin": "xyz:SP500", "time": old}]
+    held = {"hip3": {"xyz": {"assetPositions": [{"position": {"coin": "xyz:SP500", "szi": "460.0"}}]}}}
+    closed = {"hip3": {"xyz": {"assetPositions": [{"position": {"coin": "xyz:SP500", "szi": "0.0"}}]}}}
+    assert risk._holds_xyz(held) is True
+    assert risk._holds_xyz(closed) is False
+    assert risk._holds_xyz({"hip3": {}}) is False, "the collector omits a dex with no book"
+    assert risk._holds_xyz({"perp": {}}) is None and risk._holds_xyz([]) is None
+    assert risk._xyz_abandoned(fills, holds_xyz=True) is False
+    assert risk._xyz_abandoned(fills, holds_xyz=False) is True
+    assert risk._xyz_abandoned(fills, holds_xyz=None) is True, "unknown keeps the fill-only answer"
+
+
 # --- amount rarity, measured against the real candidate pool ------------------
 #
 # The correlator is the mechanism most likely to actually find a migrated
