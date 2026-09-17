@@ -1126,6 +1126,25 @@ def alert_deposit_address_shared(row: dict, hl_state: dict | None = None) -> boo
     return _send_with_cooldown(key, 168, subject, body)
 
 
+def alert_feed_stale(feed: str, problem: str, path: str) -> bool:
+    """A detector has stopped producing readings — a capability of OURS, so HIGH.
+
+    Blindness presents as calm: a dead detector and a quiet target write the
+    same nothing. Cooled down a day per feed so a long outage is a reminder,
+    not a siren. See src/feed_health.py.
+    """
+    subject = f"[EZEKIEL] HIGH: Detector Feed Stale ({feed})"
+    body = (
+        f"Feed: {feed}\n"
+        f"Problem: {problem}\n"
+        f"File: data/{path}\n\n"
+        f"While this lasts, whatever the feed watches is not being watched, and\n"
+        f"its silence says nothing about the target. Check the workflow that\n"
+        f"writes it (Actions tab) and the local dispatcher's log.\n"
+    )
+    return _send_with_cooldown(f"feed_stale_{feed.replace(' ', '_').lower()}", 24, subject, body)
+
+
 def alert_circle_flow(kind: str, row: dict, hl_state: dict | None) -> bool:
     """A Circle transfer into or out of Hyperliquid with one of his wallets on
     one end and an account outside the cluster on the other — read from

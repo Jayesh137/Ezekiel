@@ -338,6 +338,15 @@ jobs:
       - name: Build wallet roster
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/roster.py
+      # Crosswise freshness: this job reports the close watch's feeds (watch.yml
+      # reports everyone else's). A dead watch writes the same nothing as a
+      # quiet target (src/feed_health.py).
+      - name: Check the watch's detector feeds
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 2
+        run: python scripts/check_feed_health.py watch
       # After the roster, because it classifies each destination using the tiers
       # the roster just assigned. Pure file reads.
       - name: Reconcile outbound funds

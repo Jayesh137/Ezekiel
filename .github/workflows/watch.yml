@@ -53,7 +53,7 @@ jobs:
     # to 20 when the deposit-address step joined: the job ceiling must stay
     # above the sum of its step timeouts (8 + 3 + 5), or a slow run is
     # CANCELLED and the commit step never persists what the others read.
-    # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 = 20).
+    # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 + 2 = 22).
     timeout-minutes: 25
     env:
       PYTHONUNBUFFERED: "1"
@@ -132,6 +132,15 @@ jobs:
         # READ_SECONDS is 120; a hung call is bounded by its own 30s timeout.
         timeout-minutes: 4
         run: python scripts/check_circle_flows.py
+      # Crosswise freshness: this job reports the feeds trace, scan, analyze
+      # and the collector write; trace.yml reports this job's. A dead detector
+      # writes the same nothing as a quiet target (src/feed_health.py).
+      - name: Check other workflows' detector feeds
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 2
+        run: python scripts/check_feed_health.py other
       # ALWAYS: a step that failed costs its own reading, not the whole run's.
       # Every writer rewrites its own file whole, so a file not updated this
       # run keeps the previous value. (Job CANCELLATION still skips this — only
