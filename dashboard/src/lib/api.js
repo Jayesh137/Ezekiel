@@ -663,3 +663,49 @@ export function getAlertState(fundFlows, candidates, hlTransfers, scan = null) {
 }
 
 export { RAW_BASE };
+
+// --- tripwires --------------------------------------------------------------------
+// Mirrors src/feed_health.py: each detector's own latest.json, the timestamp it
+// writes, and the age past which it is treated as stopped. Keep the two in step.
+
+export const DETECTOR_FEEDS = [
+	{ name: 'Close watch', path: 'data/watchlist/latest.json', key: 'computed_at', limitMin: 360 },
+	{ name: 'Deposit-address sentinels', path: 'data/deposit_sentinels/latest.json', key: 'computed_at', limitMin: 360 },
+	{ name: 'Circle flows', path: 'data/circle_flows/latest.json', key: 'computed_at', limitMin: 360 },
+	{ name: 'Migration risk', path: 'data/risk/latest.json', key: 'computed_at', limitMin: 360 },
+	{ name: 'Roster', path: 'data/roster/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'HL account surface', path: 'data/hl_surface/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Identities', path: 'data/identity/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Shared agents', path: 'data/agent_links/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Dormancy handoff', path: 'data/dormancy/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Behavioural scan', path: 'data/scans/latest.json', key: 'scan_time', limitMin: 720 },
+	{ name: 'Amount correlation', path: 'data/correlations/latest.json', key: 'computed_at', limitMin: 2160 }
+];
+
+/**
+ * One feed's freshness verdict. Pure. A missing or undated file is never
+ * "fresh": a detector that wrote nothing looks exactly like a quiet target.
+ * @returns {{status: 'fresh'|'stale'|'missing', ageMin: number|null}}
+ */
+export function feedFreshness(doc, key, limitMin, nowMs = Date.now()) {
+	if (!doc || typeof doc !== 'object') return { status: 'missing', ageMin: null };
+	const t = Date.parse(doc[key]);
+	if (Number.isNaN(t)) return { status: 'missing', ageMin: null };
+	const ageMin = Math.max(0, Math.round((nowMs - t) / 60000));
+	return { status: ageMin > limitMin ? 'stale' : 'fresh', ageMin };
+}
+
+export async function fetchTripwires() {
+	const [feeds, sentinels, circle, watch] = await Promise.all([
+		Promise.all(DETECTOR_FEEDS.map((f) => fetchJSON(f.path))),
+		fetchJSON('data/deposit_sentinels/latest.json'),
+		fetchJSON('data/circle_flows/latest.json'),
+		fetchJSON('data/watchlist/latest.json')
+	]);
+	return {
+		feeds: DETECTOR_FEEDS.map((f, i) => ({ ...f, ...feedFreshness(feeds[i], f.key, f.limitMin) })),
+		sentinels,
+		circle,
+		watch
+	};
+}

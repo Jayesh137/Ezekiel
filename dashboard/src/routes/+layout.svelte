@@ -10,6 +10,7 @@
 		{ href: `${base}/recovery`, label: 'Recovery', icon: 'R' },
 		{ href: `${base}/transfers`, label: 'Transfers', icon: 'T' },
 		{ href: `${base}/roster`, label: 'Roster', icon: 'W' },
+		{ href: `${base}/tripwires`, label: 'Tripwires', icon: '!' },
 		{ href: `${base}/`, label: 'Dashboard', icon: 'D' },
 		{ href: `${base}/fills`, label: 'Fills', icon: 'F' },
 		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'P' },

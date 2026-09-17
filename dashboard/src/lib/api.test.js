@@ -63,3 +63,26 @@ test('a health file written before the split claims nothing', () => {
 	const d = getAlertDelivery({ healthy: true });
 	assert.equal(d.withheld, 0);
 });
+
+import { feedFreshness, DETECTOR_FEEDS } from './api.js';
+
+test('a feed inside its limit is fresh, past it stale', () => {
+	const now = Date.parse('2026-09-17T03:00:00Z');
+	assert.deepEqual(feedFreshness({ computed_at: '2026-09-17T02:30:00+00:00' }, 'computed_at', 60, now),
+		{ status: 'fresh', ageMin: 30 });
+	assert.deepEqual(feedFreshness({ computed_at: '2026-09-17T01:00:00+00:00' }, 'computed_at', 60, now),
+		{ status: 'stale', ageMin: 120 });
+});
+
+test('a missing or undated feed is never fresh', () => {
+	assert.equal(feedFreshness(null, 'computed_at', 60).status, 'missing');
+	assert.equal(feedFreshness({ other: 1 }, 'computed_at', 60).status, 'missing');
+	assert.equal(feedFreshness({ computed_at: 'not a date' }, 'computed_at', 60).status, 'missing');
+});
+
+test('every detector feed names a data path, a key and a limit above cadence', () => {
+	for (const f of DETECTOR_FEEDS) {
+		assert.ok(f.path.startsWith('data/') && f.path.endsWith('latest.json'), f.name);
+		assert.ok(f.key && f.limitMin >= 360, f.name);
+	}
+});
