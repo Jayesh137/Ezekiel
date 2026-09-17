@@ -1072,8 +1072,7 @@ def persist_candidate(result: dict) -> None:
     every run for ever after — which is what happened, and why the caller being
     fixed is not on its own enough.
     """
-    from src.utils import never_candidates
-    if result["wallet"].lower() in never_candidates(load_config()):
+    if result["wallet"].lower() == load_config()["target_wallet"].lower():
         return
     candidate_dir = DATA_DIR / "candidates"
     candidate_dir.mkdir(parents=True, exist_ok=True)
@@ -1659,11 +1658,9 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     # The leaderboard sweep below has always refused him; a priority source is
     # not a different question, and the cost of the asymmetry was three vectors
     # deep — see tests/test_target_not_a_candidate.py.
-    # And the operator's own copy-trading accounts, for the mirror-image reason.
-    from src.utils import never_candidates
-    refused = never_candidates(config)
+    target_lower = config["target_wallet"].lower()
     priority = {addr: meta for addr, meta in priority.items()
-                if addr.lower() not in refused}
+                if addr.lower() != target_lower}
 
     if not priority:
         print("[scanner] No priority targets to scan")
@@ -1834,11 +1831,9 @@ def scan_leaderboard():
     # Largest accounts first, not the API's arbitrary order — see
     # select_leaderboard_wallets for why the previous slice excluded the
     # target himself and 80% of the wallets he could plausibly have become.
-    from src.utils import never_candidates
-    refused = never_candidates(config)
     for entry in select_leaderboard_wallets(leaderboard, max_wallets):
         wallet = entry.get("ethAddress", entry.get("address", ""))
-        if not wallet or wallet.lower() == target or wallet.lower() in refused:
+        if not wallet or wallet.lower() == target:
             continue
         if wallet.lower() in priority_wallets:
             continue  # Already scanned in priority phase

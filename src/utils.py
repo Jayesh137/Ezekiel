@@ -18,23 +18,6 @@ def load_config():
     with open(CONFIG_PATH) as f:
         return json.load(f)
 
-
-def never_candidates(config: dict | None) -> set:
-    """Addresses that must never be scored, ranked or watched as candidates.
-
-    The target, and `config.owner_wallets` — the operator's OWN copy-trading
-    accounts. The owner copies him by hand, so an owner account trades his
-    markets in his direction just after him: to the style scorer, co-movement
-    and portfolio overlap it is the most target-like wallet on the venue, and
-    the day one enters a scan it would top the lineup — the same contamination
-    the target himself caused on 2026-09-13, from the other side.
-    """
-    config = config or {}
-    out = {(config.get("target_wallet") or "").strip().lower()}
-    out |= {(w or "").strip().lower() for w in config.get("owner_wallets") or []}
-    out.discard("")
-    return out
-
 # --- Hyperliquid API ---
 
 def hl_post(request_body: dict, retries: int = 3) -> dict | list:
