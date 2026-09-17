@@ -25,6 +25,18 @@ while read local_ref local_sha remote_ref remote_sha; do
     else
         changed=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)
     fi
+    # The code this push would put on main, by content. Automated data commits
+    # land on main every few minutes; rebasing onto them changes nothing here,
+    # so a suite that already passed for this exact code need not run again -
+    # re-running it (~100s) is what let a data commit win the race and reject
+    # the push on 2026-09-17.
+    key=$(for p in src tests scripts config.json requirements.txt; do git rev-parse "$local_sha:$p" 2>/dev/null; done | tr '
+' ' ')
+    stamp="$(git rev-parse --git-dir)/ezekiel-prepush-passed"
+    if [ -n "$key" ] && [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$key" ]; then
+        echo "[pre-push] this exact code already passed ruff and the suite - not re-running"
+        continue
+    fi
     if echo "$changed" | grep -Eq '^(src|scripts|tests)/|\.py$|^config\.json$|^requirements'; then
         py=".venv/Scripts/python.exe"; [ -x "$py" ] || py=".venv/bin/python"; [ -x "$py" ] || py="python"
         echo "[pre-push] code changed - running ruff and the test suite before pushing"
@@ -32,6 +44,10 @@ while read local_ref local_sha remote_ref remote_sha; do
         "$py" -m pytest -q -p no:cacheprovider -x >/tmp/ezekiel-prepush.log 2>&1 \
             || { tail -20 /tmp/ezekiel-prepush.log; echo "[pre-push] tests failed - push blocked"; exit 1; }
         tail -1 /tmp/ezekiel-prepush.log
+        printf '%s' "$key" > "$stamp"
+    fi
+    if echo "$changed" | grep -Eq '^scripts/apps_script/'; then
+        node --test scripts/apps_script/relay.test.mjs >/tmp/ezekiel-prepush-relay.log 2>&1             || { tail -20 /tmp/ezekiel-prepush-relay.log; echo "[pre-push] relay tests failed - push blocked"; exit 1; }
     fi
     if echo "$changed" | grep -Eq '^dashboard/'; then
         echo "[pre-push] dashboard changed - running its tests"
