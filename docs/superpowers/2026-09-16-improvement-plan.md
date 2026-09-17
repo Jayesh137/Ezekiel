@@ -81,6 +81,31 @@ PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
 - **DONE-14 Detector freshness.** `src/feed_health.py`, checked crosswise by watch.yml
   and trace.yml; HIGH when a feed stops.
 - **DONE-15 Dashboard Tripwires page.**
+- **DONE-16 Google Apps Script relay (replaces P3-1/P3-2).** No always-on machine, so the
+  real-time websocket is scrapped. `scripts/apps_script/ezekiel_relay.gs` runs free on
+  Google every 5 minutes: dispatches the workflows on schedule (never into a busy queue)
+  and pushes an urgent ntfy within ~5 minutes of a non-trading action by his wallets that
+  reaches outside the cluster or hands out control. 12 Node tests in CI. Needs the
+  operator's one-time 5-minute setup (`scripts/apps_script/SETUP.md`).
+- **DONE-17 CI failures stopped at the source.** The two red runs of 2026-09-17 were a
+  push with a failing test and a manual dispatch evicted from a busy concurrency group. A
+  pre-push hook (`scripts/git-hooks/pre-push`) now runs lint + tests (cached by tree hash)
+  and blocks; the relay counts an unreadable run list as busy.
+- **DONE-18 Multi-sig tripwire (was P7 "builder-fee/multi-sig").** Found a real bug: the
+  collector read `userToMultiSigSigners` as a list, which it never is, so a conversion
+  would have been discarded. Fixed; the watch reads signers as agents; the explorer parser
+  and the relay name the outside signer or co-signed account. Builder-fee approvals stay
+  recorded, not alerted: a builder is a front-end many traders share (rule 9).
+- **DONE-19 The watch's size ratio.** It read the target at $59.6M against $66.3M held
+  (HIP-3 margin left out, ~11% ratio inflation), and a failed read counted as $0. Now
+  perp + every HIP-3 dex + spot USDC, raising on a failed read; `extraAgents` and
+  `subAccounts` failures no longer read as "none".
+- **DONE-20 False risk factor removed.** "Stopped trading xyz" added 5 points while he held
+  four xyz positions (~$13.2M notional); an open xyz book now means not abandoned.
+- **DONE-21 Blind-feed checks (was P6 "canary reads / schema drift").** A detector writing
+  on time while its reads fail, or reading zero where zero never happens, alerts HIGH
+  after 6 hours; shown as `blind` on the Tripwires page. Built from each detector's own
+  output, so it costs no API calls.
 
 **Measured and rejected on 2026-09-17** (do not rebuild):
 - *Clock-skew fingerprint from action nonces (P3-5):* the explorer's ORDER rows carry no
@@ -94,8 +119,63 @@ PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
   since 2024-08-14 but traded only $939K (held up to $55.0M, staked, vaulted);
   `0xf078969e…` since 2025-01-01, $549 of volume. No known wallet is a predecessor.
 
-**Remaining, in order:** P3 real-time stream (needs a host decision), P4 self-cross /
-OI conservation, P5-1 likelihood ratios.
+- *Testnet, Unit, ENS names, Hypurrscan aliases, multi-sig signers:* empty for all three
+  of his wallets. Testnet rows are all inbound airdrops; he never signed there.
+- *Self-cross via trade ids (P4-1):* 0 shared trades between his 163,633 fills and the
+  treasury's full history, `0xf078969e…`, or 25 roster wallets' newest 2,000 fills.
+- *Style drift / fading activity on the target (P3-10, P3-8 changepoints):* weekly notional
+  $0 to 20x its $2.7M median, 6 of 31 weeks under a quarter of it — an alert would fire on
+  normal weeks. Dormancy, calibrated on his gaps, covers real silence.
+- *COPIER classification (P5-3) and follow-the-followers (P4-4):* co-movement is
+  `untestable` for all 12 candidates — 2 target decisions in its 21-day window.
+- *Relayer decoding (P2-2 relayers):* 4 of the cluster's 4,978 records touch Relay, Across,
+  deBridge or LI.FI.
+- *Block co-occurrence (P3-4):* a block of his held 441 transactions, 52 from one market
+  maker; co-occurrence finds bots, not owners.
+
+**Nothing remains open.** Every item below has a final status in the next section.
+
+## Final disposition of every remaining item (2026-09-17)
+
+| Item | Status | Why |
+|---|---|---|
+| P1-5 shadow mode | Scrapped | Each new tripwire was replayed on history or seeded before it could alert (sentinels, new payees seeded 615, Circle flows 0 findings on first read) — the stronger check. |
+| P1-8 live fire drill | Scrapped | The tripwires fire on HIS wallets' actions; nobody without his keys can trigger them, so a drill with other money tests nothing real. |
+| P2-2 Arbitrum bridge identity / relayers | Covered + measured no | Circle deposits are decoded end to end (DONE-13); relayers carry 4 of 4,978 cluster records. |
+| P2-3 Solana CCTP burns | Covered | A burn from his Solana wallet into Hyperliquid names its sender in `MessageReceived` (DONE-13). Burns to other chains do not reach an HL account. |
+| P2-4 Blockscout for Base/Optimism | Covered for the mission | Flow from those chains reaches HL through Circle (DONE-13) or via Arbitrum (bridge + correlator). |
+| P2-5 Aave capital-in-motion | Scrapped | His Aave/Monad yield loop moves routinely and returns to his own account; it would alert on routine. |
+| P2-6 newborn x funding route | Covered | A newborn funded through Circle from any of his identities is already CRITICAL. |
+| P3-1 runtime, P3-2 websocket | Replaced | No always-on machine: the Apps Script relay (DONE-16). |
+| P3-3 global action feed, P3-6 tape slice trains, P4-2 OI conservation, P4-3 mirror-on-close | Scrapped | Each needs a continuous trade/action stream, which needs a host. |
+| P3-4 block co-occurrence | Measured no | See above. |
+| P3-5 nonce clock-skew | Measured no | Order rows carry no nonce. |
+| P3-7 migration as a ratio | Covered | The watch's size ratio (now correct, DONE-19), accounting and the drawdown factor. |
+| P3-8 adaptive cadence | Built | The relay heightens the watch to 5 minutes for 6 hours after an alert. Changepoints: measured no. |
+| P3-9 SUSPEND COPYING | Covered | `risk.py` is that declaration — silence, drawdown, xyz, correlation, L1 and HL outbound — and alerts HIGH/CRITICAL. |
+| P3-10 style drift | Measured no | See above. |
+| P4-1 self-cross | Measured no | See above. |
+| P4-4 follow the followers, P5-3 COPIER | Measured no | Co-movement untestable today. |
+| P5-1 likelihood ratios + FDR | Scrapped | Calibrating a likelihood ratio needs known examples of his wallets; there are three. |
+| P5-2 evidence ledger | Built where it matters | Permanent facts are read from their own files (first funders, sentinels are sticky); `carry_peak_tier` records lost evidence. |
+| P5-4 action-named states + runbook | Scrapped | Every alert body already says what happened, what to check, and links each address on Hypurrscan. |
+| P5-6 target as a set + promotion script | Scrapped | The operator will not maintain lists; the roster feeds the watch automatically. |
+| P5-8 exact fees / delay prior in the correlator | Scrapped | Tuning a scorer with no ground truth to validate it against (rule 4). |
+| P5-10 full history from the node archive | Scrapped | Needs an AWS account and paid egress; collection since 2026-02-05 plus `portfolio` suffices. |
+| P5-11 "what would change my mind" queue | Scrapped | CLAUDE.md's measured-no records serve it. |
+| P6 platform (SQLite, async sweeps, schema versions, rules-as-data, property tests, recall harness) | Scrapped | High regression risk for little detection gain; compaction solved size. Canary reads built as DONE-21. |
+| P7 HyperEVM full sweep | Covered | Nonce tripwire plus Circle events; he has never sent on HyperEVM. |
+| P7 Unit, testnet, names, public trackers | Measured no | See above. |
+| P7 agent/sub-account EOAs swept | Scrapped | Agents are signing keys that hold nothing; sub-accounts have no L1 presence. |
+| P7 sleep-window veto | Scrapped | A new veto on the scorer is tuning the validator (rule 4). |
+| P7 builder-fee / multi-sig | Built | DONE-18. |
+| P7 validator co-delegation | Scrapped | Thousands delegate to the same validators (rule 9). |
+| P7 public-attention precursor, nightly analyst note | Scrapped | Need paid APIs (X, an LLM key). |
+| P7 vault leaders as candidates | Covered | `webData2.leadingVaults` is read; the target leads no vault. |
+| P7 venue-wide value conservation, community detection | Scrapped | Needs full-venue state; the graph is dominated by infrastructure (rule 9). |
+| P7 unlock-schedule check | Scrapped | No free float/unlock source. |
+| P7 approval / counterparty / gas fingerprints | Scrapped | A migration is on Hyperliquid, where there is no gas or approval; strangers' L1 histories are not swept. |
+| P7 shadow book from tape, automated copying | Scrapped | Needs a stream; automated trading is out of scope. |
 
 ## Route matrix additions (found by measurement, 2026-09-16)
 
@@ -105,11 +185,9 @@ OI conservation, P5-1 likelihood ratios.
 | R21 | A fresh wallet pays his private exchange deposit address | DONE-5 |
 | R22 | His treasury or `0xf078969e…` pays a never-seen EOA | DONE-7 |
 
-**Next, in order:** (1) follow the $31.8M inside Monad — if chain 143 is refused
-on the free tier, scan `eth_getLogs` on rpc.monad.xyz (capped at 100 blocks) in a
-window after each known mint for USDC leaving `0xf078969e…`, and ask Hyperliquid
-about every recipient; (2) P1-7 market-maker classification; (3) P2-1/P2-3 Circle
-source and Solana burn decoding.
+**Resolved:** (1) the $31.8M on Monad is an Aave yield loop that returns to his own
+Hyperliquid account (chain 143 is served on the free tier; Monad joined `config.chains`);
+(2) P1-7 measured no; (3) P2-1/P2-3 superseded by Circle flows (DONE-13).
 
 ---
 
@@ -240,15 +318,16 @@ leaders as candidates; venue-wide value conservation; unlock-schedule check;
 approval/counterparty/gas fingerprints; community detection; nightly analyst
 note; shadow book from tape; automated copying (scope decision only).
 
-## Operator decisions pending
+## Operator decisions (all resolved 2026-09-17; the operator delegated them)
 
-1. Runtime for the fast path (VM or PC) — gates P3 and going private.
-2. `0xf078969e…` into `known_self_wallets`?
-3. `0xb83de012…` (~$177M) into `watch_wallets`? (Its link to the target rested
-   partly on the retracted funder; the same-day referral habit with
-   `0x5b5d5120…` stands.)
-4. The owner's own wallet addresses, to exclude from every lineup.
-5. S3 egress (a few dollars) for his full history.
+1. Runtime for the fast path — **the Apps Script relay** (DONE-16). Going private stays
+   off: the pipeline still uses ~795 Actions minutes a day.
+2. `0xf078969e…` into `known_self_wallets` — **done** (DONE-11).
+3. `0xb83de012…` into `watch_wallets` — **no.** Its only tie to the target was the shared
+   first funder, which was measured to be an exchange wallet (DONE-1); a referral habit
+   shared with `0x5b5d5120…` does not link either to him.
+4. The owner's own wallets — **scrapped** at the operator's request.
+5. S3 egress — **scrapped** (P5-10).
 
 ## Not to build (measured and rejected)
 

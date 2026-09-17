@@ -81,7 +81,7 @@ trading style. Never promote a wallet on one vector alone.
 | Dormancy handoff | `dormancy.py` | One wallet goes quiet, another is born. The only vector needing NO connection between them |
 | HyperEVM watch | `scripts/check_hyperevm.py`, `scripts/probe_hyperevm_index.py` | Nonce tripwire, plus a survey: chain 999 IS readable through the Etherscan key |
 | Identity | `hl_identity.py`, `scripts/check_identity.py` | `userRole` (agent → owner, sub-account → master), `webData2` (frontend agent), `stakingLink`, delegations, `portfolio` birth. An explicit link CONFIRMs alone |
-| Own actions | `hl_actions.py` (collector step) | The explorer's last 300 L1 actions: `withdraw3` destinations, agent approvals, vault transfers, sub-accounts. A foreign destination alerts |
+| Own actions | `hl_actions.py` (collector step) | The explorer's last 300 L1 actions: `withdraw3` destinations, agent approvals, vault transfers, sub-accounts, and multi-sig (`convertToMultiSigUser` names every signer, `multiSig` names the account signed for; each outside address is its own finding). A foreign destination alerts |
 | Bridge destinations | `chain/bridges.py`, `scripts/check_bridge_destinations.py` | CCTP/Socket calldata names the destination chain and recipient; Hyperliquid's CCTP extension names the HL account. A non-cluster recipient alerts |
 | Withdrawal pairing | `withdrawals.py`, `scripts/check_withdrawals.py` | Each HL withdrawal paired with the bridge payout at his own address; an unpaired one is resolved and alerted |
 | Newborn accounts | `newborn.py`, `scripts/check_newborn.py` | Birth from the leaderboard's window volumes, no per-wallet calls; the youngest large accounts become priority scans |
@@ -92,6 +92,7 @@ trading style. Never promote a wallet on one vector alone.
 | Deposit-address sentinels | `deposit_sentinels.py`, `scripts/check_deposit_sentinels.py` (watch.yml) | His private exchange deposit addresses read from **their own** side: conduit/inferred deposit addresses the config cluster paid ≥$1K, measured quiet (rule 9), sticky in their own file. A new outside sender measured quiet alerts **CRITICAL** (unmeasured HIGH, busy recorded); first sight of a sentinel is a baseline. Quiet senders carry `linkage` in the roster from this file. Live at build: sentinels `0x8570c2ae…` and `0x499662e0…`; outside senders `0xda0932d2…` (2024) and `0xf078969e…` |
 | New payee of his | `watchlist.outbound_payments`/`novel_payments`, `check_watchlist.check_new_payees` | A settled watched wallet (CONFIRMED or config) paying an address **no cluster wallet has ever transacted with**: native value at any amount (gas funds a fresh wallet), tokens ≥$100, never spam. Contract/busy is seen silently, unmeasured is held for the next run, a quiet EOA alerts HIGH — CRITICAL if Hyperliquid already shows the address in use. The target's own L1 is the tracer's; this covers the treasury and `0xf078969e…`, which had nothing. Seeded from history (615 addresses) so nothing old is announced |
 | Circle flows, both ends | `circle_flows.py`, `scripts/check_circle_flows.py` (watch.yml) | Circle's MessageTransmitterV2 events on HyperEVM name BOTH ends of every Circle transfer into and out of Hyperliquid: `MessageReceived` carries the source domain, the source `messageSender` (EVM or Solana bytes32) and the credited account in `cctp-forward` hook data; `MessageSent` carries the withdrawing account, destination domain and recipient. Chain-agnostic and it cannot roll out of an explorer window. CRITICAL when a wallet of his funds an account outside the cluster, when an outside account pays one of his addresses (incl. private deposit addresses and his Solana wallet), or when his account withdraws to an outside address; such accounts carry `transfer` in the roster. Etherscan V2 (chainid 999) in CI, the public RPC (≈1 getLogs/min) as fallback; a cursor that never skips an unread range. First sample: 56 deposits in 1,000 blocks, from Arbitrum, Solana, Polygon, Base, Ethereum and Monad |
+| Blind feeds | `feed_health.blind`, `scripts/check_feed_health.py` | A detector can write `computed_at` on time while every read fails or its parser no longer understands an endpoint. Per feed, a reading that is fresh but blind (half its reads failed, 0 agents or 0 sub-accounts across ≥20 wallets, 0 Circle transfers in ≥3,000 blocks, an empty roster/scan/candidate pool) is reported HIGH once it has lasted `BLIND_HOURS` = 6; the start time is kept per group in `data/feed_health/<group>.json` (one writer each). The dashboard's Tripwires page shows it as `blind` |
 | Re-scoring roster leads | `scanner.roster_rescore_targets` | Priority source 7: up to 25 roster leads (operator list pinned) and 10 stale unvetoed scores ≥0.65 re-scored every scan, so behaviour can corroborate what dormancy, linkage or a sentinel found. Not corroboration by itself |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
@@ -1397,6 +1398,31 @@ $97,430. Adjacency is where a poisoner lives, not evidence.
 funder beside the destination, the scorer beside the backtest, the reach beside
 the transfer. All three were found by asking why a PROBABLE was PROBABLE.
 
+**Four silent defects, found while probing for new vectors (fixed 2026-09-17).**
+
+- **A conversion to multi-sig would have been thrown away.** The collector has
+  asked `userToMultiSigSigners` since 2026-09-10 and read the answer as a list.
+  It is `null` or `{"authorizedUsers": [...], "threshold": n}`, so a signer —
+  an address that can act for the account, which is identity — could never
+  have been recorded. `agent_links.multisig_signers` separates null (none) from
+  anything else (unreadable), the close watch now reads signers as agents, and
+  the explorer parser and the relay recognise the two multi-sig actions.
+- **The watch priced the target $6.7M light.** `check_watchlist.account_value`
+  summed the main dex's margin and spot USDC; a HIP-3 dex keeps its own margin,
+  so live it read him at **$59.6M against $66.3M held**, inflating every watched
+  wallet's size ratio ~11% towards the 1.15 band. It now uses
+  `utils.account_value_components` (perp + every HIP-3 dex + spot USDC), and a
+  failed read raises instead of counting as $0.00.
+- **`utils.hl_post` never raises.** When every retry fails it answers `[]` if
+  the request type contains "user", else `{}`. The watch read `{}` from
+  `extraAgents` and `subAccounts` as "none". Each read now checks the answer has
+  the shape a real answer has. **Before trusting an empty result from
+  `hl_post`, ask which sentinel that request type gets.**
+- **"Stopped trading xyz" cost 5 risk points while he held the xyz book.** His
+  last xyz fill was 2026-08-14; four xyz positions (~$13.2M notional) were
+  still open. Holding is not leaving: `risk._xyz_abandoned` is now False while
+  `data/account/latest.json` shows an open xyz position.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
@@ -1517,6 +1543,30 @@ the next session rebuilding them:
   books. No weight and no threshold was changed.
 - **Rare-market co-presence** — already partly used via `xyz:` markets; extend to
   any market with few participants.
+- **Measured 2026-09-17 and rejected — do not rebuild without new evidence:**
+  - *Testnet.* The target and the treasury exist on testnet, but every row is
+    inbound: `spotGenesis` airdrops and token deployers sending the same tokens
+    to both within minutes. No trade, no send, no agent. He never signed there.
+  - *Unit (BTC/ETH/SOL bridge), ENS names, Hypurrscan aliases, multi-sig
+    signers:* empty for the target, the treasury and `0xf078969e…`. Multi-sig
+    stays a tripwire (see the fixes above).
+  - *Self-cross (a position handed between his accounts through the book).*
+    No fill of the target's 163,633 shares a trade id with the treasury's whole
+    fill history, `0xf078969e…`, or the newest 2,000 fills of 25 roster wallets.
+    The endpoints that name BOTH sides of a trade (`recentTrades`, the trades
+    websocket) cover only the last few trades, so going further needs a stream.
+  - *Block co-occurrence.* One of his blocks held 441 transactions, 52 from a
+    single market maker: co-occurrence finds bots present in every block.
+  - *A "fading activity" alert on the target.* His weekly notional runs from $0
+    to 20x its $2.7M median, and 6 of 31 weeks fall below a quarter of it. It
+    would fire on normal weeks; `dormancy.py`, calibrated on his gaps, is the
+    right instrument.
+  - *Copier classification from co-movement.* All 12 candidates are
+    `untestable`: he made 2 decisions inside the 21-day window. There is
+    nothing to classify until he trades more.
+  - *Relay/Across/deBridge/LI.FI decoding.* 4 of the cluster's 4,978 records
+    touch one (a $500K LI.FI swap in 2024 and three inbound Across fills, all
+    on `0xf078969e…`). He bridges through Circle and Socket, both decoded.
 
 ---
 
@@ -1968,7 +2018,8 @@ that it is.
   ntfy within ~5 minutes of a non-trading action reaching outside the cluster
   or handing out control, heightening the watch to 5 minutes for 6 hours after
   one. Routine his-own round trips, staking delegation and shared venues (HLP)
-  are not alerted: measured over his history, ~1 alert a month. Tested under
+  are not alerted: measured over his history, ~1 alert a month. A multi-sig
+  conversion or a multi-sig action names its outside signer or account. Tested under
   Node with Google's globals mocked (`relay.test.mjs`, in CI) and dry-run live
   against GitHub and the explorer, which found two real bugs: the seen-set held
   orders and evicted a real withdrawal (re-alert), and a 60-entry cap was below
