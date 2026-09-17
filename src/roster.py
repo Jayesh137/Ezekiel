@@ -630,6 +630,33 @@ def build_roster(config: dict | None = None) -> dict:
         if reason not in e["reasons"]:
             e["reasons"].append(reason)
 
+    # A Circle transfer, read from Circle's own events on HyperEVM, between one
+    # of his wallets and an account outside the cluster: his wallet funded it,
+    # or it paid one of his addresses. An observed transfer — the protocol names
+    # both ends — so the `transfer` vote, from this detector's own file.
+    try:
+        with open(DATA_DIR / "circle_flows" / "latest.json") as f:
+            circle = json.load(f)
+    except (OSError, ValueError):
+        circle = {}
+    from src.circle_flows import KIND_FUNDED_OUTSIDE, KIND_OUTSIDE_PAID_HIM
+    for row in (circle.get("findings") if isinstance(circle, dict) else None) or []:
+        if not isinstance(row, dict) or row.get("kind") not in (KIND_FUNDED_OUTSIDE,
+                                                                 KIND_OUTSIDE_PAID_HIM):
+            continue
+        a = (row.get("hl_account") or "").lower()
+        if not a or a == target:
+            continue
+        e = entry(a)
+        e["vectors"].add(VECTOR_TRANSFER)
+        e["evidence"].setdefault("circle_flows", []).append(
+            {k: row.get(k) for k in ("kind", "direction", "chain", "amount_usd",
+                                     "tx_hash", "block")})
+        reason = ("Funded by a wallet of his through Circle" if row["kind"] == KIND_FUNDED_OUTSIDE
+                  else "Paid one of his addresses through Circle")
+        if reason not in e["reasons"]:
+            e["reasons"].append(reason)
+
     for party in _read(DATA_DIR / "hl_transfers" / "latest.json", "counterparties"):
         a = (party.get("wallet") or "").lower()
         if not a or a == target:

@@ -1126,6 +1126,43 @@ def alert_deposit_address_shared(row: dict, hl_state: dict | None = None) -> boo
     return _send_with_cooldown(key, 168, subject, body)
 
 
+def alert_circle_flow(kind: str, row: dict, hl_state: dict | None) -> bool:
+    """A Circle transfer into or out of Hyperliquid with one of his wallets on
+    one end and an account outside the cluster on the other — read from
+    Circle's own events on HyperEVM, so the source chain does not matter and
+    the record cannot roll out of an explorer window. See src/circle_flows.py.
+    """
+    from src import circle_flows as cf
+
+    headline = {
+        cf.KIND_FUNDED_OUTSIDE: "A Wallet Of His Funded A Hyperliquid Account Outside The Cluster",
+        cf.KIND_OUTSIDE_PAID_HIM: "A Hyperliquid Account Outside The Cluster Paid One Of His Addresses",
+        cf.KIND_HIS_ACCOUNT_WITHDREW_OUTSIDE: "His Hyperliquid Account Withdrew Through Circle To An Outside Address",
+    }.get(kind, "Circle Flow Touching The Cluster")
+    subject = f"[EZEKIEL] CRITICAL: {headline}"
+    hl = hl_state or {}
+    if hl.get("read_ok"):
+        hl_line = (f"The account on Hyperliquid: role {hl.get('role')}, value "
+                   f"${float(hl.get('account_value') or 0):,.0f}, born "
+                   f"{hl.get('birth') or 'never funded'}, {hl.get('fills', 0)} recent fill(s)\n")
+    else:
+        hl_line = f"The account on Hyperliquid: could not be read ({hl.get('error') or 'not asked'})\n"
+    direction = "into Hyperliquid" if row.get("direction") == "in" else "out of Hyperliquid"
+    body = (
+        f"Circle transfer {direction}, {row.get('chain')} side.\n"
+        f"{address_line(row.get('hl_account') or '', 'Hyperliquid account')}\n"
+        f"Other end ({row.get('chain')}): {row.get('counterparty') or row.get('counterparty_raw')}\n"
+        f"Amount: ${float(row.get('amount_usd') or 0):,.2f}\n"
+        f"HyperEVM tx: {row.get('tx_hash')} (block {row.get('block')})\n"
+        f"{hl_line}\n"
+        f"Read from Circle's MessageTransmitter events on HyperEVM: both ends are\n"
+        f"named by the protocol, not inferred. An account he funds, or that pays\n"
+        f"him, is his until shown otherwise - but a transfer is still not ownership.\n"
+    )
+    key = f"circle_{kind}_{(row.get('tx_hash') or '').lower()}"
+    return _send_with_cooldown(key, 168, subject, body)
+
+
 def alert_settled_wallet_new_payee(wallet: str, destination: str, payment: dict,
                                    hl_state: dict | None, severity: str) -> bool:
     """A wallet already believed to be his paid an address never seen before.
