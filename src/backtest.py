@@ -188,7 +188,7 @@ def orders_in_window(orders: list[dict], window_fills: list[dict]) -> list[dict]
     return out
 
 
-def stranger_results(scan: dict, target: str) -> list[dict]:
+def stranger_results(scan: dict, target: str, exclude=()) -> list[dict]:
     """Scan rows eligible to be strangers — everything except the target.
 
     The lineup is drawn from a file this module does not write, so the guard
@@ -199,8 +199,8 @@ def stranger_results(scan: dict, target: str) -> list[dict]:
     beat the self-match on all four days it was present (0.6985 against
     0.6593), taking rank 1 off him and reporting the scorer as FAILING.
     """
-    t = (target or "").lower()
-    return [r for r in scan.get("results", []) if (r.get("wallet") or "").lower() != t]
+    refused = {(target or "").lower()} | {(a or "").lower() for a in exclude or ()}
+    return [r for r in scan.get("results", []) if (r.get("wallet") or "").lower() not in refused]
 
 
 def run_backtest() -> dict:
@@ -303,7 +303,8 @@ def run_backtest() -> dict:
         try:
             with open(scans_path) as f:
                 scan = json.load(f)
-            for r in stranger_results(scan, config["target_wallet"]):
+            for r in stranger_results(scan, config["target_wallet"],
+                                      exclude=config.get("owner_wallets") or ()):
                 cand_fp = r.get("fingerprint")
                 if not cand_fp:
                     continue

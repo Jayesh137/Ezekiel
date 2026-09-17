@@ -788,6 +788,12 @@ def build_roster(config: dict | None = None) -> dict:
         subaccounts = read_hl_surface(surface, entry, wallets, target)
         apply_operator_groups(wallets, subaccounts, entry, target)
 
+    # The operator's own copy-trading accounts are never candidates: they copy
+    # him, so every behavioural reading would call them his (utils.never_candidates).
+    owners = {(w or "").strip().lower() for w in config.get("owner_wallets") or []}
+    for owner in owners:
+        wallets.pop(owner, None)
+
     rows = []
     for e in wallets.values():
         e["vectors"] = sorted(e["vectors"])
