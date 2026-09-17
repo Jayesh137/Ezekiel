@@ -39,7 +39,11 @@
 # in version control next to the thing they keep alive.
 
 [CmdletBinding()]
-param([switch]$Install)
+param(
+    [switch]$Install,
+    # Decide and log exactly as a real run would, but dispatch nothing.
+    [switch]$DryRun
+)
 
 $ErrorActionPreference = "Continue"
 $TaskName = "Ezekiel workflow dispatcher"
@@ -157,7 +161,8 @@ function Test-GroupBusy([string]$Group) {
 }
 
 $now = (Get-Date).ToUniversalTime()
-$groupChecked = @{}
+$due = @()
+$index = 0
 foreach ($job in $Schedule) {
     $wf = $job.File
     $newest = Get-NewestRun $wf
@@ -177,19 +182,38 @@ foreach ($job in $Schedule) {
         Write-Log ("{0} : last run {1:n1} min ago (< {2}) - not yet" -f $wf, $age, $job.Minutes)
         continue
     }
+    $due += [pscustomobject]@{ Index = $index; File = $wf; Group = $job.Group; Age = $age
+                               Overdue = $age / $job.Minutes; Event = $newest.event }
+    $index += 1
+}
+
+# At most ONE dispatch per concurrency group per run, the most overdue (age as
+# a multiple of its interval) first. A group holds one running and one PENDING
+# run, so dispatching several into it in the same seconds starts one, queues
+# one and lets the next evict it: collect, trace and scan went out at
+# 04:10:54-58 on 2026-09-17 and trace (run 35180941359) was "cancelled" four
+# seconds later. The rest wait for a later run, when the group is free.
+foreach ($group in @($due | ForEach-Object { $_.Group } | Select-Object -Unique)) {
+    $inGroup = @($due | Where-Object { $_.Group -eq $group } | Sort-Object Overdue -Descending)
+    $pick = $inGroup[0]
+    foreach ($other in @($inGroup | Select-Object -Skip 1)) {
+        Write-Log ("{0} : due, but {1} is more overdue in group '{2}' - next run" -f $other.File, $pick.File, $group)
+    }
     # Don't queue behind a busy concurrency group: the run would sit pending
-    # and be cancelled by the next arrival. Checked at most once per group.
-    $g = $job.Group
-    if (-not $groupChecked.ContainsKey($g)) { $groupChecked[$g] = Test-GroupBusy $g }
-    if ($groupChecked[$g]) {
-        Write-Log ("{0} : group '{1}' is busy - skipping rather than queueing" -f $wf, $g)
+    # and be cancelled by the next arrival.
+    if (Test-GroupBusy $group) {
+        Write-Log ("{0} : group '{1}' is busy - skipping rather than queueing" -f $pick.File, $group)
         continue
     }
-    & gh workflow run $wf --repo $Repo --ref $Ref 2>&1 | Out-Null
+    if ($DryRun) {
+        Write-Log ("{0} : WOULD dispatch (last run {1:n1} min ago, event {2}) [dry run]" -f $pick.File, $pick.Age, $pick.Event)
+        continue
+    }
+    & gh workflow run $pick.File --repo $Repo --ref $Ref 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Log ("{0} : dispatched (last run {1:n1} min ago, event {2})" -f $wf, $age, $newest.event)
+        Write-Log ("{0} : dispatched (last run {1:n1} min ago, event {2})" -f $pick.File, $pick.Age, $pick.Event)
     } else {
-        Write-Log "$wf : dispatch FAILED (exit $LASTEXITCODE)"
+        Write-Log "$($pick.File) : dispatch FAILED (exit $LASTEXITCODE)"
     }
 }
 

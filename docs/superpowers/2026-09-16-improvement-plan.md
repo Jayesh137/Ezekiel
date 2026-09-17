@@ -90,7 +90,10 @@ PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
 - **DONE-17 CI failures stopped at the source.** The two red runs of 2026-09-17 were a
   push with a failing test and a manual dispatch evicted from a busy concurrency group. A
   pre-push hook (`scripts/git-hooks/pre-push`) now runs lint + tests (cached by tree hash)
-  and blocks; the relay counts an unreadable run list as busy.
+  and blocks; the relay counts an unreadable run list as busy. A third cause surfaced
+  at 04:10: the PC dispatcher sent collect, trace and scan into one concurrency group in
+  four seconds and trace was evicted. Both schedulers now send at most one run per group
+  per tick, the most overdue first (0 cancelled or failed in the 44 runs after).
 - **DONE-18 Multi-sig tripwire (was P7 "builder-fee/multi-sig").** Found a real bug: the
   collector read `userToMultiSigSigners` as a list, which it never is, so a conversion
   would have been discarded. Fixed; the watch reads signers as agents; the explorer parser

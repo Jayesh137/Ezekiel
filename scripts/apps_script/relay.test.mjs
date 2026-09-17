@@ -53,9 +53,31 @@ test('dispatch waits while a run is queued and when the interval has not passed'
   const d = Object.fromEntries(sandbox.decideDispatch(sandbox.SCHEDULE, newest, NOW).map((x) => [x.file, x]));
   assert.equal(d['watch.yml'].dispatch, false);
   assert.equal(d['collect.yml'].dispatch, false);
+  // trace (45/30) and scan (90/60) are equally overdue; the earlier entry wins,
+  // and nothing else goes into the same group this tick.
   assert.equal(d['trace.yml'].dispatch, true);
-  assert.equal(d['scan.yml'].dispatch, true);
-  assert.equal(d['analyze.yml'].dispatch, true);
+  assert.equal(d['scan.yml'].dispatch, false);
+  assert.equal(d['analyze.yml'].dispatch, false);
+  assert.match(d['scan.yml'].reason, /trace\.yml is more overdue/);
+});
+
+test('one tick never sends two runs into one group (the 04:10 eviction on 2026-09-17)', () => {
+  const { sandbox } = load();
+  const newest = {
+    'watch.yml': { status: 'completed', created_at: ago(12) },
+    'collect.yml': { status: 'completed', created_at: ago(18) },
+    'trace.yml': { status: 'completed', created_at: ago(40) },
+    'scan.yml': { status: 'completed', created_at: ago(70) },
+    'analyze.yml': { status: 'completed', created_at: ago(30) },
+    'backfill.yml': { status: 'completed', created_at: ago(9999) },
+    'substrate-backfill.yml': { status: 'completed', created_at: ago(9999) }
+  };
+  const got = [...sandbox.decideDispatch(sandbox.SCHEDULE, newest, NOW)];
+  assert.deepEqual(got.filter((x) => x.dispatch).map((x) => x.file), ['watch.yml', 'trace.yml'],
+    'watch has its own group; trace (1.33x its interval) beats collect (1.2x) and scan (1.17x)');
+  const groups = got.filter((x) => x.dispatch)
+    .map((x) => sandbox.SCHEDULE.find((j) => j.file === x.file).group);
+  assert.equal(new Set(groups).size, groups.length);
 });
 
 test('nothing is queued into a busy data-commit group (that is what cancels runs)', () => {

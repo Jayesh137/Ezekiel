@@ -89,7 +89,7 @@ function decideDispatch(schedule, newest, nowMs, watchMinutes) {
     var run = newest[f];
     return run === null || (run && run.status !== 'completed');
   });
-  return schedule.map(function (job) {
+  var decisions = schedule.map(function (job) {
     var run = newest[job.file];
     var minutes = (job.file === 'watch.yml' && watchMinutes) ? watchMinutes : job.minutes;
     if (run === null || run === undefined) {
@@ -106,7 +106,28 @@ function decideDispatch(schedule, newest, nowMs, watchMinutes) {
     if (job.group === 'data-commit' && groupBusy) {
       return { file: job.file, dispatch: false, reason: 'data-commit group busy' };
     }
-    return { file: job.file, dispatch: true, reason: 'last run ' + ageMin.toFixed(1) + ' min ago' };
+    return { file: job.file, dispatch: true, overdue: ageMin / minutes,
+             reason: 'last run ' + ageMin.toFixed(1) + ' min ago' };
+  });
+  // At most ONE dispatch per concurrency group per tick, the most overdue (age
+  // as a multiple of its interval) first; ties go to the earlier schedule
+  // entry. A group holds one running and one PENDING run, so several
+  // dispatched in the same seconds start one, queue one and let the next evict
+  // it: collect, trace and scan went out together at 04:10:54-58 on 2026-09-17
+  // and trace (run 35180941359) was cancelled four seconds later.
+  var best = {};
+  decisions.forEach(function (d, i) {
+    if (!d.dispatch) return;
+    var g = schedule[i].group;
+    if (!(g in best) || d.overdue > decisions[best[g]].overdue) best[g] = i;
+  });
+  return decisions.map(function (d, i) {
+    var g = schedule[i].group;
+    if (d.dispatch && best[g] !== i) {
+      return { file: d.file, dispatch: false,
+               reason: 'due, but ' + decisions[best[g]].file + ' is more overdue in group ' + g };
+    }
+    return { file: d.file, dispatch: d.dispatch, reason: d.reason };
   });
 }
 

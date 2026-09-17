@@ -2013,7 +2013,8 @@ that it is.
   The operator has no always-on machine, so real-time websocket streaming is
   SCRAPPED. `scripts/apps_script/ezekiel_relay.gs` runs free on Google's
   servers every 5 minutes: it dispatches the workflows exactly as the PC
-  dispatcher does (never into a queued run or the busy `data-commit` group),
+  dispatcher does (never into a queued run or the busy `data-commit` group,
+  and never two into one group in the same tick),
   and it is a fast tripwire — the explorer for the config wallets, an urgent
   ntfy within ~5 minutes of a non-trading action reaching outside the cluster
   or handing out control, heightening the watch to 5 minutes for 6 hours after
@@ -2045,6 +2046,15 @@ that it is.
   the better fix and is deliberately NOT done: it needs a proven
   single-writer map, and a wrong one is the lost-update bug this repo has
   already paid for once.
+  **Nor may it send two runs into one group in the same tick (fixed
+  2026-09-17).** The busy check ran once, before any dispatch, so when collect,
+  trace and scan were all due it sent all three within four seconds (04:10:54
+  to 04:10:58): collect started, trace queued, and scan's arrival evicted
+  trace (run 35180941359, "cancelled" — a red mark in the Actions tab for work
+  that was never lost). Both schedulers now dispatch at most ONE workflow per
+  group per tick, the most overdue as a multiple of its interval; the rest go
+  on a later tick. `-DryRun` logs the decisions without dispatching. Measured
+  after the fix: 44 runs from 04:20 to 07:10, none cancelled or failed.
   **`schtasks /Create` silently kills it on a laptop — install with `-Install`
   (2026-09-12).** Registered with the documented `schtasks` line, the task
   carried `DisallowStartIfOnBatteries` and `StopIfGoingOnBatteries`, both TRUE
