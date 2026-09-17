@@ -1,15 +1,15 @@
 {
-  "computed_at": "2026-09-17T00:05:34.937464+00:00",
+  "computed_at": "2026-09-17T00:44:12.009980+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 358,
   "behavioural_counts_as_a_vector": true,
   "tier_counts": {
     "CONFIRMED": 2,
     "POSSIBLE": 26,
-    "WATCH": 161,
-    "INFRASTRUCTURE": 169
+    "WATCH": 160,
+    "INFRASTRUCTURE": 170
   },
-  "demoted_count": 119,
+  "demoted_count": 118,
   "demoted": [
     {
       "wallet": "0x3b2d7db2e70b4f4ea83043a8dc00f7e40198b5cc",
@@ -239,7 +239,7 @@
         "correlation_confidence": 0.9974,
         "correlation_gap_hours": 4.4,
         "competing_deposits": 0,
-        "portfolio_overlap": 0.0368,
+        "portfolio_overlap": 0.0369,
         "shared_rare_markets": [
           "GRAM",
           "ASTER",
@@ -388,7 +388,7 @@
         "correlation_confidence": 0.6466,
         "correlation_gap_hours": 257.7,
         "competing_deposits": 2,
-        "portfolio_overlap": 0.0219,
+        "portfolio_overlap": 0.0212,
         "shared_rare_markets": [
           "CHIP"
         ],
@@ -547,13 +547,13 @@
         "style_vetoes": [
           "Decision frequency 8x apart (0.80 vs 6.00 position episodes/day)"
         ],
-        "portfolio_overlap": 0.1102,
+        "portfolio_overlap": 0.11,
         "shared_rare_markets": [
           "APEX",
           "SYRUP",
           "GRAM",
           "kBONK",
-          "CHIP"
+          "PENGU"
         ],
         "hl_role": "user",
         "hl_account_value": 8967947.366104,
@@ -597,7 +597,7 @@
         "style_vetoes": [
           "Decision frequency 15x apart (0.80 vs 12.00 position episodes/day)"
         ],
-        "portfolio_overlap": 0.0198,
+        "portfolio_overlap": 0.0199,
         "shared_rare_markets": [
           "VVV"
         ],
@@ -2585,41 +2585,6 @@
       "rank_strength": 0.045
     },
     {
-      "wallet": "0x5777d92f208679db4b9778590fa3cab3ac9e2168",
-      "vectors": [],
-      "confidence": 0.045,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Repeated transfers (196 separate movements)",
-        "Last movement 451 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 2 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 196,
-          "unvalued_edge_count": 0
-        },
-        "depth": 2,
-        "chains": [
-          "ethereum"
-        ],
-        "graph_reach_only": true,
-        "hl_role": "missing",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": null
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 0,
-      "tier": "WATCH",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": "POSSIBLE",
-      "rank_strength": 0.045
-    },
-    {
       "wallet": "0x5c2ccbdf8c53635a2491367e35ee80caa27a210f",
       "vectors": [],
       "confidence": 0.045,
@@ -3435,7 +3400,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 223 days ago \u2014 transfer evidence aged to 63%",
+        "Last movement 224 days ago \u2014 transfer evidence aged to 63%",
         "Reached at 2 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -9573,6 +9538,39 @@
       "vector_count": 0,
       "tier": "INFRASTRUCTURE",
       "peak_tier": "INFRASTRUCTURE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
+      "wallet": "0x5777d92f208679db4b9778590fa3cab3ac9e2168",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": "SERVICE",
+      "reasons": [
+        "Excluded: configured service address (exchange/bridge/contract)"
+      ],
+      "evidence": {
+        "service_reason": "configured service address (exchange/bridge/contract)",
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 196,
+          "unvalued_edge_count": 0
+        },
+        "depth": 2,
+        "chains": [
+          "ethereum"
+        ],
+        "graph_reach_only": true,
+        "hl_role": "missing",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": null
+      },
+      "is_service": true,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "INFRASTRUCTURE",
+      "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.0
     },
