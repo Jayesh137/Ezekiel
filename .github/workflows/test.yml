@@ -78,3 +78,9 @@ jobs:
         if: ${{ !cancelled() && steps.npm.conclusion == 'success' }}
         working-directory: dashboard
         run: npm run build
+      # The Google Apps Script relay that replaces an always-on machine: its
+      # dispatch and tripwire decisions, with Google's globals mocked. No npm
+      # dependencies, so it never waits on npm ci.
+      - name: Relay tests
+        if: ${{ !cancelled() }}
+        run: node --test scripts/apps_script/relay.test.mjs

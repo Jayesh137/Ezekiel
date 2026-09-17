@@ -1959,6 +1959,20 @@ that it is.
   **`workflow_dispatch` is not best-effort** — anything outside GitHub that
   can make one API call drives a run immediately. Do not quote the cron
   interval as the cadence; quote the measurement.
+- **The Google Apps Script relay replaces an always-on machine (2026-09-17).**
+  The operator has no always-on machine, so real-time websocket streaming is
+  SCRAPPED. `scripts/apps_script/ezekiel_relay.gs` runs free on Google's
+  servers every 5 minutes: it dispatches the workflows exactly as the PC
+  dispatcher does (never into a queued run or the busy `data-commit` group),
+  and it is a fast tripwire — the explorer for the config wallets, an urgent
+  ntfy within ~5 minutes of a non-trading action reaching outside the cluster
+  or handing out control, heightening the watch to 5 minutes for 6 hours after
+  one. Routine his-own round trips, staking delegation and shared venues (HLP)
+  are not alerted: measured over his history, ~1 alert a month. Tested under
+  Node with Google's globals mocked (`relay.test.mjs`, in CI) and dry-run live
+  against GitHub and the explorer, which found two real bugs: the seen-set held
+  orders and evicted a real withdrawal (re-alert), and a 60-entry cap was below
+  the treasury's 72 non-trading actions. Setup: `scripts/apps_script/SETUP.md`.
 - **A local dispatcher now drives the crons (2026-09-12).**
   `scripts/dispatch_workflows.ps1` runs from Windows Task Scheduler on the
   operator's machine every 5 minutes and dispatches `watch.yml` (10 min),
