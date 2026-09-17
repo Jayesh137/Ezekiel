@@ -63,6 +63,36 @@ PROBABLE 0, POSSIBLE 26; the graph step logged the funder as busy; risk fell
 - **DONE-9 Test isolation.** Linkage caches sandboxed; graph pipeline tests no
   longer call Blockscout (suite 171s → 90s).
 
+## Done on 2026-09-17 (operator delegated all remaining decisions)
+
+- **DONE-10 $84.6M of counterfeit value stopped.** Polygon "USDT" (15 contracts, $54.3M)
+  and ERC-20 "ETH" on ETH-native chains (25 contracts, ~$30.5M) were priced as real;
+  quarantined in production by analyze.yml: 316 records, $84,635,116.82.
+- **DONE-11 `0xf078969e…` in `known_self_wallets`,** with the hop-through-a-config-wallet
+  transfer vote now requiring >= $1,000 of valued flow (`self_flow_usd`) — 56 of the
+  72 wallets beside it were $0 poisoners.
+- **DONE-12 `config.owner_wallets`.** The operator's own copy-trading accounts are
+  refused by every candidate path (scan, priority set, candidate files, backtest
+  lineup, roster). Ships empty: **paste your wallet addresses into it.**
+- **DONE-13 Circle flows, both ends (supersedes P2-1 and P2-3).** Circle's
+  MessageTransmitterV2 events on HyperEVM name source chain, source sender and
+  credited account for every deposit, and withdrawing account plus recipient for every
+  withdrawal. CRITICAL when his wallet funds an outside account, an outside account pays
+  him, or his account withdraws outside. Etherscan chainid 999 in CI, RPC fallback.
+- **DONE-14 Detector freshness.** `src/feed_health.py`, checked crosswise by watch.yml
+  and trace.yml; HIGH when a feed stops.
+- **DONE-15 Dashboard Tripwires page.**
+
+**Measured and rejected on 2026-09-17** (do not rebuild):
+- *Clock-skew fingerprint from action nonces (P3-5):* the explorer's ORDER rows carry no
+  nonce; only wallet-signed actions do, and those include human confirmation delay
+  (17.2s on his Circle withdrawal). Not buildable from this API.
+- *Market-maker classification (P1-7):* after DONE-1..3 only 4 POSSIBLE rows rest on
+  dormancy alone, 2 of them the market maker's; not worth a classifier today.
+
+**Remaining, in order:** P3 real-time stream (needs a host decision), P4 self-cross /
+OI conservation, P5-1 likelihood ratios, P5-9 find his previous account.
+
 ## Route matrix additions (found by measurement, 2026-09-16)
 
 | # | Route | Watched now |
