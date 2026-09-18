@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-18T02:22:52.265064+00:00",
+  "computed_at": "2026-09-18T07:31:16.327720+00:00",
   "wallets": 1,
   "records": 3,
   "spam_suppressed": 5,
@@ -8,10 +8,12 @@
     "symbol_forgery": 2,
     "zero_value": 3
   },
-  "calls": 27,
+  "calls": 26,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "polygon"
+  ],
   "unsupported_sources": [
     "base",
     "bsc",
@@ -106,17 +108,19 @@
         "polygon": {
           "records": 0,
           "spam": 1,
-          "calls": 6,
+          "calls": 5,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Unexpected error, timeout or server too busy. Please try again later",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {
             "symbol_forgery": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Unexpected error, timeout or server too busy. Please try again later"
+          },
           "cursor_by_kind": {
             "erc20": 79283383,
             "native": 0,
@@ -164,7 +168,9 @@
           "unverified_kinds": {}
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "polygon"
+      ],
       "unsupported_sources": [
         "base",
         "optimism",
