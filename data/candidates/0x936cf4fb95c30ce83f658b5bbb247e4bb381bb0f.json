@@ -1,16 +1,20 @@
 {
   "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
   "first_seen": "2026-07-09T16:23:24.091306+00:00",
-  "last_seen": "2026-09-16T16:32:13.912204+00:00",
+  "last_seen": "2026-09-19T07:01:08.906262+00:00",
   "best_score": 0.6159,
-  "latest_score": 0.45,
+  "latest_score": 0.3675,
+  "latest_scoring_schema": "2026-08-05.1",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar account-size bracket"
+      "Similar account-size bracket",
+      "Matching long/short bias",
+      "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
+      "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
@@ -18,35 +22,37 @@
     ],
     "asset_overlap": {
       "overlap": [
-        "CASHCAT",
-        "ETH",
         "FARTCOIN"
       ],
       "target_only": [
-        "ADA"
+        "ADA",
+        "BTC",
+        "ETH"
       ],
       "candidate_only": [
         "@306",
         "ASTER",
+        "CASHCAT",
         "CC",
         "EIGEN",
         "ENA",
+        "GRAM",
         "GRASS",
         "JTO",
-        "LIT",
         "NEAR",
+        "PONS",
         "PUMP",
         "SKR",
-        "SOL",
+        "TAO",
         "VVV",
         "WLD",
+        "XMR",
         "XPL",
-        "XRP",
         "ZEC"
       ],
-      "overlap_count": 3,
+      "overlap_count": 1,
       "rare_overlap": [],
-      "jaccard": 0.1429
+      "jaccard": 0.0435
     },
     "market_rarity": {
       "shared_markets": [],
@@ -55,36 +61,17 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.45,
+      "score_without_bonus": 0.3675,
       "explanations": [],
       "frequencies": {}
     },
     "tooling": {
-      "requests": 43533854.0,
-      "cum_volume_usd": 2461177256.3,
-      "requests_per_1k_usd": 17.6882
+      "requests": 44991575.0,
+      "cum_volume_usd": 2519875385.89,
+      "requests_per_1k_usd": 17.8547
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-25T06:25:21.052880+00:00",
-      "score": 0.45,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.4203,
-        "timing_profile": null,
-        "leverage_profile": 0.7774,
-        "entry_exit_style": 0.3531,
-        "hold_duration": 0.4992,
-        "account_size": 0.5585,
-        "trade_sequencing": 0.2862,
-        "position_sizing": 0.5,
-        "activity": 0.5712,
-        "direction_bias": 1.0,
-        "position_management": 0.6812,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-25T07:36:37.026646+00:00",
       "score": 0.45,
@@ -2012,8 +1999,29 @@
         "position_management": 0.7691,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-09-19T07:01:08.906262+00:00",
+      "score": 0.3675,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0435,
+        "timing_profile": null,
+        "leverage_profile": 0.9539,
+        "entry_exit_style": 0.4451,
+        "hold_duration": null,
+        "account_size": 0.8086,
+        "trade_sequencing": 0.5183,
+        "position_sizing": 0.4284,
+        "order_profile": null,
+        "activity": 0.4001,
+        "direction_bias": 1.0,
+        "position_management": 0.8411,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-08-05.1"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4455
+  "recent_avg_score": 0.4337
 }
