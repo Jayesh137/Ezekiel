@@ -1,82 +1,70 @@
 {
   "wallet": "0xe3e18f5b100713bca7acf8c5a3d5b592605d0fa6",
   "first_seen": "2026-06-30T13:16:36.998574+00:00",
-  "last_seen": "2026-06-30T13:16:36.998574+00:00",
+  "last_seen": "2026-09-19T17:45:03.116353+00:00",
   "best_score": 0.651,
-  "latest_score": 0.651,
-  "latest_tier": "WEAK_LEAD",
+  "latest_score": 0.331,
+  "latest_scoring_schema": "2026-08-05.1",
+  "latest_tier": "BACKGROUND",
   "latest_evidence": {
-    "tier": "WEAK_LEAD",
+    "tier": "BACKGROUND",
     "reasons": [
-      "Shares rare HIP-3 markets: xyz:SNDK",
-      "Similar market/limit execution style"
+      "Similar market/limit execution style",
+      "Similar scaling/TWAP/clip-size habits"
     ],
-    "warnings": [],
+    "warnings": [
+      "Weak asset overlap",
+      "Too few position episodes to compare holding style"
+    ],
+    "vetoes": [
+      "Decision frequency 7x apart (0.80 vs 5.67 position episodes/day)"
+    ],
     "asset_overlap": {
-      "overlap": [
-        "BTC",
-        "HYPE",
-        "VVV",
-        "xyz:SNDK"
-      ],
+      "overlap": [],
       "target_only": [
-        "2Z",
-        "@107",
-        "ASTER",
-        "BLAST",
-        "BNB",
-        "CHILLGUY",
-        "CHIP",
-        "DOGE",
-        "ENA",
+        "ADA",
+        "BTC",
         "ETH",
-        "GOAT",
-        "GRASS",
-        "HBAR",
-        "INIT",
-        "KAITO",
-        "LDO",
-        "LTC",
-        "MON",
-        "MOODENG",
-        "NEAR",
-        "PENDLE",
-        "PNUT",
-        "POPCAT",
-        "RESOLV",
-        "S",
-        "SOL",
-        "SUI",
-        "TAO",
-        "VINE",
-        "VIRTUAL",
-        "WIF",
-        "XPL",
-        "XRP",
-        "ZK",
-        "ZRO",
-        "xyz:BRENTOIL",
-        "xyz:CL",
-        "xyz:COPPER",
-        "xyz:SILVER",
-        "xyz:SP500",
-        "xyz:XYZ100"
+        "FARTCOIN"
       ],
       "candidate_only": [
-        "CRV",
-        "INJ",
+        "@107",
+        "ACE",
+        "CASHCAT",
+        "CC",
+        "CHIP",
+        "HYPE",
         "MORPHO",
-        "PAXG",
-        "TRUMP",
+        "PUMP",
         "WLD",
-        "ZEC",
-        "xyz:MU"
-      ],
-      "overlap_count": 4,
-      "rare_overlap": [
+        "xyz:BE",
+        "xyz:CL",
+        "xyz:MU",
+        "xyz:NBIS",
+        "xyz:NOW",
+        "xyz:SILVER",
+        "xyz:SKHX",
         "xyz:SNDK"
       ],
-      "jaccard": 0.0755
+      "overlap_count": 0,
+      "rare_overlap": [],
+      "jaccard": 0.0
+    },
+    "market_rarity": {
+      "shared_markets": [],
+      "rare_markets": [],
+      "classification": {},
+      "description": "no shared markets",
+      "sample_sufficient": true,
+      "bonus_applied": 0.0,
+      "score_without_bonus": 0.331,
+      "explanations": [],
+      "frequencies": {}
+    },
+    "tooling": {
+      "requests": 14689.0,
+      "cum_volume_usd": 204613443.18,
+      "requests_per_1k_usd": 0.0718
     }
   },
   "score_history": [
@@ -94,6 +82,27 @@
         "trade_sequencing": 0.8179,
         "position_sizing": 0.0012
       }
+    },
+    {
+      "scan_time": "2026-09-19T17:45:03.116353+00:00",
+      "score": 0.331,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.8848,
+        "entry_exit_style": 0.9599,
+        "hold_duration": null,
+        "account_size": 0.3087,
+        "trade_sequencing": 0.9805,
+        "position_sizing": 0.0054,
+        "order_profile": null,
+        "activity": 0.4594,
+        "direction_bias": 0.2862,
+        "position_management": 0.8167,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-08-05.1"
     }
   ],
   "status": "ACTIVE",
