@@ -1,14 +1,14 @@
 {
   "wallet": "0xcafeed0c0ce5895e2cab39a9281967d2d76b1f01",
   "first_seen": "2026-09-15T12:26:07.221739+00:00",
-  "last_seen": "2026-09-16T02:09:23.542079+00:00",
+  "last_seen": "2026-09-21T02:09:08.237894+00:00",
   "best_score": 0.3147,
-  "latest_score": 0.2591,
+  "latest_score": 0.2366,
+  "latest_scoring_schema": "2026-08-05.1",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
       "Similar account-size bracket"
     ],
     "warnings": [
@@ -16,19 +16,21 @@
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Incompatible hold style: 75% vs 0% of holds under 1h"
+      "Decision frequency 6x apart (0.80 vs 0.14 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
       "target_only": [
         "ADA",
-        "CASHCAT",
+        "BTC",
         "ETH",
         "FARTCOIN"
       ],
       "candidate_only": [
         "@107",
-        "@151"
+        "@151",
+        "@700",
+        "HYPE"
       ],
       "overlap_count": 0,
       "rare_overlap": [],
@@ -41,14 +43,14 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2591,
+      "score_without_bonus": 0.2366,
       "explanations": [],
       "frequencies": {}
     },
     "tooling": {
-      "requests": 27.0,
-      "cum_volume_usd": 876691.28,
-      "requests_per_1k_usd": 0.0308
+      "requests": 110.0,
+      "cum_volume_usd": 2219573.84,
+      "requests_per_1k_usd": 0.0496
     }
   },
   "score_history": [
@@ -151,6 +153,27 @@
         "position_management": 0.6338,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-09-21T02:09:08.237894+00:00",
+      "score": 0.2366,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.7684,
+        "hold_duration": null,
+        "account_size": 0.7304,
+        "trade_sequencing": 0.8704,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.4298,
+        "direction_bias": null,
+        "position_management": 0.5109,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-08-05.1"
     }
   ],
   "status": "ACTIVE",
