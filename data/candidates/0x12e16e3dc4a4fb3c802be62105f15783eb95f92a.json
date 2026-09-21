@@ -1,76 +1,57 @@
 {
   "wallet": "0x12e16e3dc4a4fb3c802be62105f15783eb95f92a",
   "first_seen": "2026-06-30T10:30:17.033051+00:00",
-  "last_seen": "2026-06-30T10:30:17.033051+00:00",
+  "last_seen": "2026-09-21T15:33:30.140044+00:00",
   "best_score": 0.7019,
-  "latest_score": 0.7019,
-  "latest_tier": "WEAK_LEAD",
+  "latest_score": 0.4045,
+  "latest_scoring_schema": "2026-08-05.1",
+  "latest_tier": "BACKGROUND",
   "latest_evidence": {
-    "tier": "WEAK_LEAD",
+    "tier": "BACKGROUND",
     "reasons": [
-      "Shares rare HIP-3 markets: xyz:SP500, xyz:XYZ100",
-      "Similar market/limit execution style"
+      "Similar market/limit execution style",
+      "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
-      "Very different account-size bracket"
+      "Weak asset overlap",
+      "Too few position episodes to compare holding style"
+    ],
+    "vetoes": [
+      "Decision frequency 5x apart (0.80 vs 4.14 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
-        "BTC",
-        "HYPE",
-        "xyz:SP500",
-        "xyz:XYZ100"
+        "BTC"
       ],
       "target_only": [
-        "2Z",
-        "@107",
-        "ASTER",
-        "BLAST",
-        "BNB",
-        "CHILLGUY",
-        "CHIP",
-        "DOGE",
-        "ENA",
+        "ADA",
         "ETH",
-        "GOAT",
-        "GRASS",
-        "HBAR",
-        "INIT",
-        "KAITO",
-        "LDO",
-        "LTC",
-        "MON",
-        "MOODENG",
-        "NEAR",
-        "PENDLE",
-        "PNUT",
-        "POPCAT",
-        "RESOLV",
-        "S",
-        "SOL",
-        "SUI",
-        "TAO",
-        "VINE",
-        "VIRTUAL",
-        "VVV",
-        "WIF",
-        "XPL",
-        "XRP",
-        "ZK",
-        "ZRO",
-        "xyz:BRENTOIL",
-        "xyz:CL",
-        "xyz:COPPER",
-        "xyz:SILVER",
-        "xyz:SNDK"
+        "FARTCOIN"
       ],
-      "candidate_only": [],
-      "overlap_count": 4,
-      "rare_overlap": [
-        "xyz:SP500",
-        "xyz:XYZ100"
+      "candidate_only": [
+        "CASHCAT",
+        "HYPE",
+        "PONS"
       ],
-      "jaccard": 0.0889
+      "overlap_count": 1,
+      "rare_overlap": [],
+      "jaccard": 0.1429
+    },
+    "market_rarity": {
+      "shared_markets": [],
+      "rare_markets": [],
+      "classification": {},
+      "description": "no shared markets",
+      "sample_sufficient": true,
+      "bonus_applied": 0.0,
+      "score_without_bonus": 0.4045,
+      "explanations": [],
+      "frequencies": {}
+    },
+    "tooling": {
+      "requests": 21188.0,
+      "cum_volume_usd": 251539643.08,
+      "requests_per_1k_usd": 0.0842
     }
   },
   "score_history": [
@@ -86,6 +67,29 @@
         "hold_duration": 0.4205,
         "account_size": 0.0927
       }
+    },
+    {
+      "scan_time": "2026-09-21T15:33:30.140044+00:00",
+      "score": 0.4045,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": null,
+        "leverage_profile": 0.8671,
+        "entry_exit_style": 0.9818,
+        "hold_duration": null,
+        "account_size": 0.2825,
+        "trade_sequencing": 0.9015,
+        "position_sizing": 0.0212,
+        "order_profile": null,
+        "activity": 0.6433,
+        "direction_bias": 0.3867,
+        "position_management": 0.8147,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-08-05.1"
     }
-  ]
+  ],
+  "status": "ACTIVE",
+  "recent_avg_score": null
 }
