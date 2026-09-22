@@ -17,6 +17,8 @@
 		{ href: `${base}/scanner`, label: 'Scanner', icon: 'S' },
 	];
 
+	$: bare = $page.url.pathname.startsWith(`${base}/review`);
+
 	let freshnessMinutes = null;
 	// Alert delivery health. This sits above everything else because if alerting
 	// is down, nothing else on this dashboard can reach the operator in time to
@@ -54,77 +56,94 @@
 	});
 </script>
 
-<div class="app-shell">
-	<nav class="sidebar">
-		<div class="sidebar-header">
-			<span class="logo">EZK</span>
-			<span class="logo-sub">EZEKIEL</span>
+<!-- The phone review app (/review) is its own full-screen PWA surface: no
+     sidebar and no bottom nav, which would steal a fifth of an iPhone screen. -->
+{#if bare}
+	{#if alertDelivery?.down}
+		<!-- Kept on the phone too: it is the one fault that means ntfy will not
+		     reach this device, so the app is the only place left to see it. -->
+		<div class="alert-down alert-down-bare" role="alert">
+			<strong>ALERTING IS DOWN</strong>
+			<span>
+				{alertDelivery.undelivered} alert{alertDelivery.undelivered === 1 ? '' : 's'} not delivered.
+				Check this app directly until it is fixed.
+			</span>
 		</div>
-		<ul class="nav-list">
-			{#each navItems as item}
-				<li>
-					<a
-						href={item.href}
-						class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
-					>
-						<span class="nav-icon">{item.icon}</span>
-						{item.label}
-					</a>
-				</li>
-			{/each}
-		</ul>
-		<div class="sidebar-footer">
-			<span class="text-muted" style="font-size:0.7rem">Trader Intelligence</span>
-			{#if freshnessLabel}
-				<span class="freshness-pill freshness-{freshnessStatus}" title={freshnessTitle}>
-					{freshnessStatus === 'stale' ? 'STALLED' : 'Data'}: {freshnessLabel}
-				</span>
-			{/if}
-			<!-- Deliberately muted, and deliberately NOT part of the ALERTING IS
-			     DOWN banner: these alerts were withheld on purpose, so this is
-			     information, not a fault. It is here at all because a policy that
-			     withholds alerts should not also hide how much it is withholding. -->
-			{#if alertDelivery?.withheld > 0}
-				<span class="withheld-pill"
-				      title="INFO-level alerts are recorded in the data and shown on this dashboard, but deliberately not pushed to ntfy, Telegram or GitHub issues — only CRITICAL and HIGH are, so low-confidence discoveries cannot bury the two that matter. Set NTFY_INCLUDE_INFO=1 to receive them.">
-					{alertDelivery.withheld} INFO withheld
-				</span>
-			{/if}
-		</div>
-	</nav>
-	<main class="main-content">
-		{#if alertDelivery?.down}
-			<!-- Deliberately the loudest thing on the page and above the content on
-			     every route. A detection system whose output channel is dead looks
-			     exactly like a quiet week; this is the only place that difference is
-			     visible, because email cannot report its own failure. -->
-			<div class="alert-down" role="alert">
-				<strong>ALERTING IS DOWN</strong>
-				<span>
-					{alertDelivery.undelivered} alert{alertDelivery.undelivered === 1 ? '' : 's'}
-					not delivered{alertDelivery.since ? ` since ${alertDelivery.since.slice(0, 16).replace('T', ' ')}` : ''}.
-					You will not be emailed if the trader migrates — check this dashboard directly until it is fixed.
-				</span>
-				{#if alertDelivery.reason}
-					<span class="alert-down-reason">{alertDelivery.reason}</span>
+	{/if}
+	<slot />
+{:else}
+	<div class="app-shell">
+		<nav class="sidebar">
+			<div class="sidebar-header">
+				<span class="logo">EZK</span>
+				<span class="logo-sub">EZEKIEL</span>
+			</div>
+			<ul class="nav-list">
+				{#each navItems as item}
+					<li>
+						<a
+							href={item.href}
+							class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
+						>
+							<span class="nav-icon">{item.icon}</span>
+							{item.label}
+						</a>
+					</li>
+				{/each}
+			</ul>
+			<div class="sidebar-footer">
+				<span class="text-muted" style="font-size:0.7rem">Trader Intelligence</span>
+				{#if freshnessLabel}
+					<span class="freshness-pill freshness-{freshnessStatus}" title={freshnessTitle}>
+						{freshnessStatus === 'stale' ? 'STALLED' : 'Data'}: {freshnessLabel}
+					</span>
+				{/if}
+				<!-- Deliberately muted, and deliberately NOT part of the ALERTING IS
+				     DOWN banner: these alerts were withheld on purpose, so this is
+				     information, not a fault. It is here at all because a policy that
+				     withholds alerts should not also hide how much it is withholding. -->
+				{#if alertDelivery?.withheld > 0}
+					<span class="withheld-pill"
+					      title="INFO-level alerts are recorded in the data and shown on this dashboard, but deliberately not pushed to ntfy, Telegram or GitHub issues — only CRITICAL and HIGH are, so low-confidence discoveries cannot bury the two that matter. Set NTFY_INCLUDE_INFO=1 to receive them.">
+						{alertDelivery.withheld} INFO withheld
+					</span>
 				{/if}
 			</div>
-		{/if}
-		<slot />
-	</main>
-</div>
+		</nav>
+		<main class="main-content">
+			{#if alertDelivery?.down}
+				<!-- Deliberately the loudest thing on the page and above the content on
+				     every route. A detection system whose output channel is dead looks
+				     exactly like a quiet week; this is the only place that difference is
+				     visible, because email cannot report its own failure. -->
+				<div class="alert-down" role="alert">
+					<strong>ALERTING IS DOWN</strong>
+					<span>
+						{alertDelivery.undelivered} alert{alertDelivery.undelivered === 1 ? '' : 's'}
+						not delivered{alertDelivery.since ? ` since ${alertDelivery.since.slice(0, 16).replace('T', ' ')}` : ''}.
+						You will not be emailed if the trader migrates — check this dashboard directly until it is fixed.
+					</span>
+					{#if alertDelivery.reason}
+						<span class="alert-down-reason">{alertDelivery.reason}</span>
+					{/if}
+				</div>
+			{/if}
+			<slot />
+		</main>
+	</div>
 
-<nav class="mobile-nav">
-	{#each navItems as item}
-		<a
-			href={item.href}
-			class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
-		>
-			<span class="mobile-nav-icon">{item.icon}</span>
-			<span class="mobile-nav-label">{item.label}</span>
-		</a>
-	{/each}
-</nav>
+	<nav class="mobile-nav">
+		{#each navItems as item}
+			<a
+				href={item.href}
+				class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
+			>
+				<span class="mobile-nav-icon">{item.icon}</span>
+				<span class="mobile-nav-label">{item.label}</span>
+			</a>
+		{/each}
+	</nav>
+{/if}
 
 <style>
 	.app-shell {
@@ -234,6 +253,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+	}
+	.alert-down-bare {
+		margin: calc(8px + env(safe-area-inset-top, 0px)) 16px 0;
 	}
 	.alert-down strong {
 		color: var(--accent-red);

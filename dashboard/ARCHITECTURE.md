@@ -105,6 +105,7 @@ it is always as fresh as the last committed run.
 dashboard/
 ├── ARCHITECTURE.md
 ├── scripts/make_icons.mjs             NEW  draws the PNG icons (node:zlib, no deps)
+├── scripts/check_pwa_build.mjs        NEW  asserts the build is installable (npm run check:pwa)
 ├── static/
 │   ├── manifest.webmanifest           NEW
 │   ├── icon-180.png                   NEW  apple-touch-icon
@@ -187,10 +188,10 @@ Clean means:
 │ (◉) (◉) (○)                          │  Stories: close watch
 │ 0xdd53… 0xf078… 0x5b5d…              │
 ├──────────────────────────────────────┤
-│  ◔ 12 / 38 reviewed                   │  ReviewProgress
+│  ◔ 12 / 33 reviewed                   │  ReviewProgress
 │    3 new · 1 changed    Mark all ✓   │
 ├──────────────────────────────────────┤
-│ [ For review 38 | Watch 149 | All ]  │  Segmented
+│ [ Likely 2 | Leads 33 ]              │  Segmented
 ├──────────────────────────────────────┤
 │ ● (av) 0xf078…f19e     CONFIRMED  NEW │  WalletPost
 │   ●●○  2 vectors agree               │
@@ -246,20 +247,36 @@ eligible(roster)
       minus tier == INFRASTRUCTURE, minus is_service, minus wallet == roster.target
 
 feed(roster, state, tab)
-    'review' → eligible ∩ (tier ∈ {CONFIRMED, PROBABLE, POSSIBLE}  OR  status == 'changed')
-    'watch'  → eligible ∩ tier == WATCH
-    'all'    → eligible
+    'likely' → eligible ∩ tier ∈ {CONFIRMED, PROBABLE}   two or more vectors agree
+    'leads'  → eligible ∩ (tier == POSSIBLE  OR  a demotion to WATCH not yet reviewed)
     sorted by
       1. unread first         (status new | changed)
-      2. tier rank            CONFIRMED > PROBABLE > POSSIBLE > WATCH
-      3. vector_count         desc
-      4. rank_strength        desc; absent sorts last, never as 0.0
-      5. wallet               asc, deterministic last resort
+      2. tier rank            CONFIRMED > PROBABLE > POSSIBLE
+      3. NOT known_self       a wallet the owner has already named ranks last
+      4. vector_count         desc
+      5. rank_strength        desc; absent sorts last, never as 0.0
+      6. wallet               asc, deterministic last resort
 ```
 
-A POSSIBLE wallet demoted to WATCH stays in "For review" as **changed** until
-you review it, because a demotion is news. `rank_strength` only orders the
+**WATCH is never listed.** 151 wallets today carry no vector at all, which was
+the bulk of the list and is evidence of nothing; on a phone that buries the few
+that matter. They are counted in a one-line footnote instead. A wallet demoted
+all the way to WATCH still surfaces once under **Leads** as `changed`, because
+a demotion is news.
+
+**The two tabs are the honest split.** Likely means two or more independent
+vectors agree, the strongest evidence this project produces. Leads means one
+vector, which has repeatedly turned out to be an exchange, a bot or a
+coincidence. Today Likely holds only wallets the owner has already named, and
+the app says exactly that rather than letting two familiar addresses read as
+new finds. An empty Likely tab is a finding, not an empty screen. `rank_strength` only orders the
 list and is never displayed; it is a maximum over different scales.
+
+**Order is frozen for the session** (`sessionFeed(roster, orderState, state,
+tab)`). Which wallets appear, and in what order, is computed from the state
+at load time. Each row's status is live. Without this, marking a post would
+re-sort the feed under your finger, and reviewing a demoted WATCH wallet
+would make it vanish mid-read. **⟳** starts a new session.
 
 ### 6.2 Review state
 
@@ -387,9 +404,10 @@ iOS reads only `apple-touch-icon` for the home screen.
 
 ### 7.4 Icons
 
-`scripts/make_icons.mjs` draws a dark rounded tile with a gradient ring and an
-"E" using a minimal PNG encoder on `node:zlib`. The PNGs are committed, and
-the script is run by hand.
+`scripts/make_icons.mjs` draws an opaque square tile (iOS rounds the corners
+itself) with the story ring and an "E", using a minimal PNG encoder on
+`node:zlib`. The ring sits inside the maskable safe zone. The PNGs are
+committed, and the script is run by hand.
 
 ### 7.5 Service worker
 
@@ -441,6 +459,7 @@ raw rather than disappearing.
 | Malformed address | Plain text, no link |
 | Storage unavailable | No unread dots and no streak, plus a one-line notice |
 | Offline | Shell loads from cache, and the feed area says offline |
+| Alert delivery is down (`data/alerts/latest.json`) | The layout's ALERTING IS DOWN banner, kept on the phone shell. It is the one fault that means ntfy will not reach this device. |
 
 ---
 
@@ -452,11 +471,28 @@ raw rather than disappearing.
   formatters returning `—` for null.
 - **`toast.test.js`**: queue, dismiss, Undo callback.
 - **`api.test.js`** (existing) already pins `addressUrl`.
-- **Build check**: after `npm run build`, the manifest, icons and
-  `service-worker.js` are in `build/`, and `start_url` carries `/Ezekiel`.
-- **Rendered check**: headless Chrome at 390×844 against `vite dev` and live
-  data. Screenshot it, confirm a full Hypurrscan href, and confirm there is no
-  horizontal scroll.
+- **Build check**: `npm run check:pwa` (also a CI step in `test.yml`). It
+  checks that the manifest, icons and `service-worker.js` are in `build/`,
+  that `start_url` carries `/Ezekiel`, that every manifest icon exists, and
+  that the prerendered pages carry the iOS tags.
+- **Rendered check**, as done on 2026-09-22. Three traps apply:
+  - **Chrome on Windows will not make a window narrower than ~500px.**
+    `--window-size=390` screenshots a 500px layout cropped to 390, which looks
+    like overflow and is not. Load the page in a 390px `<iframe>` on a probe
+    page, and measure `scrollWidth` and each element's right edge there.
+  - **Headless `--virtual-time-budget` does not advance CSS animations or
+    resolve service-worker and Cache API promises.** A tick drawn by an
+    animation looks missing, and a SW probe never returns. Drive Chrome in
+    real time over CDP (`--remote-debugging-port` plus Node's built-in
+    `WebSocket`) for anything involving the service worker.
+  - **`vite preview` does not behave like Pages.** It answers unknown files
+    with the app's 404 route. Serve `build/` with a small server that maps
+    `/Ezekiel/x` to `x.html`, which is what GitHub Pages does.
+- **Measured at build**: 0 elements past 390px; 70 of 70 Hypurrscan hrefs are
+  full 40-hex addresses; every `$0.00` shown is a real 0 in the JSON; mark,
+  why, story and mark-all all behave; the SW is active at `/Ezekiel/` with 57
+  shell entries; an offline reload shows the cached shell and "You're
+  offline", with review state untouched.
 - **On the phone**: Add to Home Screen, confirm it launches standalone on
   `/review`, and confirm an address opens Hypurrscan.
 

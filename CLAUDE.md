@@ -2141,6 +2141,20 @@ that it is.
   automatic and once-only — keyed on no shards existing yet, NOT on
   `legacy.json` being absent, because `latest.json` is derived after the first
   shard write and re-migrating it would fold every event in twice.
+- **The owner reviews candidates on an iPhone app (2026-09-22).**
+  `https://jayesh137.github.io/Ezekiel/review` is a read-only PWA inside the
+  dashboard (Add to Home Screen), described in `dashboard/ARCHITECTURE.md`.
+  It reads `data/roster/latest.json` and `data/watchlist/latest.json` live, and
+  every address links to its Hypurrscan wallet page through `addressUrl()`.
+  **Renaming a roster or watch field it reads (§8 of that file) breaks the
+  phone silently**, so check that list before changing either writer. Review
+  marks live only in the phone's localStorage: nothing on the phone feeds the
+  pipeline, and its tiers are the roster's own.
+  It shows **Likely** (CONFIRMED/PROBABLE — two or more agreeing vectors) and
+  **Leads** (POSSIBLE — one vector); the WATCH tier is counted in a footnote
+  and never listed, because a wallet with no vector is evidence of nothing. On
+  the day it was built Likely held only the two config wallets, and the app says
+  so on screen rather than letting known wallets read as new finds.
 - **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
   collector run's silence and account-drop alerts arrived on the topic within
   seconds while email failed as usual, as did every CRITICAL that day.

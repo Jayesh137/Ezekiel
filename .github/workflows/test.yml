@@ -75,9 +75,18 @@ jobs:
       # Same rule: a failing unit test must not hide whether the build is
       # broken. They are two separate answers about the dashboard.
       - name: Build
+        id: build
         if: ${{ !cancelled() && steps.npm.conclusion == 'success' }}
         working-directory: dashboard
         run: npm run build
+      # The phone review app installs from the home screen. A build that stopped
+      # being installable (a missing icon, a manifest without the /Ezekiel base)
+      # still looks fine in every desktop check, so it is asserted here. Gated
+      # on the build it reads, not on the unit tests beside it.
+      - name: PWA installable
+        if: ${{ !cancelled() && steps.build.conclusion == 'success' }}
+        working-directory: dashboard
+        run: npm run check:pwa
       # The Google Apps Script relay that replaces an always-on machine: its
       # dispatch and tripwire decisions, with Google's globals mocked. No npm
       # dependencies, so it never waits on npm ci.
