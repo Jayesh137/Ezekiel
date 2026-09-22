@@ -1,20 +1,21 @@
 {
   "wallet": "0x399965e15d4e61ec3529cc98b7f7ebb93b733336",
   "first_seen": "2026-07-27T20:06:35.579044+00:00",
-  "last_seen": "2026-09-22T02:13:16.331596+00:00",
+  "last_seen": "2026-09-22T08:07:32.146707+00:00",
   "best_score": 0.3675,
-  "latest_score": 0.2573,
+  "latest_score": 0.2485,
   "latest_scoring_schema": "2026-08-05.1",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Similar account-size bracket"
+    ],
     "warnings": [
-      "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Weak asset overlap"
     ],
     "vetoes": [
-      "Decision frequency 39x apart (0.80 vs 31.00 position episodes/day)"
+      "Decision frequency 33x apart (1.00 vs 33.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -22,7 +23,8 @@
         "ADA",
         "BTC",
         "ETH",
-        "FARTCOIN"
+        "FARTCOIN",
+        "NEAR"
       ],
       "candidate_only": [
         "@107",
@@ -30,14 +32,12 @@
         "@151",
         "@156",
         "@162",
-        "@182",
         "@188",
         "@210",
         "@719",
         "io:ANTH",
         "io:NBIS",
         "io:SNDK",
-        "mkts:US500",
         "mkts:USTECH",
         "xyz:AAPL",
         "xyz:AMD",
@@ -46,6 +46,7 @@
         "xyz:COIN",
         "xyz:COPPER",
         "xyz:CRCL",
+        "xyz:CXMT",
         "xyz:DELL",
         "xyz:DRAM",
         "xyz:EWY",
@@ -61,6 +62,7 @@
         "xyz:NBIS",
         "xyz:ORCL",
         "xyz:RKLB",
+        "xyz:SHEIN",
         "xyz:SOXL",
         "xyz:SPCX",
         "xyz:TSM",
@@ -77,36 +79,17 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2573,
+      "score_without_bonus": 0.2485,
       "explanations": [],
       "frequencies": {}
     },
     "tooling": {
-      "requests": 2915675395.0,
-      "cum_volume_usd": 17302759733.44,
-      "requests_per_1k_usd": 168.5093
+      "requests": 2918358376.0,
+      "cum_volume_usd": 17306698303.13,
+      "requests_per_1k_usd": 168.6259
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-09-05T18:41:06.758472+00:00",
-      "score": 0.1945,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.0169,
-        "timing_profile": null,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 0.234,
-        "hold_duration": 0.5036,
-        "account_size": 0.1162,
-        "trade_sequencing": 0.81,
-        "position_sizing": 0.5,
-        "activity": 0.4875,
-        "direction_bias": 0.6588,
-        "position_management": 0.68,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-09-05T20:49:22.005923+00:00",
       "score": 0.1928,
@@ -2083,8 +2066,29 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-08-05.1"
+    },
+    {
+      "scan_time": "2026-09-22T08:07:32.146707+00:00",
+      "score": 0.2485,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.6391,
+        "entry_exit_style": 0.1548,
+        "hold_duration": 0.441,
+        "account_size": 0.7435,
+        "trade_sequencing": 0.8706,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.4505,
+        "direction_bias": 0.5716,
+        "position_management": 0.644,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-08-05.1"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2595
+  "recent_avg_score": 0.2609
 }
