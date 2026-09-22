@@ -52,37 +52,53 @@ test('status keys on the lowercased address', () => {
 	assert.equal(status(w(upper(A), 'POSSIBLE'), s), 'reviewed');
 });
 
-test('review tab: C/P/P plus any changed wallet, including a demotion to WATCH', () => {
+test('likely is CONFIRMED and PROBABLE only: two or more vectors agree', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'PROBABLE'), w(D, 'CONFIRMED')
+	] };
+	assert.deepEqual(feed(roster, emptyState(), 'likely').map((x) => x.wallet), [D, C]);
+});
+
+test('leads is POSSIBLE, plus a demotion to WATCH until it is reviewed', () => {
 	const roster = { target: T, wallets: [
 		w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'WATCH'), w(D, 'CONFIRMED')
 	] };
 	const s = { ...emptyState(), reviewed: { [B]: 'POSSIBLE', [C]: 'WATCH' } };
-	const got = feed(roster, s, 'review').map((x) => x.wallet);
-	assert.ok(got.includes(A) && got.includes(D) && got.includes(B));
-	assert.ok(!got.includes(C), 'an unchanged WATCH wallet is not in the review tab');
+	const got = feed(roster, s, 'leads').map((x) => x.wallet);
+	assert.ok(got.includes(A), 'a POSSIBLE wallet is a lead');
+	assert.ok(got.includes(B), 'a wallet demoted to WATCH surfaces once');
+	assert.ok(!got.includes(C), 'a WATCH wallet nothing changed about stays hidden');
+	assert.ok(!got.includes(D), 'a CONFIRMED wallet is not a lead');
 });
 
-test('watch and all tabs', () => {
-	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(B, 'WATCH')] };
-	assert.deepEqual(feed(roster, emptyState(), 'watch').map((x) => x.wallet), [B]);
-	assert.equal(feed(roster, emptyState(), 'all').length, 2);
+test('a zero-vector WATCH wallet is never shown in either tab', () => {
+	const roster = { target: T, wallets: [w(B, 'WATCH')] };
+	assert.equal(feed(roster, emptyState(), 'likely').length, 0);
+	assert.equal(feed(roster, emptyState(), 'leads').length, 0);
 });
 
-test('an unknown tab falls back to review', () => {
-	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(B, 'WATCH')] };
-	assert.deepEqual(feed(roster, emptyState(), 'nope').map((x) => x.wallet), [A]);
+test('an unknown tab falls back to likely', () => {
+	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(D, 'CONFIRMED')] };
+	assert.deepEqual(feed(roster, emptyState(), 'nope').map((x) => x.wallet), [D]);
 });
 
-test('order: unread, tier, vector count, strength (absent last), address', () => {
+test('order inside a tab: unread, vector count, strength (absent last), address', () => {
 	const roster = { target: T, wallets: [
 		w(A, 'POSSIBLE', { vector_count: 1, rank_strength: 0.9 }),
-		w(B, 'CONFIRMED', { vector_count: 2 }),
+		w(B, 'POSSIBLE', { vector_count: 2, rank_strength: 0.9 }),
 		w(C, 'POSSIBLE', { vector_count: 1, rank_strength: null }),
 		w(D, 'POSSIBLE', { vector_count: 2, rank_strength: 0.2 })
 	] };
 	// B was reviewed at its current tier, so it is read and sorts after unread.
-	const s = { ...emptyState(), reviewed: { [B]: 'CONFIRMED' } };
-	assert.deepEqual(feed(roster, s, 'review').map((x) => x.wallet), [D, A, C, B]);
+	const s = { ...emptyState(), reviewed: { [B]: 'POSSIBLE' } };
+	assert.deepEqual(feed(roster, s, 'leads').map((x) => x.wallet), [D, A, C, B]);
+});
+
+test('order: a stronger tier leads, since more vectors agree', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'PROBABLE', { vector_count: 2 }), w(B, 'CONFIRMED', { vector_count: 2 })
+	] };
+	assert.deepEqual(feed(roster, emptyState(), 'likely').map((x) => x.wallet), [B, A]);
 });
 
 test('order: an absent strength is not treated as 0.0', () => {
@@ -90,18 +106,20 @@ test('order: an absent strength is not treated as 0.0', () => {
 		w(A, 'POSSIBLE', { rank_strength: undefined }),
 		w(B, 'POSSIBLE', { rank_strength: 0 })
 	] };
-	assert.deepEqual(feed(roster, emptyState(), 'review').map((x) => x.wallet), [B, A]);
+	assert.deepEqual(feed(roster, emptyState(), 'leads').map((x) => x.wallet), [B, A]);
 });
 
 test('feed rows carry their status and do not mutate the roster', () => {
 	const roster = { target: T, wallets: [w(A, 'POSSIBLE')] };
-	assert.equal(feed(roster, emptyState(), 'review')[0].status, 'new');
+	assert.equal(feed(roster, emptyState(), 'leads')[0].status, 'new');
 	assert.equal(roster.wallets[0].status, undefined);
 });
 
-test('tabCounts', () => {
-	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'INFRASTRUCTURE')] };
-	assert.deepEqual(tabCounts(roster, emptyState()), { review: 1, watch: 1, all: 2 });
+test('tabCounts, with the zero-vector wallets counted but not listed', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'INFRASTRUCTURE'), w(D, 'CONFIRMED')
+	] };
+	assert.deepEqual(tabCounts(roster, emptyState()), { likely: 1, leads: 1, hidden: 1 });
 });
 
 test('vectorLabel: every roster vector in plain English, unknown raw', () => {
@@ -239,10 +257,18 @@ test('sessionFeed: order and membership frozen at load, status live', () => {
 	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'POSSIBLE')] };
 	// At load, B was reviewed as POSSIBLE and is now WATCH: changed, so in the tab.
 	const atLoad = { ...emptyState(), reviewed: { [B]: 'POSSIBLE' } };
-	const before = sessionFeed(roster, atLoad, atLoad, 'review').map((r) => r.wallet);
+	const before = sessionFeed(roster, atLoad, atLoad, 'leads').map((r) => r.wallet);
 	// Reviewing A and B during the session must not move or drop them.
 	const now = markReviewed(atLoad, [w(A, 'POSSIBLE'), w(B, 'WATCH')]);
-	const after = sessionFeed(roster, atLoad, now, 'review');
+	const after = sessionFeed(roster, atLoad, now, 'leads');
 	assert.deepEqual(after.map((r) => r.wallet), before);
 	assert.deepEqual(after.map((r) => r.status), before.map((x) => (x === C ? 'new' : 'reviewed')));
+});
+
+test('at one tier, a wallet the owner has not already named ranks first', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'CONFIRMED', { known_self: true, vector_count: 2 }),
+		w(B, 'CONFIRMED', { vector_count: 2 })
+	] };
+	assert.deepEqual(feed(roster, emptyState(), 'likely').map((x) => x.wallet), [B, A]);
 });

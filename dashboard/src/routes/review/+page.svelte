@@ -5,7 +5,7 @@
 	import { onMount } from 'svelte';
 	import { fetchRoster, fetchWatchlist, shortAddr } from '$lib/api.js';
 	import {
-		sessionFeed, progress, dropped, dismissDropped, markReviewed, markStorySeen,
+		sessionFeed, tabCounts, progress, dropped, dismissDropped, markReviewed, markStorySeen,
 		checkIn, localDay, freshness, watchFreshIso, readState, writeState, emptyState,
 		walletKey, vectorLabel, TIER_LABEL
 	} from '$lib/review.js';
@@ -30,7 +30,7 @@
 	// session, so marking a post never moves it out from under your finger.
 	let orderState = emptyState();
 	let storageOk = true;
-	let tab = 'review';
+	let tab = 'likely';
 	/** @type {null | {kind: 'why'|'watch'|'dropped', w?: any}} */
 	let sheet = null;
 
@@ -118,24 +118,21 @@
 		return `${Math.floor(f.minutes / 1440)}d ago`;
 	}
 
+	// The queue is whichever tab is open: reviewing the strong wallets and
+	// reviewing the weak leads are two different jobs with their own finish line.
 	$: rows = roster ? sessionFeed(roster, orderState, state, tab) : [];
-	$: queue = roster ? sessionFeed(roster, orderState, state, 'review') : [];
-	$: prog = progress(queue);
-	$: counts = roster
-		? {
-			review: queue.length,
-			watch: sessionFeed(roster, orderState, state, 'watch').length,
-			all: sessionFeed(roster, orderState, state, 'all').length
-		}
-		: null;
+	$: prog = progress(rows);
+	$: counts = roster ? tabCounts(roster, orderState) : null;
+	// Today the Likely tab holds only his known wallets. Saying so stops two
+	// familiar addresses reading as new finds.
+	$: allKnown = tab === 'likely' && rows.length > 0 && rows.every((r) => r.known_self);
 	$: drops = roster ? dropped(roster, state) : [];
 	$: rosterFresh = freshness(roster?.computed_at, now);
 	$: watchFresh = freshness(watchFreshIso(watch), now);
 	$: streak = storageOk ? state.streak?.count || 0 : 0;
 	$: tabs = [
-		{ value: 'review', label: 'For review', count: counts?.review ?? null },
-		{ value: 'watch', label: 'Watch', count: counts?.watch ?? null },
-		{ value: 'all', label: 'All', count: counts?.all ?? null }
+		{ value: 'likely', label: 'Likely', count: counts?.likely ?? null },
+		{ value: 'leads', label: 'Leads', count: counts?.leads ?? null }
 	];
 	$: sheetTitle = sheet?.kind === 'watch' ? 'Close watch'
 		: sheet?.kind === 'dropped' ? 'Left the list'
@@ -197,9 +194,28 @@
 
 		<Stories {watch} {state} on:open={(e) => openStory(e.detail)} />
 
-		<ReviewProgress p={prog} on:markall={() => mark(queue, `${prog.total - prog.done} marked reviewed`)} />
-
 		<Segmented options={tabs} bind:value={tab} label="Wallet list" />
+
+		<p class="tabnote">
+			{#if tab === 'likely'}
+				Two or more independent vectors agree. That is the strongest evidence
+				this project produces, because the ways the vectors can be fooled do
+				not overlap.
+			{:else}
+				One vector only. A lead, not a candidate: a single signal is the one
+				that has repeatedly turned out to be an exchange, a bot or a
+				coincidence.
+			{/if}
+		</p>
+
+		{#if allKnown}
+			<p class="warn">
+				Every Likely wallet here is one you already know is his. Nothing new has
+				reached two agreeing vectors.
+			</p>
+		{/if}
+
+		<ReviewProgress p={prog} on:markall={() => mark(rows, `${prog.total - prog.done} marked reviewed`)} />
 
 		<div class="stack">
 			{#each rows as w (w.wallet)}
@@ -212,7 +228,20 @@
 				/>
 			{:else}
 				<div class="empty">
-					<p class="sub">No wallets in this tab.</p>
+					{#if tab === 'likely'}
+						<p class="title">No unknown wallet is likely today</p>
+						<p class="sub">
+							Nothing outside the wallets you already know as his reaches two
+							agreeing vectors. That is a real finding, not an empty screen:
+							a tier nobody can defend would put your attention on the wrong
+							wallet.
+						</p>
+						<button class="btn" on:click={() => (tab = 'leads')}>
+							See the {counts?.leads ?? 0} one-vector lead{counts?.leads === 1 ? '' : 's'}
+						</button>
+					{:else}
+						<p class="sub">No leads in this tab.</p>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -224,6 +253,10 @@
 		{/if}
 
 		<p class="foot">
+			{#if counts?.hidden}
+				{counts.hidden} further wallets carry no vector at all and are not shown.
+				<br />
+			{/if}
 			Read-only. Reviews are stored on this device only. Tiers come from how many
 			independent vectors agree, never from one score.
 		</p>
@@ -348,6 +381,12 @@
 		line-height: 1.5;
 	}
 	.muted { color: var(--text-muted); }
+	.tabnote {
+		margin: -6px 0 0;
+		font-size: 0.76rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
 	.warn {
 		margin: 0;
 		font-size: 0.82rem;

@@ -5,6 +5,9 @@
 // Plain ES module with no SvelteKit aliases, so node --test can import it.
 
 export const TIER_RANK = { CONFIRMED: 0, PROBABLE: 1, POSSIBLE: 2, WATCH: 3 };
+/** Two or more independent vectors agree. The only wallets the app calls
+ *  likely; everything else is a lead. */
+export const LIKELY_TIERS = ['CONFIRMED', 'PROBABLE'];
 export const REVIEW_TIERS = ['CONFIRMED', 'PROBABLE', 'POSSIBLE'];
 /** The watch's own outgrew-target band (scripts/check_watchlist.py). */
 export const SIZE_BAND = 1.15;
@@ -75,6 +78,12 @@ function compare(x, y) {
 	const tx = TIER_RANK[x.tier] ?? 9;
 	const ty = TIER_RANK[y.tier] ?? 9;
 	if (tx !== ty) return tx - ty;
+	// At the same tier, a wallet the owner has NOT already named ranks first:
+	// a known wallet of his confirms nothing new, and the whole point is the
+	// wallet nobody has named yet.
+	const kx = x.known_self ? 1 : 0;
+	const ky = y.known_self ? 1 : 0;
+	if (kx !== ky) return kx - ky;
 	const vx = x.vector_count || 0;
 	const vy = y.vector_count || 0;
 	if (vx !== vy) return vy - vx;
@@ -86,17 +95,27 @@ function compare(x, y) {
 	return ax < ay ? -1 : ax > ay ? 1 : 0;
 }
 
-// A wallet demoted out of the review tiers stays in "For review" as changed
-// until it is reviewed: a demotion is news.
+// Two tabs, split on how many INDEPENDENT vectors agree, which is the only
+// measure of strength this project trusts:
+//
+//   likely  CONFIRMED / PROBABLE — two or more vectors agree
+//   leads   POSSIBLE — one vector, which is a lead and not a candidate
+//
+// WATCH (no vector at all: 151 wallets today) is never shown. It was the bulk
+// of the list and none of it is evidence of anything, so on a phone it is noise
+// that buries the few wallets that matter.
+//
+// A wallet demoted out of its tier stays visible as `changed` until it is
+// reviewed, because a demotion is news. It appears in the tab its NEW tier
+// belongs to, and a demotion all the way to WATCH surfaces once under leads.
 const TAB_FILTER = {
-	review: (r) => REVIEW_TIERS.includes(r.tier) || r.status === 'changed',
-	watch: (r) => r.tier === 'WATCH',
-	all: () => true
+	likely: (r) => LIKELY_TIERS.includes(r.tier),
+	leads: (r) => r.tier === 'POSSIBLE' || (r.status === 'changed' && r.tier === 'WATCH')
 };
 
 /** The rows for one tab, each a copy carrying its `status`, in feed order. */
-export function feed(roster, state, tab = 'review') {
-	const pick = TAB_FILTER[tab] || TAB_FILTER.review;
+export function feed(roster, state, tab = 'likely') {
+	const pick = TAB_FILTER[tab] || TAB_FILTER.likely;
 	return eligible(roster)
 		.map((w) => ({ ...w, status: status(w, state) }))
 		.filter(pick)
@@ -107,15 +126,16 @@ export function feed(roster, state, tab = 'review') {
  *  order is frozen at load (`orderState`), while each row's status is live
  *  (`state`). Otherwise marking a post reviewed would re-sort the feed under
  *  their finger, and a reviewed demotion would vanish mid-read. */
-export function sessionFeed(roster, orderState, state, tab = 'review') {
+export function sessionFeed(roster, orderState, state, tab = 'likely') {
 	return feed(roster, orderState, tab).map((r) => ({ ...r, status: status(r, state) }));
 }
 
 export function tabCounts(roster, state) {
 	return {
-		review: feed(roster, state, 'review').length,
-		watch: feed(roster, state, 'watch').length,
-		all: feed(roster, state, 'all').length
+		likely: feed(roster, state, 'likely').length,
+		leads: feed(roster, state, 'leads').length,
+		/** Shown as a footnote, never as a list: no vector supports these. */
+		hidden: eligible(roster).filter((w) => !LIKELY_TIERS.includes(w.tier) && w.tier !== 'POSSIBLE').length
 	};
 }
 
