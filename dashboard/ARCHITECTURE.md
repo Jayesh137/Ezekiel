@@ -1,9 +1,12 @@
 # Ezekiel Review: phone app architecture
 
-> A read-only, installable phone view of the wallets the detectors have
-> identified. Every address opens its Hypurrscan wallet page.
-> Scope: the `/review` route of this dashboard and the PWA shell that installs it.
-> The rest of the dashboard is described in [`../docs/architecture.md`](../docs/architecture.md).
+> A read-only, installable phone app for reviewing the wallets the detectors
+> have identified. It is feed-shaped like a social app and has a small review
+> loop like a gamified one, with a clean design. Every address opens its
+> Hypurrscan wallet page.
+> Scope: the `/review` route of this dashboard, its UI kit, and the PWA shell
+> that installs it. The rest of the dashboard is described in
+> [`../docs/architecture.md`](../docs/architecture.md).
 
 ---
 
@@ -18,41 +21,38 @@ What the app is for, in priority order:
 1. **Every address is one tap from its Hypurrscan wallet page**
    (`https://hypurrscan.io/address/<full address>`).
 2. **It installs on the home screen** and opens full-screen like an app.
-3. **It shows what changed**: new wallets, tier changes and demotions since the
-   owner last looked.
+3. **It makes checking a habit**: a feed of what changed, a review queue you
+   can clear, and a daily streak.
 4. **It never presents stale or missing data as a current answer.**
 
 What it is deliberately **not**:
 
-- **Not a writer.** No buttons feed decisions back to the pipeline, so the
-  phone holds no GitHub token and has no auth surface. Promoting a wallet stays
-  an edit to `config.json`.
+- **Not a writer.** Review marks live only in the phone's browser storage.
+  Nothing feeds decisions back to the pipeline, so the phone holds no GitHub
+  token and has no auth surface. Promoting a wallet stays an edit to
+  `config.json`.
 - **Not a live Hyperliquid client.** Hypurrscan already shows live state one
-  tap away, so a second implementation would duplicate it.
-- **Not an alert channel.** ntfy already does that, and duplicating it would
-  split the operator's attention.
+  tap away.
+- **Not an alert channel.** ntfy already does that.
 
 ---
 
 ## 2. Stack
 
-**Svelte on Vite, via SvelteKit.** This is the stack the dashboard already
-runs, so the app is a route inside it rather than a second project:
+**Svelte on Vite, via SvelteKit**, the stack the dashboard already runs. The
+app is a route inside it, not a second project.
 
 | Piece | Version | Role |
 |---|---|---|
-| Svelte | 5 | Components. Existing pages use legacy syntax (`export let`, `$:`), and the new route matches them. |
+| Svelte | 5 | Components. Existing pages use legacy syntax (`export let`, `$:`), and the new code matches them. |
 | Vite | 6 | Dev server and bundler (`npm run dev` / `npm run build`) |
 | SvelteKit | 2 | Routing, `$app/paths` base handling, built-in service-worker bundling |
 | `@sveltejs/adapter-static` | 3 | Emits a static site with the `index.html` fallback |
-| GitHub Pages | — | Hosting, deployed by `.github/workflows/deploy-dashboard.yml` on push to `dashboard/**` |
-| `node --test` | built in | Unit tests (`npm test`), network-free, like the existing `api.test.js` |
+| `svelte/transition`, `svelte/easing` | built in | All motion. No animation library. |
+| GitHub Pages | — | Hosting, via `.github/workflows/deploy-dashboard.yml` on push to `dashboard/**` |
+| `node --test` | built in | Unit tests (`npm test`), network-free |
 
-**No new dependencies.** A second standalone Vite + Svelte app was considered
-and rejected. It would duplicate `api.js`, the `Addr` component and the deploy
-workflow, and the two copies of the Hypurrscan link logic would drift. That
-logic exists as a single function precisely because inline copies once put a
-shortened label into an href.
+**No new dependencies**, including no Tailwind; see §13 for why.
 
 ---
 
@@ -76,31 +76,26 @@ shortened label into an href.
 
 ### Backend: none, deliberately
 
-The app needs no server of its own, because the "backend" already exists and
-already runs for free:
+The "backend" already exists and already runs for free:
 
-- **Compute**: the Python detectors on GitHub Actions write the roster and the
-  watch.
-- **Storage and API**: those JSON files are committed to `main` and served by
-  `raw.githubusercontent.com` with CORS open, so the phone can `fetch()` them
-  directly.
-- **Hosting**: GitHub Pages serves the static app.
+- **Compute**: the Python detectors on GitHub Actions.
+- **Storage and API**: the committed JSON, served by `raw.githubusercontent.com`
+  with CORS open.
+- **Hosting**: GitHub Pages.
 
-Adding a server (Firebase, Supabase, a VPS, or Cloudflare Workers) would add
-an account, an uptime burden and a second copy of the data, all to return the
-same JSON the repo already serves. Each item below turns a server from
-overhead into a requirement, and each is a separate decision (§12):
+A server would add an account, an uptime burden and a second copy of the data,
+all to return the same JSON. Each item below turns a server from overhead into
+a requirement:
 
 | If you later want… | You need | Right choice here |
 |---|---|---|
-| Buttons that write back ("watch this", "not him") | Something holding a GitHub token off the phone | A Cloudflare Worker (free tier) that calls `workflow_dispatch`. Alternatively, reuse the Google Apps Script relay that already exists. |
-| Native push notifications to the PWA | A push server with VAPID keys | The same Worker. ntfy already covers this, so probably never. |
-| A **private** list | Auth in front of the data | Move the data out of the public repo. That is a whole-project change, not an app change (§11). |
+| Buttons that write back ("watch this", "not him") | Something holding a GitHub token off the phone | A Cloudflare Worker (free tier) that calls `workflow_dispatch`, or the existing Google Apps Script relay |
+| Native push notifications to the PWA | A push server with VAPID keys | The same Worker. ntfy covers this, so probably never. |
+| Review marks shared across devices | A small key-value store | The same Worker plus KV |
+| A **private** list | Auth in front of the data | Move the data out of the public repo. That is a whole-project change (§11). |
 
-The data is **not** baked into the build. The app fetches the JSON when it
-opens, so it is exactly as fresh as the last committed run and needs no
-redeploy when the roster changes. That is the existing dashboard's model,
-reused as-is.
+The data is **not** baked into the build. It is fetched when the app opens, so
+it is always as fresh as the last committed run.
 
 ---
 
@@ -108,93 +103,134 @@ reused as-is.
 
 ```
 dashboard/
-├── ARCHITECTURE.md                    this file
+├── ARCHITECTURE.md
+├── scripts/make_icons.mjs             NEW  draws the PNG icons (node:zlib, no deps)
 ├── static/
-│   ├── manifest.webmanifest           NEW  PWA manifest
-│   ├── icon-180.png                   NEW  apple-touch-icon (iOS home screen)
-│   ├── icon-192.png                   NEW  manifest icon
-│   └── icon-512.png                   NEW  manifest icon / splash
-├── scripts/
-│   └── make_icons.mjs                 NEW  generates the three PNGs (node:zlib, no deps)
+│   ├── manifest.webmanifest           NEW
+│   ├── icon-180.png                   NEW  apple-touch-icon
+│   ├── icon-192.png                   NEW
+│   └── icon-512.png                   NEW
 └── src/
-    ├── app.html                       EDIT manifest link, apple-* meta tags, theme-color
-    ├── service-worker.js              NEW  app-shell cache (SvelteKit auto-registers it)
+    ├── app.html                       EDIT manifest + apple-* meta, viewport-fit=cover
+    ├── app.css                        EDIT motion, radius and elevation tokens; reduced motion
+    ├── service-worker.js              NEW  app-shell cache
     ├── lib/
-    │   ├── api.js                     reuse fetchRoster, fetchWatchlist, addressUrl, formatUSD
-    │   ├── Addr.svelte                reuse: the one component that renders an address
-    │   ├── review.js                  NEW  pure logic: filter, sort, diff, freshness
-    │   └── review.test.js             NEW  node --test for review.js
+    │   ├── api.js                     reuse: fetchRoster, fetchWatchlist, addressUrl, formatUSD, shortAddr
+    │   ├── Addr.svelte                reuse
+    │   ├── review.js                  NEW  pure logic: selection, order, review state, streak, avatars
+    │   ├── review.test.js             NEW
+    │   └── ui/                        NEW  the app's UI kit (§13), usable by any page
+    │       ├── Avatar.svelte               identicon from the address
+    │       ├── Sheet.svelte                bottom sheet on native <dialog>
+    │       ├── Segmented.svelte            segmented control
+    │       ├── ProgressRing.svelte         review progress
+    │       ├── Pips.svelte                 evidence meter (vector count)
+    │       ├── Skeleton.svelte             loading placeholder
+    │       ├── Toast.svelte + toast.js     toast host + store (with Undo)
+    │       └── toast.test.js
     └── routes/
-        ├── +layout.svelte             EDIT drop the desktop sidebar on /review
+        ├── +layout.svelte             EDIT no sidebar / bottom nav on /review
         └── review/
-            ├── +page.svelte           NEW  page: fetch, compose, local "last seen"
-            ├── WatchCard.svelte       NEW  one close-watch wallet
-            └── WalletCard.svelte      NEW  one roster wallet
+            ├── +page.svelte           the composer
+            ├── Stories.svelte         close-watch row
+            ├── WatchDetail.svelte     sheet body for one watched wallet
+            ├── ReviewProgress.svelte  progress ring card + "all caught up"
+            └── WalletPost.svelte      one roster wallet as a feed post
 ```
 
-**The boundary that matters:** `review.js` holds **all** the decisions (what is
-shown, in what order, what counts as new, what counts as stale) as pure
-functions over plain objects. The `.svelte` files only render and handle taps.
-That keeps every rule testable without a browser, the same split `api.js`
-already follows.
+**The boundary that matters:** `review.js` holds **all** the decisions (what
+is shown, in what order, what counts as new, what the streak is) as pure
+functions over plain objects and an injected clock. Components only render
+and handle taps, so every rule is testable without a browser.
 
 ---
 
-## 5. Components
+## 5. Experience
 
-### 5.1 `review/+page.svelte`, the composer
+### 5.1 Principles
 
-- On mount it calls `fetchRoster()` and `fetchWatchlist()` in parallel.
-- It reads the previous snapshot from `localStorage` (see §6.3), computes the
-  diff with `review.js`, renders, and **then** writes the new snapshot. It
-  writes only after a successful roster read: a failed fetch must never
-  overwrite "last seen" with an empty list, or the next open would announce
-  every wallet as new.
-- Layout, top to bottom:
-  1. **Freshness bar**: "Roster updated 3h ago · Watch updated 12m ago".
-  2. **Close watch**: `WatchCard` × ≤6.
-  3. **Tier chips**: Confirmed · Probable · Possible (default on), Watch (off),
-     with counts.
-  4. **Wallet list**: `WalletCard` × n.
-- Pull-to-refresh is not built. A **Refresh** button in the freshness bar
-  re-runs the fetch, which is enough for a standalone PWA where the browser's
-  reload gesture is absent.
+Borrowed from social apps:
+- **A feed** of wallets as posts, with an unread dot on anything new or changed.
+- **Stories** for the close watch: a ring lights up when something about the
+  wallet changed since you last tapped it.
+- **Avatars**: each address gets a deterministic gradient identicon, so you
+  recognise "the purple one" before reading hex.
+- **Bottom sheets** for detail, so you never lose your place in the feed.
 
-### 5.2 `WalletCard.svelte`
+Borrowed from gamified apps:
+- **A clearable queue**: a progress ring shows how many of the wallets needing
+  review you've reviewed, finishing on "You're all caught up".
+- **A streak**: consecutive days you've checked in.
+- **Instant feedback**: a toast with Undo on every mark.
 
-One roster row as a card, laid out for a ~390px wide screen:
+The one rule gamification must not break: **the game measures YOUR review,
+never the wallet's likelihood.** There are no points, XP or loot-rarity tiers
+on evidence. Making a wallet feel more or less likely because of how it is
+dressed up is the same failure as fitting a tier to the story. Tiers keep
+their sober colours, and the evidence meter shows a count of independent
+vectors, not a score.
 
-- **Full address** in monospace, wrapped, rendered through `<Addr full>`, so
-  the href is always the full address and a malformed one renders as plain
-  text rather than a dead link. The whole address line is the tap target, at
-  least 44px high (Apple's minimum).
-- **Copy** button (`navigator.clipboard.writeText`) beside it.
-- **Tier badge**, plus "was PROBABLE" when `tier_dropped_from` is set, and a
-  **NEW** or **CHANGED** badge from the diff.
-- **Vectors in plain English**, using the same labels as `routes/roster`. The
-  map moves into `review.js` so both pages share one copy.
-- **Figures**: HL account value, received from and sent to the target, chains,
-  HL birth date. Any absent figure renders **"—", never "$0"** (rule 6).
-- **Reasons**: collapsed. Tapping expands the `reasons[]` list.
+Clean means:
+- One accent colour per tier, and nothing else coloured.
+- Generous spacing.
+- System font for text, mono only for addresses and figures, with
+  `tabular-nums` on figures.
+- Motion only where it explains something (§5.4).
 
-### 5.3 `WatchCard.svelte`
+### 5.2 Screen
 
-One `data/watchlist` wallet:
+```
+┌──────────────────────────────────────┐
+│ Ezekiel               🔥 4    ⟳       │  sticky, blurred header
+│ Roster 3h ago · Watch 12m ago        │  freshness (amber >160m, red >360m)
+├──────────────────────────────────────┤
+│ (◉) (◉) (○)                          │  Stories: close watch
+│ 0xdd53… 0xf078… 0x5b5d…              │
+├──────────────────────────────────────┤
+│  ◔ 12 / 38 reviewed                   │  ReviewProgress
+│    3 new · 1 changed    Mark all ✓   │
+├──────────────────────────────────────┤
+│ [ For review 38 | Watch 149 | All ]  │  Segmented
+├──────────────────────────────────────┤
+│ ● (av) 0xf078…f19e     CONFIRMED  NEW │  WalletPost
+│   ●●○  2 vectors agree               │
+│   Shared funder/deposit · Transfer   │
+│   $54  ·  ⇄ $161M / $141M  ·  4 chains│
+│   0xf078969e55cabf9ae3f26afeb5ec62…  │  ← tap: Hypurrscan
+│   [↗ Hypurrscan] [⧉ Copy] [✓ Reviewed]│
+│   Why? ›                              │
+├──────────────────────────────────────┤
+│ 2 wallets left the list  ›            │  dropped notice
+└──────────────────────────────────────┘
+```
 
-- Address (as above), account value, **size vs the target** as `0.69x`, turning
-  red at or above `1.15x`, the watch's own `outgrew_target` band.
-- Agent and sub-account counts, each address linked through `Addr`.
-- Last fill, as "3h ago".
-- The `why` note, collapsed.
-- `read_ok: false` renders **"could not read"** with the errors, never a card of
-  dashes that looks like an empty wallet (rule 5).
+### 5.3 Interactions
 
-### 5.4 `+layout.svelte` (edit)
+| Action | Result |
+|---|---|
+| Tap the address or **↗ Hypurrscan** | Opens Hypurrscan **and marks the wallet reviewed**. Looking at it IS the review. |
+| **✓ Reviewed** | Marks reviewed. Toast "Marked reviewed · Undo". |
+| **⧉ Copy** | Copies the full address. Toast "Copied". |
+| **Why? ›** | Opens a bottom sheet with every reason and the full evidence figures |
+| Tap a story | Opens a sheet with `WatchDetail` and marks the story seen |
+| **Mark all ✓** | Marks every visible post reviewed. Toast with Undo. |
+| **⟳** | Refetches both files. The streak is counted once per day, on a successful load. |
+| Segmented | Switches instantly, with no animation (§5.4) |
 
-On `/review` the desktop sidebar and header are hidden and the page is
-full-bleed with safe-area padding (`env(safe-area-inset-*)`), because
-`viewport-fit=cover` lets content run under the notch. The rest of the
-dashboard is unchanged.
+### 5.4 Motion (Emil Kowalski's rules, applied)
+
+- **Frequent actions get no animation**: tab switches, marking reviewed,
+  expanding "Why?". They happen dozens of times a session, and animation
+  there reads as lag.
+- **Everything else stays under 300ms**, `ease-out`
+  (`cubic-bezier(0.23, 1, 0.32, 1)`):
+  - Sheet: 240ms slide up. It closes instantly, which is native `<dialog>` behaviour, and exits should be faster than entrances anyway.
+  - Toast: 180ms.
+  - Pressed buttons: `scale(0.97)` at 100ms, which is feedback rather than
+    decoration.
+- **Delight only where it is rare**: the "all caught up" check draws once
+  (400ms), when the queue empties.
+- `prefers-reduced-motion: reduce` sets every duration to 0.
 
 ---
 
@@ -205,70 +241,104 @@ Every function is pure and covered by `review.test.js`.
 ### 6.1 Selection and order
 
 ```
-visibleWallets(roster, { tiers }) →
+eligible(roster)
     roster.wallets
-      minus  tier == INFRASTRUCTURE      (never shown)
-      minus  is_service                  (never shown)
-      minus  wallet == roster.target     (he is followed already)
-      keep   tier ∈ tiers                (default CONFIRMED, PROBABLE, POSSIBLE)
+      minus tier == INFRASTRUCTURE, minus is_service, minus wallet == roster.target
+
+feed(roster, state, tab)
+    'review' → eligible ∩ (tier ∈ {CONFIRMED, PROBABLE, POSSIBLE}  OR  status == 'changed')
+    'watch'  → eligible ∩ tier == WATCH
+    'all'    → eligible
     sorted by
-      1. tier rank        CONFIRMED > PROBABLE > POSSIBLE > WATCH
-      2. flag             NEW / CHANGED first within a tier
-      3. vector_count     desc
-      4. rank_strength    desc, with absent treated as lowest (not 0.0)
-      5. wallet           asc, only as a deterministic last resort
+      1. unread first         (status new | changed)
+      2. tier rank            CONFIRMED > PROBABLE > POSSIBLE > WATCH
+      3. vector_count         desc
+      4. rank_strength        desc; absent sorts last, never as 0.0
+      5. wallet               asc, deterministic last resort
 ```
 
-`rank_strength` is only used to **order** the list. It is never displayed as
-a confidence, because it is the maximum of scores on different scales.
-`roster.py` says the same.
+A POSSIBLE wallet demoted to WATCH stays in "For review" as **changed** until
+you review it, because a demotion is news. `rank_strength` only orders the
+list and is never displayed; it is a maximum over different scales.
 
-### 6.2 Freshness
+### 6.2 Review state
 
-```
-freshness(computed_at, now) → { minutes, level }
-    level = 'ok'    ≤ 160 min
-          = 'warn'  ≤ 360 min
-          = 'stale' > 360 min    (the thresholds +layout.svelte already uses)
-          = 'unknown' when computed_at is absent or unparseable
-```
-
-`unknown` renders as a warning, never as fresh.
-
-### 6.3 "New since you last looked"
-
-Stored under the `localStorage` key `ezekiel.review.lastSeen.v1`:
+A single `localStorage` key, `ezekiel.review.v1`:
 
 ```json
-{ "seen_at": "2026-09-22T08:00:00Z",
-  "roster_computed_at": "...",
-  "wallets": { "0xabc…": "POSSIBLE", "0xdef…": "CONFIRMED" } }
+{ "reviewed": { "0xabc…": "POSSIBLE" },
+  "stories":  { "0xdd5…": "1|0|0|1" },
+  "streak":   { "day": "2026-09-22", "count": 4 } }
 ```
 
 ```
-diff(previous, roster) → Map<wallet, 'new' | 'changed'>
-    previous absent         → empty map. The first open is a baseline, not
-                              "everything is new". This is the
-                              extraAgents seeding rule.
-    wallet not in previous  → 'new'
-    tier differs            → 'changed'   (the card shows old → new)
-    wallet in previous, gone from roster → listed once in a
-                              "Dropped off the list" line, since a
-                              disappearance is news too
+status(wallet, state)
+    not in reviewed           → 'new'
+    reviewed tier ≠ current   → 'changed'  (the post shows "was X")
+    else                      → 'reviewed'
+
+markReviewed(state, rows) → new state (immutable; Undo restores the old one)
+
+dropped(roster, state)
+    wallets in `reviewed` that are no longer eligible (gone, or became
+    infrastructure). They are listed once in "N wallets left the list", and
+    dismissing one removes it from `reviewed`.
+
+progress(rows, state) → { done, total, fresh, changed }
+    computed over the 'review' tab
 ```
 
-Only visible tiers are stored, so a WATCH wallet rising to POSSIBLE reads as
-new to the list. Every `localStorage` access is wrapped in `try/catch`. If
-storage is unavailable, as in iOS private mode, the page renders without
-badges and says "can't remember last visit". It never crashes and never
-fabricates a baseline.
+The first open has an empty `reviewed` map, so everything shows as new. That
+is deliberate: it is a genuine backlog to work through, and **Mark all ✓**
+clears it in one tap.
 
-### 6.4 Formatting
+Every storage access is wrapped in `try/catch`. If storage is unavailable, as
+in iOS private mode, a one-line notice says "can't remember your reviews on
+this device" and the feed still renders with no dots. The state is written
+**only after a successful roster load**, so a failed fetch can never erase
+it.
 
-`formatUSD` and `formatTime` are reused from `api.js`. `review.js` adds
-`ago(ms, now)` ("3h ago", "2d ago") and `ratio(x)` ("0.69x"). Every formatter
-returns `'—'` for `null` or `undefined`, and nothing coerces a missing value to
-0.
+### 6.3 Streak
+
+```
+checkIn(streak, today)
+    same day            → unchanged
+    day after last      → count + 1
+    any other           → count = 1
+```
+
+`today` is the local calendar date (`YYYY-MM-DD`), injected for tests. The
+streak only moves on a successful load: opening the app offline does not
+count, because you did not see anything.
+
+### 6.4 Stories
+
+```
+storyKey(w) = `${agents.length}|${subaccounts.length}|${size_ratio ≥ 1.15 ? 1 : 0}|${read_ok ? 1 : 0}`
+storyRing(w, state)
+    read_ok false or size_ratio ≥ 1.15  → 'alert'  (red)
+    storyKey ≠ stories[address]         → 'unseen' (accent gradient)
+    else                                → 'seen'   (grey)
+```
+
+`last_fill_ms` is deliberately **not** in the key. It changes on nearly every
+run, so a ring keyed on it would always be lit, and an always-lit ring means
+nothing.
+
+### 6.5 Avatars
+
+`avatar(address) → { a, b, angle }`: two HSL hues and a gradient angle
+derived from an FNV-1a hash of the lowercased address. The output is
+deterministic and pure.
+
+### 6.6 Freshness and formatting
+
+- `freshness(iso, nowMs)` returns `{ minutes, level }` where `level` is one of
+  `ok ≤160`, `warn ≤360`, `stale`, or `unknown`, the thresholds
+  `+layout.svelte` already uses. `unknown` renders as a warning.
+- `ago(ms, nowMs)` gives "3h ago", and `ratio(x)` gives "0.69x".
+- Every formatter returns `'—'` for null. `formatUSD` from `api.js` is
+  reused, and nothing coerces a missing value to 0.
 
 ---
 
@@ -276,13 +346,12 @@ returns `'—'` for `null` or `undefined`, and nothing coerces a missing value t
 
 ### 7.1 Why a PWA
 
-iOS offers two ways to put an app on a phone. The App Store costs $99 a year,
-requires review, and is pointless for a private tool. **Add to Home Screen**
-(Safari → Share → Add to Home Screen) is free and immediate, and with the tags
-below it launches full-screen with its own icon, no browser chrome, and its
-own entry in the app switcher.
+The App Store costs $99 a year plus review, which is pointless for a private
+tool. **Safari → Share → Add to Home Screen** is free and immediate, and with
+the tags below the app launches full-screen with its own icon and its own
+place in the app switcher.
 
-### 7.2 Manifest (`static/manifest.webmanifest`)
+### 7.2 Manifest
 
 ```json
 {
@@ -291,8 +360,8 @@ own entry in the app switcher.
   "start_url": "/Ezekiel/review",
   "scope": "/Ezekiel/",
   "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
   "icons": [
     { "src": "/Ezekiel/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/Ezekiel/icon-512.png", "sizes": "512x512", "type": "image/png" }
@@ -300,11 +369,9 @@ own entry in the app switcher.
 }
 ```
 
-The paths carry the `/Ezekiel` base because Pages serves the site under it
-(`svelte.config.js` → `paths.base`). `start_url` opens straight on `/review`,
-not the desktop dashboard.
+Paths carry the `/Ezekiel` base (`svelte.config.js` → `paths.base`).
 
-### 7.3 `app.html` additions
+### 7.3 `app.html`
 
 ```html
 <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
@@ -312,75 +379,53 @@ not the desktop dashboard.
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Ezekiel" />
-<meta name="theme-color" content="#0d1117" />
+<meta name="theme-color" content="#0a0a0f" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 ```
 
-iOS ignores manifest icons for the home screen and reads only
-`apple-touch-icon`, which is why that tag is required.
+iOS reads only `apple-touch-icon` for the home screen.
 
 ### 7.4 Icons
 
-`scripts/make_icons.mjs` draws the three PNGs (a solid dark tile with a light
-"E") using a minimal PNG encoder on `node:zlib`, so no image library is
-added. The PNGs are committed, and the script is run by hand, not in CI.
+`scripts/make_icons.mjs` draws a dark rounded tile with a gradient ring and an
+"E" using a minimal PNG encoder on `node:zlib`. The PNGs are committed, and
+the script is run by hand.
 
-### 7.5 Service worker (`src/service-worker.js`)
+### 7.5 Service worker
 
-SvelteKit bundles and registers it automatically. It follows one rule:
-
-- **The app shell is cache-first**: the `build` and `files` lists from
-  `$service-worker`, keyed on `version`, with the old cache deleted on
-  `activate`. The app opens instantly, even with a poor signal.
-- **Data is never cached by the worker.** Requests to
-  `raw.githubusercontent.com` pass straight to the network. Serving a cached
-  roster offline would present a stale list as the current one, which is the
-  exact failure the freshness bar exists to prevent. Offline, the page says
-  "offline, can't reach the data" instead.
-
-The worker's scope is `/Ezekiel/`, so it also speeds up the desktop pages. It
-never affects their data for the same reason.
+- **App shell is cache-first**, keyed on `$service-worker`'s `version`, with
+  old caches deleted on `activate`.
+- **Data is never cached.** Requests to `raw.githubusercontent.com` go
+  straight to the network. A cached roster shown offline would present a
+  stale list as current. Offline, the page says so.
 
 ### 7.6 Links out
 
-Hypurrscan links use `target="_blank" rel="noopener noreferrer"`, as `Addr`
-already does. In a standalone iOS PWA this opens Safari's in-app browser over
-the app, and **Done** returns to the list at the same scroll position.
+`target="_blank" rel="noopener noreferrer"`. In a standalone iOS PWA this
+opens Safari's in-app browser over the app, and **Done** returns to the same
+scroll position.
 
 ---
 
 ## 8. Data contract
 
-The app reads these fields. Anything else in the files is ignored, so the
-Python side can add fields freely. Renaming or removing one of these is a
-breaking change for the phone.
+The app reads only these fields. Renaming or removing one breaks the phone.
 
-**`data/roster/latest.json`**
+**`data/roster/latest.json`**: `computed_at`, `target`, and for each of
+`wallets[]`: `.wallet`, `.tier`, `.tier_dropped_from`, `.vectors[]`,
+`.vector_count`, `.rank_strength`, `.is_service`, `.known_self`, `.reasons[]`,
+and the `.evidence` fields `hl_account_value`, `totals.received_from_target_usd`,
+`totals.sent_to_target_usd`, `chains[]` and `hl_birth_ms`.
 
-| Field | Use |
-|---|---|
-| `computed_at` | freshness |
-| `target` | excluded from the list |
-| `wallets[].wallet` | address → Hypurrscan |
-| `wallets[].tier`, `tier_dropped_from` | badge, "was X" |
-| `wallets[].vectors[]`, `vector_count` | plain-English chips, sort |
-| `wallets[].rank_strength` | sort only |
-| `wallets[].is_service`, `known_self` | exclusion, "his (config)" label |
-| `wallets[].reasons[]` | expandable detail |
-| `wallets[].evidence.hl_account_value` | figure |
-| `wallets[].evidence.totals.received_from_target_usd`, `sent_to_target_usd` | figures |
-| `wallets[].evidence.chains[]`, `hl_birth_ms` | figures |
+**`data/watchlist/latest.json`**: `computed_at` (with each wallet's
+`checked_at` as fallback), and for each of `wallets[]`: `.address`,
+`.read_ok`, `.errors[]`, `.account_value`, `.target_value`, `.size_ratio`,
+`.agents[]`, `.subaccounts[]`, `.last_fill_ms`, `.why` and `.source`.
 
-**`data/watchlist/latest.json`**
-
-| Field | Use |
-|---|---|
-| `computed_at` | freshness |
-| `wallets[].address`, `read_ok`, `errors[]` | card, rule-5 state |
-| `wallets[].account_value`, `target_value`, `size_ratio` | size vs target |
-| `wallets[].agents[]`, `subaccounts[]` | counts and links |
-| `wallets[].last_fill_ms` | "last traded" |
-| `wallets[].why`, `source` | note, "roster" or "config" origin |
+**Vector labels** cover every name `src/roster.py` defines: `transfer`,
+`linkage`, `correlation`, `behavioural`, `hl_native`, `shared_agent`,
+`explicit_link`, `dormancy_handoff` and `referral`. An unknown name renders
+raw rather than disappearing.
 
 ---
 
@@ -388,58 +433,94 @@ breaking change for the phone.
 
 | Situation | Shows |
 |---|---|
-| Roster fetch fails | "Couldn't load the roster", plus Retry. Last-seen is untouched. |
-| Watchlist fetch fails | Roster still renders, and the watch section says it could not load. The two are independent. |
-| `computed_at` over 6h old | Amber or red freshness bar. The list still renders, clearly dated. |
-| A watched wallet `read_ok: false` | "Could not read" with errors, never an empty-looking card |
+| Roster fetch fails | "Couldn't load the roster", plus Retry. State is untouched. |
+| Watchlist fetch fails | The feed still renders, and the stories row says it could not load |
+| Data over 6h old | Red freshness line. The feed still renders, clearly dated. |
+| Watched wallet `read_ok: false` | Red story ring, and the sheet says "could not read" with the errors |
 | Figure absent | `—` |
-| Malformed address | Plain text, no link (`addressUrl` returns null) |
-| `localStorage` unavailable | No NEW/CHANGED badges, plus a one-line notice |
-| Offline | Shell loads from cache, and the data section says offline |
+| Malformed address | Plain text, no link |
+| Storage unavailable | No unread dots and no streak, plus a one-line notice |
+| Offline | Shell loads from cache, and the feed area says offline |
 
 ---
 
 ## 10. Testing
 
-- **`src/lib/review.test.js`** (`node --test`, network-free):
-  - Selection excludes infrastructure, services and the target.
-  - Order puts tier first, flagged wallets next, and absent `rank_strength`
-    last rather than equal to 0.
-  - Diff treats the first open as a baseline and detects new, changed and
-    dropped wallets.
-  - Freshness thresholds hold, and an absent timestamp reads as `unknown`.
-  - Formatters return `—` for null and undefined, and `0` stays `$0`.
-- **`api.test.js`**: existing `addressUrl` coverage already pins the
-  Hypurrscan URL and refuses a shortened label.
-- **Build check**: `npm run build`, then assert that `build/manifest.webmanifest`,
-  the three icons and `build/service-worker.js` exist, and that `start_url`
-  carries the `/Ezekiel` base.
-- **Rendered check**: headless Chrome at 390×844 against `vite dev` and the live
-  `main` data, the method recorded in memory as working here. Screenshot the
-  list, confirm an address href is the full Hypurrscan URL, and confirm no
+- **`review.test.js`**: selection exclusions, order, the tab rule for demoted
+  wallets, status, dropped, progress, streak (same day, next day, gap, month
+  boundary), story ring, avatar determinism, freshness thresholds, and
+  formatters returning `—` for null.
+- **`toast.test.js`**: queue, dismiss, Undo callback.
+- **`api.test.js`** (existing) already pins `addressUrl`.
+- **Build check**: after `npm run build`, the manifest, icons and
+  `service-worker.js` are in `build/`, and `start_url` carries `/Ezekiel`.
+- **Rendered check**: headless Chrome at 390×844 against `vite dev` and live
+  data. Screenshot it, confirm a full Hypurrscan href, and confirm there is no
   horizontal scroll.
-- **On the phone**: after deploy, Add to Home Screen, then confirm it launches
-  standalone on `/review` and that a tapped address opens Hypurrscan.
+- **On the phone**: Add to Home Screen, confirm it launches standalone on
+  `/review`, and confirm an address opens Hypurrscan.
 
 ---
 
 ## 11. Privacy
 
 The Pages site and the repo are **public**. Anyone with the URL can read this
-list, which is equally true of the existing Roster page and of the raw JSON
-itself. The app adds no new exposure, but it does not hide anything either. If
-that ever needs to change, the whole data model (public raw JSON) has to move,
-not just this page.
+list, just as they can the existing Roster page and the raw JSON. Review marks
+never leave the phone.
 
 ---
 
 ## 12. Later, if wanted
 
-Not built now, and each is a separate decision:
+- **Write-back** ("watch this" / "not him") via a Worker and `workflow_dispatch`.
+- **Swipe to mark reviewed** (beUI's Swipeable List pattern). The button comes
+  first, and a gesture can follow if the button proves slow.
+- **Live Hyperliquid snapshot** on a card.
+- **Web Push**, which needs a push server.
 
-- **Write-back**: "watch this" or "not him", via a fine-grained GitHub token
-  and `workflow_dispatch`.
-- **Live HL snapshot** on a card, from the public `info` endpoint, if
-  Hypurrscan proves too slow to glance at.
-- **Web Push**: iOS 16.4+ supports push for installed PWAs, which could
-  replace ntfy, but it needs a push server this project does not have.
+---
+
+## 13. UI kit: where each piece comes from
+
+The owner pointed at ten sources. Measured on 2026-09-22:
+
+| Source | What it is | Tech | Usable here? |
+|---|---|---|---|
+| ui.shadcn.com | 70+ primitives | React + Tailwind (shadcn CLI) | Patterns only. Its Svelte port is shadcn-svelte, see below. |
+| beui.dev | 124 motion components (Bottom Sheet, Dock, Swipeable List, Notification Stack, Number Animation…) | React 19, Tailwind 4, Framer Motion | Patterns only |
+| rareui.com | 20+ novelty components (Fluid Orb, Folder, Duration Picker…) | React, Motion, shadcn CLI | Not needed |
+| reui.io | 1,149 shadcn compositions (Data Grid, Timeline, Kanban…) | React, shadcn | Patterns only |
+| coss.com/ui | 55 components on Base UI (incl. **Segmented Control**, **Meter**) | React | Patterns only |
+| transitions.dev | 43 transitions (Success check, Skeleton reveal, Toast, Sheet, Notification badge…) | CSS / React | CSS ports |
+| beautifului.dev | 21 AI-agent patterns (Chat Composer, Thinking, Approval Card…) | copy-paste | Not applicable: no chat here |
+| ui-skills.com | Agent skills plus a playbook | — | **Adopted as rules**: 44px touch targets, `tabular-nums`, matched nested radius, scale-on-press, aspect ratios against layout shift |
+| designsystemchecklist.com | A checklist (Foundations, Design language, 29 core components with required states) | — | **Adopted as the acceptance bar** for each kit component |
+| emilkowal.ski/ui/you-dont-need-animations | Animation rules | — | **Adopted**: §5.4 |
+
+**Decision: hand-port the eight patterns this app needs into
+`src/lib/ui/`, in Svelte, with no dependencies.** The alternatives were:
+
+- **Adopt shadcn-svelte plus Tailwind v4 plus bits-ui.** This is the only real
+  Svelte route into the shadcn ecosystem, and it is rejected for this app.
+  Tailwind's preflight resets base styles globally, so it would restyle all
+  eight existing dashboard pages, which are built on plain CSS variables.
+  It would also pull in three dependencies for eight small components. If the
+  whole dashboard is ever redesigned, this becomes the right call, and the kit
+  below keeps shadcn's component names so a swap is mechanical.
+- **Wrap React components.** Rejected outright: it means two frameworks in one
+  bundle on a phone.
+
+| Kit component | Pattern taken from | Checklist states it must meet |
+|---|---|---|
+| `Avatar` | shadcn/coss Avatar, with a generated identicon in place of an image | sizes, shape, accessible label (the address) |
+| `Sheet` | beUI Bottom Sheet / shadcn Sheet, using native `<dialog>` for free focus trap and Esc | close action, focus trapping, keyboard, title labelling, reduced motion |
+| `Segmented` | coss Segmented Control | selected state, keyboard (arrow keys), 44px targets, `role="tablist"` |
+| `ProgressRing` | coss Meter / Progress | label, `role="progressbar"` with values |
+| `Pips` | coss Meter | accessible label ("2 of 3 vectors") |
+| `Skeleton` | shadcn Skeleton plus transitions.dev skeleton reveal | shapes, reduced motion |
+| `Toast` | shadcn Sonner / transitions.dev toast | timeout (4s), stacking (max 3), supplementary action (Undo), reduced motion, `role="status"` |
+| Success check | transitions.dev Success check | reduced motion |
+
+Tokens are added to `app.css`, not a new file, so every page shares them:
+`--radius-sm/md/lg`, `--dur-fast` (100ms), `--dur` (180ms), `--dur-slow`
+(240ms), `--ease-out` and `--shadow-sheet`.
