@@ -2,6 +2,9 @@
 	import { onMount } from 'svelte';
 	import { fetchRoster, formatUSD, formatTime } from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
+	// One label table for every page: each vector is a different way of being
+	// right, so the label says what was observed rather than repeating a score.
+	import { VECTOR_LABEL } from '$lib/review.js';
 
 	let roster = null;
 	let loading = true;
@@ -35,15 +38,6 @@
 		INFRASTRUCTURE: 'badge-grey'
 	};
 
-	// Each vector is a different way of being right, so the label says what was
-	// actually observed rather than repeating a score.
-	const VECTOR_LABEL = {
-		transfer: 'Observed transfer',
-		linkage: 'Shared funder / deposit address',
-		correlation: 'Exit amount re-appeared as a deposit',
-		behavioural: 'Trades like the target',
-		hl_native: 'Two-way flow inside Hyperliquid'
-	};
 
 	function toggle(wallet) {
 		expanded = expanded === wallet ? null : wallet;
