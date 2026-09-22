@@ -335,6 +335,17 @@ jobs:
       - name: Score portfolio overlap
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_portfolio_overlap.py
+      # Measures roster CANDIDATES whole-chain, so `services_from_activity` can
+      # disqualify an exchange or a contract on the NEXT build. The graph's own
+      # measurement budget goes to the highest-VALUE unmeasured addresses,
+      # which is a different set: measured 2026-09-22, 18 of the 35 wallets the
+      # phone app was showing had never been measured on any chain, and of
+      # those that had, five were exchange-scale and three were contracts.
+      # Blockscout is keyless, so this costs no API quota.
+      - name: Measure candidate activity
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 4          # internal budget is 90s
+        run: python scripts/measure_candidates.py
       - name: Build wallet roster
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/roster.py

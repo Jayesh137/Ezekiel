@@ -279,6 +279,66 @@ def pinned_wallets(config: dict | None) -> list[str]:
     return out
 
 
+def services_from_activity(table: dict | None, ground_truth: set | None = None,
+                           hl_accounts: set | None = None) -> dict:
+    """Addresses the WHOLE CHAIN says cannot be a wallet he trades from.
+
+    Two verdicts, both from `data/labels/address_activity.json`:
+
+      * **busy** — an exchange, bridge or router. Fan degree inside our own
+        substrate cannot see this: an exchange the cluster used twice never
+        trips it, which is rule 9 and cost this project a false PROBABLE on a
+        funder with 2,282,986 transactions.
+      * **a contract** — code at the address. Volume says nothing here: a
+        GnosisSafeProxy with 35 transactions and a BoringSolver with 284 both
+        reached POSSIBLE on the live roster (2026-09-22), and the operator was
+        being asked on his phone whether a Merkle distributor might be him.
+
+    `ground_truth` (the target and `known_self_wallets`) is immune, because a
+    wallet the operator named outranks a measurement — the rule
+    `spam.ground_truth_addresses` already follows.
+
+    `hl_accounts` — addresses Hyperliquid knows as trading users — are exempt
+    from the CONTRACT verdict and never from the busy one. An address can be an
+    EOA on one chain and a contract on another: `0xb798aef7…` is an EOA on
+    Arbitrum, a contract on Ethereum, and holds $9.7M with 2,000 fills on
+    Hyperliquid. Code somewhere else does not unmake a trading account, and
+    burying one would remove exactly what the mission is for.
+
+    Unmeasured stays absent: not evidence of a service, and not evidence of a
+    person either. Pure, so the whole guard is testable without a network.
+    """
+    from src.chain.activity import is_busy
+
+    ground = {(a or "").lower() for a in (ground_truth or set())}
+    trading = {(a or "").lower() for a in (hl_accounts or set())}
+    out: dict[str, str] = {}
+    for key, reading in (table or {}).items():
+        if not isinstance(reading, dict) or ":" not in str(key):
+            continue
+        address = str(key).split(":", 1)[1].strip().lower()
+        if not address or address in ground:
+            continue
+        if is_busy(reading):
+            out[address] = (f"global activity: {int(reading.get('txs') or 0):,} txs, "
+                            f"{int(reading.get('token_transfers') or 0):,} token transfers")
+        elif (reading.get("is_contract") and address not in out
+              and address not in trading):
+            name = reading.get("name") or "unnamed"
+            out[address] = f"contract: {name}"
+    return out
+
+
+def activity_table() -> dict:
+    """The stored whole-chain readings. Missing file is an empty table."""
+    try:
+        with open(DATA_DIR / "labels" / "address_activity.json") as f:
+            doc = json.load(f)
+        return doc if isinstance(doc, dict) else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def detector_candidates(config: dict | None, roster: dict | None,
                         limit: int) -> list[str]:
     """The wallets a per-wallet detector should ask about this run.
@@ -311,8 +371,24 @@ def detector_candidates(config: dict | None, roster: dict | None,
     if target:
         seen.add(target)
     rows = (roster or {}).get("wallets")
+    rows = rows if isinstance(rows, list) else []
+    # Wallets Hyperliquid knows go first. The deliverable is an address that
+    # trades THERE, so a bounded budget spent on an address HL has never heard
+    # of cannot produce one. Measured 2026-09-22: the agent index covered 120
+    # wallets and missed 6 of the 13 leads holding HL accounts, while carrying
+    # addresses with none — and a shared agent CONFIRMs a wallet alone.
+    #
+    # Deferred, never dropped: opening an HL account is itself the move this
+    # project watches for, and an UNREADABLE role stays with the accounts
+    # (rule 5 — a failed read must not silently demote a wallet).
+    def _off_hyperliquid(row) -> int:
+        if not isinstance(row, dict):
+            return 1
+        return 1 if ((row.get("evidence") or {}).get("hl_role") == "missing") else 0
+
+    rows = sorted(rows, key=_off_hyperliquid)
     room = max(0, int(limit) - len(picked))
-    for row in rows if isinstance(rows, list) else []:
+    for row in rows:
         if room <= 0:
             break
         if not isinstance(row, dict):
@@ -814,6 +890,22 @@ def build_roster(config: dict | None = None) -> dict:
     if isinstance(surface, dict):
         subaccounts = read_hl_surface(surface, entry, wallets, target)
         apply_operator_groups(wallets, subaccounts, entry, target)
+
+    # A measured exchange, bridge, router or contract is not a wallet he trades
+    # from, whatever flow reached it. Applied here rather than in the graph so
+    # traversal keeps its reach (rule 7): this decides who is a CANDIDATE.
+    # Hyperliquid's own answer outranks a contract flag read off another chain.
+    hl_accounts = {a for a, e in wallets.items()
+                   if (e["evidence"].get("hl_role") or "missing") != "missing"}
+    measured_services = services_from_activity(activity_table(),
+                                               ground_truth={target} | known_self,
+                                               hl_accounts=hl_accounts)
+    for address, reason in measured_services.items():
+        e = wallets.get(address)
+        if e is None or e["known_self"]:
+            continue
+        e["is_service"] = True
+        e["evidence"]["service_reason"] = e["evidence"].get("service_reason") or reason
 
     rows = []
     for e in wallets.values():

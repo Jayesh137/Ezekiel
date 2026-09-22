@@ -254,7 +254,13 @@
 
 		<p class="foot">
 			{#if counts?.hidden}
-				{counts.hidden} further wallets carry no vector at all and are not shown.
+				{counts.hidden} further wallets carry no vector at all.
+			{/if}
+			{#if counts?.offHl}
+				{counts.offHl} are not on Hyperliquid, so you could not follow them there.
+			{/if}
+			{#if counts?.hidden || counts?.offHl}
+				Both are watched by the pipeline and not listed here.
 				<br />
 			{/if}
 			Read-only. Reviews are stored on this device only. Tiers come from how many

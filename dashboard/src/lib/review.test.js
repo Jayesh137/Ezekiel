@@ -12,6 +12,7 @@ import {
 	freshness, ago, ratio, bornLabel,
 	markReviewed, dropped, dismissDropped, progress, localDay, checkIn,
 	storyKey, storyRing, markStorySeen, watchFreshIso, readState, writeState, STORAGE_KEY,
+	hlPresent, hiddenCounts,
 	sessionFeed
 } from './review.js';
 
@@ -119,7 +120,8 @@ test('tabCounts, with the zero-vector wallets counted but not listed', () => {
 	const roster = { target: T, wallets: [
 		w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'INFRASTRUCTURE'), w(D, 'CONFIRMED')
 	] };
-	assert.deepEqual(tabCounts(roster, emptyState()), { likely: 1, leads: 1, hidden: 1 });
+	assert.deepEqual(tabCounts(roster, emptyState()),
+		{ likely: 1, leads: 1, hidden: 1, offHl: 0 });
 });
 
 test('vectorLabel: every roster vector in plain English, unknown raw', () => {
@@ -271,4 +273,36 @@ test('at one tier, a wallet the owner has not already named ranks first', () => 
 		w(B, 'CONFIRMED', { vector_count: 2 })
 	] };
 	assert.deepEqual(feed(roster, emptyState(), 'likely').map((x) => x.wallet), [B, A]);
+});
+
+// --- Hyperliquid presence ----------------------------------------------------
+// The deliverable is an address that trades on HYPERLIQUID. A wallet HL has
+// never heard of cannot be copied there, so it is not a candidate on the phone
+// however interesting its flow is. It stays in the roster for the pipeline.
+
+test('a wallet Hyperliquid does not know is not shown', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'POSSIBLE', { evidence: { hl_role: 'missing' } }),
+		w(B, 'POSSIBLE', { evidence: { hl_role: 'user' } })
+	] };
+	assert.deepEqual(eligible(roster).map((x) => x.wallet), [B]);
+});
+
+test('an unreadable HL role is kept, because failed is not absent', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'POSSIBLE', { evidence: {} }),
+		w(B, 'POSSIBLE', { evidence: { hl_role: null } })
+	] };
+	assert.equal(eligible(roster).length, 2, 'rule 5: we could not tell, so we do not decide');
+});
+
+test('counts say how many are hidden and why', () => {
+	const roster = { target: T, wallets: [
+		w(A, 'POSSIBLE', { evidence: { hl_role: 'user' } }),
+		w(B, 'WATCH', { evidence: { hl_role: 'user' } }),
+		w(C, 'POSSIBLE', { evidence: { hl_role: 'missing' } }),
+		w(D, 'CONFIRMED', { evidence: { hl_role: 'user' } })
+	] };
+	assert.deepEqual(tabCounts(roster, emptyState()),
+		{ likely: 1, leads: 1, hidden: 1, offHl: 1 });
 });

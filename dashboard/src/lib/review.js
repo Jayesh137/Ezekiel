@@ -47,13 +47,44 @@ export function emptyState() {
 	return { reviewed: {}, stories: {}, streak: null };
 }
 
-/** Wallets the app may show at all: no services, no infrastructure, not him. */
+/** Has Hyperliquid ever heard of this address?
+ *  true = it has an account, false = a successful read said it does not,
+ *  null = the read failed. `hl_identity.present()` makes the same three-way
+ *  distinction, and collapsing the last two is rule 5. */
+export function hlPresent(w) {
+	const role = w?.evidence?.hl_role;
+	if (role === undefined || role === null) return null;
+	return role !== 'missing';
+}
+
+/** Wallets the app may show at all: no services, no infrastructure, not him,
+ *  and nothing Hyperliquid has never heard of.
+ *
+ *  That last rule is the mission's own: the owner copy-trades on Hyperliquid,
+ *  so a wallet he cannot follow there is worth nothing to him however
+ *  interesting its flow is. Measured 2026-09-22, 18 of 33 leads on this phone
+ *  had no HL account at all. They stay in the roster, where the pipeline keeps
+ *  watching them and where one opening an HL account is itself news. */
 export function eligible(roster) {
 	const target = walletKey(roster?.target);
 	return (roster?.wallets || []).filter(
 		(w) => w && w.wallet && w.tier !== 'INFRASTRUCTURE' && !w.is_service
-			&& walletKey(w.wallet) !== target
+			&& walletKey(w.wallet) !== target && hlPresent(w) !== false
 	);
+}
+
+/** Roster rows the app deliberately does not list, by reason. */
+export function hiddenCounts(roster) {
+	const target = walletKey(roster?.target);
+	let offHl = 0;
+	let noVector = 0;
+	for (const w of roster?.wallets || []) {
+		if (!w?.wallet || w.tier === 'INFRASTRUCTURE' || w.is_service) continue;
+		if (walletKey(w.wallet) === target) continue;
+		if (hlPresent(w) === false) offHl++;
+		else if (!LIKELY_TIERS.includes(w.tier) && w.tier !== 'POSSIBLE') noVector++;
+	}
+	return { offHl, noVector };
 }
 
 /** 'new' | 'changed' | 'reviewed', against the tier you last reviewed it at. */
@@ -134,8 +165,9 @@ export function tabCounts(roster, state) {
 	return {
 		likely: feed(roster, state, 'likely').length,
 		leads: feed(roster, state, 'leads').length,
-		/** Shown as a footnote, never as a list: no vector supports these. */
-		hidden: eligible(roster).filter((w) => !LIKELY_TIERS.includes(w.tier) && w.tier !== 'POSSIBLE').length
+		/** Shown as a footnote, never as a list. */
+		hidden: hiddenCounts(roster).noVector,
+		offHl: hiddenCounts(roster).offHl
 	};
 }
 
