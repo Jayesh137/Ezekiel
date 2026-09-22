@@ -11,7 +11,8 @@ import {
 	eligible, feed, tabCounts, status, emptyState, vectorLabel, avatar,
 	freshness, ago, ratio, bornLabel,
 	markReviewed, dropped, dismissDropped, progress, localDay, checkIn,
-	storyKey, storyRing, markStorySeen, watchFreshIso, readState, writeState, STORAGE_KEY
+	storyKey, storyRing, markStorySeen, watchFreshIso, readState, writeState, STORAGE_KEY,
+	sessionFeed
 } from './review.js';
 
 const T = '0x45d26f28196d226497130c4bac709d808fed4029';
@@ -232,4 +233,16 @@ test('writeState round-trips and reports failure', () => {
 	assert.deepEqual(readState(st).state, s);
 	assert.equal(writeState(null, s), false);
 	assert.equal(writeState({ setItem() { throw new Error('quota'); } }, s), false);
+});
+
+test('sessionFeed: order and membership frozen at load, status live', () => {
+	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(B, 'WATCH'), w(C, 'POSSIBLE')] };
+	// At load, B was reviewed as POSSIBLE and is now WATCH: changed, so in the tab.
+	const atLoad = { ...emptyState(), reviewed: { [B]: 'POSSIBLE' } };
+	const before = sessionFeed(roster, atLoad, atLoad, 'review').map((r) => r.wallet);
+	// Reviewing A and B during the session must not move or drop them.
+	const now = markReviewed(atLoad, [w(A, 'POSSIBLE'), w(B, 'WATCH')]);
+	const after = sessionFeed(roster, atLoad, now, 'review');
+	assert.deepEqual(after.map((r) => r.wallet), before);
+	assert.deepEqual(after.map((r) => r.status), before.map((x) => (x === C ? 'new' : 'reviewed')));
 });

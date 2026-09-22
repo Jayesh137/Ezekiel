@@ -103,6 +103,14 @@ export function feed(roster, state, tab = 'review') {
 		.sort(compare);
 }
 
+/** The feed as the owner sees it within one session: which wallets and in what
+ *  order is frozen at load (`orderState`), while each row's status is live
+ *  (`state`). Otherwise marking a post reviewed would re-sort the feed under
+ *  their finger, and a reviewed demotion would vanish mid-read. */
+export function sessionFeed(roster, orderState, state, tab = 'review') {
+	return feed(roster, orderState, tab).map((r) => ({ ...r, status: status(r, state) }));
+}
+
 export function tabCounts(roster, state) {
 	return {
 		review: feed(roster, state, 'review').length,
@@ -119,7 +127,9 @@ export function avatar(address) {
 		h = Math.imul(h, 0x01000193) >>> 0;
 	}
 	const a = h % 360;
-	const b = (a + 40 + ((h >>> 9) % 80)) % 360;
+	// The second hue sits 90-210° away, so every avatar carries two clearly
+	// different colours and neighbours do not blur into one family.
+	const b = (a + 90 + ((h >>> 9) % 120)) % 360;
 	const angle = (h >>> 17) % 360;
 	return { a, b, angle };
 }
