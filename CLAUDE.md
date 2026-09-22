@@ -2150,6 +2150,11 @@ that it is.
   phone silently**, so check that list before changing either writer. Review
   marks live only in the phone's localStorage: nothing on the phone feeds the
   pipeline, and its tiers are the roster's own.
+  It shows **Likely** (CONFIRMED/PROBABLE — two or more agreeing vectors) and
+  **Leads** (POSSIBLE — one vector); the WATCH tier is counted in a footnote
+  and never listed, because a wallet with no vector is evidence of nothing. On
+  the day it was built Likely held only the two config wallets, and the app says
+  so on screen rather than letting known wallets read as new finds.
 - **`NTFY_TOPIC` is configured and delivering.** Verified 2026-09-11: a
   collector run's silence and account-drop alerts arrived on the topic within
   seconds while email failed as usual, as did every CRITICAL that day.
