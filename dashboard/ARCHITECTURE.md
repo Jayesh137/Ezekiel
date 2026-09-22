@@ -188,10 +188,10 @@ Clean means:
 │ (◉) (◉) (○)                          │  Stories: close watch
 │ 0xdd53… 0xf078… 0x5b5d…              │
 ├──────────────────────────────────────┤
-│  ◔ 12 / 38 reviewed                   │  ReviewProgress
+│  ◔ 12 / 33 reviewed                   │  ReviewProgress
 │    3 new · 1 changed    Mark all ✓   │
 ├──────────────────────────────────────┤
-│ [ For review 38 | Watch 149 | All ]  │  Segmented
+│ [ Likely 2 | Leads 33 ]              │  Segmented
 ├──────────────────────────────────────┤
 │ ● (av) 0xf078…f19e     CONFIRMED  NEW │  WalletPost
 │   ●●○  2 vectors agree               │
@@ -247,19 +247,29 @@ eligible(roster)
       minus tier == INFRASTRUCTURE, minus is_service, minus wallet == roster.target
 
 feed(roster, state, tab)
-    'review' → eligible ∩ (tier ∈ {CONFIRMED, PROBABLE, POSSIBLE}  OR  status == 'changed')
-    'watch'  → eligible ∩ tier == WATCH
-    'all'    → eligible
+    'likely' → eligible ∩ tier ∈ {CONFIRMED, PROBABLE}   two or more vectors agree
+    'leads'  → eligible ∩ (tier == POSSIBLE  OR  a demotion to WATCH not yet reviewed)
     sorted by
       1. unread first         (status new | changed)
-      2. tier rank            CONFIRMED > PROBABLE > POSSIBLE > WATCH
-      3. vector_count         desc
-      4. rank_strength        desc; absent sorts last, never as 0.0
-      5. wallet               asc, deterministic last resort
+      2. tier rank            CONFIRMED > PROBABLE > POSSIBLE
+      3. NOT known_self       a wallet the owner has already named ranks last
+      4. vector_count         desc
+      5. rank_strength        desc; absent sorts last, never as 0.0
+      6. wallet               asc, deterministic last resort
 ```
 
-A POSSIBLE wallet demoted to WATCH stays in "For review" as **changed** until
-you review it, because a demotion is news. `rank_strength` only orders the
+**WATCH is never listed.** 151 wallets today carry no vector at all, which was
+the bulk of the list and is evidence of nothing; on a phone that buries the few
+that matter. They are counted in a one-line footnote instead. A wallet demoted
+all the way to WATCH still surfaces once under **Leads** as `changed`, because
+a demotion is news.
+
+**The two tabs are the honest split.** Likely means two or more independent
+vectors agree, the strongest evidence this project produces. Leads means one
+vector, which has repeatedly turned out to be an exchange, a bot or a
+coincidence. Today Likely holds only wallets the owner has already named, and
+the app says exactly that rather than letting two familiar addresses read as
+new finds. An empty Likely tab is a finding, not an empty screen. `rank_strength` only orders the
 list and is never displayed; it is a maximum over different scales.
 
 **Order is frozen for the session** (`sessionFeed(roster, orderState, state,
