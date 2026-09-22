@@ -135,3 +135,25 @@ tr:hover { background: var(--bg-card-hover); }
 .text-yellow { color: var(--accent-yellow); }
 .text-purple { color: var(--accent-purple); }
 .text-muted { color: var(--text-muted); }
+
+/* --- Tokens for the phone app's UI kit (dashboard/ARCHITECTURE.md §13) -------
+   Motion follows emilkowal.ski/ui/you-dont-need-animations: frequent actions
+   are not animated at all, everything else stays under 300ms, ease-out. */
+:root {
+	--radius-sm: 8px;
+	--radius-md: 14px;
+	--radius-lg: 22px;
+	--dur-fast: 100ms;
+	--dur: 180ms;
+	--dur-slow: 240ms;
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+	--shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+	:root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
+	*, *::before, *::after {
+		animation-duration: 0ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0ms !important;
+	}
+}
