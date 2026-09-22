@@ -1483,10 +1483,35 @@ So the strongest vector in the project has now been asked about every lead that
 can be the deliverable, and the answer is no. **Nothing outside the config
 cluster is above one vector.**
 
-**Also observed, unexplained:** the target's frontend agent is now
-`0x6f4e393f490f8b5f8bfb63eb44fe9d6bd2f0f191`, where this file recorded
-`0x98cf3fee…` approved 2026-08-31. A new frontend agent is a new browser
-session of his; worth a look at whether `alert_new_agent` fired for it.
+**A new agent OF HIS was never announced, and that is the CONFIRM-alone vector
+(fixed 2026-09-22).** His frontend agent is now
+`0x6f4e393f490f8b5f8bfb63eb44fe9d6bd2f0f191` where this file recorded
+`0x98cf3fee…` approved 2026-08-31, and **no agent alert exists in the last 60
+delivery shards**. `collect_agents` has stored the answer since 2026-09-10 and
+nothing ever diffed it: `watchlist.changes` is the project's ONLY agent diff,
+and the target is deliberately outside the close watch because a second writer
+on `data/actions/` is a lost update. So the one signal strong enough to confirm
+a wallet alone was being recorded and thrown away for him.
+
+`collector.new_agents` diffs the stored record and `alert_new_target_agent`
+fires on ADDITIONS only — an agent falling off is an expiry, and an unreadable
+endpoint presents identically, so alerting on a disappearance would fire on our
+own blindness. An absent previous record is a baseline (the `extraAgents`
+seeding rule; the size-ratio exception does not apply, because an agent is a
+fact about the past rather than a live state nobody has been told). A NAMED
+agent (`extraAgents`, an API wallet) is CRITICAL; the unnamed frontend agent is
+HIGH, because it rotates when he signs in again — measured twice in the week to
+2026-09-22, and a weekly CRITICAL for logging in is how an operator learns to
+swipe the channel away.
+
+**And the same rule-5 hole was in the collector, one call from where it was
+already fixed.** `collect_agents` called `parse_web_data(hl_post(...))` with no
+guard, so an exhausted-retry `{}` answered `agent_address: None` — recorded as
+"he has authorised nobody". `agent_links.webdata_is_unreadable` has existed
+since 2026-09-12 for exactly this, and the collector never used it. The stored
+history shows it: his agent record reads `none` between two real agents.
+**When one call in a pair is guarded, ask what guards the other** — third time
+this file has recorded that sentence.
 
 ## Vectors collected but NOT wired into detection — pursue these
 

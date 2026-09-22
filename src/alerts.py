@@ -909,6 +909,46 @@ def alert_shared_agent(agent: str, accounts: list) -> bool:
     return _send_with_cooldown(f"shared_agent_{agent.lower()}", 168, subject, body)
 
 
+def alert_new_target_agent(wallet: str, agent: dict) -> bool:
+    """Fire when the TARGET authorises a new agent.
+
+    An agent is an address he explicitly approved to trade on his behalf, so a
+    new one is a new address he controls — and two accounts sharing an agent is
+    the one vector strong enough to CONFIRM alone. Nothing diffed his agents
+    until 2026-09-22: `watchlist.changes` is the project's only agent diff and
+    the target is deliberately outside the close watch, so his frontend agent
+    went 0x98cf3fee… -> 0x6f4e393f… with no alert in 60 delivery shards.
+
+    Two severities, on the distinction the endpoints themselves draw:
+
+      * a NAMED agent comes from `extraAgents` and is an API wallet — a bot, a
+        script or another device he named. Never routine: CRITICAL.
+      * the unnamed frontend agent (`webData2`) rotates when he signs in again.
+        Measured twice in the week to 2026-09-22, so it is HIGH, not CRITICAL:
+        a weekly CRITICAL for logging in is how an operator learns to swipe the
+        channel away.
+    """
+    address = (agent.get("address") or "").lower()
+    name = agent.get("name")
+    source = agent.get("source") or "unknown"
+    severity = "CRITICAL" if name else "HIGH"
+    kind = f"named agent '{name}'" if name else "frontend agent"
+    subject = f"[EZEKIEL] {severity}: Target Authorised A New Agent"
+    body = (
+        f"The target has authorised a new {kind} on Hyperliquid.{chr(10)}{chr(10)}"
+        f"{address_line(address, 'Agent')}{chr(10)}"
+        f"{address_line(wallet, 'Account')}{chr(10)}"
+        f"Source: {source}{chr(10)}{chr(10)}"
+        f"An agent is an address the account explicitly approved to trade on its "
+        f"behalf, so this{chr(10)}is a NEW ADDRESS HE CONTROLS. If any other "
+        f"account authorises the same agent,{chr(10)}that account is his - it is "
+        f"the strongest single signal this system produces.{chr(10)}{chr(10)}"
+        f"Action: check whether this agent appears on any other account "
+        f"(scripts/check_agents.py).{chr(10)}"
+    )
+    return _send_with_cooldown(f"target_agent_{address}", 168, subject, body)
+
+
 def alert_explicit_link(kind: str, address: str, linked_to: str, why: str) -> bool:
     """Fire when Hyperliquid itself declares two addresses under one control.
 

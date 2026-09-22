@@ -1,6 +1,7 @@
 # src/collector.py
 """Collects trading data from Hyperliquid API for the target wallet."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -309,17 +310,79 @@ def collect_agents(wallet: str) -> None:
     # 2026-09-10: extraAgents said [] while webData2 showed an agent approved
     # four days earlier, so the "he has no agents" baseline was false.
     try:
+        from src.agent_links import webdata_is_unreadable
         from src.hl_identity import parse_web_data
-        web = parse_web_data(hl_post({"type": "webData2", "user": wallet}))
-        out["sources"]["webData2"] = {"agentAddress": web["agent_address"],
-                                      "agentValidUntil": web["agent_valid_until"]}
-        if web["agent_address"]:
-            out["agents"].append({"address": web["agent_address"], "name": None,
-                                  "valid_until": web["agent_valid_until"],
-                                  "source": "webData2"})
+        payload = hl_post({"type": "webData2", "user": wallet})
+        if webdata_is_unreadable(payload):
+            # `hl_post` answers {} when its retries are exhausted, and
+            # parse_web_data({}) then reports agent_address None — which is
+            # indistinguishable from "he has authorised nobody". webData2 is
+            # the ONLY endpoint naming the agent that actually signs his
+            # orders, so a timeout must never serialise as its absence.
+            out["errors"].append("webData2: unreadable answer (empty payload)")
+            out["sources"]["webData2"] = None
+        else:
+            web = parse_web_data(payload)
+            out["sources"]["webData2"] = {"agentAddress": web["agent_address"],
+                                          "agentValidUntil": web["agent_valid_until"]}
+            if web["agent_address"]:
+                out["agents"].append({"address": web["agent_address"], "name": None,
+                                      "valid_until": web["agent_valid_until"],
+                                      "source": "webData2"})
     except Exception as exc:                          # noqa: BLE001 - transport
         out["errors"].append(f"webData2: {type(exc).__name__}: {exc}")
+
+    # An agent is an address HE authorised to trade for him, so a new one is a
+    # new address he controls — the vector strong enough to CONFIRM alone.
+    # Nothing diffed this until 2026-09-22: `watchlist.changes` is the only
+    # agent diff in the project and the target is deliberately outside the
+    # watch, so his frontend agent went 0x98cf3fee… -> 0x6f4e393f… in silence.
+    previous = _stored_agents()
+    for agent in new_agents(previous, out):
+        from src.alerts import alert_new_target_agent
+        alert_new_target_agent(wallet, agent)
+
     save_latest(str(DATA_DIR / "agents"), out)
+
+
+def _stored_agents() -> dict | None:
+    """The previous agent record, or None when there is not one yet."""
+    try:
+        with open(DATA_DIR / "agents" / "latest.json") as f:
+            doc = json.load(f)
+        return doc if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def new_agents(previous: dict | None, current: dict | None) -> list[dict]:
+    """Agents in `current` that were not in `previous`. Pure.
+
+    ADDITIONS ONLY. An agent that falls off has expired, and an unreadable
+    endpoint presents the same way — neither is a new address he controls, and
+    alerting on it would fire on our own blindness.
+
+    An absent previous record is a BASELINE, not news: announcing an approval
+    that happened weeks ago as a transition is the `extraAgents` seeding
+    mistake. The size-ratio exception does not apply, because an agent is a
+    fact about the past, not a live state nobody has been told.
+    """
+    def addresses(doc):
+        return {(a.get("address") or "").lower()
+                for a in ((doc or {}).get("agents") or [])
+                if isinstance(a, dict) and a.get("address")}
+
+    if not previous or not (previous.get("agents") is not None):
+        return []
+    known = addresses(previous)
+    out, seen = [], set()
+    for agent in (current or {}).get("agents") or []:
+        addr = (agent.get("address") or "").lower() if isinstance(agent, dict) else ""
+        if not addr or addr in known or addr in seen:
+            continue
+        seen.add(addr)
+        out.append(agent)
+    return out
 
 
 def collect_portfolio(wallet: str) -> None:
