@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 
 import {
 	eligible, feed, tabCounts, status, emptyState, vectorLabel, avatar,
-	freshness, ago, ratio, bornLabel
+	freshness, ago, ratio, bornLabel,
+	markReviewed, dropped, dismissDropped, progress, localDay, checkIn,
+	storyKey, storyRing, markStorySeen, watchFreshIso, readState, writeState, STORAGE_KEY
 } from './review.js';
 
 const T = '0x45d26f28196d226497130c4bac709d808fed4029';
@@ -144,4 +146,90 @@ test('ratio and bornLabel never invent a number', () => {
 	assert.equal(ratio(0), '0.00x');
 	assert.equal(bornLabel(null), '—');
 	assert.equal(bornLabel(Date.parse('2025-01-01T20:28:00Z')), 'Jan 2025');
+});
+
+// --- review state ------------------------------------------------------------
+
+test('markReviewed records the current tier and does not mutate', () => {
+	const s0 = emptyState();
+	const s1 = markReviewed(s0, [w(A, 'POSSIBLE'), w(upper(B), 'CONFIRMED')]);
+	assert.deepEqual(s0.reviewed, {});
+	assert.deepEqual(s1.reviewed, { [A]: 'POSSIBLE', [B]: 'CONFIRMED' });
+});
+
+test('dropped: reviewed wallets that left the eligible set', () => {
+	const roster = { target: T, wallets: [w(A, 'POSSIBLE'), w(B, 'INFRASTRUCTURE')] };
+	const s = { ...emptyState(), reviewed: { [A]: 'POSSIBLE', [B]: 'WATCH', [C]: 'POSSIBLE' } };
+	assert.deepEqual(dropped(roster, s), [{ wallet: B, tier: 'WATCH' }, { wallet: C, tier: 'POSSIBLE' }]);
+	assert.deepEqual(Object.keys(dismissDropped(s, upper(C)).reviewed).sort(), [A, B]);
+	assert.deepEqual(Object.keys(s.reviewed).length, 3, 'dismiss does not mutate');
+});
+
+test('progress over feed rows', () => {
+	const rows = [{ status: 'new' }, { status: 'changed' }, { status: 'reviewed' }, { status: 'reviewed' }];
+	assert.deepEqual(progress(rows), { done: 2, total: 4, fresh: 1, changed: 1 });
+	assert.deepEqual(progress([]), { done: 0, total: 0, fresh: 0, changed: 0 });
+});
+
+test('localDay uses the local calendar', () => {
+	assert.equal(localDay(new Date(2026, 8, 2, 23, 59)), '2026-09-02');
+	assert.equal(localDay(new Date(2026, 0, 1, 0, 0)), '2026-01-01');
+});
+
+test('checkIn: first, same day, next day, gap, month and year boundary, junk', () => {
+	assert.deepEqual(checkIn(null, '2026-09-22'), { day: '2026-09-22', count: 1 });
+	assert.deepEqual(checkIn({ day: '2026-09-22', count: 4 }, '2026-09-22'), { day: '2026-09-22', count: 4 });
+	assert.deepEqual(checkIn({ day: '2026-09-21', count: 4 }, '2026-09-22'), { day: '2026-09-22', count: 5 });
+	assert.deepEqual(checkIn({ day: '2026-09-19', count: 4 }, '2026-09-22'), { day: '2026-09-22', count: 1 });
+	assert.deepEqual(checkIn({ day: '2026-09-30', count: 2 }, '2026-10-01'), { day: '2026-10-01', count: 3 });
+	assert.deepEqual(checkIn({ day: '2026-12-31', count: 2 }, '2027-01-01'), { day: '2027-01-01', count: 3 });
+	assert.deepEqual(checkIn({ day: '2028-02-28', count: 1 }, '2028-02-29'), { day: '2028-02-29', count: 2 });
+	assert.deepEqual(checkIn({ day: 'junk', count: 9 }, '2026-09-22'), { day: '2026-09-22', count: 1 });
+});
+
+test('stories: alert beats unseen beats seen; last fill is not in the key', () => {
+	const base = { address: A, read_ok: true, agents: ['x'], subaccounts: [], size_ratio: 0.7, last_fill_ms: 1 };
+	assert.equal(storyKey(base), '1|0|0|1');
+	assert.equal(storyRing(base, emptyState()), 'unseen');
+	const seen = markStorySeen(emptyState(), base);
+	assert.equal(storyRing(base, seen), 'seen');
+	assert.equal(storyRing({ ...base, address: upper(A) }, seen), 'seen');
+	assert.equal(storyRing({ ...base, last_fill_ms: 999 }, seen), 'seen');
+	assert.equal(storyRing({ ...base, agents: ['x', 'y'] }, seen), 'unseen');
+	assert.equal(storyRing({ ...base, size_ratio: 1.15 }, seen), 'alert');
+	assert.equal(storyRing({ ...base, read_ok: false }, seen), 'alert');
+	assert.equal(storyRing({ ...base, size_ratio: null }, seen), 'seen');
+});
+
+test('watchFreshIso: computed_at, else newest checked_at, else null', () => {
+	assert.equal(watchFreshIso({ computed_at: 'X' }), 'X');
+	assert.equal(watchFreshIso({ wallets: [{ checked_at: '2026-09-01T00:00:00Z' },
+		{ checked_at: '2026-09-02T00:00:00Z' }] }), '2026-09-02T00:00:00Z');
+	assert.equal(watchFreshIso({ wallets: [] }), null);
+	assert.equal(watchFreshIso(null), null);
+});
+
+function fakeStorage(initial = {}) {
+	const m = new Map(Object.entries(initial));
+	return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) };
+}
+
+test('readState: absent, valid, corrupt, wrong shape, unavailable', () => {
+	assert.deepEqual(readState(fakeStorage()), { state: emptyState(), ok: true });
+	const good = { reviewed: { [A]: 'POSSIBLE' }, stories: {}, streak: { day: '2026-09-22', count: 2 } };
+	assert.deepEqual(readState(fakeStorage({ [STORAGE_KEY]: JSON.stringify(good) })), { state: good, ok: true });
+	assert.deepEqual(readState(fakeStorage({ [STORAGE_KEY]: '{nope' })), { state: emptyState(), ok: true });
+	assert.deepEqual(readState(fakeStorage({ [STORAGE_KEY]: '[1,2]' })).state, emptyState());
+	assert.deepEqual(readState(fakeStorage({ [STORAGE_KEY]: '{"reviewed":[1]}' })).state, emptyState());
+	assert.deepEqual(readState(null), { state: emptyState(), ok: false });
+	assert.deepEqual(readState({ getItem() { throw new Error('denied'); } }), { state: emptyState(), ok: false });
+});
+
+test('writeState round-trips and reports failure', () => {
+	const st = fakeStorage();
+	const s = markReviewed(emptyState(), [w(A, 'POSSIBLE')]);
+	assert.equal(writeState(st, s), true);
+	assert.deepEqual(readState(st).state, s);
+	assert.equal(writeState(null, s), false);
+	assert.equal(writeState({ setItem() { throw new Error('quota'); } }, s), false);
 });

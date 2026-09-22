@@ -153,3 +153,136 @@ export function bornLabel(ms) {
 	const d = new Date(ms);
 	return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
+
+// --- review state ------------------------------------------------------------
+// Lives only in this phone's localStorage. The game measures YOUR review,
+// never the wallet's likelihood (ARCHITECTURE.md §5.1).
+
+export const STORAGE_KEY = 'ezekiel.review.v1';
+
+export function markReviewed(state, rows) {
+	const reviewed = { ...(state?.reviewed || {}) };
+	for (const r of rows) reviewed[walletKey(r.wallet)] = r.tier;
+	return { ...state, reviewed };
+}
+
+/** Reviewed wallets that are no longer eligible: gone, or became a service.
+ *  A disappearance is news too, so it is listed until dismissed. */
+export function dropped(roster, state) {
+	const live = new Set(eligible(roster).map((w) => walletKey(w.wallet)));
+	return Object.entries(state?.reviewed || {})
+		.filter(([k]) => !live.has(k))
+		.map(([wallet, tier]) => ({ wallet, tier }))
+		.sort((x, y) => (x.wallet < y.wallet ? -1 : 1));
+}
+
+export function dismissDropped(state, wallet) {
+	const reviewed = { ...(state?.reviewed || {}) };
+	delete reviewed[walletKey(wallet)];
+	return { ...state, reviewed };
+}
+
+export function progress(rows) {
+	let done = 0;
+	let fresh = 0;
+	let changed = 0;
+	for (const r of rows) {
+		if (r.status === 'reviewed') done++;
+		else if (r.status === 'changed') changed++;
+		else fresh++;
+	}
+	return { done, total: rows.length, fresh, changed };
+}
+
+// --- streak ------------------------------------------------------------------
+
+export function localDay(date = new Date()) {
+	const p = (n) => String(n).padStart(2, '0');
+	return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+}
+
+function dayAfter(day) {
+	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || '');
+	if (!m) return null;
+	return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + 1)).toISOString().slice(0, 10);
+}
+
+/** Called only on a successful load: opening offline shows you nothing, so it
+ *  does not count as checking in. */
+export function checkIn(streak, today) {
+	if (streak?.day === today) return streak;
+	if (streak && dayAfter(streak.day) === today) {
+		return { day: today, count: (streak.count || 0) + 1 };
+	}
+	return { day: today, count: 1 };
+}
+
+// --- stories -----------------------------------------------------------------
+
+/** last_fill_ms is deliberately absent: it changes on nearly every run, so a
+ *  ring keyed on it would always be lit, and an always-lit ring means nothing. */
+export function storyKey(w) {
+	const big = typeof w.size_ratio === 'number' && w.size_ratio >= SIZE_BAND ? 1 : 0;
+	return `${(w.agents || []).length}|${(w.subaccounts || []).length}|${big}|${w.read_ok ? 1 : 0}`;
+}
+
+/** 'alert' (unreadable, or outgrew the target) | 'unseen' | 'seen'. */
+export function storyRing(w, state) {
+	if (!w.read_ok || (typeof w.size_ratio === 'number' && w.size_ratio >= SIZE_BAND)) return 'alert';
+	return state?.stories?.[walletKey(w.address)] === storyKey(w) ? 'seen' : 'unseen';
+}
+
+export function markStorySeen(state, w) {
+	return { ...state, stories: { ...(state?.stories || {}), [walletKey(w.address)]: storyKey(w) } };
+}
+
+/** The watch file's age: computed_at, else its newest per-wallet read. */
+export function watchFreshIso(watchlist) {
+	if (!watchlist) return null;
+	if (watchlist.computed_at) return watchlist.computed_at;
+	const times = (watchlist.wallets || []).map((x) => x.checked_at).filter(Boolean).sort();
+	return times.length ? times[times.length - 1] : null;
+}
+
+// --- storage -----------------------------------------------------------------
+
+function isPlainObject(v) {
+	return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** { state, ok }. ok=false means storage is UNAVAILABLE (iOS private mode,
+ *  blocked site data), which is different from empty; the page says so. */
+export function readState(storage) {
+	if (!storage) return { state: emptyState(), ok: false };
+	let raw;
+	try {
+		raw = storage.getItem(STORAGE_KEY);
+	} catch {
+		return { state: emptyState(), ok: false };
+	}
+	if (raw == null) return { state: emptyState(), ok: true };
+	try {
+		const v = JSON.parse(raw);
+		if (!isPlainObject(v)) return { state: emptyState(), ok: true };
+		return {
+			state: {
+				reviewed: isPlainObject(v.reviewed) ? v.reviewed : {},
+				stories: isPlainObject(v.stories) ? v.stories : {},
+				streak: isPlainObject(v.streak) ? v.streak : null
+			},
+			ok: true
+		};
+	} catch {
+		return { state: emptyState(), ok: true };
+	}
+}
+
+export function writeState(storage, state) {
+	if (!storage) return false;
+	try {
+		storage.setItem(STORAGE_KEY, JSON.stringify(state));
+		return true;
+	} catch {
+		return false;
+	}
+}
