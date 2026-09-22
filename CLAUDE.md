@@ -1423,6 +1423,71 @@ the transfer. All three were found by asking why a PROBABLE was PROBABLE.
   still open. Holding is not leaving: `risk._xyz_abandoned` is now False while
   `data/account/latest.json` shows an open xyz position.
 
+**An exchange or a contract could reach the operator's phone, and eight did
+(fixed 2026-09-22).** The owner asked for "only the most highly probable
+wallets" and, reading the live roster to answer, the list he was being shown
+held **five exchange-scale addresses** (110,535 to 929,361 transactions) and
+**three named contracts** — `DeusdMerkleDistributor`, `BoringSolver`,
+`GnosisSafeProxy`. Each was POSSIBLE on a real `transfer` vector, and each was
+put to him as a wallet that might be his.
+
+Neither kind can be caught from inside our own substrate. Fan degree only sees
+wallets we swept, so an exchange the cluster paid twice never trips it — rule 9,
+which already cost a false PROBABLE on a funder with 2,282,986 transactions —
+and **code is not a fan-out pattern at all**, so a Gnosis Safe with 35
+transactions looks exactly like a quiet personal wallet. Only the whole-chain
+reading answers, and `roster.services_from_activity` now applies both verdicts
+at tiering: busy → service, contract → service, config ground truth immune.
+Live: candidates **35 → 27**.
+
+**A contract flag must NOT bury an address Hyperliquid knows as a trader.**
+The first version of the guard graded `0xb798aef7…` INFRASTRUCTURE — and that
+address is an **EOA on Arbitrum (108 txs), a contract on Ethereum (649 txs),
+and a live HL account holding $9.7M with 2,000 fills**. One address can be
+both, and code on some other chain does not unmake a trading account. Removing
+it would have deleted precisely what the mission is for. Caught by replaying
+the guard against the live roster before it landed, never by a unit test —
+**replay a filter against production data before trusting it**.
+
+**And nothing was measuring the candidates.** 18 of the 35 had no reading on
+any chain, because the graph spends its measurement budget on the
+highest-VALUE unmeasured addresses, which is a different set from "the wallets
+the operator is being shown". `scripts/measure_candidates.py` gives the
+candidate list its own bounded pass (15 addresses / 90s, keyless Blockscout),
+wired into trace.yml before the roster build.
+
+**The phone lists only wallets Hyperliquid has heard of (2026-09-22).** The
+deliverable is an address that trades on HL, and **18 of 33 leads on the phone
+had no HL account at all** — nothing the owner could follow. `review.js`
+excludes `hl_role == "missing"` and keeps an unreadable role (rule 5: failed is
+not absent), counting both in a footnote. They stay in the roster, where one
+opening an HL account is itself news.
+
+**The detector budget was being spent off-Hyperliquid.** `detector_candidates`
+ranked by evidence alone, so the shared-agent index — the one vector strong
+enough to CONFIRM a wallet alone — covered 120 wallets and **missed 6 of the 13
+leads that actually hold HL accounts**, while carrying addresses with none.
+Wallets HL knows now sort first, unreadable roles rank with them, and an
+address with no account is deferred rather than dropped. Live: HL leads inside
+the cap **7/13 → 15/15**.
+
+**What asking every HL-native vector about those leads actually returned: a
+measured no (2026-09-22).** Across the 13 HL-present leads plus the config
+cluster — `extraAgents`, `webData2`, `subAccounts`, `referral`, `portfolio`,
+`userFills`: **0 shared agents, 0 shared agent-name families, 0 sub-account
+crossings, 0 referrals by a cluster wallet.** Three leads carry someone else's
+referral code (`XYZSET9`, `REF8888GO`, `MMREFCSI`) and none is his. Two leads
+run agent fleets — `0xf5d81a135f` with **102 agents and 20 sub-accounts**,
+`0x60a8c761f3` with 10 — which is a market maker's shape, not a person's.
+So the strongest vector in the project has now been asked about every lead that
+can be the deliverable, and the answer is no. **Nothing outside the config
+cluster is above one vector.**
+
+**Also observed, unexplained:** the target's frontend agent is now
+`0x6f4e393f490f8b5f8bfb63eb44fe9d6bd2f0f191`, where this file recorded
+`0x98cf3fee…` approved 2026-08-31. A new frontend agent is a new browser
+session of his; worth a look at whether `alert_new_agent` fired for it.
+
 ## Vectors collected but NOT wired into detection — pursue these
 
 - ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
