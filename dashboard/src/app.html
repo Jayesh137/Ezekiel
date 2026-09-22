@@ -3,7 +3,16 @@
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<!-- Installable phone app (dashboard/ARCHITECTURE.md §7). iOS reads only
+		     apple-touch-icon for the home screen, never the manifest's icons. -->
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-180.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Ezekiel" />
+		<meta name="theme-color" content="#0a0a0f" />
 		<title>Ezekiel Dashboard</title>
 		%sveltekit.head%
 	</head>
