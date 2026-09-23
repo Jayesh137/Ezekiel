@@ -1,74 +1,66 @@
 {
   "wallet": "0xfc667adba8d4837586078f4fdcdc29804337ca06",
   "first_seen": "2026-07-06T14:52:52.089575+00:00",
-  "last_seen": "2026-09-22T23:22:11.728916+00:00",
+  "last_seen": "2026-09-23T01:47:21.976854+00:00",
   "best_score": 0.57,
-  "latest_score": 0.2523,
+  "latest_score": 0.2941,
   "latest_scoring_schema": "2026-08-05.1",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Matching long/short bias",
+      "Similar scaling/TWAP/clip-size habits"
+    ],
     "warnings": [
       "Weak asset overlap"
     ],
     "vetoes": [
-      "Decision frequency 40x apart (1.00 vs 40.00 position episodes/day)"
+      "Decision frequency 30x apart (1.00 vs 30.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
-        "BTC"
+        "BTC",
+        "ETH"
       ],
       "target_only": [
         "ADA",
-        "ETH",
         "FARTCOIN",
         "NEAR"
       ],
       "candidate_only": [
+        "HYPE",
         "SOL",
         "mkts:SMALL2000",
         "mkts:USBOND",
-        "mkts:USTECH",
         "xyz:AMD",
-        "xyz:AMZN",
-        "xyz:ARM",
         "xyz:BABA",
-        "xyz:BB",
         "xyz:BRENTOIL",
         "xyz:CL",
-        "xyz:COIN",
-        "xyz:CRWV",
+        "xyz:CRCL",
         "xyz:DRAM",
-        "xyz:EWY",
-        "xyz:GOLD",
         "xyz:GOOGL",
-        "xyz:INTC",
         "xyz:LITE",
         "xyz:META",
         "xyz:MRVL",
         "xyz:MSFT",
         "xyz:MSTR",
         "xyz:MU",
+        "xyz:NBIS",
         "xyz:NFLX",
         "xyz:NVDA",
-        "xyz:ORCL",
-        "xyz:QCOM",
         "xyz:RIVN",
-        "xyz:RKLB",
         "xyz:SILVER",
         "xyz:SKHX",
-        "xyz:SMSN",
         "xyz:SNDK",
         "xyz:SOXL",
         "xyz:SP500",
         "xyz:SPCX",
-        "xyz:TSLA",
         "xyz:XYZ100"
       ],
-      "overlap_count": 1,
+      "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.0227
+      "jaccard": 0.0606
     },
     "market_rarity": {
       "shared_markets": [],
@@ -77,36 +69,17 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2523,
+      "score_without_bonus": 0.2941,
       "explanations": [],
       "frequencies": {}
     },
     "tooling": {
-      "requests": 5137614057.0,
-      "cum_volume_usd": 14985656162.36,
-      "requests_per_1k_usd": 342.8354
+      "requests": 5139202306.0,
+      "cum_volume_usd": 14989256858.58,
+      "requests_per_1k_usd": 342.859
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-09-07T23:06:58.101858+00:00",
-      "score": 0.45,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.049,
-        "timing_profile": null,
-        "leverage_profile": 0.4913,
-        "entry_exit_style": 0.0336,
-        "hold_duration": 0.5177,
-        "account_size": 0.6195,
-        "trade_sequencing": 0.9706,
-        "position_sizing": 1.0,
-        "activity": 0.5063,
-        "direction_bias": 0.7892,
-        "position_management": 0.7078,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-09-08T01:45:36.499734+00:00",
       "score": 0.45,
@@ -2100,8 +2073,29 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-08-05.1"
+    },
+    {
+      "scan_time": "2026-09-23T01:47:21.976854+00:00",
+      "score": 0.2941,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1067,
+        "timing_profile": null,
+        "leverage_profile": 0.5251,
+        "entry_exit_style": 0.3679,
+        "hold_duration": 0.4003,
+        "account_size": 0.5423,
+        "trade_sequencing": 0.503,
+        "position_sizing": 0.4233,
+        "order_profile": null,
+        "activity": 0.4547,
+        "direction_bias": 0.8574,
+        "position_management": 0.8077,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-08-05.1"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3197
+  "recent_avg_score": 0.316
 }
