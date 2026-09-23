@@ -5,6 +5,9 @@
 	         separationCaveat } from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
 	import Chart from 'chart.js/auto';
+	import { C, SANS, alpha, tooltip, applyChartDefaults } from '$lib/ui/chartTheme.js';
+
+	applyChartDefaults(Chart);
 
 	let scan = null;
 	let targetFp = null;
@@ -155,20 +158,20 @@
 						{
 							label: 'Target',
 							data: DIM_KEYS.map(() => 100),
-							borderColor: 'rgba(0, 204, 221, 0.9)',
-							backgroundColor: 'rgba(0, 204, 221, 0.1)',
+							borderColor: alpha(C.accent, 0.9),
+							backgroundColor: alpha(C.accent, 0.1),
 							borderWidth: 2,
 							pointRadius: 3,
-							pointBackgroundColor: 'rgba(0, 204, 221, 1)',
+							pointBackgroundColor: alpha(C.accent, 1),
 						},
 						{
 							label: 'Candidate',
 							data: candidateScores,
-							borderColor: 'rgba(255, 170, 0, 0.9)',
-							backgroundColor: 'rgba(255, 170, 0, 0.1)',
+							borderColor: alpha(C.amber, 0.9),
+							backgroundColor: alpha(C.amber, 0.1),
 							borderWidth: 2,
 							pointRadius: 3,
-							pointBackgroundColor: 'rgba(255, 170, 0, 1)',
+							pointBackgroundColor: alpha(C.amber, 1),
 						}
 					]
 				},
@@ -181,33 +184,33 @@
 							max: 100,
 							ticks: {
 								stepSize: 25,
-								color: 'rgba(136, 136, 160, 0.6)',
+								color: C.tick,
 								backdropColor: 'transparent',
-								font: { family: "'JetBrains Mono', monospace", size: 9 },
+								font: { family: SANS, size: 9 },
 							},
-							grid: { color: 'rgba(42, 42, 74, 0.5)' },
-							angleLines: { color: 'rgba(42, 42, 74, 0.5)' },
+							grid: { color: C.grid },
+							angleLines: { color: C.grid },
 							pointLabels: {
-								color: 'rgba(224, 224, 232, 0.9)',
-								font: { family: "'JetBrains Mono', monospace", size: 11, weight: 500 },
+								color: C.textSecondary,
+								font: { family: SANS, size: 11, weight: 500 },
 							},
 						}
 					},
 					plugins: {
 						legend: {
 							labels: {
-								color: 'rgba(136, 136, 160, 0.8)',
-								font: { family: "'JetBrains Mono', monospace", size: 10 },
+								color: C.tick,
+								font: { family: SANS, size: 10 },
 								usePointStyle: true,
 								pointStyleWidth: 8,
 							},
 						},
 						tooltip: {
-							backgroundColor: 'rgba(18, 18, 26, 0.95)',
-							borderColor: 'rgba(42, 42, 74, 0.8)',
+							backgroundColor: tooltip.backgroundColor,
+							borderColor: C.border,
 							borderWidth: 1,
-							titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
-							bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+							titleFont: { family: SANS, size: 11 },
+							bodyFont: { family: SANS, size: 11 },
 							callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%` },
 						},
 					},
@@ -232,13 +235,13 @@
 							{
 								label: 'Target',
 								data: targetHourly.map(v => v * 100),
-								backgroundColor: 'rgba(0, 204, 221, 0.6)',
+								backgroundColor: alpha(C.accent, 0.6),
 								borderRadius: 2,
 							},
 							{
 								label: 'Candidate',
 								data: candidateHourly.map(v => v * 100),
-								backgroundColor: 'rgba(255, 170, 0, 0.6)',
+								backgroundColor: alpha(C.amber, 0.6),
 								borderRadius: 2,
 							}
 						]
@@ -249,14 +252,14 @@
 						scales: {
 							x: {
 								grid: { display: false },
-								ticks: { color: 'rgba(136, 136, 160, 0.6)', font: { size: 8, family: "'JetBrains Mono', monospace" } },
+								ticks: { color: C.tick, font: { size: 8, family: SANS } },
 								border: { display: false },
 							},
 							y: {
-								grid: { color: 'rgba(42, 42, 74, 0.3)' },
+								grid: { color: C.grid },
 								ticks: {
-									color: 'rgba(136, 136, 160, 0.6)',
-									font: { size: 9, family: "'JetBrains Mono', monospace" },
+									color: C.tick,
+									font: { size: 9, family: SANS },
 									callback: v => v.toFixed(0) + '%',
 								},
 								border: { display: false },
@@ -265,15 +268,15 @@
 						plugins: {
 							legend: {
 								labels: {
-									color: 'rgba(136, 136, 160, 0.8)',
-									font: { size: 10, family: "'JetBrains Mono', monospace" },
+									color: C.tick,
+									font: { size: 10, family: SANS },
 									usePointStyle: true,
 									pointStyleWidth: 8,
 								},
 							},
 							tooltip: {
-								backgroundColor: 'rgba(18, 18, 26, 0.95)',
-								borderColor: 'rgba(42, 42, 74, 0.8)',
+								backgroundColor: tooltip.backgroundColor,
+								borderColor: C.border,
 								borderWidth: 1,
 							},
 						},
@@ -335,15 +338,15 @@
 {:else}
 	<div class="grid-3" style="margin-bottom:24px">
 		<div class="card">
-			<div class="stat-value text-blue">{scan.wallets_scanned ?? 0}</div>
+			<div class="stat-value">{scan.wallets_scanned ?? 0}</div>
 			<div class="stat-label">Wallets Scanned{#if scan.priority_scanned} <span class="text-muted" style="font-size:0.7rem">({scan.priority_scanned} priority)</span>{/if}</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-yellow">{scan.matches_found ?? 0}</div>
+			<div class="stat-value">{scan.matches_found ?? 0}</div>
 			<div class="stat-label">Matches Found</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-muted">{scan.scan_time?.split('T')[0] ?? '—'}</div>
+			<div class="stat-value">{scan.scan_time?.split('T')[0] ?? '—'}</div>
 			<div class="stat-label">Last Scan</div>
 		</div>
 	</div>
@@ -422,13 +425,13 @@
 							<div class="result-dims">
 								{#each DIM_KEYS as k}
 									<div class="dim-bar-wrap" title="{DIM_LABELS[k]}: {r.dimensions?.[k] ? (r.dimensions[k] * 100).toFixed(0) + '%' : '—'}">
-										<div class="dim-bar" style="width:{(r.dimensions?.[k] || 0) * 100}%"></div>
+										<div class="dim-track"><div class="dim-bar" style="width:{(r.dimensions?.[k] || 0) * 100}%"></div></div>
 										<span class="dim-label">{DIM_LABELS[k]}</span>
 									</div>
 								{/each}
 							</div>
 							<div class="result-meta">
-								<span class="mono">{r.fills_count} fills</span>
+								<span class="num">{r.fills_count} fills</span>
 								{#if sparkPts}
 									<svg width="80" height="20" class="sparkline" title="{trend.appearances || 1} scan appearances">
 										<polyline
@@ -562,9 +565,6 @@
 {/if}
 
 <style>
-	.page-header { margin-bottom: 24px; }
-	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
-	.loading { text-align: center; padding: 60px; color: var(--text-muted); }
 
 	.results-list {
 		display: flex;
@@ -573,9 +573,9 @@
 	}
 
 	.result-row {
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
-		transition: background 0.15s;
+		transition: background var(--dur-fast) var(--ease-out);
 		overflow: hidden;
 	}
 	.result-row:hover {
@@ -585,22 +585,22 @@
 		background: var(--bg-card-hover);
 	}
 	.result-row.has-flow {
-		border: 1px solid rgba(255,51,85,0.35);
+		border: 1px solid color-mix(in srgb, var(--accent-red) 35%, transparent);
 	}
 	.flow-link-bar {
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.65rem;
 		font-weight: 700;
 		letter-spacing: 0.08em;
 		padding: 4px 14px;
-		background: rgba(255,170,0,0.12);
+		background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
 		color: var(--accent-yellow);
-		border-bottom: 1px solid rgba(255,170,0,0.2);
+		border-bottom: 1px solid color-mix(in srgb, var(--accent-yellow) 20%, transparent);
 	}
 	.flow-link-bar.flow-confirmed {
-		background: rgba(255,51,85,0.12);
+		background: color-mix(in srgb, var(--accent-red) 12%, transparent);
 		color: var(--accent-red);
-		border-color: rgba(255,51,85,0.2);
+		border-color: color-mix(in srgb, var(--accent-red) 20%, transparent);
 	}
 	.sparkline {
 		display: block;
@@ -609,10 +609,10 @@
 
 	.result-main {
 		display: grid;
-		grid-template-columns: 160px 120px 1fr 120px;
+		grid-template-columns: 150px 200px minmax(0, 1fr) 170px;
 		align-items: center;
-		gap: 16px;
-		padding: 10px 14px;
+		gap: 20px;
+		padding: 14px 16px;
 	}
 
 	/* The anchor is rendered by <Addr>, so scoped CSS cannot reach it — this
@@ -629,7 +629,7 @@
 	.separation-strong { color: var(--accent-green); }
 	.result-position {
 		display: block;
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.65rem;
 		color: var(--text-muted);
 		margin-top: 2px;
@@ -644,13 +644,14 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.9rem;
 	}
 
 	.result-dims {
 		display: flex;
-		gap: 8px;
+		gap: 12px;
+		min-width: 0;
 	}
 	.dim-bar-wrap {
 		flex: 1;
@@ -658,19 +659,23 @@
 		flex-direction: column;
 		gap: 2px;
 	}
-	.dim-bar {
+	.dim-track {
 		height: 4px;
-		background: var(--accent-cyan);
-		border-radius: 2px;
-		opacity: 0.7;
-		transition: width 0.3s;
+		border-radius: 999px;
+		background: var(--border-subtle);
+		overflow: hidden;
+	}
+	.dim-bar {
+		height: 100%;
+		background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, transparent), var(--accent));
+		border-radius: 999px;
 	}
 	.dim-label {
-		font-size: 0.55rem;
+		font-size: 0.6rem;
 		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.result-meta {
@@ -683,15 +688,17 @@
 	}
 
 	.trend-badge {
-		font-size: 0.65rem;
-		padding: 1px 6px;
-		border-radius: 4px;
-		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 500;
+		padding: 1px 8px;
+		border-radius: 999px;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
 	}
-	.trend-up { background: rgba(0,255,136,0.15); color: var(--accent-green); }
-	.trend-down { background: rgba(255,51,85,0.15); color: var(--accent-red); }
-	.trend-stable { background: rgba(68,136,255,0.15); color: var(--accent-blue); }
-	.trend-new { background: rgba(136,136,160,0.15); color: var(--text-muted); }
+	.trend-up { background: color-mix(in srgb, var(--accent-green) 15%, transparent); color: var(--accent-green); }
+	.trend-down { background: color-mix(in srgb, var(--accent-red) 15%, transparent); color: var(--accent-red); }
+	.trend-stable { background: color-mix(in srgb, var(--accent-blue) 15%, transparent); color: var(--accent-blue); }
+	.trend-new { background: color-mix(in srgb, var(--accent-grey) 15%, transparent); color: var(--text-muted); }
 
 	/* Comparison panel */
 	.comparison-panel {
@@ -740,14 +747,14 @@
 	}
 
 	.coin-tag {
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.7rem;
 		padding: 2px 6px;
 		border-radius: 4px;
 	}
-	.coin-match { background: rgba(0,255,136,0.15); color: var(--accent-green); }
-	.coin-target { background: rgba(0,204,221,0.15); color: var(--accent-cyan); }
-	.coin-candidate { background: rgba(255,170,0,0.15); color: var(--accent-yellow); }
+	.coin-match { background: color-mix(in srgb, var(--accent-green) 15%, transparent); color: var(--accent-green); }
+	.coin-target { background: color-mix(in srgb, var(--accent-cyan) 15%, transparent); color: var(--accent-cyan); }
+	.coin-candidate { background: color-mix(in srgb, var(--accent-yellow) 15%, transparent); color: var(--accent-yellow); }
 
 	@media (max-width: 1024px) {
 		.result-main {
@@ -768,27 +775,27 @@
 		flex-direction: column;
 		gap: 2px;
 		padding: 6px 10px;
-		border-left: 2px solid var(--accent-yellow, #f59e0b);
-		background: rgba(245, 158, 11, 0.06);
+		border-left: 2px solid var(--accent-yellow);
+		background: color-mix(in srgb, var(--accent-yellow) 6%, transparent);
 		font-size: 0.68rem;
 	}
 	.market-rarity.no-bonus {
-		border-left-color: var(--border, #2a2a4a);
-		background: rgba(136, 136, 160, 0.05);
+		border-left-color: var(--border);
+		background: color-mix(in srgb, var(--accent-grey) 5%, transparent);
 	}
 	.mr-head {
 		font-weight: 600;
 	}
 	.mr-bonus {
-		color: var(--accent-yellow, #f59e0b);
+		color: var(--accent-yellow);
 		margin-left: 6px;
 	}
 	.mr-none {
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 		margin-left: 6px;
 	}
 	.mr-why {
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 	}
 
 	.policy-bar {
@@ -797,15 +804,15 @@
 		gap: 3px;
 		padding: 8px 12px;
 		margin-bottom: 12px;
-		border-left: 3px solid var(--accent-cyan, #00ccdd);
-		background: rgba(0, 204, 221, 0.06);
+		border-left: 3px solid var(--accent-cyan);
+		background: color-mix(in srgb, var(--accent-cyan) 6%, transparent);
 		font-size: 0.72rem;
 	}
 	.policy-bar.policy-warn {
-		border-left-color: var(--accent-yellow, #f59e0b);
-		background: rgba(245, 158, 11, 0.07);
+		border-left-color: var(--accent-yellow);
+		background: color-mix(in srgb, var(--accent-yellow) 7%, transparent);
 	}
 	.policy-note {
-		color: var(--accent-yellow, #f59e0b);
+		color: var(--accent-yellow);
 	}
 </style>

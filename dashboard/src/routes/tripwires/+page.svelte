@@ -196,5 +196,5 @@
 	h3 { font-size: 0.95rem; margin: 16px 0 8px; }
 	section { margin-bottom: 20px; }
 	table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-	th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border, #2a2a2a); }
+	th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 </style>

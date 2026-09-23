@@ -521,9 +521,13 @@ export function badgeFor(score, th) {
  */
 export function formatUSD(val) {
 	if (val == null) return '—';
-	if (Math.abs(val) >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-	if (Math.abs(val) >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
-	return `$${val.toFixed(2)}`;
+	// The sign goes before the currency symbol ("−$36.19M", not "$-36.19M"), and
+	// as a true minus so it is the same width as "+" in tabular figures.
+	const sign = val < 0 ? '−' : '';
+	const a = Math.abs(val);
+	if (a >= 1_000_000) return `${sign}$${(a / 1_000_000).toFixed(2)}M`;
+	if (a >= 1_000) return `${sign}$${(a / 1_000).toFixed(1)}K`;
+	return `${sign}$${a.toFixed(2)}`;
 }
 
 /**

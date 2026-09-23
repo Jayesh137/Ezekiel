@@ -9,6 +9,9 @@
 	import Addr from '$lib/Addr.svelte';
 	import Chart from 'chart.js/auto';
 	import 'chartjs-adapter-date-fns';
+	import { C, SERIES, alpha, areaFill, tooltip, scale, tickFont, applyChartDefaults } from '$lib/ui/chartTheme.js';
+
+	applyChartDefaults(Chart);
 
 	let positions = null;
 	let spot = null;
@@ -62,47 +65,27 @@
 	});
 
 	const CHART_COLORS = {
-		cyan: 'rgba(0, 204, 221, 1)',
-		cyanFill: 'rgba(0, 204, 221, 0.08)',
-		green: 'rgba(0, 255, 136, 1)',
-		greenFill: 'rgba(0, 255, 136, 0.08)',
-		red: 'rgba(255, 51, 85, 1)',
-		redFill: 'rgba(255, 51, 85, 0.08)',
-		purple: 'rgba(170, 102, 255, 1)',
-		purpleFill: 'rgba(170, 102, 255, 0.08)',
-		yellow: 'rgba(255, 170, 0, 1)',
-		blue: 'rgba(68, 136, 255, 1)',
-		grid: 'rgba(42, 42, 74, 0.5)',
-		gridZero: 'rgba(42, 42, 74, 0.8)',
-		tick: 'rgba(136, 136, 160, 0.8)',
+		cyan: C.accent,
+		cyanFill: areaFill(C.accent),
+		green: C.green,
+		red: C.red,
+		purple: C.purple,
+		purpleFill: areaFill(C.purple),
 	};
 
 	const baseScales = {
-		x: {
+		x: scale({
 			type: 'time',
 			time: { unit: 'hour', displayFormats: { hour: 'MMM d HH:mm' } },
-			grid: { color: CHART_COLORS.grid, drawBorder: false },
-			ticks: { color: CHART_COLORS.tick, font: { family: "'JetBrains Mono', monospace", size: 10 }, maxTicksLimit: 8 },
-			border: { display: false },
-		},
-		y: {
-			grid: { color: CHART_COLORS.grid, drawBorder: false },
-			ticks: { color: CHART_COLORS.tick, font: { family: "'JetBrains Mono', monospace", size: 10 } },
-			border: { display: false },
-		},
+			grid: { display: false },
+			ticks: { maxTicksLimit: 7, maxRotation: 0 },
+		}),
+		y: scale({ ticks: { maxTicksLimit: 6 } }),
 	};
 
 	const basePlugins = {
 		legend: { display: false },
-		tooltip: {
-			backgroundColor: 'rgba(18, 18, 26, 0.95)',
-			borderColor: 'rgba(42, 42, 74, 0.8)',
-			borderWidth: 1,
-			titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
-			bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
-			padding: 10,
-			cornerRadius: 6,
-		},
+		tooltip,
 	};
 
 	async function renderCharts() {
@@ -123,8 +106,10 @@
 						backgroundColor: CHART_COLORS.cyanFill,
 						borderWidth: 2,
 						fill: true,
-						tension: 0.3,
+						tension: 0.35,
 						pointRadius: 0,
+						pointHoverRadius: 4,
+						pointHoverBackgroundColor: C.text,
 						pointHitRadius: 8,
 					}]
 				},
@@ -162,11 +147,13 @@
 					datasets: [{
 						data: pnlh.map(([ts, val]) => ({ x: ts, y: parseFloat(val) })),
 						borderColor: CHART_COLORS.green,
-						backgroundColor: CHART_COLORS.greenFill,
 						borderWidth: 2,
-						fill: true,
-						tension: 0.3,
+						// Shade by sign, like the line: green above zero, red below.
+						fill: { target: 'origin', above: alpha(C.green, 0.12), below: alpha(C.red, 0.12) },
+						tension: 0.35,
 						pointRadius: 0,
+						pointHoverRadius: 4,
+						pointHoverBackgroundColor: C.text,
 						pointHitRadius: 8,
 						segment: {
 							borderColor: ctx => ctx.p1.parsed.y < 0 ? CHART_COLORS.red : CHART_COLORS.green,
@@ -225,8 +212,10 @@
 						backgroundColor: CHART_COLORS.purpleFill,
 						borderWidth: 2,
 						fill: true,
-						tension: 0.3,
+						tension: 0.35,
 						pointRadius: 0,
+						pointHoverRadius: 4,
+						pointHoverBackgroundColor: C.text,
 						pointHitRadius: 8,
 					}]
 				},
@@ -267,12 +256,14 @@
 					}))
 					.sort((a, b) => b.notional - a.notional);
 
-				const palette = [
-					CHART_COLORS.cyan, CHART_COLORS.green, CHART_COLORS.purple,
-					CHART_COLORS.yellow, CHART_COLORS.blue, CHART_COLORS.red,
-					'rgba(0, 180, 180, 1)', 'rgba(180, 120, 255, 1)',
-					'rgba(255, 200, 0, 1)', 'rgba(100, 200, 100, 1)',
-				];
+				// Nine largest by name, the tail folded into one slice: 28 slivers
+				// with a 28-row legend communicated nothing. The total is unchanged.
+				const TOP = 9;
+				if (sorted.length > TOP + 1) {
+					const tail = sorted.splice(TOP);
+					sorted.push({ coin: `Other (${tail.length})`, notional: tail.reduce((a, p) => a + p.notional, 0) });
+				}
+				const palette = [...SERIES.slice(0, 7), '#6b7280', '#c084fc', '#3f3f46'];
 
 				allocChart = new Chart(allocChartEl, {
 					type: 'doughnut',
@@ -281,27 +272,29 @@
 						datasets: [{
 							data: sorted.map(p => p.notional),
 							backgroundColor: sorted.map((_, i) => palette[i % palette.length]),
-							borderColor: 'rgba(26, 26, 46, 1)',
+							borderColor: C.surface,
 							borderWidth: 2,
+							hoverOffset: 6,
 						}]
 					},
 					options: {
 						responsive: true,
 						maintainAspectRatio: false,
-						cutout: '65%',
+						cutout: '72%',
 						plugins: {
 							legend: {
 								position: 'right',
 								labels: {
-									color: CHART_COLORS.tick,
-									font: { family: "'JetBrains Mono', monospace", size: 10 },
-									padding: 8,
+									color: C.textSecondary,
+									font: tickFont,
+									padding: 10,
 									usePointStyle: true,
-									pointStyleWidth: 8,
+									boxWidth: 8,
+									boxHeight: 8,
 								},
 							},
 							tooltip: {
-								...basePlugins.tooltip,
+								...tooltip,
 								callbacks: {
 									label: ctx => {
 										const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
@@ -366,7 +359,7 @@
 	{@const alertState = getAlertState(fundFlows, candidates, hlTransfers, scan)}
 	{#if alertState}
 		<div class="alert-banner alert-{alertState.level}">
-			<span class="alert-label">[{alertState.level.toUpperCase()}]</span>
+			<span class="alert-label">{alertState.level.toUpperCase()}</span>
 			{alertState.msg}
 			{#if alertState.wallet}
 				<span style="margin: 0 8px;"><Addr address={alertState.wallet} /></span>
@@ -395,7 +388,7 @@
 
 	<div class="grid-4 stats-row">
 		<div class="card">
-			<div class="stat-value text-blue">{formatUSD(accountValue)}</div>
+			<div class="stat-value">{formatUSD(accountValue)}</div>
 			<!-- Perp + HIP-3 margin accounts only. The chart below plots
 			     Hyperliquid's portfolio series, which also includes spot, so the
 			     two differ by roughly 3x — measured 2026-08-05: $6.07M perp +
@@ -411,11 +404,11 @@
 			<div class="stat-label">Unrealized PnL</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-yellow">{openPositions.length}</div>
+			<div class="stat-value">{openPositions.length}</div>
 			<div class="stat-label">Open Positions</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-purple">{formatUSD(totalNotional)}</div>
+			<div class="stat-value">{formatUSD(totalNotional)}</div>
 			<div class="stat-label">Total Notional</div>
 		</div>
 	</div>
@@ -428,15 +421,15 @@
 			<div class="stat-label">Margin Utilization</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-muted">{index?.stats?.total_fills?.toLocaleString() ?? '—'}</div>
+			<div class="stat-value">{index?.stats?.total_fills?.toLocaleString() ?? '—'}</div>
 			<div class="stat-label">Total Fills</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-muted">{index?.stats?.total_funding?.toLocaleString() ?? '—'}</div>
+			<div class="stat-value">{index?.stats?.total_funding?.toLocaleString() ?? '—'}</div>
 			<div class="stat-label">Funding Events</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-muted">{scan?.matches_found ?? '—'}</div>
+			<div class="stat-value">{scan?.matches_found ?? '—'}</div>
 			<div class="stat-label">Scanner Matches</div>
 		</div>
 	</div>
@@ -494,7 +487,7 @@
 
 	{#if openPositions.length > 0}
 		<div class="card" style="margin-top:24px">
-			<h2 style="margin-bottom:16px; font-size:1.1rem">Open Positions</h2>
+			<h2 style="margin-bottom:16px">Open Positions</h2>
 			<table>
 				<thead>
 					<tr>
@@ -513,13 +506,13 @@
 						{@const size = parseFloat(pos.szi)}
 						{@const pnl = parseFloat(pos.unrealizedPnl || 0)}
 						<tr>
-							<td><strong>{pos.coin}</strong></td>
+							<td class="coin">{pos.coin}</td>
 							<td>
 								<span class="badge" class:badge-green={size > 0} class:badge-red={size < 0}>
 									{size > 0 ? 'LONG' : 'SHORT'}
 								</span>
 							</td>
-							<td>{Math.abs(size).toFixed(4)}</td>
+							<td>{Math.abs(size).toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
 							<td>{formatUSD(parseFloat(pos.entryPx || 0))}</td>
 							<td>{formatUSD(parseFloat(pos.positionValue || 0) / Math.abs(size) || 0)}</td>
 							<td>{pos.leverage?.value || '—'}x</td>
@@ -541,7 +534,7 @@
 	{@const spotBalances = getSpotBalances(spot)}
 	{#if spotBalances.length > 0}
 		<div class="card" style="margin-top:24px">
-			<h2 style="margin-bottom:16px; font-size:1.1rem">Spot Positions</h2>
+			<h2 style="margin-bottom:16px">Spot Positions</h2>
 			<table>
 				<thead>
 					<tr>
@@ -554,9 +547,9 @@
 				<tbody>
 					{#each spotBalances as bal}
 						<tr>
-							<td><strong>{bal.coin}</strong></td>
-							<td>{parseFloat(bal.total || 0).toFixed(4)}</td>
-							<td>{parseFloat(bal.hold || 0).toFixed(4)}</td>
+							<td class="coin">{bal.coin}</td>
+							<td>{parseFloat(bal.total || 0).toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
+							<td>{parseFloat(bal.hold || 0).toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
 							<td>{bal.entryNtl ? formatUSD(parseFloat(bal.entryNtl) / parseFloat(bal.total || 1)) : '—'}</td>
 						</tr>
 					{/each}
@@ -567,23 +560,23 @@
 
 	{#if fingerprint}
 		<div class="card" style="margin-top:24px">
-			<h2 style="margin-bottom:16px; font-size:1.1rem">Fingerprint Summary</h2>
+			<h2 style="margin-bottom:16px">Fingerprint Summary</h2>
 			<div class="grid-3">
 				<div>
 					<div class="stat-label">Total Fills</div>
-					<div class="mono">{fingerprint.data_range?.total_fills ?? '—'}</div>
+					<div class="num">{fingerprint.data_range?.total_fills ?? '—'}</div>
 				</div>
 				<div>
 					<div class="stat-label">Days Active</div>
-					<div class="mono">{fingerprint.data_range?.total_days_active ?? '—'}</div>
+					<div class="num">{fingerprint.data_range?.total_days_active ?? '—'}</div>
 				</div>
 				<div>
 					<div class="stat-label">Top Coins</div>
-					<div class="mono">{fingerprint.asset_preferences?.top_5_by_volume?.join(', ') ?? '—'}</div>
+					<div class="num">{fingerprint.asset_preferences?.top_5_by_volume?.join(', ') ?? '—'}</div>
 				</div>
 				<div>
 					<div class="stat-label">Win Rate</div>
-					<div class="mono">{fingerprint.entry_exit_style?.win_rate ? (fingerprint.entry_exit_style.win_rate * 100).toFixed(1) + '%' : '—'}</div>
+					<div class="num">{fingerprint.entry_exit_style?.win_rate ? (fingerprint.entry_exit_style.win_rate * 100).toFixed(1) + '%' : '—'}</div>
 				</div>
 				<div>
 					<div class="stat-label">Market/Limit Ratio</div>
@@ -593,7 +586,7 @@
 				</div>
 				<div>
 					<div class="stat-label">Computed</div>
-					<div class="mono text-muted">{fingerprint.computed_at?.split('T')[0] ?? '—'}</div>
+					<div class="num text-muted">{fingerprint.computed_at?.split('T')[0] ?? '—'}</div>
 				</div>
 			</div>
 		</div>
@@ -602,7 +595,7 @@
 	{#if scan?.results?.length > 0}
 		<div class="card" style="margin-top:24px">
 			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-				<h2 style="font-size:1.1rem">Top Scanner Matches</h2>
+				<h2>Top Scanner Matches</h2>
 				<a href="scanner" class="text-muted" style="font-size:0.8rem">View all →</a>
 			</div>
 			<table>
@@ -629,11 +622,11 @@
 									{(s * 100).toFixed(1)}%
 								</strong>
 							</td>
-							<td class="mono">{r.dimensions?.asset_preferences ? (r.dimensions.asset_preferences * 100).toFixed(0) + '%' : '—'}</td>
-							<td class="mono">{r.dimensions?.timing_profile ? (r.dimensions.timing_profile * 100).toFixed(0) + '%' : '—'}</td>
-							<td class="mono">{r.dimensions?.leverage_profile ? (r.dimensions.leverage_profile * 100).toFixed(0) + '%' : '—'}</td>
-							<td class="mono">{r.dimensions?.entry_exit_style ? (r.dimensions.entry_exit_style * 100).toFixed(0) + '%' : '—'}</td>
-							<td class="mono">{r.dimensions?.hold_duration ? (r.dimensions.hold_duration * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="num">{r.dimensions?.asset_preferences ? (r.dimensions.asset_preferences * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="num">{r.dimensions?.timing_profile ? (r.dimensions.timing_profile * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="num">{r.dimensions?.leverage_profile ? (r.dimensions.leverage_profile * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="num">{r.dimensions?.entry_exit_style ? (r.dimensions.entry_exit_style * 100).toFixed(0) + '%' : '—'}</td>
+							<td class="num">{r.dimensions?.hold_duration ? (r.dimensions.hold_duration * 100).toFixed(0) + '%' : '—'}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -643,19 +636,19 @@
 
 	{#if fees}
 		<div class="card" style="margin-top:24px">
-			<h2 style="margin-bottom:16px; font-size:1.1rem">Fee Schedule</h2>
+			<h2 style="margin-bottom:16px">Fee Schedule</h2>
 			<div class="grid-3">
 				<div>
 					<div class="stat-label">Daily Volume</div>
-					<div class="mono">{formatUSD(parseFloat(fees.dailyVlm || 0))}</div>
+					<div class="num">{formatUSD(parseFloat(fees.dailyVlm || 0))}</div>
 				</div>
 				<div>
 					<div class="stat-label">Maker Rate</div>
-					<div class="mono">{fees.userMakerRate ? (parseFloat(fees.userMakerRate) * 100).toFixed(4) + '%' : '—'}</div>
+					<div class="num">{fees.userMakerRate ? (parseFloat(fees.userMakerRate) * 100).toFixed(4) + '%' : '—'}</div>
 				</div>
 				<div>
 					<div class="stat-label">Taker Rate</div>
-					<div class="mono">{fees.userTakerRate ? (parseFloat(fees.userTakerRate) * 100).toFixed(4) + '%' : '—'}</div>
+					<div class="num">{fees.userTakerRate ? (parseFloat(fees.userTakerRate) * 100).toFixed(4) + '%' : '—'}</div>
 				</div>
 			</div>
 		</div>
@@ -667,36 +660,25 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 10px 16px;
-		border-radius: 8px;
-		margin-bottom: 20px;
+		padding: 12px 16px;
+		border-radius: var(--radius-sm);
+		margin-bottom: 24px;
 		font-size: 0.85rem;
 		font-weight: 500;
 		flex-wrap: wrap;
 	}
-	.alert-critical { background: rgba(255,51,85,0.15); border: 1px solid rgba(255,51,85,0.4); color: var(--accent-red); }
-	.alert-high { background: rgba(255,51,85,0.10); border: 1px solid rgba(255,51,85,0.3); color: var(--accent-red); }
-	.alert-warn { background: rgba(255,170,0,0.12); border: 1px solid rgba(255,170,0,0.3); color: var(--accent-yellow); }
-	.alert-medium { background: rgba(255,170,0,0.08); border: 1px solid rgba(255,170,0,0.2); color: var(--accent-yellow); }
-	.alert-label { font-family: var(--font-mono); font-weight: 700; }
+	.alert-critical { background: var(--tint-red); border: 1px solid color-mix(in srgb, var(--accent-red) 40%, transparent); color: var(--accent-red); }
+	.alert-high { background: color-mix(in srgb, var(--accent-red) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent-red) 28%, transparent); color: var(--accent-red); }
+	.alert-warn { background: var(--tint-yellow); border: 1px solid color-mix(in srgb, var(--accent-yellow) 35%, transparent); color: var(--accent-yellow); }
+	.alert-medium { background: color-mix(in srgb, var(--accent-yellow) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent-yellow) 22%, transparent); color: var(--accent-yellow); }
+	.alert-label { font-weight: 700; letter-spacing: 0.06em; font-size: 0.75rem; }
 	.alert-link { margin-left: auto; opacity: 0.8; font-size: 0.8rem; }
 	.alert-link:hover { opacity: 1; }
 
-	.page-header {
-		margin-bottom: 28px;
-	}
-	.page-header h1 {
-		font-size: 1.6rem;
-		font-weight: 700;
-	}
-	.loading {
-		text-align: center;
-		padding: 60px;
-		color: var(--text-muted);
-	}
 	.stats-row {
-		margin-bottom: 8px;
+		margin-bottom: 16px;
 	}
+	td.coin { font-weight: 600; }
 	.charts-section {
 		margin-top: 24px;
 		display: flex;
@@ -712,7 +694,7 @@
 		min-width: 0;
 	}
 	.chart-card-sm {
-		flex: 0 0 340px;
+		flex: 0 0 400px;
 	}
 	.chart-header {
 		display: flex;
@@ -720,23 +702,19 @@
 		align-items: center;
 		margin-bottom: 16px;
 	}
-	.chart-header h2 {
-		font-size: 1.1rem;
-		font-weight: 600;
-	}
+	.chart-header h2 { margin: 0; }
 	.chart-badge {
-		font-family: var(--font-mono);
-		font-size: 0.7rem;
+		font-size: 0.72rem;
+		font-variant-numeric: tabular-nums;
 		color: var(--text-muted);
-		background: rgba(255,255,255,0.04);
-		padding: 3px 8px;
-		border-radius: 4px;
+		border: 1px solid var(--border);
+		padding: 2px 8px;
+		border-radius: 999px;
 	}
 	/* Scope note on a heading — quieter than the h2 so it reads as a qualifier
 	   rather than part of the title. */
 	.chart-note {
-		font-family: var(--font-mono);
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		font-weight: 400;
 		color: var(--text-muted);
 		margin-left: 6px;

@@ -95,7 +95,7 @@
 		<tbody>
 			{#each rows as w (w.wallet)}
 				<tr class="row" on:click={() => toggle(w.wallet)}>
-					<td><Addr addr={w.wallet} /></td>
+					<td><Addr address={w.wallet} stopPropagation /></td>
 					<td><span class="badge {TIER_BADGE[w.tier] || 'badge-grey'}">{TIER_LABEL[w.tier] || w.tier}</span></td>
 					<td class="num">{w.vector_count}</td>
 					<!-- Rule 6 in the UI: `confidence` is produced by the transfer graph
@@ -170,7 +170,7 @@
 	.tiers { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
 	.toggle { display: block; margin: 0.75rem 0; font-size: 0.9rem; }
 	table { width: 100%; border-collapse: collapse; }
-	th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border, #222); }
+	th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
 	th.num, td.num { text-align: right; }
 	.row { cursor: pointer; }
 	.row:hover { background: rgba(255,255,255,0.03); }

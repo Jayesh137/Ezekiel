@@ -1,154 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
+/* --- Design tokens -----------------------------------------------------------
+   One palette for every page and the phone app (docs/superpowers/specs/
+   2026-09-23-dashboard-restyle-design.md). Quiet zinc neutrals, one indigo
+   interaction accent, and status colours that carry MEANING only — tier,
+   severity, delta — never decoration.
+
+   The legacy names (--bg-card, --accent-green, ...) are the public API: every
+   page and the review app read them, so they keep their names and take the new
+   values. Contrast measured against the LIGHTEST surface a colour sits on
+   (--bg-card-hover #1c1c21), so the figures hold on a hovered row:
+     text-primary 14.5:1 · secondary 6.6:1 · muted 4.7:1 (AA body)
+     green 8.8 · red 6.1 · blue 6.5 · amber 9.4 · purple 7.0 · cyan 8.7 */
 :root {
-	--bg-primary: #0a0a0f;
-	--bg-secondary: #12121a;
-	--bg-card: #1a1a2e;
-	--bg-card-hover: #222240;
-	--border: #2a2a4a;
-	/* Contrast measured against the darkest AND lightest surfaces these sit on
-	   (--bg-primary #0a0a0f through --bg-card-hover #222240), so the figures hold
-	   on a hovered card, not just on the page. --text-muted was #555570, which is
-	   2.13:1 on a hovered card — below even the 3:1 large-text floor — while
-	   carrying real content: the data-freshness indicator, chart axis labels and
-	   secondary table columns. --text-secondary was 4.43:1, marginally under AA.
-	   Both raised; the luminance ordering primary > secondary > muted is
-	   preserved, so the visual hierarchy is unchanged. */
-	--text-primary: #e0e0e8;   /* 11.67:1 worst case */
-	--text-secondary: #a8a8c4; /*  6.61:1 worst case */
-	--text-muted: #8a8aa8;     /*  4.58:1 worst case — clears AA for body text */
-	--accent-green: #00ff88;
-	--accent-red: #ff3355;
-	--accent-blue: #4488ff;
-	--accent-purple: #aa66ff;
-	--accent-yellow: #ffaa00;
-	--accent-cyan: #00ccdd;
-	--font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
+	color-scheme: dark;
 
-* {
-	margin: 0;
-	padding: 0;
-	box-sizing: border-box;
-}
+	--bg-primary: #09090b;     /* canvas */
+	--bg-secondary: #0e0e11;   /* sidebar, insets, wells */
+	--bg-card: #111114;        /* raised surface */
+	--bg-card-hover: #1c1c21;  /* hovered row / selected control */
+	--bg-elevated: #16161a;    /* popovers, tooltips, sticky headers */
 
-body {
-	font-family: var(--font-sans);
-	background: var(--bg-primary);
-	color: var(--text-primary);
-	line-height: 1.6;
-	min-height: 100vh;
-}
+	--border: #26262c;
+	--border-subtle: #1c1c21;
+	--border-strong: #34343c;
+	--highlight: rgba(255, 255, 255, 0.045); /* 1px top sheen on raised surfaces */
 
-a { color: var(--accent-blue); text-decoration: none; }
-a:hover { text-decoration: underline; }
+	--text-primary: #ededf0;
+	--text-secondary: #a1a1aa;
+	--text-muted: #86868f;
 
-/* Keyboard focus. The UA default ring was never removed, so focus was already
-   visible — but on a near-black background it is thin and low-contrast, and this
-   page is a dense grid of 380+ wallet links on the scanner route. An explicit
-   high-contrast ring makes the focused element findable at a glance. Scoped to
-   :focus-visible so it appears for keyboard and programmatic focus without
-   ringing every mouse click. */
-:focus-visible {
-	outline: 2px solid var(--accent-cyan);
-	outline-offset: 2px;
-	border-radius: 2px;
-}
+	--accent: #8b93ff;         /* interaction: links, focus, active nav */
+	--accent-green: #34d399;
+	--accent-red: #f87171;
+	--accent-blue: #7c9cff;
+	--accent-purple: #b596f8;
+	--accent-yellow: #f5b544;
+	--accent-cyan: #5cc8d7;
+	--accent-grey: #9a9aa6;
 
-.card {
-	background: var(--bg-card);
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 24px;
-	transition: border-color 0.2s;
-}
-.card:hover { border-color: var(--accent-blue); }
+	/* Soft tints for badge fills, banners and selected states. */
+	--tint-accent: color-mix(in srgb, var(--accent) 14%, transparent);
+	--tint-green: color-mix(in srgb, var(--accent-green) 13%, transparent);
+	--tint-red: color-mix(in srgb, var(--accent-red) 13%, transparent);
+	--tint-blue: color-mix(in srgb, var(--accent-blue) 13%, transparent);
+	--tint-purple: color-mix(in srgb, var(--accent-purple) 13%, transparent);
+	--tint-yellow: color-mix(in srgb, var(--accent-yellow) 13%, transparent);
+	--tint-cyan: color-mix(in srgb, var(--accent-cyan) 13%, transparent);
+	--tint-grey: color-mix(in srgb, var(--accent-grey) 12%, transparent);
 
-.badge {
-	display: inline-block;
-	padding: 2px 10px;
-	border-radius: 9999px;
-	font-size: 0.75rem;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-}
-.badge-green { background: rgba(0,255,136,0.15); color: var(--accent-green); }
-.badge-red { background: rgba(255,51,85,0.15); color: var(--accent-red); }
-.badge-blue { background: rgba(68,136,255,0.15); color: var(--accent-blue); }
-.badge-yellow { background: rgba(255,170,0,0.15); color: var(--accent-yellow); }
-.badge-purple { background: rgba(170,102,255,0.15); color: var(--accent-purple); }
-/* Global, not page-scoped: the roster and tripwire pages use these too, and a
-   class defined only inside one page renders unstyled everywhere else. */
-.badge-cyan { background: rgba(0,204,221,0.15); color: #00ccdd; }
-.badge-grey { background: rgba(136,136,160,0.15); color: #8888a0; }
+	--font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-.mono { font-family: var(--font-mono); }
-
-.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-
-@media (max-width: 768px) {
-	.grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-}
-
-table {
-	width: 100%;
-	border-collapse: collapse;
-}
-th, td {
-	padding: 10px 14px;
-	text-align: left;
-	border-bottom: 1px solid var(--border);
-}
-th {
-	color: var(--text-secondary);
-	font-size: 0.8rem;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-}
-td {
-	font-family: var(--font-mono);
-	font-size: 0.85rem;
-}
-tr:hover { background: var(--bg-card-hover); }
-
-.stat-value {
-	font-size: 1.8rem;
-	font-weight: 700;
-	font-family: var(--font-mono);
-}
-.stat-label {
-	font-size: 0.8rem;
-	color: var(--text-secondary);
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	margin-top: 4px;
-}
-
-.text-green { color: var(--accent-green); }
-.text-red { color: var(--accent-red); }
-.text-blue { color: var(--accent-blue); }
-.text-yellow { color: var(--accent-yellow); }
-.text-purple { color: var(--accent-purple); }
-.text-muted { color: var(--text-muted); }
-
-/* --- Tokens for the phone app's UI kit (dashboard/ARCHITECTURE.md §13) -------
-   Motion follows emilkowal.ski/ui/you-dont-need-animations: frequent actions
-   are not animated at all, everything else stays under 300ms, ease-out. */
-:root {
+	--radius-xs: 6px;
 	--radius-sm: 8px;
 	--radius-md: 14px;
 	--radius-lg: 22px;
+
+	--shadow-card: 0 1px 0 0 var(--highlight) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+	--shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+	--shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.45);
+
+	/* Motion follows emilkowal.ski/ui/you-dont-need-animations: frequent
+	   actions are not animated at all, everything else stays under 300ms,
+	   ease-out. */
 	--dur-fast: 100ms;
 	--dur: 180ms;
 	--dur-slow: 240ms;
 	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-	--shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.45);
 }
+
 @media (prefers-reduced-motion: reduce) {
 	:root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
 	*, *::before, *::after {
@@ -157,3 +78,295 @@ tr:hover { background: var(--bg-card-hover); }
 		transition-duration: 0ms !important;
 	}
 }
+
+/* --- Base ------------------------------------------------------------------ */
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html { background: var(--bg-primary); }
+
+body {
+	font-family: var(--font-sans);
+	font-feature-settings: 'cv11', 'ss01', 'ss03';
+	font-size: 15px;
+	background:
+		radial-gradient(900px 480px at 18% -120px, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+		radial-gradient(700px 420px at 92% -160px, color-mix(in srgb, var(--accent-cyan) 5%, transparent), transparent 70%),
+		var(--bg-primary);
+	background-repeat: no-repeat;
+	color: var(--text-primary);
+	line-height: 1.6;
+	min-height: 100vh;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+h1, h2, h3, h4 {
+	letter-spacing: -0.02em;
+	line-height: 1.25;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+h1 { font-size: 1.75rem; letter-spacing: -0.03em; }
+h2 { font-size: 1.05rem; }
+h3 { font-size: 0.95rem; }
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+	transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: color-mix(in srgb, var(--accent) 80%, white); text-decoration: none; }
+
+code, kbd {
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+	padding: 0.1em 0.35em;
+	border-radius: 5px;
+	background: var(--bg-card-hover);
+	border: 1px solid var(--border-subtle);
+}
+
+hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* Keyboard focus. The pages are dense grids of wallet links (380+ on the
+   scanner route), so the focused element must be findable at a glance.
+   Scoped to :focus-visible so mouse clicks do not ring. */
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* Thin, quiet scrollbars on wide tables and the sidebar. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+	background: var(--border-strong);
+	border-radius: 999px;
+	border: 3px solid transparent;
+	background-clip: content-box;
+}
+
+/* --- Page header ----------------------------------------------------------- */
+
+.page-header { margin-bottom: 28px; }
+.page-header h1 { margin-bottom: 6px; }
+.page-header p,
+.page-header .subtitle,
+.page-header .lede {
+	color: var(--text-secondary);
+	font-size: 0.95rem;
+	max-width: 72ch;
+}
+.lede { color: var(--text-secondary); max-width: 76ch; }
+/* Pages that open with a bare h1 + lede instead of a .page-header. */
+h1 + .lede { margin: 6px 0 28px; }
+
+/* The small uppercase label above a section title. */
+.kicker, .section-kicker {
+	display: block;
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+}
+
+/* --- Card ------------------------------------------------------------------ */
+
+.card {
+	background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 92%, white 1.5%) 0%, var(--bg-card) 100%);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-card);
+	padding: 24px;
+	transition: border-color var(--dur) var(--ease-out);
+}
+.card:hover { border-color: var(--border-strong); }
+.card h2, .card h3 { margin-bottom: 12px; }
+
+/* --- Badge ----------------------------------------------------------------- */
+
+.badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 9px;
+	border-radius: 999px;
+	font-size: 0.7rem;
+	font-weight: 600;
+	line-height: 1.6;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	white-space: nowrap;
+	background: var(--tint-grey);
+	color: var(--accent-grey);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
+	font-family: var(--font-sans);
+	vertical-align: middle;
+}
+.badge-green { background: var(--tint-green); color: var(--accent-green); }
+.badge-red { background: var(--tint-red); color: var(--accent-red); }
+.badge-blue { background: var(--tint-blue); color: var(--accent-blue); }
+.badge-yellow { background: var(--tint-yellow); color: var(--accent-yellow); }
+.badge-purple { background: var(--tint-purple); color: var(--accent-purple); }
+/* Global, not page-scoped: the roster and tripwire pages use these too, and a
+   class defined only inside one page renders unstyled everywhere else. */
+.badge-cyan { background: var(--tint-cyan); color: var(--accent-cyan); }
+.badge-grey { background: var(--tint-grey); color: var(--accent-grey); }
+/* Opt-in status dot for badges that name a live state. */
+.badge.dot::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+	box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+/* --- Buttons & inputs ------------------------------------------------------ */
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.btn,
+select,
+input[type='text'],
+input[type='search'],
+input[type='number'],
+input[type='date'] {
+	min-height: 34px;
+	padding: 6px 12px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--border);
+	background: var(--bg-secondary);
+	color: var(--text-primary);
+	font-size: 0.85rem;
+	transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+select:hover, input:hover, .btn:hover { border-color: var(--border-strong); }
+select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+select { cursor: pointer; }
+input::placeholder { color: var(--text-muted); }
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	font-weight: 500;
+	background: var(--bg-card-hover);
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--accent); border-color: transparent; color: #0b0b1a; }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, white); }
+
+/* --- Stats ----------------------------------------------------------------- */
+
+.mono { font-family: var(--font-mono); font-feature-settings: normal; }
+.num, .tabular { font-variant-numeric: tabular-nums; }
+
+.stat-value {
+	font-size: 1.75rem;
+	font-weight: 600;
+	letter-spacing: -0.03em;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+.stat-label {
+	font-size: 0.72rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.07em;
+	margin-top: 6px;
+}
+
+/* --- Layout ---------------------------------------------------------------- */
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+
+@media (max-width: 1100px) {
+	.grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+	.grid-2, .grid-3 { grid-template-columns: 1fr; }
+	/* Stat rows stay two-up on a phone: eight full-width tiles is a scroll,
+	   not a summary. */
+	.grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+	.grid-4 > .card { padding: 16px; }
+	.grid-4 .stat-value { font-size: 1.3rem; }
+}
+
+/* --- Table ----------------------------------------------------------------- */
+
+table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-variant-numeric: tabular-nums;
+}
+th, td {
+	padding: 11px 14px;
+	text-align: left;
+	border-bottom: 1px solid var(--border-subtle);
+	vertical-align: middle;
+}
+th {
+	color: var(--text-muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.07em;
+	border-bottom-color: var(--border);
+	white-space: nowrap;
+}
+td {
+	font-size: 0.86rem;
+	color: var(--text-primary);
+}
+tbody tr { transition: background var(--dur-fast) var(--ease-out); }
+tbody tr:hover { background: color-mix(in srgb, var(--bg-card-hover) 70%, transparent); }
+tbody tr:last-child td { border-bottom: 0; }
+
+/* --- Text colours ---------------------------------------------------------- */
+
+.text-green { color: var(--accent-green); }
+.text-red { color: var(--accent-red); }
+.text-blue { color: var(--accent-blue); }
+.text-yellow { color: var(--accent-yellow); }
+.text-purple { color: var(--accent-purple); }
+.text-cyan { color: var(--accent-cyan); }
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+
+/* --- Loading / empty -------------------------------------------------------- */
+
+.loading, .empty-state {
+	display: grid;
+	place-items: center;
+	gap: 10px;
+	padding: 64px 24px;
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	text-align: center;
+}
+.loading::before {
+	content: '';
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	border: 2px solid var(--border-strong);
+	border-top-color: var(--accent);
+	animation: ezk-spin 0.8s linear infinite;
+}
+@keyframes ezk-spin { to { transform: rotate(360deg); } }

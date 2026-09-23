@@ -2,6 +2,9 @@
 	import { onMount } from 'svelte';
 	import { fetchFingerprint, formatPct } from '$lib/api.js';
 	import Chart from 'chart.js/auto';
+	import { C, SANS, alpha, tooltip, applyChartDefaults } from '$lib/ui/chartTheme.js';
+
+	applyChartDefaults(Chart);
 
 	let fp = null;
 	let loading = true;
@@ -71,12 +74,12 @@
 					datasets: [{
 						label: 'Weight %',
 						data: weights,
-						borderColor: 'rgba(0, 204, 221, 0.9)',
-						backgroundColor: 'rgba(0, 204, 221, 0.15)',
+						borderColor: alpha(C.accent, 0.9),
+						backgroundColor: alpha(C.accent, 0.15),
 						borderWidth: 2,
 						pointRadius: 4,
-						pointBackgroundColor: 'rgba(0, 204, 221, 1)',
-						pointBorderColor: 'rgba(0, 204, 221, 1)',
+						pointBackgroundColor: alpha(C.accent, 1),
+						pointBorderColor: alpha(C.accent, 1),
 					}]
 				},
 				options: {
@@ -88,26 +91,26 @@
 							max: 20,
 							ticks: {
 								stepSize: 5,
-								color: 'rgba(136, 136, 160, 0.5)',
+								color: C.tick,
 								backdropColor: 'transparent',
-								font: { family: "'JetBrains Mono', monospace", size: 9 },
+								font: { family: SANS, size: 9 },
 							},
-							grid: { color: 'rgba(42, 42, 74, 0.5)' },
-							angleLines: { color: 'rgba(42, 42, 74, 0.5)' },
+							grid: { color: C.grid },
+							angleLines: { color: C.grid },
 							pointLabels: {
-								color: 'rgba(224, 224, 232, 0.9)',
-								font: { family: "'JetBrains Mono', monospace", size: 10 },
+								color: C.textSecondary,
+								font: { family: SANS, size: 10 },
 							},
 						}
 					},
 					plugins: {
 						legend: { display: false },
 						tooltip: {
-							backgroundColor: 'rgba(18, 18, 26, 0.95)',
-							borderColor: 'rgba(42, 42, 74, 0.8)',
+							backgroundColor: tooltip.backgroundColor,
+							borderColor: C.border,
 							borderWidth: 1,
-							titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
-							bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+							titleFont: { family: SANS, size: 11 },
+							bodyFont: { family: SANS, size: 11 },
 							callbacks: { label: ctx => ` Weight: ${ctx.raw}%` },
 						},
 					},
@@ -125,7 +128,7 @@
 					labels: dayLabels,
 					datasets: [{
 						data: dow.map(v => v * 100),
-						backgroundColor: dow.map(v => v > 0.1 ? 'rgba(0, 204, 221, 0.7)' : 'rgba(0, 204, 221, 0.3)'),
+						backgroundColor: dow.map(v => v > 0.1 ? alpha(C.accent, 0.7) : alpha(C.accent, 0.3)),
 						borderRadius: 3,
 					}]
 				},
@@ -135,14 +138,14 @@
 					scales: {
 						x: {
 							grid: { display: false },
-							ticks: { color: 'rgba(136, 136, 160, 0.7)', font: { family: "'JetBrains Mono', monospace", size: 10 } },
+							ticks: { color: C.tick, font: { family: SANS, size: 10 } },
 							border: { display: false },
 						},
 						y: {
-							grid: { color: 'rgba(42, 42, 74, 0.3)' },
+							grid: { color: C.grid },
 							ticks: {
-								color: 'rgba(136, 136, 160, 0.5)',
-								font: { family: "'JetBrains Mono', monospace", size: 9 },
+								color: C.tick,
+								font: { family: SANS, size: 9 },
 								callback: v => v.toFixed(0) + '%',
 							},
 							border: { display: false },
@@ -151,10 +154,10 @@
 					plugins: {
 						legend: { display: false },
 						tooltip: {
-							backgroundColor: 'rgba(18, 18, 26, 0.95)',
-							borderColor: 'rgba(42, 42, 74, 0.8)',
+							backgroundColor: tooltip.backgroundColor,
+							borderColor: C.border,
 							borderWidth: 1,
-							bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+							bodyFont: { family: SANS, size: 11 },
 							callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)}% of trades` },
 						},
 					},
@@ -199,15 +202,15 @@
 
 	<div class="grid-3" style="margin-bottom:24px">
 		<div class="card">
-			<div class="stat-value text-blue">{fp.data_range?.total_fills?.toLocaleString() ?? '—'}</div>
+			<div class="stat-value">{fp.data_range?.total_fills?.toLocaleString() ?? '—'}</div>
 			<div class="stat-label">Total Fills Analyzed</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-yellow">{fp.data_range?.total_days_active ?? '—'}</div>
+			<div class="stat-value">{fp.data_range?.total_days_active ?? '—'}</div>
 			<div class="stat-label">Days Active</div>
 		</div>
 		<div class="card">
-			<div class="stat-value text-muted">{fp.asset_preferences?.total_unique_coins ?? '—'}</div>
+			<div class="stat-value">{fp.asset_preferences?.total_unique_coins ?? '—'}</div>
 			<div class="stat-label">Unique Coins Traded</div>
 		</div>
 	</div>
@@ -225,14 +228,14 @@
 				<div class="health-item">
 					<span class="health-label">xyz: HIP-3 Markets</span>
 					{#if health.xyzPresent}
-						<span class="text-green mono">Present ({health.xyzCoins.length} markets) — scanner has rare identifiers</span>
+						<span class="text-green num">Present ({health.xyzCoins.length} markets) — scanner has rare identifiers</span>
 					{:else}
 						<span class="text-red mono">ABSENT — scanner lacks unique HIP-3 market identifiers</span>
 					{/if}
 				</div>
 				<div class="health-item">
 					<span class="health-label">xyz: Coins</span>
-					<span class="mono">{health.xyzCoins.length > 0 ? health.xyzCoins.join(', ') : '—'}</span>
+					<span class="num">{health.xyzCoins.length > 0 ? health.xyzCoins.join(', ') : '—'}</span>
 				</div>
 			</div>
 		</div>
@@ -326,7 +329,7 @@
 					{#each Object.entries(dim.data).filter(([k]) => k !== 'weight') as [key, val]}
 						<div class="dim-row">
 							<span class="text-muted">{key}:</span>
-							<span class="mono">{formatVal(val)}</span>
+							<span class="num">{formatVal(val)}</span>
 						</div>
 					{/each}
 				</div>
@@ -336,15 +339,12 @@
 {/if}
 
 <style>
-	.page-header { margin-bottom: 24px; }
-	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
-	.loading { text-align: center; padding: 60px; color: var(--text-muted); }
 
 	.fp-health-warning {
-		background: rgba(255,170,0,0.10);
-		border: 1px solid rgba(255,170,0,0.3);
+		background: color-mix(in srgb, var(--accent-yellow) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--accent-yellow) 30%, transparent);
 		color: var(--accent-yellow);
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.78rem;
 		padding: 10px 14px;
 		border-radius: 8px;
@@ -383,7 +383,7 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 6px 0;
-		border-bottom: 1px solid rgba(42, 42, 74, 0.3);
+		border-bottom: 1px solid var(--border);
 	}
 	.trait:last-child { border-bottom: none; }
 	.trait-label {
@@ -391,7 +391,7 @@
 		color: var(--text-secondary);
 	}
 	.trait-value {
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.8rem;
 	}
 
@@ -412,7 +412,7 @@
 	}
 	.hour-bar {
 		width: 100%;
-		background: var(--accent-cyan);
+		background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 55%, transparent));
 		border-radius: 2px 2px 0 0;
 		min-height: 2px;
 		opacity: 0.8;
@@ -423,7 +423,7 @@
 		font-size: 0.6rem;
 		color: var(--text-muted);
 		margin-top: 4px;
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 	}
 	.dim-details {
 		display: flex;
@@ -436,7 +436,9 @@
 		gap: 8px;
 		overflow: hidden;
 	}
+	.dim-row .num,
 	.dim-row .mono {
+		min-width: 0;
 		font-size: 0.75rem;
 		word-break: break-all;
 	}

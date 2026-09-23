@@ -81,7 +81,7 @@
 						</td>
 						<td class="text-muted">{fill.dir || '—'}</td>
 						<td>{formatUSD(parseFloat(fill.px || 0))}</td>
-						<td>{parseFloat(fill.sz || 0).toFixed(4)}</td>
+						<td>{parseFloat(fill.sz || 0).toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
 						<td>{formatUSD(notional)}</td>
 						<td class="text-muted">{formatUSD(parseFloat(fill.fee || 0))}</td>
 						<td class:text-green={pnl > 0} class:text-red={pnl < 0}>
@@ -95,16 +95,8 @@
 {/if}
 
 <style>
-	.page-header { margin-bottom: 24px; }
-	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
-	.loading { text-align: center; padding: 60px; color: var(--text-muted); }
 	.date-select {
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		color: var(--text-primary);
-		padding: 6px 12px;
-		border-radius: 6px;
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.85rem;
 	}
 </style>

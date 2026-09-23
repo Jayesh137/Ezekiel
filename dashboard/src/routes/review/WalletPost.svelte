@@ -144,10 +144,10 @@
 		border-radius: 999px;
 		white-space: nowrap;
 	}
-	.tier-confirmed { background: rgba(255, 51, 85, 0.15); color: var(--accent-red); }
-	.tier-probable { background: rgba(255, 170, 0, 0.15); color: var(--accent-yellow); }
-	.tier-possible { background: rgba(0, 204, 221, 0.15); color: var(--accent-cyan); }
-	.tier-watch { background: rgba(136, 136, 160, 0.15); color: var(--text-secondary); }
+	.tier-confirmed { background: color-mix(in srgb, var(--accent-red) 15%, transparent); color: var(--accent-red); }
+	.tier-probable { background: color-mix(in srgb, var(--accent-yellow) 15%, transparent); color: var(--accent-yellow); }
+	.tier-possible { background: color-mix(in srgb, var(--accent-cyan) 15%, transparent); color: var(--accent-cyan); }
+	.tier-watch { background: color-mix(in srgb, var(--accent-grey) 15%, transparent); color: var(--text-secondary); }
 	.flag.new { background: var(--accent-cyan); color: var(--bg-primary); }
 	.flag.changed { background: var(--accent-yellow); color: var(--bg-primary); }
 	.evidence {

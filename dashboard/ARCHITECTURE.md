@@ -560,3 +560,15 @@ The owner pointed at ten sources. Measured on 2026-09-22:
 Tokens are added to `app.css`, not a new file, so every page shares them:
 `--radius-sm/md/lg`, `--dur-fast` (100ms), `--dur` (180ms), `--dur-slow`
 (240ms), `--ease-out` and `--shadow-sheet`.
+
+**2026-09-23: the whole dashboard now shares one design**
+(`docs/superpowers/specs/2026-09-23-dashboard-restyle-design.md`). Still no
+dependencies. The palette moved from neon-on-navy to quiet zinc neutrals with
+one indigo interaction accent (`--accent`); status colours carry meaning only.
+The legacy token NAMES are unchanged, so this app took the new values with no
+edit. Additions: `--accent`, `--tint-*` soft fills, `--border-subtle/strong`,
+`--shadow-card`, global `.btn`/inputs/`.kicker`/`.loading`, the inline-SVG
+`ui/Icon.svelte`, and `ui/chartTheme.js` — the one Chart.js theme every chart
+imports, mirroring the tokens because a canvas cannot read CSS variables.
+Figures are Inter `tabular-nums` (`.num`); JetBrains Mono (`.mono`) is kept for
+addresses, hashes and code names.

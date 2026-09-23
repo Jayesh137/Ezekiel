@@ -1,6 +1,9 @@
 <script>
 	import { onMount } from 'svelte';
 	import Chart from 'chart.js/auto';
+	import { C, SANS, alpha, tooltip, applyChartDefaults } from '$lib/ui/chartTheme.js';
+
+	applyChartDefaults(Chart);
 	import Addr from '$lib/Addr.svelte';
 	import {
 		fetchLatest,
@@ -95,8 +98,8 @@
 						type: 'bar',
 						label: 'Target Active',
 						data: data.fillActivity,
-						backgroundColor: 'rgba(0, 204, 221, 0.2)',
-						borderColor: 'rgba(0, 204, 221, 0.45)',
+						backgroundColor: alpha(C.accent, 0.2),
+						borderColor: alpha(C.accent, 0.45),
 						borderWidth: 1,
 						yAxisID: 'y2',
 						order: 2,
@@ -105,8 +108,8 @@
 						type: 'line',
 						label: `Top Candidate Score${data.wallet ? ' (' + data.wallet.slice(0, 8) + '...)' : ''}`,
 						data: data.candidateScores,
-						borderColor: 'rgba(255, 170, 0, 0.9)',
-						backgroundColor: 'rgba(255, 170, 0, 0.07)',
+						borderColor: alpha(C.amber, 0.9),
+						backgroundColor: alpha(C.amber, 0.07),
 						borderWidth: 2,
 						fill: true,
 						pointRadius: 2,
@@ -123,28 +126,28 @@
 				interaction: { mode: 'index', intersect: false },
 				scales: {
 					x: {
-						ticks: { color: 'rgba(136,136,160,0.6)', font: { size: 8, family: "'JetBrains Mono', monospace" }, maxTicksLimit: 15 },
+						ticks: { color: C.tick, font: { size: 8, family: SANS }, maxTicksLimit: 15 },
 						grid: { display: false },
 						border: { display: false },
 					},
 					y: {
 						min: 0, max: 1, position: 'left',
-						ticks: { color: 'rgba(255,170,0,0.7)', font: { size: 9, family: "'JetBrains Mono', monospace" }, callback: v => (v * 100).toFixed(0) + '%' },
-						grid: { color: 'rgba(42,42,74,0.3)' },
+						ticks: { color: alpha(C.amber, 0.7), font: { size: 9, family: SANS }, callback: v => (v * 100).toFixed(0) + '%' },
+						grid: { color: C.grid },
 						border: { display: false },
 					},
 					y2: { min: 0, max: 1, position: 'right', display: false },
 				},
 				plugins: {
 					legend: {
-						labels: { color: 'rgba(136,136,160,0.8)', font: { size: 10, family: "'JetBrains Mono', monospace" }, usePointStyle: true, pointStyleWidth: 8 }
+						labels: { color: C.tick, font: { size: 10, family: SANS }, usePointStyle: true, pointStyleWidth: 8 }
 					},
 					tooltip: {
-						backgroundColor: 'rgba(18,18,26,0.95)',
-						borderColor: 'rgba(42,42,74,0.8)',
+						backgroundColor: tooltip.backgroundColor,
+						borderColor: C.border,
 						borderWidth: 1,
-						titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
-						bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+						titleFont: { family: SANS, size: 11 },
+						bodyFont: { family: SANS, size: 11 },
 						callbacks: {
 							label: ctx => {
 								if (ctx.datasetIndex === 0) return ` Target: ${ctx.raw === 1 ? 'Active' : 'Silent'}`;
@@ -308,7 +311,7 @@
 				Wallets read per-run by <span class="mono">watch.yml</span> — the operator's own list plus every roster
 				CONFIRMED/PROBABLE. <strong>Size</strong> is this wallet against the target's whole account (perp, every
 				HIP-3 dex and spot), both sides read by one function at the same moment; it alerts on crossing
-				<span class="mono">{OUTGREW_TARGET}x</span>, a band rather than parity because both are live books.
+				<span class="num">{OUTGREW_TARGET}x</span>, a band rather than parity because both are live books.
 				A <strong>contact</strong> with his world is an observed connection, not an inference.
 			</p>
 			<table>
@@ -323,8 +326,8 @@
 						<tr>
 							<td><Addr address={w.address} className="" /></td>
 							<td class="text-muted mono" style="font-size:0.72rem">{w.source || 'config'}</td>
-							<td class="mono">{w.account_value == null ? 'unreadable' : formatUSD(w.account_value)}</td>
-							<td class="mono">
+							<td class="num">{w.account_value == null ? 'unreadable' : formatUSD(w.account_value)}</td>
+							<td class="num">
 								{#if w.size_ratio == null}
 									<span class="text-muted">unknown</span>
 								{:else}
@@ -332,11 +335,11 @@
 										class:badge-yellow={w.size_ratio < OUTGREW_TARGET}>{w.size_ratio.toFixed(2)}x</span>
 								{/if}
 							</td>
-							<td class="mono text-muted">{sinceMs(w.last_fill_ms)}</td>
-							<td class="mono">{countOf(w.agents)}</td>
-							<td class="mono">{countOf(w.subaccounts)}</td>
-							<td class="mono">{countOf(w.withdrawal_destinations)}</td>
-							<td class="mono">{w.hyperevm_nonce == null ? '?' : w.hyperevm_nonce}</td>
+							<td class="num text-muted">{sinceMs(w.last_fill_ms)}</td>
+							<td class="num">{countOf(w.agents)}</td>
+							<td class="num">{countOf(w.subaccounts)}</td>
+							<td class="num">{countOf(w.withdrawal_destinations)}</td>
+							<td class="num">{w.hyperevm_nonce == null ? '?' : w.hyperevm_nonce}</td>
 						</tr>
 						{#if w.why}
 							<tr><td colspan="9" class="text-muted watch-note">{w.why}</td></tr>
@@ -416,7 +419,7 @@
 							<tr>
 								<td><Addr address={f.destination} className="" /></td>
 								<td class="mono">{f.chain || 'unknown'}</td>
-								<td class="mono">{formatUSD(f.net_usd)}</td>
+								<td class="num">{formatUSD(f.net_usd)}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -510,10 +513,10 @@
 									<span class="badge badge-green" style="font-size:0.6rem">two-way</span>
 								{/if}
 							</td>
-							<td class="mono">{formatUSD(c.total_out_usd)}</td>
-							<td class="mono text-muted">{formatUSD(c.total_in_usd)}</td>
-							<td class="mono">{c.transfer_count}×</td>
-							<td class="text-muted mono" style="font-size:0.72rem">{c.last_seen?.split('T')[0] || '-'}</td>
+							<td class="num">{formatUSD(c.total_out_usd)}</td>
+							<td class="num text-muted">{formatUSD(c.total_in_usd)}</td>
+							<td class="num">{c.transfer_count}×</td>
+							<td class="text-muted num" style="font-size:0.72rem">{c.last_seen?.split('T')[0] || '-'}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -548,8 +551,8 @@
 						<tr>
 							<td><Addr address={m.wallet} className="" /></td>
 							<td class="mono"><span class="badge" class:badge-red={m.confidence >= 0.7} class:badge-yellow={m.confidence < 0.7}>{scorePct(m.confidence)}</span></td>
-							<td class="mono">{formatUSD(m.deposit_amount_usd)} ≈ {formatUSD(m.exit_amount_usd)}</td>
-							<td class="mono text-muted">{m.gap_hours}h</td>
+							<td class="num">{formatUSD(m.deposit_amount_usd)} ≈ {formatUSD(m.exit_amount_usd)}</td>
+							<td class="num text-muted">{m.gap_hours}h</td>
 							<td class="text-muted mono" style="font-size:0.72rem">{m.exit_source}</td>
 						</tr>
 					{/each}
@@ -586,8 +589,8 @@
 										<span class="badge badge-yellow" style="font-size:0.6rem">cooling</span>
 									{/if}
 								</td>
-								<td class="mono">{scorePct(c.best_score)}</td>
-								<td class="mono">{scorePct(c.latest_score)}</td>
+								<td class="num">{scorePct(c.best_score)}</td>
+								<td class="num">{scorePct(c.latest_score)}</td>
 								<td><span class="badge {tierClass(c.latest_tier)}">{c.latest_tier || 'WATCH'}</span></td>
 							</tr>
 						{/each}
@@ -614,7 +617,7 @@
 								<Addr address={r.wallet} className="" />
 								<span class="badge {tierClass(r.evidence?.tier)}">{r.evidence?.tier || 'LEAD'}</span>
 							</div>
-							<div class="lead-score mono">{scorePct(r.score)}</div>
+							<div class="lead-score num">{scorePct(r.score)}</div>
 							<div class="evidence">
 								{#each (r.evidence?.reasons || []).slice(0, 3) as reason}
 									<span>{reason}</span>
@@ -696,8 +699,6 @@
 		font-size: 0.72rem;
 	}
 
-	.page-header { margin-bottom: 24px; }
-	.page-header h1 { font-size: 1.6rem; font-weight: 700; }
 
 	.risk-banner {
 		display: flex;
@@ -706,48 +707,50 @@
 		margin-bottom: 16px;
 		border-left: 4px solid var(--border);
 	}
-	.risk-banner.risk-critical { border-left-color: var(--accent-red, #ff4d4d); }
-	.risk-banner.risk-elevated { border-left-color: var(--accent-yellow, #ffaa00); }
-	.risk-banner.risk-guarded { border-left-color: var(--accent-cyan, #00ccdd); }
+	.risk-banner.risk-critical { border-left-color: var(--accent-red); }
+	.risk-banner.risk-elevated { border-left-color: var(--accent-yellow); }
+	.risk-banner.risk-guarded { border-left-color: var(--accent-cyan); }
 	.risk-banner.risk-low { border-left-color: var(--border); }
+	.risk-banner.risk-critical { background: linear-gradient(90deg, var(--tint-red), transparent 55%), var(--bg-card); }
+	.risk-banner.risk-elevated { background: linear-gradient(90deg, var(--tint-yellow), transparent 55%), var(--bg-card); }
+	.risk-banner.risk-guarded { background: linear-gradient(90deg, var(--tint-cyan), transparent 55%), var(--bg-card); }
 
 	.risk-gauge {
 		display: flex;
 		align-items: baseline;
-		font-family: var(--font-mono);
-		min-width: 92px;
+		font-variant-numeric: tabular-nums;
+		min-width: 96px;
 	}
-	.risk-score-num { font-size: 2.4rem; font-weight: 700; line-height: 1; }
-	.risk-critical .risk-score-num { color: var(--accent-red, #ff4d4d); }
-	.risk-elevated .risk-score-num { color: var(--accent-yellow, #ffaa00); }
-	.risk-guarded .risk-score-num { color: var(--accent-cyan, #00ccdd); }
+	.risk-score-num { font-size: 2.75rem; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
+	.risk-critical .risk-score-num { color: var(--accent-red); }
+	.risk-elevated .risk-score-num { color: var(--accent-yellow); }
+	.risk-guarded .risk-score-num { color: var(--accent-cyan); }
 	.risk-score-den { font-size: 0.9rem; color: var(--text-muted); margin-left: 2px; }
 
 	.risk-body { flex: 1; }
 	.risk-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 	.risk-level-badge {
-		font-family: var(--font-mono);
 		font-size: 0.68rem;
 		font-weight: 700;
 		padding: 2px 8px;
 		border-radius: 999px;
 		letter-spacing: 0.05em;
 	}
-	.risk-level-badge.risk-critical { background: rgba(255,77,77,0.15); color: var(--accent-red, #ff4d4d); }
-	.risk-level-badge.risk-elevated { background: rgba(255,170,0,0.15); color: var(--accent-yellow, #ffaa00); }
-	.risk-level-badge.risk-guarded { background: rgba(0,204,221,0.12); color: var(--accent-cyan, #00ccdd); }
-	.risk-level-badge.risk-low { background: rgba(136,136,160,0.12); color: var(--text-muted); }
+	.risk-level-badge.risk-critical { background: color-mix(in srgb, var(--accent-red) 15%, transparent); color: var(--accent-red); }
+	.risk-level-badge.risk-elevated { background: color-mix(in srgb, var(--accent-yellow) 15%, transparent); color: var(--accent-yellow); }
+	.risk-level-badge.risk-guarded { background: color-mix(in srgb, var(--accent-cyan) 12%, transparent); color: var(--accent-cyan); }
+	.risk-level-badge.risk-low { background: color-mix(in srgb, var(--accent-grey) 12%, transparent); color: var(--text-muted); }
 
 	.risk-factors { display: flex; flex-wrap: wrap; gap: 6px; }
 	.risk-factor {
 		font-size: 0.72rem;
 		color: var(--text-secondary);
-		background: rgba(255,255,255,0.04);
-		border-radius: 4px;
-		padding: 2px 7px;
+		background: var(--bg-card-hover);
+		border: 1px solid var(--border-subtle);
+		border-radius: 999px;
+		padding: 2px 10px;
 	}
-	.risk-factor b { color: var(--text-primary, #e8e8f0); }
-	.loading { text-align: center; padding: 60px; color: var(--text-muted); }
+	.risk-factor b { color: var(--text-primary); }
 
 	.recovery-grid {
 		display: grid;
@@ -763,18 +766,7 @@
 		align-items: center;
 	}
 
-	.section-kicker {
-		font-size: 0.7rem;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		margin-bottom: 4px;
-	}
-
-	h2 {
-		font-size: 1.15rem;
-		margin: 0;
-	}
+	h2 { margin: 0; }
 
 	.status-metrics {
 		display: grid;
@@ -785,9 +777,10 @@
 
 	.metric-value {
 		display: block;
-		font-family: var(--font-mono);
-		font-weight: 700;
-		font-size: 1.1rem;
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		font-size: 1.35rem;
 	}
 
 	.metric-label {
@@ -795,7 +788,8 @@
 		color: var(--text-muted);
 		font-size: 0.7rem;
 		text-transform: uppercase;
-		margin-top: 2px;
+		letter-spacing: 0.07em;
+		margin-top: 4px;
 	}
 
 	.main-panels {
@@ -810,7 +804,7 @@
 	}
 
 	.count-pill {
-		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
 		font-size: 0.75rem;
 		color: var(--text-secondary);
 		border: 1px solid var(--border);
@@ -832,7 +826,7 @@
 
 	.flow-item,
 	.lead-row {
-		border-top: 1px solid rgba(42, 42, 74, 0.7);
+		border-top: 1px solid var(--border);
 		padding-top: 10px;
 	}
 
@@ -865,14 +859,15 @@
 	.evidence span {
 		font-size: 0.72rem;
 		color: var(--text-secondary);
-		background: rgba(255,255,255,0.04);
-		border-radius: 4px;
-		padding: 2px 6px;
+		background: var(--bg-card-hover);
+		border: 1px solid var(--border-subtle);
+		border-radius: 999px;
+		padding: 2px 9px;
 	}
 
 	.evidence .warning {
 		color: var(--accent-yellow);
-		background: rgba(255,170,0,0.1);
+		background: color-mix(in srgb, var(--accent-yellow) 10%, transparent);
 	}
 
 	.lead-score {

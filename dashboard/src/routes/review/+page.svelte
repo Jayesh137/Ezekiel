@@ -338,7 +338,7 @@
 		font-variant-numeric: tabular-nums;
 		padding: 6px 10px;
 		border-radius: 999px;
-		background: rgba(255, 170, 0, 0.12);
+		background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
 		color: var(--accent-yellow);
 	}
 	.icon {

@@ -6,16 +6,32 @@
 	import { fetchIndex, getDataFreshnessMinutes, fetchAlertHealth,
          getAlertDelivery } from '$lib/api.js';
 
-	const navItems = [
-		{ href: `${base}/recovery`, label: 'Recovery', icon: 'R' },
-		{ href: `${base}/transfers`, label: 'Transfers', icon: 'T' },
-		{ href: `${base}/roster`, label: 'Roster', icon: 'W' },
-		{ href: `${base}/tripwires`, label: 'Tripwires', icon: '!' },
-		{ href: `${base}/`, label: 'Dashboard', icon: 'D' },
-		{ href: `${base}/fills`, label: 'Fills', icon: 'F' },
-		{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'P' },
-		{ href: `${base}/scanner`, label: 'Scanner', icon: 'S' },
+	import Icon from '$lib/ui/Icon.svelte';
+
+	// Grouped by the question each page answers: where he might have gone, what
+	// he is doing now, and who else trades like him.
+	const navGroups = [
+		{ label: 'Hunt', items: [
+			{ href: `${base}/recovery`, label: 'Recovery', icon: 'crosshair' },
+			{ href: `${base}/transfers`, label: 'Transfers', icon: 'transfers' },
+			{ href: `${base}/roster`, label: 'Roster', icon: 'users' },
+			{ href: `${base}/tripwires`, label: 'Tripwires', icon: 'tripwire' },
+		] },
+		{ label: 'Target', items: [
+			{ href: `${base}/`, label: 'Dashboard', icon: 'grid' },
+			{ href: `${base}/fills`, label: 'Fills', icon: 'list' },
+			{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'pulse' },
+		] },
+		{ label: 'Discovery', items: [
+			{ href: `${base}/scanner`, label: 'Scanner', icon: 'scan' },
+		] },
 	];
+	const navItems = navGroups.flatMap(g => g.items);
+
+	$: path = $page.url.pathname;
+	$: isActive = (href) => path === href
+		|| (path === `${base}` && href === `${base}/`)
+		|| (href !== `${base}/` && path === `${href}/`);
 
 	$: bare = $page.url.pathname.startsWith(`${base}/review`);
 
@@ -74,27 +90,48 @@
 {:else}
 	<div class="app-shell">
 		<nav class="sidebar">
-			<div class="sidebar-header">
-				<span class="logo">EZK</span>
-				<span class="logo-sub">EZEKIEL</span>
-			</div>
-			<ul class="nav-list">
-				{#each navItems as item}
-					<li>
-						<a
-							href={item.href}
-							class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
-						>
-							<span class="nav-icon">{item.icon}</span>
-							{item.label}
-						</a>
-					</li>
+			<a class="brand" href="{base}/" aria-label="Ezekiel home">
+				<span class="brand-mark" aria-hidden="true">
+					<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M17 5H7v14h10M7 12h8" /></svg>
+				</span>
+				<span class="brand-text">
+					<span class="brand-name">Ezekiel</span>
+					<span class="brand-sub">Trader intelligence</span>
+				</span>
+			</a>
+			<div class="nav-scroll">
+				{#each navGroups as group}
+					<div class="nav-group">
+						<span class="nav-group-label">{group.label}</span>
+						<ul class="nav-list">
+							{#each group.items as item}
+								<li>
+									<a href={item.href} class:active={isActive(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+										<Icon name={item.icon} size={17} />
+										{item.label}
+									</a>
+								</li>
+							{/each}
+						</ul>
+					</div>
 				{/each}
-			</ul>
+				<div class="nav-group">
+					<span class="nav-group-label">Apps</span>
+					<ul class="nav-list">
+						<li>
+							<a href="{base}/review">
+								<Icon name="phone" size={17} />
+								Phone review
+							</a>
+						</li>
+					</ul>
+				</div>
+			</div>
 			<div class="sidebar-footer">
-				<span class="text-muted" style="font-size:0.7rem">Trader Intelligence</span>
+				<span class="footer-label">System</span>
 				{#if freshnessLabel}
 					<span class="freshness-pill freshness-{freshnessStatus}" title={freshnessTitle}>
+						<span class="pulse-dot" aria-hidden="true"></span>
 						{freshnessStatus === 'stale' ? 'STALLED' : 'Data'}: {freshnessLabel}
 					</span>
 				{/if}
@@ -132,13 +169,10 @@
 		</main>
 	</div>
 
-	<nav class="mobile-nav">
+	<nav class="mobile-nav" aria-label="Pages">
 		{#each navItems as item}
-			<a
-				href={item.href}
-				class:active={$page.url.pathname === item.href || ($page.url.pathname === `${base}` && item.href === `${base}/`)}
-			>
-				<span class="mobile-nav-icon">{item.icon}</span>
+			<a href={item.href} class:active={isActive(item.href)} aria-current={isActive(item.href) ? 'page' : undefined}>
+				<Icon name={item.icon} size={19} />
 				<span class="mobile-nav-label">{item.label}</span>
 			</a>
 		{/each}
@@ -150,137 +184,181 @@
 		display: flex;
 		min-height: 100vh;
 	}
+
+	/* --- Sidebar --- */
 	.sidebar {
-		width: 220px;
-		background: var(--bg-secondary);
-		border-right: 1px solid var(--border);
+		width: 232px;
+		background: color-mix(in srgb, var(--bg-secondary) 86%, transparent);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border-right: 1px solid var(--border-subtle);
 		display: flex;
 		flex-direction: column;
-		padding: 20px 0;
 		position: fixed;
 		top: 0;
 		left: 0;
 		bottom: 0;
 		z-index: 10;
 	}
-	.sidebar-header {
-		padding: 0 20px 24px;
-		border-bottom: 1px solid var(--border);
-		margin-bottom: 16px;
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 11px;
+		padding: 22px 20px 20px;
+		color: var(--text-primary);
 	}
-	.logo {
-		font-family: var(--font-mono);
-		font-size: 1.6rem;
-		font-weight: 700;
-		color: var(--accent-cyan);
-		letter-spacing: 0.1em;
+	.brand:hover { color: var(--text-primary); }
+	.brand-mark {
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 9px;
+		color: #0b0b1a;
+		background: linear-gradient(140deg, #c3c7ff 0%, var(--accent) 48%, #6d5dfc 100%);
+		box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14) inset, 0 6px 18px -6px color-mix(in srgb, var(--accent) 70%, transparent);
 	}
-	.logo-sub {
+	.brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+	.brand-name { color: var(--text-primary); font-weight: 650; font-size: 0.98rem; letter-spacing: -0.02em; }
+	.brand-sub { font-size: 0.72rem; color: var(--text-muted); }
+
+	.nav-scroll {
+		flex: 1;
+		overflow-y: auto;
+		padding: 4px 12px 12px;
+	}
+	.nav-group + .nav-group { margin-top: 20px; }
+	.nav-group-label {
 		display: block;
-		font-size: 0.65rem;
+		padding: 0 10px 6px;
+		font-size: 0.68rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--text-muted);
-		letter-spacing: 0.3em;
-		margin-top: 2px;
 	}
 	.nav-list {
 		list-style: none;
-		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
 	}
+	/* No transition: navigation is the most frequent action on the page. */
 	.nav-list a {
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 10px 20px;
+		padding: 7px 10px;
+		border-radius: var(--radius-sm);
 		color: var(--text-secondary);
-		font-size: 0.9rem;
+		font-size: 0.875rem;
 		font-weight: 500;
-		transition: all 0.15s;
-		border-left: 3px solid transparent;
+		transition: none;
 	}
+	.nav-list a :global(svg) { color: var(--text-muted); flex: none; }
 	.nav-list a:hover {
 		color: var(--text-primary);
-		background: rgba(255,255,255,0.03);
-		text-decoration: none;
+		background: rgba(255, 255, 255, 0.035);
 	}
 	.nav-list a.active {
-		color: var(--accent-cyan);
-		background: rgba(0,204,221,0.08);
-		border-left-color: var(--accent-cyan);
+		color: var(--text-primary);
+		background: var(--bg-card-hover);
+		box-shadow: 0 0 0 1px var(--border) inset, 0 1px 0 0 var(--highlight) inset;
 	}
-	.nav-icon {
-		font-size: 1rem;
-		width: 20px;
-		text-align: center;
-		font-family: var(--font-mono);
-		font-weight: 700;
-	}
+	.nav-list a.active :global(svg) { color: var(--accent); }
+
 	.sidebar-footer {
-		padding: 16px 20px;
-		border-top: 1px solid var(--border);
-		margin-top: auto;
+		padding: 14px 20px 18px;
+		border-top: 1px solid var(--border-subtle);
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 7px;
+	}
+	.footer-label {
+		font-size: 0.68rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-muted);
 	}
 	.freshness-pill {
-		display: inline-block;
-		margin-top: 6px;
-		font-size: 0.65rem;
-		font-family: var(--font-mono);
-		padding: 2px 7px;
-		border-radius: 4px;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.74rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		padding: 3px 10px 3px 9px;
+		border-radius: 999px;
+		cursor: help;
 	}
-	.freshness-ok { background: rgba(0,255,136,0.12); color: var(--accent-green); }
-	.freshness-warn { background: rgba(255,170,0,0.12); color: var(--accent-yellow); }
-	.freshness-stale { background: rgba(255,51,85,0.12); color: var(--accent-red); }
+	.pulse-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: currentColor;
+		box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+	}
+	.freshness-ok { background: var(--tint-green); color: var(--accent-green); }
+	.freshness-warn { background: var(--tint-yellow); color: var(--accent-yellow); }
+	.freshness-stale { background: var(--tint-red); color: var(--accent-red); }
 	/* Same geometry as the freshness pill, no status colour: withheld is not a
 	   state of health, so it must not read as green, amber or red. */
 	.withheld-pill {
-		display: inline-block;
-		margin-top: 6px;
-		font-size: 0.65rem;
-		font-family: var(--font-mono);
-		padding: 2px 7px;
-		border-radius: 4px;
+		display: inline-flex;
+		font-size: 0.74rem;
+		font-variant-numeric: tabular-nums;
+		padding: 2px 10px;
+		border-radius: 999px;
 		border: 1px solid var(--border);
 		color: var(--text-muted);
 		cursor: help;
 	}
+
+	/* --- Alerting down: deliberately the loudest element on every route --- */
 	.alert-down {
-		background: rgba(255, 51, 85, 0.14);
-		border: 1px solid var(--accent-red);
-		border-left-width: 4px;
-		border-radius: 6px;
-		padding: 12px 16px;
-		margin-bottom: 20px;
+		background: linear-gradient(90deg, color-mix(in srgb, var(--accent-red) 18%, transparent), color-mix(in srgb, var(--accent-red) 7%, transparent));
+		border: 1px solid color-mix(in srgb, var(--accent-red) 55%, transparent);
+		border-left: 4px solid var(--accent-red);
+		border-radius: var(--radius-sm);
+		padding: 14px 18px;
+		margin-bottom: 24px;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		box-shadow: 0 10px 30px -14px color-mix(in srgb, var(--accent-red) 70%, transparent);
 	}
 	.alert-down-bare {
 		margin: calc(8px + env(safe-area-inset-top, 0px)) 16px 0;
 	}
 	.alert-down strong {
 		color: var(--accent-red);
-		font-family: var(--font-mono);
-		letter-spacing: 0.06em;
-		font-size: 0.85rem;
+		letter-spacing: 0.08em;
+		font-size: 0.8rem;
+		font-weight: 700;
 	}
-	.alert-down span { font-size: 0.85rem; color: var(--text-primary); }
+	.alert-down span { font-size: 0.875rem; color: var(--text-primary); }
 	.alert-down-reason {
 		font-family: var(--font-mono);
-		font-size: 0.7rem !important;
+		font-size: 0.72rem !important;
 		color: var(--text-secondary) !important;
 	}
+
 	.main-content {
 		flex: 1;
-		margin-left: 220px;
-		padding: 32px 40px;
-		max-width: 1400px;
+		min-width: 0;
+		margin-left: 232px;
+		padding: 40px 48px 72px;
+		max-width: calc(1400px + 232px);
 	}
 
 	@media (max-width: 768px) {
 		.sidebar { display: none; }
-		.main-content { margin-left: 0; padding: 16px; padding-bottom: 80px; }
+		.main-content { margin-left: 0; padding: 20px 16px calc(88px + env(safe-area-inset-bottom, 0px)); }
 	}
 
+	/* --- Mobile tab bar --- */
 	.mobile-nav {
 		display: none;
 		position: fixed;
@@ -288,11 +366,14 @@
 		left: 0;
 		right: 0;
 		z-index: 20;
-		background: var(--bg-secondary);
-		border-top: 1px solid var(--border);
-		padding: 6px 0 env(safe-area-inset-bottom, 6px);
+		background: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
+		backdrop-filter: blur(18px) saturate(1.4);
+		-webkit-backdrop-filter: blur(18px) saturate(1.4);
+		border-top: 1px solid var(--border-subtle);
+		padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
 		justify-content: space-around;
 		align-items: center;
+		overflow-x: auto;
 	}
 	@media (max-width: 768px) {
 		.mobile-nav { display: flex; }
@@ -301,23 +382,18 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 2px;
-		color: var(--text-secondary);
-		padding: 4px 10px;
-		border-radius: 6px;
-		text-decoration: none;
+		justify-content: center;
+		gap: 3px;
+		color: var(--text-muted);
+		padding: 5px 6px;
+		border-radius: var(--radius-sm);
 		min-width: 44px;
+		min-height: 44px;
 	}
-	.mobile-nav a:hover { text-decoration: none; }
-	.mobile-nav a.active { color: var(--accent-cyan); }
-	.mobile-nav-icon {
-		font-size: 1rem;
-		font-family: var(--font-mono);
-		font-weight: 700;
-	}
+	.mobile-nav a.active { color: var(--text-primary); }
+	.mobile-nav a.active :global(svg) { color: var(--accent); }
 	.mobile-nav-label {
 		font-size: 0.6rem;
-		font-family: var(--font-mono);
-		letter-spacing: 0.02em;
+		font-weight: 500;
 	}
 </style>

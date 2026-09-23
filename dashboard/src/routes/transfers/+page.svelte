@@ -217,23 +217,23 @@
 		<div class="stat-row">
 			<div class="stat">
 				<div class="stat-label">Wallets found</div>
-				<div class="stat-value mono">{graph.node_count}</div>
+				<div class="stat-value num">{graph.node_count}</div>
 			</div>
 			<div class="stat">
 				<div class="stat-label">Transfers</div>
-				<div class="stat-value mono">{graph.edge_count}</div>
+				<div class="stat-value num">{graph.edge_count?.toLocaleString() ?? "—"}</div>
 			</div>
 			<div class="stat">
 				<div class="stat-label">Max depth</div>
-				<div class="stat-value mono">{graph.max_depth_reached}</div>
+				<div class="stat-value num">{graph.max_depth_reached}</div>
 			</div>
 			<div class="stat">
 				<div class="stat-label">Services excluded</div>
-				<div class="stat-value mono">{graph.service_count}</div>
+				<div class="stat-value num">{graph.service_count?.toLocaleString() ?? "—"}</div>
 			</div>
 			<div class="stat">
 				<div class="stat-label">Migration candidates</div>
-				<div class="stat-value mono" class:text-red={counts.MIGRATION_CANDIDATE > 0}>
+				<div class="stat-value num" class:text-red={counts.MIGRATION_CANDIDATE > 0}>
 					{counts.MIGRATION_CANDIDATE || 0}
 				</div>
 			</div>
@@ -261,7 +261,7 @@
 					<div>
 						<span class="hl">L1 expansion</span>
 						<span
-							class="mono"
+							class="num"
 							class:text-red={expansion?.status === 'failed'}
 							class:text-yellow={expansion &&
 								!['ok', 'failed'].includes(expansion.status)}
@@ -270,7 +270,7 @@
 					</div>
 					<div>
 						<span class="hl">Last successful expansion</span>
-						<span class="mono"
+						<span class="num"
 							>{fmtDate(
 								expansion?.status === 'ok'
 									? expansion?.completed_at
@@ -280,20 +280,20 @@
 					</div>
 					<div>
 						<span class="hl">Explored</span>
-						<span class="mono"
+						<span class="num"
 							>{health.nodes_explored} nodes / {health.edges_explored} edges</span
 						>
 					</div>
 					<div>
 						<span class="hl">Depth</span>
-						<span class="mono"
+						<span class="num"
 							>{health.max_depth_reached} of {health.max_depth_configured}
 							{#if health.depth_limited}<span class="text-yellow">(capped)</span>{/if}</span
 						>
 					</div>
 					<div>
 						<span class="hl">Node budget</span>
-						<span class="mono"
+						<span class="num"
 							>{health.node_budget}
 							{#if health.node_budget_exhausted}<span class="text-yellow"
 									>(exhausted)</span
@@ -302,7 +302,7 @@
 					</div>
 					<div>
 						<span class="hl">L1 lookups used</span>
-						<span class="mono"
+						<span class="num"
 							>{expansion?.lookups ?? 0} / {expansion?.lookup_budget ?? '—'}
 							{#if expansion?.frontier_remaining}<span class="text-yellow"
 									>({expansion.frontier_remaining} wallet(s) still queued)</span
@@ -311,7 +311,7 @@
 					</div>
 					<div>
 						<span class="hl">Frontier</span>
-						<span class="mono">
+						<span class="num">
 							{#if expansion?.frontier_eligible}
 								<span class="text-yellow"
 									>{expansion.frontier_retained ?? expansion.frontier_eligible} retained
@@ -335,24 +335,24 @@
 					</div>
 					<div>
 						<span class="hl">Already expanded</span>
-						<span class="mono"
+						<span class="num"
 							>{(expansion?.expanded_ledger || []).length} wallet(s) — not re-fetched</span
 						>
 					</div>
 					<div>
 						<span class="hl">Evidence window</span>
-						<span class="mono"
+						<span class="num"
 							>{fmtDate(health.oldest_evidence)} → {fmtDate(health.newest_evidence)}</span
 						>
 					</div>
 					<div>
 						<span class="hl">Sources</span>
-						<span class="mono">{(health.discovery_sources || []).join(', ') || '—'}</span>
+						<span class="num">{(health.discovery_sources || []).join(', ') || '—'}</span>
 					</div>
 				</div>
 				{#if expansion?.stopped_reason}
 					<p class="health-degraded">
-						Walk stopped early: <span class="mono">{expansion.stopped_reason}</span>. The
+						Walk stopped early: <span class="num">{expansion.stopped_reason}</span>. The
 						queued wallets are carried into the next run.
 					</p>
 				{/if}
@@ -378,7 +378,7 @@
 							— set the <span class="mono">ETHERSCAN_API_KEY</span> secret to enable
 							multi-hop L1 tracing.
 						{:else if expansion?.error}
-							— <span class="mono">{expansion.error}</span>
+							— <span class="num">{expansion.error}</span>
 						{/if}
 					</p>
 				{/if}
@@ -424,10 +424,10 @@
 					</div>
 					<div class="node-conf">
 						<span class="text-muted">confidence</span>
-						<strong class="mono">{((n.confidence ?? 0) * 100).toFixed(0)}%</strong>
+						<strong class="num">{((n.confidence ?? 0) * 100).toFixed(0)}%</strong>
 						{#if deltaLabel(n.confidence_delta)}
 							<span
-								class="delta mono"
+								class="delta num"
 								class:text-red={n.confidence_delta > 0}
 								class:text-muted={n.confidence_delta < 0}
 								title="change since the previous run"
@@ -456,18 +456,18 @@
 				</div>
 
 				<div class="flows">
-					<span>Received from target <strong class="mono"
+					<span>Received from target <strong class="num"
 							>{formatUSD(n.totals?.received_from_target_usd ?? 0)}</strong
 						></span>
-					<span>Sent to target <strong class="mono"
+					<span>Sent to target <strong class="num"
 							>{formatUSD(n.totals?.sent_to_target_usd ?? 0)}</strong
 						></span>
-					<span>Transfers <strong class="mono">{n.totals?.edge_count ?? 0}</strong></span>
+					<span>Transfers <strong class="num">{n.totals?.edge_count ?? 0}</strong></span>
 					{#if bScore != null}
 						<span>
 							Behavioural
 							<strong
-								class="mono"
+								class="num"
 								class:text-green={bScore >= thresholds.high}
 								class:text-yellow={bScore >= thresholds.medium && bScore < thresholds.high}
 								>{(bScore * 100).toFixed(0)}%</strong
@@ -503,12 +503,12 @@
 						{/if}
 						{#if n.continuity}
 							<span class="text-muted">continuity</span>
-							<strong class="mono"
+							<strong class="num"
 								>{((n.continuity.confidence ?? 0) * 100).toFixed(0)}%</strong
 							>
 							{#if deltaLabel(n.continuity_delta)}
 								<span
-									class="delta mono"
+									class="delta num"
 									class:text-red={n.continuity_delta > 0}
 									class:text-muted={n.continuity_delta < 0}
 									title="change since the previous run"
@@ -555,11 +555,11 @@
 						</div>
 						{#each ch.hops ?? [] as h, i}
 							<div class="hop-row">
-								<span class="hop-n mono">{i + 1}</span>
-								<span class="mono"
+								<span class="hop-n num">{i + 1}</span>
+								<span class="num"
 									><Addr address={h.src} /> → <Addr address={h.dst} /></span
 								>
-								<span class="mono">{formatUSD(h.amount_usd)}</span>
+								<span class="num">{formatUSD(h.amount_usd)}</span>
 								<span class="text-muted">{h.chain}</span>
 								<span class="text-muted">{h.ts ? formatTime(h.ts * 1000) : '—'}</span>
 								{#if explorerTx(h)}
@@ -586,8 +586,8 @@
 				{#if expanded === n.wallet}
 					<div class="detail">
 						<div class="detail-meta">
-							<span>First seen <span class="mono">{n.first_seen || '—'}</span></span>
-							<span>Last seen <span class="mono">{n.last_seen || '—'}</span></span>
+							<span>First seen <span class="num">{n.first_seen || '—'}</span></span>
+							<span>Last seen <span class="num">{n.last_seen || '—'}</span></span>
 							<span>Discovered via <span class="mono"
 									>{(n.discovery_sources || []).join(', ')}</span
 								></span>
@@ -617,10 +617,10 @@
 								<tbody>
 									{#each edgesFor(n).slice(0, 40) as e}
 										<tr>
-											<td class="mono">{e.ts ? formatTime(e.ts * 1000) : '—'}</td>
+											<td class="num">{e.ts ? formatTime(e.ts * 1000) : '—'}</td>
 											<td>{e.chain}</td>
-											<td class="mono">{e.asset}</td>
-											<td class="num mono">{formatUSD(e.amount_usd)}</td>
+											<td class="num">{e.asset}</td>
+											<td class="num num">{formatUSD(e.amount_usd)}</td>
 											<td class="mono dir"
 												><Addr address={e.src} /> → <Addr address={e.dst} /></td
 											>
@@ -678,20 +678,25 @@
 		margin-bottom: 16px;
 	}
 	.stat {
-		flex: 1 1 130px;
-		background: var(--bg-card, #12121a);
-		border: 1px solid var(--border, #2a2a4a);
-		border-radius: 8px;
-		padding: 10px 14px;
+		flex: 1 1 150px;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-card);
+		padding: 16px 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
 	}
 	.stat-label {
-		font-size: 0.65rem;
+		font-size: 0.7rem;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--text-muted, #8888a0);
+		letter-spacing: 0.07em;
+		color: var(--text-muted);
+		margin: 0;
 	}
 	.stat-value {
-		font-size: 1.35rem;
+		font-size: 1.6rem;
 		font-weight: 600;
 	}
 	.toolbar {
@@ -708,13 +713,13 @@
 		align-items: center;
 		gap: 6px;
 		cursor: pointer;
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 	}
 	.node {
 		margin-bottom: 12px;
 	}
 	.node.is-candidate {
-		border-color: var(--accent-red, #ef4444);
+		border-color: var(--accent-red);
 	}
 	.node-head {
 		display: flex;
@@ -748,21 +753,21 @@
 		font-size: 0.8rem;
 	}
 	.chev {
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 	}
 	.meter {
 		height: 3px;
-		background: var(--border, #2a2a4a);
+		background: var(--border);
 		border-radius: 2px;
 		margin: 10px 0;
 		overflow: hidden;
 	}
 	.meter-fill {
 		height: 100%;
-		background: var(--accent-cyan, #00ccdd);
+		background: var(--accent-cyan);
 	}
 	.is-candidate .meter-fill {
-		background: var(--accent-red, #ef4444);
+		background: var(--accent-red);
 	}
 	.path {
 		font-size: 0.75rem;
@@ -772,10 +777,10 @@
 		padding-bottom: 2px;
 	}
 	.hop-target {
-		color: var(--accent-cyan, #00ccdd);
+		color: var(--accent-cyan);
 	}
 	.arrow {
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 		margin: 0 6px;
 	}
 	.flows {
@@ -790,7 +795,7 @@
 		margin: 0;
 		padding-left: 18px;
 		font-size: 0.75rem;
-		color: var(--text-secondary, #b0b0c8);
+		color: var(--text-secondary);
 	}
 	.reasons li {
 		margin-bottom: 2px;
@@ -798,14 +803,14 @@
 	.detail {
 		margin-top: 14px;
 		padding-top: 12px;
-		border-top: 1px solid var(--border, #2a2a4a);
+		border-top: 1px solid var(--border);
 	}
 	.detail-meta {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 16px;
 		font-size: 0.7rem;
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 		margin-bottom: 10px;
 	}
 	.detail h4 {
@@ -824,27 +829,27 @@
 	td {
 		text-align: left;
 		padding: 5px 8px;
-		border-bottom: 1px solid var(--border, #2a2a4a);
+		border-bottom: 1px solid var(--border);
 		white-space: nowrap;
 	}
 	th {
-		color: var(--text-muted, #8888a0);
-		font-weight: 500;
+		color: var(--text-muted);
+		font-weight: 600;
 		text-transform: uppercase;
-		font-size: 0.6rem;
-		letter-spacing: 0.05em;
+		font-size: 0.68rem;
+		letter-spacing: 0.07em;
 	}
-	.num {
+	td.num, th.num {
 		text-align: right;
 	}
 	.dir,
 	.ref {
-		color: var(--text-secondary, #b0b0c8);
+		color: var(--text-secondary);
 	}
 	.caveat {
 		font-size: 0.72rem;
-		color: var(--text-muted, #8888a0);
-		border-left: 2px solid var(--border, #2a2a4a);
+		color: var(--text-muted);
+		border-left: 2px solid var(--border);
 		padding-left: 10px;
 		margin: 12px 0 0;
 	}
@@ -858,29 +863,29 @@
 		font-weight: 600;
 	}
 	.badge-red {
-		background: rgba(239, 68, 68, 0.15);
-		color: #ef4444;
+		background: color-mix(in srgb, var(--accent-red) 15%, transparent);
+		color: var(--accent-red);
 	}
 	.badge-yellow {
-		background: rgba(245, 158, 11, 0.15);
-		color: #f59e0b;
+		background: color-mix(in srgb, var(--accent-yellow) 15%, transparent);
+		color: var(--accent-yellow);
 	}
 	.badge-cyan {
-		background: rgba(0, 204, 221, 0.15);
-		color: #00ccdd;
+		background: color-mix(in srgb, var(--accent-cyan) 15%, transparent);
+		color: var(--accent-cyan);
 	}
 	.badge-grey {
-		background: rgba(136, 136, 160, 0.15);
-		color: #8888a0;
+		background: color-mix(in srgb, var(--accent-grey) 15%, transparent);
+		color: var(--accent-grey);
 	}
 	.text-red {
-		color: #ef4444;
+		color: var(--accent-red);
 	}
 	.text-green {
-		color: #10b981;
+		color: var(--accent-green);
 	}
 	.text-yellow {
-		color: #f59e0b;
+		color: var(--accent-yellow);
 	}
 	@media (max-width: 640px) {
 		.node-head {
@@ -890,10 +895,10 @@
 
 	.health {
 		margin-bottom: 14px;
-		border-left: 3px solid var(--accent-cyan, #00ccdd);
+		border-left: 3px solid var(--accent-cyan);
 	}
 	.health.health-warn {
-		border-left-color: var(--accent-yellow, #f59e0b);
+		border-left-color: var(--accent-yellow);
 	}
 	.health-head {
 		display: flex;
@@ -918,18 +923,18 @@
 		min-width: 0;
 	}
 	.hl {
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 		font-size: 0.62rem;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
-	.health-grid .mono {
+	.health-grid .num {
 		overflow-wrap: anywhere;
 	}
 	.health-degraded {
 		margin: 10px 0 0;
 		font-size: 0.72rem;
-		color: var(--accent-yellow, #f59e0b);
+		color: var(--accent-yellow);
 	}
 
 	.filters {
@@ -942,16 +947,16 @@
 		font-size: 0.66rem;
 		padding: 3px 10px;
 		border-radius: 4px;
-		border: 1px solid var(--border, #2a2a4a);
+		border: 1px solid var(--border);
 		background: transparent;
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 		cursor: pointer;
 		font-family: inherit;
 	}
 	.filter-btn.active,
 	.filter-btn:hover {
-		color: var(--accent-cyan, #00ccdd);
-		border-color: var(--accent-cyan, #00ccdd);
+		color: var(--accent-cyan);
+		border-color: var(--accent-cyan);
 	}
 	.lifecycle {
 		display: flex;
@@ -963,7 +968,7 @@
 	}
 	.why {
 		font-size: 0.74rem;
-		color: var(--text-secondary, #b0b0c8);
+		color: var(--text-secondary);
 		margin: 0 0 8px;
 		line-height: 1.45;
 	}
@@ -971,13 +976,13 @@
 		margin: 0 0 8px;
 		padding-left: 18px;
 		font-size: 0.7rem;
-		color: var(--accent-yellow, #f59e0b);
+		color: var(--accent-yellow);
 	}
 	.chain {
-		border-left: 2px solid var(--accent-cyan, #00ccdd);
+		border-left: 2px solid var(--accent-cyan);
 		padding: 6px 10px;
 		margin: 8px 0;
-		background: rgba(0, 204, 221, 0.04);
+		background: color-mix(in srgb, var(--accent-cyan) 4%, transparent);
 		font-size: 0.7rem;
 		overflow-x: auto;
 	}
@@ -995,11 +1000,11 @@
 		padding: 1px 0;
 	}
 	.hop-n {
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 		min-width: 1.2em;
 	}
 	.chain-break {
-		color: var(--accent-yellow, #f59e0b);
+		color: var(--accent-yellow);
 		margin-top: 4px;
 	}
 	.delta {
@@ -1011,11 +1016,11 @@
 	.contrib {
 		font-size: 0.7rem;
 		margin: 0 0 8px;
-		color: var(--text-secondary, #b0b0c8);
+		color: var(--text-secondary);
 	}
 	.contrib summary {
 		cursor: pointer;
-		color: var(--text-muted, #8888a0);
+		color: var(--text-muted);
 	}
 	.contrib ul {
 		margin: 4px 0 0;
