@@ -364,27 +364,29 @@ def compare_order_profile(fp_a: dict, fp_b: dict) -> float | None:
     rule hold_duration and the style dims follow.
 
     The target's own profile is sharply specific: 94.6% Limit orders at `Ioc`,
-    zero cancels, zero triggers, zero client order ids. That is TWAP slicing by
-    hand, and it looks nothing like a trader resting Gtc orders and cancelling
-    them, which is exactly the kind of distinction fills alone cannot draw.
+    zero cancels, zero triggers, zero client order ids. That differs from
+    resting Gtc orders and cancelling them, but does not prove manual execution
+    or common ownership: automated systems can use either submission style.
     """
     a = fp_a.get("order_profile") or {}
     b = fp_b.get("order_profile") or {}
     if not a.get("orders") or not b.get("orders"):
         return None
 
-    parts = [
-        _dist_similarity(a.get("order_type_mix"), b.get("order_type_mix")),
-        _dist_similarity(a.get("tif_mix"), b.get("tif_mix")),
-        _dist_similarity(a.get("status_mix"), b.get("status_mix")),
-    ]
+    parts = []
+    for key in ("order_type_mix", "tif_mix", "status_mix"):
+        left = {k: v for k, v in (a.get(key) or {}).items() if k != "unknown"}
+        right = {k: v for k, v in (b.get(key) or {}).items() if k != "unknown"}
+        if left and right:
+            parts.append(_dist_similarity(left, right))
     # Rates are proportions already, so closeness is 1 - |difference|.
     parts.extend(
-        1.0 - abs(float(a.get(key, 0)) - float(b.get(key, 0)))
+        1.0 - abs(float(a[key]) - float(b[key]))
         for key in ("cancel_rate", "reduce_only_rate", "trigger_rate",
                     "programmatic_rate")
+        if a.get(key) is not None and b.get(key) is not None
     )
-    return float(sum(parts) / len(parts))
+    return float(sum(parts) / len(parts)) if parts else None
 
 
 def get_asset_overlap(fp_a: dict, fp_b: dict) -> dict:
@@ -840,6 +842,9 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     }
     for name, val in style_dims.items():
         dimensions[name] = round(val, 4) if val is not None else None
+    for name in set(ezekiel_fp.get("excluded_dimensions", [])) | set(candidate_fp.get("excluded_dimensions", [])):
+        if name in dimensions:
+            dimensions[name] = None
 
     # Dynamic weights: discount account_size for fresh/small candidate wallets.
     # A migrated trader starts with a new account — size comparison is misleading early on.
@@ -1849,7 +1854,9 @@ def scan_leaderboard():
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
         score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
-        sweep_scores.append(score)
+        sweep_scores.append({"wallet": wallet.lower(), "score": score,
+                             "feature_mask": sorted(k for k, value in dimensions.items() if value is not None),
+                             "scoring_schema": th.SCORING_SCHEMA})
         # This wallet cleared min_fills and was fingerprinted, so it belongs in the
         # rarity denominator. Recording only eligible wallets keeps the frequency
         # table describing the same population the scores come from.

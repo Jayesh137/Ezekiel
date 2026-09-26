@@ -29,7 +29,8 @@ def _setup(tmp_path, monkeypatch, *, passed=True, **files):
     monkeypatch.setattr(roster, "DATA_DIR", tmp_path)
     profile = tmp_path.parent / "profile"
     profile.mkdir(parents=True, exist_ok=True)
-    (profile / "backtest.json").write_text(json.dumps({"passed": passed}))
+    (profile / "backtest.json").write_text(json.dumps({"passed": passed, "self_score": .75,
+                                                     "scoring_schema": th.SCORING_SCHEMA}))
     for name, (key, items) in files.items():
         _write(tmp_path, name, key, items)
 

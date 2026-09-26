@@ -16,7 +16,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import DATA_DIR
+from src import thresholds as th
+from src.utils import DATA_DIR, atomic_write_json
 
 POPULATION_PATH = DATA_DIR / "calibration" / "population.json"
 MAX_SAMPLES = 1000
@@ -68,37 +69,70 @@ MARKET_COMMON = "COMMON"
 MARKET_UNKNOWN = "UNKNOWN"     # insufficient sample — never treated as rare
 
 
-def load_population() -> list[float]:
+def load_population_observations() -> list[dict]:
     if not POPULATION_PATH.exists():
         return []
     try:
         with open(POPULATION_PATH) as f:
             data = json.load(f)
-        return [float(s["score"]) for s in data.get("samples", [])]
-    except Exception:
+        return [row for row in data.get("samples", []) if isinstance(row, dict)]
+    except (OSError, ValueError, AttributeError):
         return []
 
 
-def record_population_scores(scores: list[float]) -> int:
+def load_population(feature_mask: list[str] | None = None) -> list[float]:
+    """One current-schema observation per identified wallet, optionally mask-matched.
+
+    Anonymous legacy scores remain readable as observations but cannot establish
+    an independent-wallet population. Repeated scans never grow its sample size.
+    """
+    latest = {}
+    for row in load_population_observations():
+        wallet = str(row.get("wallet") or "").lower()
+        if not wallet or not th.schema_compatible(row.get("scoring_schema")) or not row.get("feature_mask"):
+            continue
+        if feature_mask is not None and sorted(row["feature_mask"]) != sorted(feature_mask):
+            continue
+        try:
+            score = float(row["score"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(score) and 0 <= score <= 1:
+            latest[wallet] = score
+    return list(latest.values())
+
+
+def record_population_scores(scores: list[float | dict]) -> int:
     """Append this sweep's leaderboard scores to the rolling population.
     Only unbiased leaderboard scans belong here — priority targets are
     pre-selected by linkage evidence and would skew the null distribution."""
     if not scores:
         return 0
-    POPULATION_PATH.parent.mkdir(parents=True, exist_ok=True)
-    samples = []
-    if POPULATION_PATH.exists():
-        try:
-            with open(POPULATION_PATH) as f:
-                samples = json.load(f).get("samples", [])
-        except Exception:
-            samples = []
+    samples = load_population_observations()
     now = datetime.now(UTC).isoformat()
-    samples.extend({"score": round(float(s), 4), "recorded_at": now} for s in scores)
-    samples = samples[-MAX_SAMPLES:]
-    with open(POPULATION_PATH, "w") as f:
-        json.dump({"updated_at": now, "samples": samples}, f)
-    return len(samples)
+    for item in scores:
+        row = dict(item) if isinstance(item, dict) else {"score": item}
+        try:
+            score = float(row.get("score"))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(score) or not 0 <= score <= 1:
+            continue
+        samples.append({"score": round(score, 4), "recorded_at": now,
+                        "wallet": str(row.get("wallet") or "").lower() or None,
+                        "scoring_schema": row.get("scoring_schema", th.SCORING_SCHEMA),
+                        "feature_mask": sorted(set(row.get("feature_mask") or [])),
+                        "cohort_known": bool(row.get("wallet") and row.get("feature_mask"))})
+    latest = {}
+    for index, row in enumerate(samples):
+        key = (row.get("wallet") or f"anonymous:{index}", row.get("scoring_schema"),
+               tuple(row.get("feature_mask") or []))
+        latest.pop(key, None)
+        latest[key] = row
+    kept = list(latest.values())[-MAX_SAMPLES:]
+    atomic_write_json(POPULATION_PATH, {"updated_at": now, "samples": kept,
+                                      "basis": "identified_wallets_current_schema"})
+    return len(load_population())
 
 
 def gate_active(population: list[float] | None = None) -> bool:

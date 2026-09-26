@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import thresholds as th
 from src.utils import (
     DATA_DIR,
     candidate_scored_by_current_scorer,
@@ -222,6 +223,12 @@ def assign_tier(vectors: set, confidence: float, is_service: bool,
     return TIER_WATCH
 
 
+def resolved_behavioural_thresholds(config: dict | None = None) -> dict:
+    config = config if config is not None else load_config()
+    raw = config.get("alert_thresholds") or load_config()["alert_thresholds"]
+    return th.resolve(raw, th.load_backtest_report(DATA_DIR.parent / "profile"))
+
+
 def behavioural_is_trustworthy() -> bool:
     """Whether the behavioural scorer has proven it can identify the target.
 
@@ -249,8 +256,8 @@ def behavioural_is_trustworthy() -> bool:
     for a wallet that scores 0.45 with a style veto when re-scored live.
     """
     try:
-        with open(DATA_DIR.parent / "profile" / "backtest.json") as f:
-            return bool(json.load(f).get("passed"))
+        return resolved_behavioural_thresholds().get("policy") in {
+            th.SRC_CURRENT_VALIDATED, th.SRC_CARRIED_FORWARD}
     except (OSError, ValueError, AttributeError):
         return False
 
@@ -617,6 +624,7 @@ def build_roster(config: dict | None = None) -> dict:
     known_self = {(w or "").lower() for w in config.get("known_self_wallets", [])}
 
     trust_behavioural = behavioural_is_trustworthy()
+    behavioural_threshold = th.behavioural_gate(resolved_behavioural_thresholds(config))
     wallets: dict[str, dict] = {}
 
     def entry(addr: str) -> dict:
@@ -773,7 +781,8 @@ def build_roster(config: dict | None = None) -> dict:
         # a vetoed wallet must not also cast a behavioural vote for being the
         # same one. And the backtest validates one scorer: a score from any
         # other is history, not evidence.
-        if score >= 0.65 and not vetoes and trust_behavioural and current:
+        e["evidence"]["behavioural_threshold"] = behavioural_threshold
+        if score >= behavioural_threshold and not vetoes and trust_behavioural and current:
             e["vectors"].add(VECTOR_BEHAVIOURAL)
 
     # Wallets sharing an authorised agent with the target.

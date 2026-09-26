@@ -192,10 +192,12 @@ def test_percentile_gate_blocks_common_scores():
 
 def test_record_and_load_population(tmp_path, monkeypatch):
     monkeypatch.setattr(calibration, "POPULATION_PATH", tmp_path / "population.json")
-    n = calibration.record_population_scores([0.5, 0.6, 0.7])
+    n = calibration.record_population_scores([
+        {"wallet": f"wallet-{i}", "score": score, "feature_mask": ["activity"]}
+        for i, score in enumerate([0.5, 0.6, 0.7])])
     assert n == 3
     assert calibration.load_population() == [0.5, 0.6, 0.7]
-    calibration.record_population_scores([0.8])
+    calibration.record_population_scores([{"wallet": "wallet-3", "score": .8, "feature_mask": ["activity"]}])
     assert len(calibration.load_population()) == 4
 
 
