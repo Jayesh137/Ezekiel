@@ -67,6 +67,7 @@ _PROBES = {
     "the whole-chain activity cache": REAL_DATA_DIR / "labels" / "address_activity.json",
     # linkage.FIRST_FUNDER_PATH: permanent facts, cached forever once written.
     "the first-funder cache": REAL_DATA_DIR / "labels" / "first_funders.json",
+    'the discovery database': REAL_DATA_DIR / '.local' / 'discovery.sqlite3',
 }
 
 
@@ -104,6 +105,14 @@ def _never_write_to_real_data(tmp_path, monkeypatch):
     monkeypatch.setattr(linkage, "DATA_DIR", sandbox)
     monkeypatch.setattr(linkage, "FIRST_FUNDER_PATH",
                         sandbox / "labels" / "first_funders.json")
+    from src.chain import collect
+    monkeypatch.setattr(collect, 'DATA_DIR', sandbox)
+    monkeypatch.setattr(collect, 'TRANSFERS_DIR', sandbox / 'transfers')
+    monkeypatch.setattr(collect, 'SPAM_DIR', sandbox / 'transfers_spam')
+    monkeypatch.setattr(collect, 'CURSOR_PATH', sandbox / 'state' / 'transfer_cursors.json')
+    from src import discovery_evaluation, evaluation_cohort
+    monkeypatch.setattr(discovery_evaluation, 'DATA_DIR', sandbox)
+    monkeypatch.setattr(evaluation_cohort, 'DATA_DIR', sandbox)
     yield sandbox
 
 

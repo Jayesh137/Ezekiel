@@ -145,7 +145,7 @@ def test_roster_uses_same_adapted_behavioural_gate(tmp_path, monkeypatch):
     assert "behavioural" in result["wallets"][0]["vectors"]
 
 
-def test_backtest_enriches_empty_order_profiles_and_deduplicates_negative_wallets(tmp_path, monkeypatch):
+def test_backtest_uses_fixed_asof_cohort_and_never_live_order_enrichment(tmp_path, monkeypatch):
     monkeypatch.setattr(backtest, "DATA_DIR", tmp_path)
     monkeypatch.setattr(backtest, "REPORT_PATH", tmp_path / "backtest.json")
     monkeypatch.setattr(fingerprint, "load_fills", fills)
@@ -153,7 +153,11 @@ def test_backtest_enriches_empty_order_profiles_and_deduplicates_negative_wallet
     monkeypatch.setattr(backtest, "load_state_asof", lambda cutoff: (
         {}, {"available": True, "observed_at_ms": cutoff}))
     seen = []
-    monkeypatch.setattr(scanner, "get_candidate_orders", lambda wallet: [order(1, "filled", 20 * DAY)])
+    monkeypatch.setattr(scanner, 'get_candidate_orders', lambda wallet: (_ for _ in ()).throw(
+        AssertionError('live orders cannot enter a historical test')))
+    from src import evaluation_cohort
+    row = {'wallet': '0x' + '2' * 40, 'fingerprint': {'order_profile': {'orders': 1}, 'test_negative': True}}
+    monkeypatch.setattr(evaluation_cohort, 'load_cohort_asof', lambda *a, cohort_row=row, **k: ([cohort_row, cohort_row], {'eligible': True}))
 
     def compare(target, candidate, *_args):
         if candidate.get("test_negative"):

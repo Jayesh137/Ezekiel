@@ -45,7 +45,7 @@ ACTION_BACKGROUND = "BACKGROUND"
 # under 2026-07-27.1 is not evidence about this scorer and must not carry over.
 # 2026-09-26.1: live recent order parity, lifecycle deduplication, true cancel
 # rates and explicit historical feature masks invalidate earlier calibration.
-SCORING_SCHEMA = "2026-09-26.1"
+SCORING_SCHEMA = "2026-09-26.2"
 
 # Where the thresholds in force came from. Published in scans/latest.json and
 # rendered on the dashboard so the operating mode is never ambiguous.

@@ -1179,18 +1179,29 @@ def tooling_fingerprint(wallet: str, fetch=None) -> dict | None:
 def discovery_targets(config: dict) -> dict:
     """Reserve a small, balance-independent scan allocation for public activity."""
     from src.discovery_store import DiscoveryStore
-    from src.market_discovery import exclusions
 
     path = DATA_DIR / ".local" / "discovery.sqlite3"
     if not path.exists():
         return {}
-    limit = max(0, min(50, int(config.get("discovery", {}).get("scan_budget", 20))))
     with DiscoveryStore(path) as store:
-        store.set_exclusions(exclusions(config))
-        stamp = int(time.time() * 1000)
-        deposits = store.deposit_candidates(limit=min(5, limit // 3), now_ms=stamp)
-        trades = store.candidates(limit=limit - len(deposits), now_ms=stamp)
-        return {r["wallet"]: {"source": r["source"], "discovery": r} for r in deposits + trades}
+        return select_discovery_targets(store, config, int(time.time() * 1000))
+
+
+def select_discovery_targets(store, config, now_ms):
+    """The same bounded allocation is used by scheduled scans and offline replay."""
+    from src.market_discovery import exclusions
+    store.set_exclusions(exclusions(config))
+    limit = max(0, min(50, int(config.get('discovery', {}).get('scan_budget', 20))))
+    deposits = store.deposit_candidates(limit=min(5, limit // 3), now_ms=now_ms)
+    trades = store.candidates(limit=limit - len(deposits), now_ms=now_ms)
+    return {r['wallet']: {'source': r['source'], 'discovery': r} for r in deposits + trades}
+
+
+def matched_population(result):
+    from src.evaluation_cohort import cohort_wallets
+    mask = sorted(k for k, v in result.get('dimensions', {}).items() if v is not None)
+    excluded = set(cohort_wallets(DATA_DIR / '.local' / 'discovery.sqlite3')) | {result.get('wallet', '').lower()}
+    return calibration.load_population(mask, excluded_wallets=excluded) if mask else []
 
 
 def _mark_discovery_checked(wallet, status):
@@ -1754,6 +1765,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
             continue
 
         score = result["score"]
+        candidate_population = matched_population(result)
+        result['calibration_population_size'] = len(candidate_population)
         print(f"[scanner] Priority {wallet[:10]}... ({source}): {score:.4f}")
 
         vetoes = result["evidence"].get("vetoes")
@@ -1770,7 +1783,7 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         # corroborated — the market itself is not corroboration.
         if rare and alertable and _is_corroborated(result, source) \
                 and _market_alert_allowed(rare):
-            md = evaluate_candidate(wallet, score, eff, population, vetoes,
+            md = evaluate_candidate(wallet, score, eff, candidate_population, vetoes,
                                     rare_overlap=True,
                                     score_without_market_bonus=_market_free_score(result),
                                     corroborated=True)
@@ -1814,7 +1827,7 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
             score = _apply_linkage(result, target_addr, target_l1)
 
         # One disposition decides promote / watchlist / drop for every route below.
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+        disp = evaluate_candidate(wallet, score, eff, candidate_population, vetoes, bool(rare),
                                   _market_free_score(result),
                                   corroborated=_is_corroborated(result, source))
         result["disposition"] = disp
@@ -1901,6 +1914,7 @@ def scan_leaderboard():
     scanned = 0
     sweep_scores = []  # this sweep's scores → next sweep's null distribution
     sweep_markets = {}  # eligible wallet → markets traded → rarity calibration
+    cohort_profiles = []
 
     # Largest accounts first, not the API's arbitrary order — see
     # select_leaderboard_wallets for why the previous slice excluded the
@@ -1928,6 +1942,9 @@ def scan_leaderboard():
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
         score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
+        cohort_profiles.append({'wallet': wallet.lower(), 'source': 'leaderboard',
+                                'fingerprint': _summarize_fingerprint(candidate_fp)})
+        candidate_population = matched_population({'wallet': wallet, 'dimensions': dimensions})
         sweep_scores.append({"wallet": wallet.lower(), "score": score,
                              "feature_mask": sorted(k for k, value in dimensions.items() if value is not None),
                              "scoring_schema": th.SCORING_SCHEMA})
@@ -1940,7 +1957,8 @@ def scan_leaderboard():
         result = {
             "wallet": wallet,
             "score": score,
-            "score_percentile": calibration.score_percentile(score, population),
+            "score_percentile": calibration.score_percentile(score, candidate_population),
+            'calibration_population_size': len(candidate_population),
             "dimensions": dimensions,
             "evidence": evidence,
             "fills_count": len(fills),
@@ -1962,7 +1980,7 @@ def scan_leaderboard():
         # A leaderboard wallet has no independent evidence by construction — it was
         # not reached via fund flow, HL-native transfer or correlation. So a shared
         # market, however rare, can only earn it a watchlist slot here.
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes,
+        disp = evaluate_candidate(wallet, score, eff, candidate_population, vetoes,
                                   bool(shared_markets),
                                   _market_free_score(result),
                                   corroborated=_is_corroborated(result))
@@ -2003,6 +2021,12 @@ def scan_leaderboard():
     print(f"[scanner] Top 5 scores: {top_scores[:5]}")
 
     pop_size = calibration.record_population_scores(sweep_scores)
+    from src.evaluation_cohort import freeze_cohort, record_profiles
+    cohort_path = DATA_DIR / '.local' / 'discovery.sqlite3'
+    if cohort_profiles:
+        cohort_stamp = int(time.time() * 1000)
+        record_profiles(cohort_profiles, cohort_stamp, cohort_path)
+        freeze_cohort(cohort_path, cohort_stamp, excluded={target, *config.get('known_self_wallets', [])})
     print(f"[scanner] Calibration population: {pop_size} samples")
 
     market_summary = calibration.record_market_observation(sweep_markets)
@@ -2089,11 +2113,11 @@ def scan_leaderboard():
                 # bypassing it, so vetoes, the percentile gate and the
                 # market-bonus protection all still apply.
                 corr_disp = evaluate_candidate(
-                    top["wallet"], top["score"], eff, population,
+                    top["wallet"], top["score"], eff, matched_population(top),
                     top.get("evidence", {}).get("vetoes"),
                     rare_overlap=bool(_measured_rare_markets(top)),
                     score_without_market_bonus=_market_free_score(top),
-                    corroborated=True,
+                    corroborated=_is_corroborated(top),
                 )
                 if top["score"] >= corr_threshold and corr_disp["action"] == th.ACTION_ALERT:
                     print(f"[scanner] MIGRATION CORRELATION: {days_silent:.1f}d silence + {top['score']:.4f} candidate")

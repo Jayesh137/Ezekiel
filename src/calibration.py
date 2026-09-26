@@ -80,7 +80,7 @@ def load_population_observations() -> list[dict]:
         return []
 
 
-def load_population(feature_mask: list[str] | None = None) -> list[float]:
+def load_population(feature_mask: list[str] | None = None, *, excluded_wallets=()) -> list[float]:
     """One current-schema observation per identified wallet, optionally mask-matched.
 
     Anonymous legacy scores remain readable as observations but cannot establish
@@ -89,6 +89,8 @@ def load_population(feature_mask: list[str] | None = None) -> list[float]:
     latest = {}
     for row in load_population_observations():
         wallet = str(row.get("wallet") or "").lower()
+        if wallet in excluded_wallets:
+            continue
         if not wallet or not th.schema_compatible(row.get("scoring_schema")) or not row.get("feature_mask"):
             continue
         if feature_mask is not None and sorted(row["feature_mask"]) != sorted(feature_mask):

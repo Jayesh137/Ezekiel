@@ -107,13 +107,19 @@ def test_missing_api_key_degrades_explicitly_not_silently(monkeypatch, l1):
     from src.chain.chains import enabled_chains
     from src.utils import load_config
 
+    # This fixture tests exclusively key-required readers. Public Blockscout
+    # readers are supported without the key and have their own offline tests.
+    config = load_config()
+    config['chains'] = [{**c, 'reader': 'etherscan'} for c in enabled_chains(config)]
+    monkeypatch.setattr(tg, 'load_config', lambda: config)
+
     edges, diag = expand_frontier(seed, target, tg.DEFAULTS)
     assert edges == seed
     assert diag["status"] == "skipped_no_api_key"
     # Every enabled chain, by name. "arbitrum_l1" was honest when collection
     # read one asset on one chain; naming it now would report five of six
     # chains as healthy on a run that read none of them.
-    expected = [c["name"] for c in enabled_chains(load_config())]
+    expected = [c["name"] for c in enabled_chains(config)]
     assert diag["degraded_sources"] == expected
     assert len(expected) > 1
 

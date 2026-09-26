@@ -64,11 +64,14 @@ def observe_candidate(wallet: str, evidence: dict, data_dir: Path | None = None)
     elif evidence.get("error"):
         row["last_read_error"] = str(evidence["error"])[:300]
     observation = {**evidence, "observed_at": stamp}
+    if row['last_read_status'] != 'ok':
+        observation['positive'] = False
     observations = row.get("observations") or []
     event = evidence.get("event_id")
     if event:
         observations = [o for o in observations
-                        if (o.get("source"), o.get("event_id")) != (evidence.get("source"), event)]
+                        if (o.get("source"), o.get("event_id")) != (evidence.get("source"), event)
+                        or (o.get('positive') and not observation.get('positive'))]
     # Keep positive facts separately from a bounded log of empty/failed checks.
     facts = [o for o in observations if o.get("positive")]
     attempts = [o for o in observations if not o.get("positive")]

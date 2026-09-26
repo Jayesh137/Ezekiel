@@ -53,3 +53,12 @@ def test_double_normalisation_does_not_drop_agent_expiration():
     rows = normalise_agents(normalise_agents([{"address": OPERATOR, "validUntil": 10}]))
     assert rows[0]["valid_until"] == 10
     assert agent_index({A: rows}, as_of_ms=20) == {}
+
+
+def test_snapshot_renewal_preserves_extended_authority_interval():
+    snapshots = [{'event_id': str(ts), 'kind': 'agent_snapshot', 'account': A, 'ts_ms': ts,
+                  'success': True, 'complete': True, 'agents': [{'address': OPERATOR, 'validUntil': expiry}]}
+                 for ts, expiry in [(10, 20), (15, 40)]]
+    result = index_authority(snapshots + [event(B, 'approve_agent', 30)], as_of_ms=35)
+    assert result['shared_authority']
+    assert result['intervals'][1]['valid_to_ms'] == 40

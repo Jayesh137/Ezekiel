@@ -43,19 +43,19 @@ def _node(**over):
     return node
 
 
-def test_two_independent_vectors_and_confidence_reach_confirmed():
+def test_two_financial_detectors_remain_one_association():
     assert roster.assign_tier({"transfer", "linkage"}, 0.7, False, False) \
-        == roster.TIER_CONFIRMED
+        == roster.TIER_POSSIBLE
 
 
 def test_one_vector_alone_cannot_reach_confirmed():
     """Every single vector has a known way of being wrong by itself."""
     assert roster.assign_tier({"correlation"}, 0.99, False, False) \
-        == roster.TIER_PROBABLE
+        == roster.TIER_POSSIBLE
 
 
-def test_high_confidence_without_two_vectors_is_only_probable():
-    assert roster.assign_tier(set(), 0.9, False, False) == roster.TIER_PROBABLE
+def test_high_graph_confidence_without_independent_evidence_is_only_possible():
+    assert roster.assign_tier(set(), 0.9, False, False) == roster.TIER_POSSIBLE
 
 
 def test_a_service_is_never_a_candidate():
@@ -85,7 +85,7 @@ def test_a_correlation_only_wallet_gets_no_transfer_vector(tmp_path, monkeypatch
     assert row["tier"] == roster.TIER_POSSIBLE
 
 
-def test_transfer_plus_linkage_confirms(tmp_path, monkeypatch):
+def test_transfer_plus_linkage_does_not_confirm_ownership(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch,
            transfer_graph=("nodes", [_node(
                confidence=0.88,
@@ -93,7 +93,8 @@ def test_transfer_plus_linkage_confirms(tmp_path, monkeypatch):
                          "shared_deposit_address": True})]))
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert set(row["vectors"]) == {"transfer", "linkage"}
-    assert row["tier"] == roster.TIER_CONFIRMED
+    assert row["tier"] == roster.TIER_POSSIBLE
+    assert row['vector_count'] == 1 and row['detector_count'] == 2
 
 
 def test_a_style_veto_cancels_the_behavioural_vote(tmp_path, monkeypatch):
@@ -165,7 +166,7 @@ def test_rows_are_ordered_by_tier_then_vector_count(tmp_path, monkeypatch):
            ]))
     rows = roster.build_roster({"target_wallet": TARGET})["wallets"]
     assert rows[0]["wallet"] == W
-    assert rows[0]["tier"] == roster.TIER_CONFIRMED
+    assert rows[0]["tier"] == roster.TIER_POSSIBLE
 
 
 def test_known_self_wallets_are_confirmed_from_config(tmp_path, monkeypatch):
@@ -174,13 +175,10 @@ def test_known_self_wallets_are_confirmed_from_config(tmp_path, monkeypatch):
     assert out["wallets"][0]["tier"] == roster.TIER_CONFIRMED
 
 
-def test_a_shared_agent_alone_confirms():
-    """An agent is an address an account EXPLICITLY authorised to trade for it.
-    Two accounts sharing one is a deliberate act of control by the same
-    operator, not an inference from flow or style — the one signal strong
-    enough to stand alone."""
+def test_a_shared_agent_is_an_operator_association():
+    """A shared delegate may manage accounts belonging to different people."""
     assert roster.assign_tier({roster.VECTOR_AGENT}, 0.0, False, False) \
-        == roster.TIER_CONFIRMED
+        == roster.TIER_POSSIBLE
 
 
 def test_a_shared_agent_does_not_override_infrastructure():
@@ -197,7 +195,7 @@ def test_agent_links_reach_the_roster(tmp_path, monkeypatch):
         {"linked_to_target": {W: ["0xagent"]}}))
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert roster.VECTOR_AGENT in row["vectors"]
-    assert row["tier"] == roster.TIER_CONFIRMED
+    assert row["tier"] == roster.TIER_POSSIBLE
     assert row["evidence"]["shared_agents"] == ["0xagent"]
 
 
@@ -221,11 +219,8 @@ def test_portfolio_overlap_is_evidence_and_never_a_vector(tmp_path, monkeypatch)
     assert row["tier"] != roster.TIER_CONFIRMED
 
 
-def test_a_dormancy_handoff_counts_as_an_independent_vector(tmp_path, monkeypatch):
-    """The only vector needing no connection between the two wallets, and it
-    cast no vote: 0xdd53c529 was born two days into a six-day silence, ran
-    $999 to $51.3M in three weeks, independently matched an exit amount — and
-    sat at POSSIBLE on one vector."""
+def test_dormancy_handoff_is_research_context(tmp_path, monkeypatch):
+    """An observed timing coincidence is retained without promoting identity."""
     import json
 
     from src import roster as r
@@ -243,8 +238,8 @@ def test_a_dormancy_handoff_counts_as_an_independent_vector(tmp_path, monkeypatc
 
     out = r.build_roster({"target_wallet": "0xTARGET", "known_self_wallets": []})
     row = next(w for w in out["wallets"] if w["wallet"] == "0xdd53")
-    assert set(row["vectors"]) == {r.VECTOR_CORRELATION, r.VECTOR_DORMANCY}
-    assert row["tier"] == r.TIER_PROBABLE          # two vectors, confidence unproven
+    assert set(row["vectors"]) == {r.VECTOR_CORRELATION}
+    assert row["tier"] == r.TIER_POSSIBLE
     assert row["evidence"]["dormancy_handoff"]["gap_length"] == 6
     # A scored-zero handoff is "did not happen", not a vector.
     assert all(w["wallet"] != "0xzero" for w in out["wallets"])
@@ -264,7 +259,7 @@ def test_a_two_hop_reach_through_a_stranger_casts_no_transfer_vote(tmp_path, mon
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert "transfer" not in row["vectors"]
     assert row["evidence"]["graph_reach_only"] is True
-    assert row["tier"] == roster.TIER_POSSIBLE
+    assert row["tier"] == roster.TIER_WATCH
 
 
 def test_a_direct_transfer_with_the_target_still_votes(tmp_path, monkeypatch):
@@ -282,8 +277,8 @@ def test_real_money_with_his_own_config_wallet_votes(tmp_path, monkeypatch):
            transfer_graph=("nodes", [_node(depth=2, path=[TARGET, treasury, W],
                                            evidence={"transfer_count": 3,
                                                      "self_flow_usd": 97_430.0})]))
-    row = roster.build_roster({"target_wallet": TARGET,
-                               "known_self_wallets": [treasury]})["wallets"][0]
+    row = next(r for r in roster.build_roster({"target_wallet": TARGET,
+                               "known_self_wallets": [treasury]})["wallets"] if r['wallet'] == W)
     assert "transfer" in row["vectors"]
 
 
@@ -295,8 +290,8 @@ def test_a_poisoner_beside_his_config_wallet_casts_no_vote(tmp_path, monkeypatch
            transfer_graph=("nodes", [_node(depth=2, path=[TARGET, treasury, W],
                                            evidence={"transfer_count": 34,
                                                      "self_flow_usd": 0.0})]))
-    row = roster.build_roster({"target_wallet": TARGET,
-                               "known_self_wallets": [treasury]})["wallets"][0]
+    row = next(r for r in roster.build_roster({"target_wallet": TARGET,
+                               "known_self_wallets": [treasury]})["wallets"] if r['wallet'] == W)
     assert "transfer" not in row["vectors"]
     assert row["evidence"]["graph_reach_only"] is True
 

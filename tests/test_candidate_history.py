@@ -39,6 +39,13 @@ def test_failed_registry_observation_preserves_last_success_and_positive_evidenc
     assert any(e.get("event_id") == "tx1" for e in row["observations"])
 
 
+def test_failed_retry_of_same_event_cannot_erase_positive_fact(tmp_path):
+    from src.candidate_registry import observe_candidate
+    observe_candidate(WALLET, {'source': 'route', 'event_id': 'tx1', 'status': 'ok', 'positive': True}, tmp_path)
+    row = observe_candidate(WALLET, {'source': 'route', 'event_id': 'tx1', 'status': 'error', 'error': 'timeout'}, tmp_path)
+    assert any(o.get('positive') and o.get('event_id') == 'tx1' for o in row['observations'])
+
+
 def test_persisted_score_downgrade_keeps_discovery_and_updates_freshness(tmp_path, monkeypatch):
     from src.candidate_registry import observe_candidate
     monkeypatch.setattr(scanner, "DATA_DIR", tmp_path)

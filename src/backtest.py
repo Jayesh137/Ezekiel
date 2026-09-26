@@ -368,34 +368,25 @@ def run_backtest() -> dict:
         self_fp["excluded_dimensions"] = ["account_size", "leverage_profile"]
     self_score, self_dims, self_evidence = compute_similarity(target_fp, self_fp, eff)
 
-    # Strangers: fingerprint summaries from the latest scan sweep
+    # Fixed membership was selected before the trial, independently of scores.
+    # Only dated profiles observed before the cutoff may enter this lineup.
+    from src.evaluation_cohort import load_cohort_asof
+    cohort_rows, cohort = load_cohort_asof(DATA_DIR / '.local' / 'discovery.sqlite3',
+        max(f['time'] for f in recent), trial_start_ms=min(f['time'] for f in older))
+    report['heldout_cohort'] = cohort
+    report['validation_basis'] = 'fixed_heldout_asof'
     strangers = []
-    scans_path = DATA_DIR / "scans" / "latest.json"
-    if scans_path.exists():
-        try:
-            with open(scans_path) as f:
-                scan = json.load(f)
-            for r in stranger_results(scan, config["target_wallet"]):
-                cand_fp = r.get("fingerprint")
-                if not cand_fp:
-                    continue
-                # Give strangers the same dimension the target gets. Scoring the
-                # self-match on order_profile while strangers lack it would
-                # hand the target a dimension nobody else could earn - the same
-                # inflation the window split exists to prevent, arriving by a
-                # different door.
-                if not (cand_fp.get("order_profile") or {}).get("orders"):
-                    from src.fingerprint import compute_order_profile
-                    from src.scanner import get_candidate_orders
-                    cand_fp = dict(cand_fp)
-                    cand_fp["order_profile"] = compute_order_profile(orders_in_window(
-                        get_candidate_orders(r["wallet"]), recent))
-                s, dims, _ = compute_similarity(target_fp, cand_fp, eff)
-                if not any(row["wallet"] == r["wallet"].lower() for row in strangers):
-                    strangers.append({"wallet": r["wallet"].lower(), "score": s,
-                                      "feature_mask": sorted(k for k, value in dims.items() if value is not None)})
-        except Exception as e:
-            print(f"[backtest] Could not score strangers: {e}")
+    excluded = {config['target_wallet'].lower(), *(w.lower() for w in config.get('known_self_wallets', []))}
+    for r in cohort_rows:
+        cand_fp = r.get('fingerprint')
+        wallet = r.get('wallet', '').lower()
+        if not cand_fp or wallet in excluded or any(row['wallet'] == wallet for row in strangers):
+            continue
+        s, dims, _ = compute_similarity(target_fp, cand_fp, eff)
+        strangers.append({'wallet': wallet, 'score': s,
+                          'independent_sessions': cand_fp.get('episode_profile', {}).get('session_count', 0),
+                          'as_of_ms': r.get('as_of_ms'),
+                          'feature_mask': sorted(k for k, value in dims.items() if value is not None)})
 
     strangers.sort(key=lambda s: s["score"], reverse=True)
     best_stranger = strangers[0]["score"] if strangers else None
@@ -415,6 +406,10 @@ def run_backtest() -> dict:
     if vetoes:
         failures.append(f"self-match tripped style vetoes: {vetoes}")
     unsupported = []
+    if not cohort.get('eligible'):
+        unsupported.append(cohort.get('reason', 'no eligible fixed held-out cohort'))
+    if any(row['independent_sessions'] < 5 for row in strangers):
+        unsupported.append('held-out profiles need at least five independent trading sessions')
     if len(strangers) < MIN_STRANGERS:
         unsupported.append(f"only {len(strangers)} independent strangers; need {MIN_STRANGERS}")
     if not positions_available:

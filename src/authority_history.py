@@ -22,10 +22,12 @@ def _snapshot_changes(events, as_of_ms):
         account = event.get("account")
         current = {a["address"]: a for a in normalise_agents(event["agents"])}
         prior = previous.get(account, {})
+        changed = {authority for authority in current if authority not in prior
+                   or current[authority].get('valid_until') != prior[authority].get('valid_until')}
         output.extend({**event, "authority": authority, "kind": "approve_agent",
                            "event_id": f"{event.get('event_id')}:{authority}",
                            "valid_until_ms": current[authority].get("valid_until"),
-                           "boundaries_observed_only": True} for authority in current.keys() - prior.keys())
+                           "boundaries_observed_only": True} for authority in changed)
         if event.get("complete"):
             output.extend({**event, "authority": authority, "kind": "revoke_agent",
                                "event_id": f"{event.get('event_id')}:{authority}",

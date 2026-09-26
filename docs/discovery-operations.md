@@ -83,3 +83,47 @@ The queue reads up to 10,000 cached fills per candidate, examines at most 100
 candidates by default (200 maximum), rotates oldest investigations within source
 priority, and publishes bounded references plus original counts. Scheduled wiring
 and cache persistence are described with the workflow integration below.
+
+## Evidence quality and replay
+
+The roster reserves `CONFIRMED` for operator-configured trusted seeds. Other tiers
+are investigation priorities. Shared delegates, subaccount relationships, private
+transfers and style matches remain separate assertions; none alone establishes
+beneficial ownership. Shared parent IDs collapse duplicate evidence. Legacy
+financial reports without parent IDs conservatively count as one dependent group.
+`detector_count` and `vector_count` distinguish report names from evidence groups.
+Explicit empty subaccounts remain watched even when their master is only a weak lead.
+
+Calibration now uses the candidate's actual feature mask, excludes that candidate
+and the held-out cohort, and deduplicates wallets. The scanner captures score-blind
+leaderboard profiles in SQLite and freezes up to 50 hashed-address cohort members
+once at least 20 independent controls are available. Membership does not change
+with scores. Historical validation only uses cohort profiles observed before its
+cutoff and a cohort frozen before the trial window, with at least five independent
+sessions per control. A new installation will be inconclusive until enough forward
+history exists; it cannot retroactively manufacture a validated trial. Profiles
+retain at most 90 days / 10,000 rows. The scorer/policy schema is `2026-09-26.2`.
+
+Run an offline chronological replay with explicitly supplied observations:
+
+```sh
+python scripts/evaluate_discovery.py --events replay-events.json --scenarios replay-scenarios.json --data-dir scratch/replay --cutoff-ms 1790000000000
+python scripts/evaluate_discovery.py --quality-only
+```
+
+Events are JSON arrays of `{kind, observed_at_ms, data}`; `fills` also supplies
+`wallet`. Supported kinds are public `trade`, `deposit`, exact observed `route`,
+`fills` and `coverage_gap`. Scenarios specify `id`, `target_wallet`, `expected_wallets`,
+optional `start_ms` and `scan_budget`, and `kind` (`synthetic`, `verified_relationship`,
+or an unverified hypothesis). Verified relationships require `verification_refs`;
+they still do not prove beneficial ownership. Hidden wallets are not pre-seeded.
+
+Replay uses the live store, selection function, registry and investigation ranker
+in disposable isolated storage. It reports observation/selection/enrichment/ranking
+misses, retrieval by the cutoff at 5/20, first-investigation latency and gaps. It
+does not send alerts or tune thresholds. Synthetic small-wallet, no-funding,
+delayed-relay, split-account, retention-gap, future-leakage and noisy-control tests
+exercise the pipeline. Their success is not a claim of real-world identification
+accuracy. The false-identity-alert count is structural while research promotion is
+disabled. `data/quality/latest.json` exposes operational coverage independently of
+whether a labelled replay has ever been run.
