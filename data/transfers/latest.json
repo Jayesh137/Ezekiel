@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-26T05:13:37.157891+00:00",
+  "computed_at": "2026-09-26T08:28:00.336703+00:00",
   "wallets": 1,
   "records": 3,
   "spam_suppressed": 5,
@@ -8,10 +8,12 @@
     "symbol_forgery": 2,
     "zero_value": 3
   },
-  "calls": 27,
+  "calls": 26,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "monad"
+  ],
   "unsupported_sources": [
     "base",
     "bsc",
@@ -65,7 +67,9 @@
             "internal": 20083520
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          }
         },
         "base": {
           "records": 0,
@@ -123,7 +127,9 @@
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {
+            "native": "Max calls per sec rate limit reached (3/sec)"
+          }
         },
         "bsc": {
           "records": 0,
@@ -146,15 +152,17 @@
         "monad": {
           "records": 1,
           "spam": 0,
-          "calls": 6,
+          "calls": 5,
           "cursor": 37671813,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 0,
             "native": 0,
@@ -164,7 +172,9 @@
           "unverified_kinds": {}
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "monad"
+      ],
       "unsupported_sources": [
         "base",
         "optimism",
