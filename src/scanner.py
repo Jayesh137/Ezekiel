@@ -1170,6 +1170,30 @@ def tooling_fingerprint(wallet: str, fetch=None) -> dict | None:
             "requests_per_1k_usd": round(used / (vlm / 1000.0), 4)}
 
 
+def discovery_targets(config: dict) -> dict:
+    """Reserve a small, balance-independent scan allocation for public activity."""
+    from src.discovery_store import DiscoveryStore
+    from src.market_discovery import exclusions
+
+    path = DATA_DIR / ".local" / "discovery.sqlite3"
+    if not path.exists():
+        return {}
+    limit = max(0, min(50, int(config.get("discovery", {}).get("scan_budget", 20))))
+    with DiscoveryStore(path) as store:
+        store.set_exclusions(exclusions(config))
+        return {r["wallet"]: {"source": "public_trades", "discovery": r}
+                for r in store.candidates(limit=limit, now_ms=int(time.time() * 1000))}
+
+
+def _mark_discovery_checked(wallet, status):
+    from src.discovery_store import DiscoveryStore
+
+    path = DATA_DIR / ".local" / "discovery.sqlite3"
+    if path.exists():
+        with DiscoveryStore(path) as store:
+            store.mark_checked(wallet, int(time.time() * 1000), status)
+
+
 def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
                           source: str = "targeted", eff: dict | None = None,
                           market_freq: dict | None = None) -> dict | None:
@@ -1689,6 +1713,11 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     priority = {addr: meta for addr, meta in priority.items()
                 if addr.lower() != target_lower}
 
+    # These accounts need neither leaderboard rank nor a minimum balance. A
+    # public trade is only a retrieval source, never independent corroboration.
+    for wallet, meta in discovery_targets(config).items():
+        priority.setdefault(wallet, meta)
+
     if not priority:
         print("[scanner] No priority targets to scan")
         return []
@@ -1704,6 +1733,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         source = meta.get("source", "targeted")
         result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source, eff=eff,
                                       market_freq=market_freq)
+        if meta.get("discovery"):
+            _mark_discovery_checked(wallet, "ok" if result is not None else "error")
         if result is None:
             continue
 
