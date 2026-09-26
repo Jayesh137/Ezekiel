@@ -1,14 +1,14 @@
 {
-  "computed_at": "2026-09-26T15:44:29.762825+00:00",
+  "computed_at": "2026-09-26T16:24:29.192290+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 388,
   "behavioural_counts_as_a_vector": true,
   "tier_counts": {
     "CONFIRMED": 2,
     "PROBABLE": 3,
-    "POSSIBLE": 33,
+    "POSSIBLE": 32,
     "WATCH": 169,
-    "INFRASTRUCTURE": 181
+    "INFRASTRUCTURE": 182
   },
   "demoted_count": 57,
   "demoted": [
@@ -951,45 +951,6 @@
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.4921
-    },
-    {
-      "wallet": "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.43,
-      "classification": "OPERATIONAL_COUNTERPARTY",
-      "reasons": [
-        "Sent funds to the target wallet",
-        "Repeated transfers (25 separate movements)",
-        "Transfer happened entirely inside Hyperliquid (no L1 trace)",
-        "Actively trading on Hyperliquid after receiving funds"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 97866017.01,
-          "edge_count": 25,
-          "unvalued_edge_count": 0
-        },
-        "depth": 1,
-        "chains": [
-          "hyperliquid"
-        ],
-        "hl_out_usd": 0.0,
-        "hl_in_usd": 97866017.01,
-        "hl_role": "user",
-        "hl_account_value": 31.000002,
-        "hl_birth_ms": 1764197760065
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "POSSIBLE",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.43
     },
     {
       "wallet": "0x84abc08c0ea62e687c370154de1f38ea462f4d37",
@@ -9151,6 +9112,42 @@
       "vector_count": 1,
       "tier": "INFRASTRUCTURE",
       "peak_tier": "INFRASTRUCTURE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
+      "wallet": "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.0,
+      "classification": "SERVICE",
+      "reasons": [
+        "Excluded: high HL fan-out (583 distinct recipients)"
+      ],
+      "evidence": {
+        "service_reason": "high HL fan-out (583 distinct recipients)",
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 97866017.01,
+          "edge_count": 25,
+          "unvalued_edge_count": 0
+        },
+        "depth": 1,
+        "chains": [
+          "hyperliquid"
+        ],
+        "hl_out_usd": 0.0,
+        "hl_in_usd": 97866017.01,
+        "hl_role": "user",
+        "hl_account_value": 31.000002,
+        "hl_birth_ms": 1764197760065
+      },
+      "is_service": true,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "INFRASTRUCTURE",
+      "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.0
     },
