@@ -1181,8 +1181,10 @@ def discovery_targets(config: dict) -> dict:
     limit = max(0, min(50, int(config.get("discovery", {}).get("scan_budget", 20))))
     with DiscoveryStore(path) as store:
         store.set_exclusions(exclusions(config))
-        return {r["wallet"]: {"source": "public_trades", "discovery": r}
-                for r in store.candidates(limit=limit, now_ms=int(time.time() * 1000))}
+        stamp = int(time.time() * 1000)
+        deposits = store.deposit_candidates(limit=min(5, limit // 3), now_ms=stamp)
+        trades = store.candidates(limit=limit - len(deposits), now_ms=stamp)
+        return {r["wallet"]: {"source": r["source"], "discovery": r} for r in deposits + trades}
 
 
 def _mark_discovery_checked(wallet, status):
@@ -1717,6 +1719,13 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     # public trade is only a retrieval source, never independent corroboration.
     for wallet, meta in discovery_targets(config).items():
         priority.setdefault(wallet, meta)
+    try:
+        for row in _doc("routes").get("discoveries", [])[:30]:
+            wallet = valid_wallet(row.get("wallet"))
+            if wallet != target_lower:
+                priority.setdefault(wallet, {"source": "funding_route", "route": row})
+    except (ValueError, OSError, TypeError):
+        pass
 
     if not priority:
         print("[scanner] No priority targets to scan")

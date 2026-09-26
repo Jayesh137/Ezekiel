@@ -76,3 +76,11 @@ def test_import_jsonl_streaming_provenance_and_bad_lines(tmp_path):
         assert first["inserted"] == 2 and first["malformed_lines"] == 1
         assert second["duplicates"] == 2
         assert store.coverage()["observations"][-1]["source"] == "import:trades.jsonl"
+
+
+def test_small_deposit_becomes_due_without_a_public_trade(tmp_path):
+    with DiscoveryStore(tmp_path / "store.db") as store:
+        store.ingest_observations("cctp_deposits", [{"wallet": B, "amount": 5, "ts": 1, "hash": "deposit"}], 2000)
+        assert store.deposit_candidates(limit=1, now_ms=2000)[0]["wallet"] == B
+        store.mark_checked(B, 2000, "ok")
+        assert not store.deposit_candidates(limit=1, now_ms=3000)

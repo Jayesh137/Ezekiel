@@ -34,6 +34,11 @@ class DiscoveryStore:
             CREATE TABLE IF NOT EXISTS discovery_excluded (wallet TEXT PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS discovery_coverage (
                 id INTEGER PRIMARY KEY, source TEXT, observed_at_ms INTEGER, data TEXT);
+            CREATE TABLE IF NOT EXISTS discovery_observations (
+                source TEXT, id TEXT, observed_at_ms INTEGER, data TEXT, PRIMARY KEY(source,id));
+            CREATE TABLE IF NOT EXISTS deposit_seeds (
+                wallet TEXT PRIMARY KEY, first_seen_ms INTEGER, last_seen_ms INTEGER,
+                last_checked_ms INTEGER DEFAULT 0, next_check_ms INTEGER DEFAULT 0);
         """)
 
     def __enter__(self):
@@ -130,6 +135,16 @@ class DiscoveryStore:
         with self.db:
             self.db.execute("UPDATE discovered_wallets SET last_checked_ms=?,next_check_ms=?,read_status=? WHERE wallet=?",
                             (now_ms, now_ms + (3600_000 if status == "error" else 6 * 3600_000), status, wallet.lower()))
+            self.db.execute("UPDATE deposit_seeds SET last_checked_ms=?,next_check_ms=? WHERE wallet=?",
+                            (now_ms, now_ms + 6 * 3600_000, wallet.lower()))
+
+    def deposit_candidates(self, limit=5, now_ms=None):
+        now_ms = now_ms if now_ms is not None else int(time.time() * 1000)
+        return [{**dict(r), "source": "circle_deposit"} for r in self.db.execute("""
+            SELECT * FROM deposit_seeds WHERE next_check_ms<=? AND last_seen_ms>=?
+            AND wallet NOT IN (SELECT wallet FROM discovery_excluded)
+            ORDER BY last_checked_ms,last_seen_ms DESC,wallet LIMIT ?""",
+            (now_ms, now_ms - 30 * 86400_000, max(0, min(limit, 50))))]
 
     def wallet_trades(self, wallet, start_ms=0, end_ms=None, limit=10_000):
         rows = self.db.execute("""SELECT e.raw FROM market_events e JOIN market_participants p
@@ -144,6 +159,30 @@ class DiscoveryStore:
             self.db.execute("DELETE FROM discovery_coverage WHERE id NOT IN "
                             "(SELECT id FROM discovery_coverage ORDER BY id DESC LIMIT 1000)")
 
+    def ingest_observations(self, source, rows, observed_at_ms):
+        with self.db:
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                raw = json.dumps(row, sort_keys=True)
+                identity = str(row.get("event_id") or row.get("id") or hashlib.sha256(raw.encode()).hexdigest())
+                self.db.execute("INSERT OR IGNORE INTO discovery_observations VALUES (?,?,?,?)",
+                                (source, identity, observed_at_ms, raw))
+                if source == "cctp_deposits":
+                    try:
+                        wallet, ts = valid_wallet(row["wallet"]), int(row["ts"] * 1000)
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    self.db.execute("""INSERT INTO deposit_seeds(wallet,first_seen_ms,last_seen_ms)
+                        VALUES (?,?,?) ON CONFLICT(wallet) DO UPDATE SET
+                        first_seen_ms=min(first_seen_ms,excluded.first_seen_ms),
+                        last_seen_ms=max(last_seen_ms,excluded.last_seen_ms)""", (wallet, ts, ts))
+
+    def observations(self, source, limit=100_000):
+        return [json.loads(r[0]) for r in self.db.execute(
+            "SELECT data FROM discovery_observations WHERE source=? ORDER BY observed_at_ms DESC,id LIMIT ?",
+            (source, min(500_000, max(0, limit))))]
+
     def coverage(self) -> dict:
         rows = self.db.execute("SELECT source,observed_at_ms,data FROM discovery_coverage ORDER BY id DESC LIMIT 100")
         return {"continuous": False, "scope": "observations only; gaps and offline periods may contain unseen trades",
@@ -155,6 +194,7 @@ class DiscoveryStore:
                                 (max(1, max_events),)).fetchone()
         cutoff = max(before_ms - 1, extra[0] if extra else -1, self.meta("pruned_through_ms", -1))
         with self.db:
+            self.db.execute("DELETE FROM discovery_observations WHERE observed_at_ms<?", (before_ms,))
             self.db.execute("DELETE FROM market_participants WHERE ts<=?", (cutoff,))
             self.db.execute("DELETE FROM market_events WHERE ts<=?", (cutoff,))
             self.db.execute("INSERT OR REPLACE INTO discovery_meta VALUES ('pruned_through_ms',?)", (json.dumps(cutoff),))

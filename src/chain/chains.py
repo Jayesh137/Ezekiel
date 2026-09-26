@@ -11,8 +11,8 @@ REQUIRED_KEYS = ("name", "chain_id", "native", "enabled", "priority")
 DEFAULT_CHAINS = [
     {"name": "arbitrum", "chain_id": 42161, "native": "ETH", "enabled": True, "priority": 0},
     {"name": "ethereum", "chain_id": 1, "native": "ETH", "enabled": True, "priority": 1},
-    {"name": "base", "chain_id": 8453, "native": "ETH", "enabled": True, "priority": 2},
-    {"name": "optimism", "chain_id": 10, "native": "ETH", "enabled": True, "priority": 3},
+    {"name": "base", "chain_id": 8453, "native": "ETH", "enabled": True, "priority": 2, "reader": "blockscout"},
+    {"name": "optimism", "chain_id": 10, "native": "ETH", "enabled": True, "priority": 3, "reader": "blockscout"},
     {"name": "polygon", "chain_id": 137, "native": "POL", "enabled": True, "priority": 4},
     {"name": "bsc", "chain_id": 56, "native": "BNB", "enabled": True, "priority": 5},
 ]

@@ -80,6 +80,7 @@ def main() -> int:
     from src.hl_identity import parse_web_data
 
     by_wallet: dict[str, list] = {}
+    snapshot_complete = {}
     unreadable = 0
     for wallet in wallets:
         try:
@@ -92,6 +93,7 @@ def main() -> int:
         # such. A failed call is NOT recorded, so it can never read as "none".
         if isinstance(resp, list):
             by_wallet[wallet] = normalise_agents(resp)
+            snapshot_complete[wallet] = False
         else:
             unreadable += 1
             time.sleep(0.15)
@@ -117,6 +119,7 @@ def main() -> int:
                 print(f"[agents] {wallet[:12]}... webData2 unreadable: empty response")
         else:
             web = parse_web_data(payload)
+            snapshot_complete[wallet] = True
             if web["agent_address"]:
                 by_wallet[wallet].append({"address": web["agent_address"],
                                           "name": None,
@@ -124,6 +127,13 @@ def main() -> int:
         time.sleep(0.15)
 
     result = build_agent_links(by_wallet, target)
+    from src.discovery_store import DiscoveryStore
+    observed_at_ms = int(time.time() * 1000)
+    snapshots = [{"event_id": f"agents:{wallet}:{observed_at_ms}", "kind": "agent_snapshot",
+                  "account": wallet, "ts_ms": observed_at_ms, "success": True, "agents": agents,
+                  "complete": snapshot_complete.get(wallet, False)} for wallet, agents in by_wallet.items()]
+    with DiscoveryStore(DATA_DIR / ".local" / "discovery.sqlite3") as store:
+        store.ingest_observations("authority_actions", snapshots, observed_at_ms)
     result["unreadable"] = unreadable
     previous = _previous()
     save(result)

@@ -2117,7 +2117,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             if name and name not in diag["unsupported_sources"]:
                 diag["unsupported_sources"].append(name)
 
-    if not os.environ.get("ETHERSCAN_API_KEY"):
+    if not os.environ.get("ETHERSCAN_API_KEY") and not any(c.get("reader") == "blockscout" for c in sweep_chains):
         diag["status"] = "skipped_no_api_key"
         degrade(all_chain_names)
         print("[graph] ETHERSCAN_API_KEY absent - L1 frontier expansion SKIPPED. "

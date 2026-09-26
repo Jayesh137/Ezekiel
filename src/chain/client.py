@@ -90,6 +90,9 @@ def fetch_kind(address: str, chain: dict, kind: str, start_block: int,
     finish. A partial result is still returned — discarding it would throw away
     real history to report a failure that is already reported.
     """
+    if chain.get("reader") == "blockscout":
+        from src.chain import blockscout
+        return blockscout.fetch_kind(address, chain, kind, start_block, budget, max_pages=max_pages)
     action = ACTIONS[kind]
     error: str | None = None
 
@@ -128,6 +131,10 @@ def probe_activity(address: str, chain: dict, budget: CallBudget) -> tuple[bool,
     not tell", never as "inactive" — a failed probe that reads as an empty chain
     is the silent all-clear this whole phase exists to prevent.
     """
+    if chain.get("reader") == "blockscout":
+        # Native transaction count cannot rule out incoming token/internal
+        # transfers. Read all three kinds instead of declaring it inactive.
+        return True, None
     try:
         budget.spend()
     except BudgetExhausted as exc:
@@ -163,6 +170,9 @@ def newest_block(address: str, chain: dict, kind: str,
     into a reportable fact. Returns (block, error); a non-None error means we
     could not tell, which must never be read as "the sweep was complete".
     """
+    if chain.get("reader") == "blockscout":
+        from src.chain import blockscout
+        return blockscout.newest_block(address, chain, kind, budget)
     try:
         budget.spend()
     except BudgetExhausted as exc:

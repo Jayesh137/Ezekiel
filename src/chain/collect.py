@@ -564,7 +564,7 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
     # Without a key every request returns "Invalid API Key", which would burn
     # the whole budget producing nothing while looking like a rate-limit
     # problem. Named skip instead, matching expand_frontier's existing pattern.
-    if not os.environ.get("ETHERSCAN_API_KEY"):
+    if not os.environ.get("ETHERSCAN_API_KEY") and not any(c.get("reader") == "blockscout" for c in chains):
         result["status"] = "skipped_no_api_key"
         for chain in chains:
             blank = _blank_chain_result()
@@ -578,6 +578,11 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         name = chain["name"]
         chain_result = _blank_chain_result()
         result["chains"][name] = chain_result
+        chain_result["reader"] = chain.get("reader", "etherscan")
+        if not os.environ.get("ETHERSCAN_API_KEY") and chain.get("reader") != "blockscout":
+            chain_result["error"] = "skipped_no_api_key"
+            result["unsupported_sources"].append(name)
+            continue
 
         # Already settled this run: report it, spend nothing.
         if plan_refused is not None and name in plan_refused:
