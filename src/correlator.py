@@ -5,17 +5,14 @@ A sophisticated trader who wants to shake followers won't move funds wallet->wal
 on-chain (we catch that three ways already). He'll withdraw to a CEX, then fund a
 FRESH wallet from the CEX and redeposit to Hyperliquid — no direct on-chain link.
 
-Two research-backed heuristics defeat that:
+Two investigative heuristics can produce leads across that boundary:
 
-1. Amount + timing (FIFO temporal matching). He exits ~$X at time T and re-enters
-   ~$X shortly after. Matching exit amounts to new bridge-deposit amounts in time
-   order re-links them even through a CEX. Non-round amounts are far more
-   conclusive than round ones (a $1,234,567 match is near-unique; a round $1M
-   isn't). FIFO matching is documented to lift linkage rates 15-22pp on mixers.
+1. Amount + timing. Score competing exit/deposit pairs, then select a bounded
+   maximum-weight assignment while preserving alternatives. Amount shape and
+   rarity are heuristics; neither reveals an exchange's internal routing.
 
-2. Address reuse (highest-confidence heuristic — cryptographic certainty). A CEX
-   deposit address is unique to one account. If a new wallet sends USDC to the
-   SAME address the target withdraws to, they are almost certainly the same person.
+2. Private deposit-address reuse. A repeated route can support association, but
+   brokers, payments and delegated operations remain alternative explanations.
 
 ## Two routes in, two routes out (2026-09-12)
 
@@ -92,7 +89,7 @@ def _rarity(amount: float, population: list[float], tol_pct: float) -> tuple[flo
 
     The round-number proxy above asks what an amount looks like. This asks the
     question that actually matters: how many OTHER deposits in this window would
-    have matched the same exit just as well? One is near-proof. Fifty is noise,
+    have matched the same exit just as well? One is more selective than fifty,
     however odd the number looks.
 
     That distinction only became measurable once the candidate pool stopped
@@ -119,142 +116,112 @@ def _rarity(amount: float, population: list[float], tol_pct: float) -> tuple[flo
 def find_correlations(exits: list[dict], entries: list[dict],
                       tol_pct: float = 0.03, window_days: float = 14,
                       min_amount: float = 100_000, min_confidence: float = 0.55) -> list[dict]:
-    """FIFO temporal match of target exits against fresh bridge deposits (entries).
+    """Score competing hypotheses before deterministic one-to-one assignment.
 
-    exits/entries: dicts with 'amount' (USD) and 'ts' (unix seconds). entries also
-    carry 'wallet'. Each exit is consumed at most once (FIFO) so one big withdrawal
-    can't spawn many spurious findings. Pure function — no I/O, fully testable.
+    Rejected edges never consume an exit. Alternatives remain visible because
+    the selected assignment is a useful investigation order, not hidden CEX truth.
     """
+    from src.matching import maximum_weight_pairs
+    from src.movements import positive_number
+
+    if positive_number(tol_pct) is None or positive_number(window_days) is None:
+        return []
     window_s = window_days * 86400
-    # The amounts every candidate deposit is competing with. Measured once, on
-    # the whole pool, so rarity is a fact about the window rather than about
-    # the order matches happen to be evaluated in.
-    population = [float(e.get("amount", 0) or 0) for e in entries]
-    usable_exits = sorted(
-        [e for e in exits if e.get("amount", 0) >= min_amount and e.get("ts")],
-        key=lambda e: e["ts"],
-    )
-    used = [False] * len(usable_exits)
+
+    def usable(rows):
+        out = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            amount, ts = positive_number(row.get("amount")), positive_number(row.get("ts"))
+            if amount is None or ts is None or amount < min_amount:
+                continue
+            item = {**row, "amount": amount, "ts": int(ts)}
+            key = (item["ts"], str(item.get("wallet", "")), str(item.get("id") or item.get("ref")
+                   or item.get("hash") or ""), amount, str(item.get("chain") or ""))
+            out[key] = item
+        return [out[key] for key in sorted(out)]
+
+    usable_exits, usable_entries = usable(exits), usable(entries)
+    population = [row["amount"] for row in usable_entries]
+    hypotheses = {}
+    by_exit, by_entry = {}, {}
+    for i, ex in enumerate(usable_exits):
+        rarity, competitors = _rarity(ex["amount"], population, tol_pct)
+        for j, entry in enumerate(usable_entries):
+            elapsed = entry["ts"] - ex["ts"]
+            ratio = abs(entry["amount"] - ex["amount"]) / ex["amount"]
+            if elapsed < 0 or elapsed > window_s or ratio > tol_pct:
+                continue
+            score = round(.5 * (1 - ratio / tol_pct) + .2 * (1 - elapsed / window_s)
+                          + .3 * rarity, 4)
+            if score < min_confidence:
+                continue
+            finding = {
+                "id": f"corr:{entry.get('wallet', '')}:{ex.get('id') or ex.get('ref') or ex['ts']}",
+                "wallet": entry.get("wallet", ""), "deposit_amount_usd": round(entry["amount"], 2),
+                "exit_amount_usd": round(ex["amount"], 2), "amount_diff_pct": round(ratio * 100, 3),
+                "gap_hours": round(elapsed / 3600, 1), "exit_source": ex.get("source", "unknown"),
+                "exit_ref": ex.get("ref", ""), "exit_id": ex.get("id"),
+                "event_ids": ex.get("event_ids", [ex.get("ref", "")]),
+                "deposit_ref": entry.get("ref") or entry.get("hash"),
+                "uniqueness": rarity, "competing_deposits": competitors,
+                "confidence": score, "score_kind": "heuristic", "deposit_ts": entry["ts"],
+            }
+            hypotheses[i, j] = finding
+            by_exit.setdefault(i, []).append((i, j))
+            by_entry.setdefault(j, []).append((i, j))
+    pairs, mode = maximum_weight_pairs([(i, j, row["confidence"])
+                                       for (i, j), row in hypotheses.items()])
     findings = []
+    for i, j in pairs:
+        finding = hypotheses[i, j].copy()
+        alternatives = sorted((hypotheses[p] for p in set(by_exit[i] + by_entry[j])
+                               if p != (i, j)), key=lambda row: (-row["confidence"], row["id"]))
+        finding.update(assignment_mode=mode, alternative_count=len(alternatives),
+                       alternatives=[{k: row[k] for k in ("wallet", "confidence", "exit_ref", "deposit_ts")}
+                                     for row in alternatives[:10]],
+                       ambiguous=bool(alternatives), detected_at=utc_now())
+        findings.append(finding)
+    return sorted(findings, key=lambda row: (-row["confidence"], row["id"]))
 
-    for entry in sorted(entries, key=lambda e: e.get("ts", 0)):
-        ea = float(entry.get("amount", 0) or 0)
-        ets = int(entry.get("ts", 0) or 0)
-        if ea < min_amount or not ets:
-            continue
 
-        # Best unused exit: preceding the deposit, within window, closest in amount.
-        best_i, best_r = None, None
-        for i, ex in enumerate(usable_exits):
-            if used[i]:
-                continue
-            xts = ex["ts"]
-            if xts > ets or (ets - xts) > window_s:
-                continue
-            xa = float(ex["amount"])
-            r = abs(ea - xa) / xa if xa else 1.0
-            if r > tol_pct:
-                continue
-            if best_r is None or r < best_r:
-                best_r, best_i = r, i
+def collect_target_movements(target: str, min_amount: float = 0, *,
+                             config: dict | None = None, data_dir: Path | None = None) -> dict:
+    """Read the trusted cluster and reconcile exact routes, without writing data."""
+    import json
 
-        if best_i is None:
-            continue
+    from src.movements import reconcile_movements
 
-        ex = usable_exits[best_i]
-        used[best_i] = True
-        r = best_r
-        dt_days = (ets - ex["ts"]) / 86400
-        amount_score = 1.0 - (r / tol_pct if tol_pct else 0)
-        time_score = 1.0 - (dt_days / window_days if window_days else 0)
-        uniq, competitors = _rarity(ex["amount"], population, tol_pct)
-        confidence = round(0.5 * amount_score + 0.2 * max(0.0, time_score) + 0.3 * uniq, 4)
-        if confidence < min_confidence:
-            continue
-
-        findings.append({
-            "id": f"corr:{entry.get('wallet','')}:{ex.get('ts')}",
-            "wallet": entry.get("wallet", ""),
-            "deposit_amount_usd": round(ea, 2),
-            "exit_amount_usd": round(float(ex["amount"]), 2),
-            "amount_diff_pct": round(r * 100, 3),
-            "gap_hours": round(dt_days * 24, 1),
-            "exit_source": ex.get("source", "unknown"),
-            "exit_ref": ex.get("ref", ""),
-            "uniqueness": uniq,
-            # How many OTHER deposits in the window would have matched this
-            # exit just as well. 0 means nothing else came close, which is what
-            # makes an amount match evidence rather than coincidence.
-            "competing_deposits": competitors,
-            "confidence": confidence,
-            "deposit_ts": ets,
-            "detected_at": utc_now(),
-        })
-
-    findings.sort(key=lambda f: f["confidence"], reverse=True)
-    return findings
+    config = config if config is not None else load_config()
+    directory = Path(data_dir) if data_dir is not None else DATA_DIR
+    cluster = {target.lower()} | {str(w).lower() for w in config.get("known_self_wallets", []) if w}
+    records = [record for wallet in sorted(cluster) for record in records_for(wallet)]
+    ledger = load_all_records(str(directory / "ledger"))
+    try:
+        decodes = json.loads((directory / "labels" / "bridge_decodes.json").read_text())
+    except (OSError, ValueError):
+        decodes = {}
+    if not isinstance(decodes, dict):
+        decodes = {}
+    result = reconcile_movements(records, ledger, cluster, decodes, min_amount)
+    circle = unpaired_cctp_exits(target, ledger, min_amount, config=config)
+    result["unresolved_exits"].extend({**row, "id": f"hl-cctp:{row['ref']}",
+                                      "event_ids": [f"hl:{row['ref']}"],
+                                      "resolution": "unresolved", "route_resolved": False}
+                                     for row in circle)
+    result["coverage"]["cctp_pairing"] = "legacy_amount_time_hypothesis"
+    result["coverage"]["known_cluster_wallets"] = len(cluster)
+    result["totals"]["unresolved_exit_usd"] = round(sum(row["amount"] for row in result["unresolved_exits"]), 2)
+    return result
 
 
 def collect_target_exits(target: str, min_amount: float) -> list[dict]:
-    """Target 'exits': HL withdrawals (ledger) + outbound transfers from the substrate.
-
-    The L1 side used to read data/l1_transactions, the single-page Arbitrum-USDC
-    table src/tracer.py wrote. Nothing writes that table any more — the tracer was
-    pointed at the substrate — so this reads records_for(target) instead, the same
-    store every other consumer now reads. That also means the value is already
-    computed once, correctly, for every asset on every collected chain: re-deriving
-    USDC's `value / 1e6` here would be wrong for anything that isn't USDC, so
-    `amount_usd` is taken as-is. A `price_unavailable` record (`amount_usd is None`,
-    a known asset like ETH we could not price this run) is skipped outright rather
-    than treated as a $0 exit: amount-matching is the entire basis of correlation,
-    and an exit of unknown size cannot be matched, correctly, to anything.
-    """
-    exits = []
-    ledger = load_all_records(str(DATA_DIR / "ledger"))
-
-    for entry in ledger:
-        d = entry.get("delta", {})
-        if d.get("type") != "withdraw":
-            continue
-        try:
-            amt = float(d.get("usdc", 0))
-        except (TypeError, ValueError):
-            continue
-        if amt >= min_amount:
-            exits.append({
-                "amount": amt,
-                "ts": int(entry.get("time", 0)) // 1000,
-                "source": "hl_withdraw",
-                "ref": entry.get("hash", ""),
-            })
-
-    target = target.lower()
-    for rec in records_for(target):
-        if (rec.get("src") or "").lower() != target:
-            continue
-        usd = rec.get("amount_usd")
-        if usd is None:
-            continue
-        try:
-            amt = float(usd)
-        except (TypeError, ValueError):
-            # amount_usd is only ever produced internally, but a hand-edited or
-            # truncated file in data/transfers/ should skip one bad record, not
-            # crash the correlator.
-            continue
-        if amt >= min_amount:
-            exits.append({
-                "amount": amt,
-                "ts": int(rec.get("ts", 0) or 0),
-                "source": "l1_outbound",
-                "ref": rec.get("tx_hash", ""),
-            })
-
-    exits.extend(unpaired_cctp_exits(target, ledger, min_amount))
-    return exits
+    return collect_target_movements(target, min_amount)["unresolved_exits"]
 
 
-def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float) -> list[dict]:
+def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float, *,
+                        config: dict | None = None) -> list[dict]:
     """Circle withdrawals that did NOT land at a cluster address.
 
     A spot send to the USDC system address mints at some recipient minutes
@@ -263,7 +230,7 @@ def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float) -> l
     left Hyperliquid to an address this project does not sweep — precisely
     the exit a fresh wallet's deposit should be matched against.
     """
-    config = load_config()
+    config = config if config is not None else load_config()
     target = (target or "").lower()
     cluster = {target} | {(w or "").lower() for w in config.get("known_self_wallets", []) or []}
     circle = cctp_withdrawals(ledger, target)
@@ -413,7 +380,7 @@ def _stored_pools() -> dict:
 
 
 def run_correlation(pools=POOLS) -> dict:
-    """Gather exits and the requested candidate pools, FIFO-correlate each,
+    """Gather exits and the requested candidate pools, assign hypotheses,
     persist per pool, alert.
 
     A pool not asked for this run keeps its stored result: the bridge pool is
