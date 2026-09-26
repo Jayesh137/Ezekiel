@@ -1,13 +1,13 @@
 {
-  "computed_at": "2026-09-26T09:54:29.663355+00:00",
+  "computed_at": "2026-09-26T10:17:39.222691+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 387,
+  "wallet_count": 388,
   "behavioural_counts_as_a_vector": true,
   "tier_counts": {
     "CONFIRMED": 2,
     "PROBABLE": 3,
     "POSSIBLE": 32,
-    "WATCH": 168,
+    "WATCH": 169,
     "INFRASTRUCTURE": 182
   },
   "demoted_count": 57,
@@ -270,6 +270,13 @@
       "classification": null,
       "reasons": [],
       "evidence": {
+        "portfolio_overlap": 0.0318,
+        "shared_rare_markets": [
+          "TRX"
+        ],
+        "hl_role": "subAccount",
+        "hl_account_value": 11111571.619261,
+        "hl_birth_ms": 1781740440010,
         "dormancy_handoff": {
           "score": 0.4921,
           "gap_length": 10,
@@ -443,6 +450,10 @@
         "style_vetoes": [
           "Decision frequency 7x apart (1.00 vs 7.00 position episodes/day)"
         ],
+        "portfolio_overlap": 0.0128,
+        "shared_rare_markets": [
+          "ASTER"
+        ],
         "hl_role": "user",
         "hl_account_value": 125174000.974273,
         "hl_birth_ms": 1740613800204,
@@ -541,6 +552,10 @@
         "correlation_confidence": 0.7065,
         "correlation_gap_hours": 241.0,
         "competing_deposits": 1,
+        "portfolio_overlap": 0.0337,
+        "shared_rare_markets": [
+          "CHIP"
+        ],
         "hl_role": "user",
         "hl_account_value": 2917331.645983,
         "hl_birth_ms": 1753917960075,
@@ -582,6 +597,12 @@
         "correlation_confidence": 0.7025,
         "correlation_gap_hours": 41.6,
         "competing_deposits": 10,
+        "portfolio_overlap": 0.0534,
+        "shared_rare_markets": [
+          "GRAM",
+          "GRASS",
+          "ASTER"
+        ],
         "hl_role": "user",
         "hl_account_value": 32863858.03964,
         "hl_birth_ms": 1764805800068,
@@ -744,6 +765,10 @@
         "correlation_confidence": 0.6066,
         "correlation_gap_hours": 257.7,
         "competing_deposits": 4,
+        "portfolio_overlap": 0.0339,
+        "shared_rare_markets": [
+          "CHIP"
+        ],
         "hl_role": "user",
         "hl_account_value": 1271694.093508,
         "hl_birth_ms": 1766013600096,
@@ -1234,7 +1259,7 @@
       "reasons": [
         "Sent funds to the target wallet",
         "Transfer happened entirely inside Hyperliquid (no L1 trace)",
-        "Last movement 617 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 618 days ago \u2014 transfer evidence aged to 40%",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
@@ -1619,6 +1644,50 @@
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": "POSSIBLE",
       "rank_strength": 0.1725
+    },
+    {
+      "wallet": "0x2a5602898d52be3b552ff46acdb3e1b14e1dd9a9",
+      "vectors": [],
+      "confidence": 0.06,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Actively trading on Hyperliquid after receiving funds",
+        "Last movement 305 days ago \u2014 transfer evidence aged to 41%",
+        "Reached at 2 hops from target \u2014 confidence discounted",
+        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1,
+          "unvalued_edge_count": 0
+        },
+        "depth": 2,
+        "chains": [
+          "arbitrum"
+        ],
+        "graph_reach_only": true,
+        "portfolio_overlap": 0.1144,
+        "shared_rare_markets": [
+          "INIT",
+          "MOODENG",
+          "SEI",
+          "ATOM",
+          "POL"
+        ],
+        "hl_role": "user",
+        "hl_account_value": 1059.313635,
+        "hl_birth_ms": 1764195000052
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
+      "rank_strength": 0.1144
     },
     {
       "wallet": "0x0000000000000068f116a894984e2db1123eb395",
@@ -2301,42 +2370,6 @@
         "hl_account_value": 0.001838,
         "hl_birth_ms": 1756937160049,
         "frontend_agent": "0x720e5676ae14e7fb332e131439a3ee50503fc22c"
-      },
-      "is_service": false,
-      "known_self": false,
-      "vector_count": 0,
-      "tier": "WATCH",
-      "peak_tier": "WATCH",
-      "tier_dropped_from": null,
-      "rank_strength": 0.06
-    },
-    {
-      "wallet": "0x2a5602898d52be3b552ff46acdb3e1b14e1dd9a9",
-      "vectors": [],
-      "confidence": 0.06,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 305 days ago \u2014 transfer evidence aged to 41%",
-        "Reached at 2 hops from target \u2014 confidence discounted",
-        "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1,
-          "unvalued_edge_count": 0
-        },
-        "depth": 2,
-        "chains": [
-          "arbitrum"
-        ],
-        "graph_reach_only": true,
-        "hl_role": "user",
-        "hl_account_value": 1059.313635,
-        "hl_birth_ms": 1764195000052
       },
       "is_service": false,
       "known_self": false,
@@ -3910,7 +3943,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 690 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 691 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -4145,7 +4178,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 537 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 538 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -4720,6 +4753,29 @@
       "rank_strength": 0.0
     },
     {
+      "wallet": "0x607cffa1838ea9caba1b5a7dad68d731e8c062b0",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "referral_pairs": [
+          {
+            "with": "0xaf1439cf254aa9e72b39809c88b57ef0a09a4802",
+            "role": "referrer",
+            "code_accounts": 4
+          }
+        ]
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 0,
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
       "wallet": "0x622fc18a3f1a616a331b96e4c17f1b457feb5c6f",
       "vectors": [],
       "confidence": 0.0,
@@ -5053,6 +5109,9 @@
             "role": "referrer",
             "code_accounts": 9
           }
+        ],
+        "vault_deposits": [
+          "0xafe724d8a3ba6cb29cb176bba975a7992ccef3fc"
         ]
       },
       "is_service": false,
@@ -5790,6 +5849,11 @@
             "with": "0x264fe26f75588c87af245226bd88fdbf85e32bea",
             "role": "referrer",
             "code_accounts": 1
+          },
+          {
+            "with": "0x607cffa1838ea9caba1b5a7dad68d731e8c062b0",
+            "role": "referred",
+            "code_accounts": 4
           }
         ]
       },
@@ -6834,6 +6898,9 @@
             "role": "referrer",
             "code_accounts": 6
           }
+        ],
+        "vault_deposits": [
+          "0x8fdf4562a873a104f4f81b8a19fffec952c3244f"
         ]
       },
       "is_service": false,
