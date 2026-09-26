@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
+from src.episodes import build_episodes, compact_profile, episode_profile, regime_profiles
 from src.thresholds import SCORING_SCHEMA
 from src.utils import DATA_DIR, load_all_records, load_config, save_latest
 
@@ -741,6 +742,8 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
     if fills is None:
         fills = load_fills()
     funding = load_funding()
+    orders = load_orders()
+    episodes = build_episodes(fills, orders)
     positions = load_positions_latest()
 
     # Use perp positions if available
@@ -777,7 +780,9 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         "trade_sequencing": compute_trade_sequencing(fills),
         "account_characteristics": compute_account_characteristics(positions, fills),
         "style_profile": compute_style_profile(fills),
-        "order_profile": compute_order_profile(load_orders()),
+        "order_profile": compute_order_profile(orders),
+        'episode_profile': compact_profile(episode_profile(episodes)),
+        'episode_regimes': [{**r, 'profile': compact_profile(r['profile'])} for r in regime_profiles(episodes)[-12:]],
     }
 
     return fingerprint
@@ -792,6 +797,9 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
     recent = [f for f in fills if cutoff_ms <= f.get("time", 0) <= end_ms]
     if len(recent) < 20:
         return {}
+
+    orders = normalise_orders(load_orders(), start_ms=cutoff_ms, end_ms=end_ms)
+    episodes = build_episodes(recent, orders)
 
     positions = load_positions_latest()
     if isinstance(positions, dict) and "assetPositions" not in positions:
@@ -813,7 +821,9 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
         "trade_sequencing": compute_trade_sequencing(recent),
         "account_characteristics": compute_account_characteristics(positions, recent),
         "style_profile": compute_style_profile(recent),
-        "order_profile": compute_order_profile(normalise_orders(load_orders(), start_ms=cutoff_ms, end_ms=end_ms)),
+        "order_profile": compute_order_profile(orders),
+        'episode_profile': compact_profile(episode_profile(episodes)),
+        'episode_regimes': [{**r, 'profile': compact_profile(r['profile'])} for r in regime_profiles(episodes)],
     }
 
 

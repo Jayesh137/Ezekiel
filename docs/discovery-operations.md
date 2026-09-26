@@ -53,3 +53,33 @@ All decoded Circle logs and legitimate small forwarder deposits are retained loc
 For an isolated offline run, provide `--data-dir`, `--db`, `--output-dir`, and optionally `--routes` containing `records`, `bridge_decodes`, and `circle_events`. The bounded report is `data/routes/latest.json`, and factual discoveries join the persistent candidate registry.
 
 Sources: [Circle message service](https://developers.circle.com/api-reference/cctp/all/get-messages-v2), [Circle message fields](https://developers.circle.com/cctp/references/technical-guide), [Circle hook parser](https://github.com/circlefin/hyperevm-circle-contracts/blob/master/src/messages/CctpForwarderHookData.sol), and [Blockscout API schema](https://github.com/blockscout/blockscout-api-v2-swagger/blob/main/swagger.yaml).
+# Successor investigations
+
+`python scripts/check_successor_hypotheses.py` builds `data/investigations/latest.json`
+from stored target fills, candidate fill caches and route/authority observations.
+It makes no network calls and sends no alerts. `--input fixture.json --data-dir
+scratch/replay --as-of-ms 123456789` supports offline research; input contains
+`target`, `candidates` and optional `context`. Each account has `wallet`, `fills`
+and optional complete dated `positions_history` snapshots. `--disclosures claims.json`
+accepts manual `{wallet, observed_at_ms, url, claim}` records as hypotheses.
+
+Investigations preserve exact funding/return routes even when execution style differs.
+They compare reconstructed episodes and weekly regimes, quantity handoffs, funding
+before first observed trading, observed authority overlap, reactivation and style
+changes. Independently linked groups of two to four wallets may be compared as a
+combined book; similar style alone never authorises a group. Missing historical
+equity stays unknown; capital-normalised size measures gross episode turnover,
+not leverage. A gap between fills does not prove inactivity. Public claims never
+become identity ground truth.
+
+Timing uses distinct matched decisions, at least five independent sessions and
+six whole-session day shifts. The legacy `same_hand` key means a leading timing
+pattern only. Shared signals, news and execution software remain alternatives.
+Copier-cohort research needs at least three demonstrated prior following patterns
+and three observed following patterns after a dated migration. All new research
+outputs have `promotable: false`; experimental timing alone cannot send an alert.
+
+The queue reads up to 10,000 cached fills per candidate, examines at most 100
+candidates by default (200 maximum), rotates oldest investigations within source
+priority, and publishes bounded references plus original counts. Scheduled wiring
+and cache persistence are described with the workflow integration below.

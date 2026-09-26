@@ -967,6 +967,9 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
         } if shared_markets else {},
     }
     evidence["reasons"].extend(market_reasons)
+    from src.episodes import compare_episode_profiles
+    evidence['episodes'] = compare_episode_profiles(ezekiel_fp.get('episode_profile', {}),
+                                                   candidate_fp.get('episode_profile', {}))
     return score, dimensions, evidence
 
 
@@ -991,6 +994,7 @@ def build_candidate_fingerprint(fills: list[dict], state: dict,
     sweep is scored exactly as before rather than penalised for data nobody
     fetched.
     """
+    from src.episodes import build_episodes, compact_profile, episode_profile
     from src.fingerprint import (
         compute_entry_exit_style,
         compute_hold_duration,
@@ -1018,6 +1022,7 @@ def build_candidate_fingerprint(fills: list[dict], state: dict,
 
     return {
         "excluded_dimensions": excluded,
+        'episode_profile': compact_profile(episode_profile(build_episodes(fills, orders))),
         "asset_preferences": compute_asset_preferences(fills),
         "timing_profile": compute_timing_profile(fills),
         "leverage_profile": compute_leverage_profile(fills, positions),
@@ -1045,6 +1050,7 @@ def _summarize_fingerprint(fp: dict) -> dict:
 
     return {
         "excluded_dimensions": fp.get("excluded_dimensions", []),
+        'episode_profile': fp.get('episode_profile', {}),
         # Carried so a stored scan can be compared on order habits without
         # re-fetching. The backtest needs strangers to have the same dimensions
         # the target has, or the self-match is scored on a dimension nobody else
