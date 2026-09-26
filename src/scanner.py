@@ -22,6 +22,7 @@ from src.alerts import (
     alert_vault_match,
     alert_xyz_signature_match,
 )
+from src.candidate_registry import iter_candidates, observe_candidate, valid_wallet
 from src.fingerprint import (
     build_fingerprint,
     compute_asset_preferences,
@@ -33,6 +34,7 @@ from src.thresholds import VETO_BONUS_CEILING, VETO_SCORE_CAP
 from src.utils import (
     DATA_DIR,
     append_records,
+    atomic_write_json,
     hl_post,
     load_config,
     read_cursor,
@@ -194,19 +196,21 @@ def select_leaderboard_wallets(rows: list[dict], max_wallets: int) -> list[dict]
 
 
 def get_candidate_fills(wallet: str, lookback_days: int = 7) -> list[dict]:
-    """Get recent fills for a candidate wallet."""
+    """Read and retain the available history, with explicit coverage metadata."""
+    from src.history import FillBatch, cached_fill_history
+
     now_ms = int(time.time() * 1000)
     start_ms = now_ms - (lookback_days * 24 * 60 * 60 * 1000)
+    result = cached_fill_history(wallet, start_ms, now_ms,
+                                 db_path=DATA_DIR / ".local" / "discovery.sqlite3")
+    return FillBatch(result)
 
-    try:
-        fills = hl_post({
-            "type": "userFillsByTime",
-            "user": wallet,
-            "startTime": start_ms,
-        })
-        return fills if isinstance(fills, list) else []
-    except Exception:
-        return []
+
+def _record_fill_read(wallet: str, fills: list, source: str) -> bool:
+    read = getattr(fills, "read", {"status": "ok"})
+    observe_candidate(wallet, {**read, "source": source, "positive": bool(fills)
+                              and read["status"] == "ok"}, DATA_DIR)
+    return read["status"] == "ok"
 
 
 def get_candidate_orders(wallet: str) -> list[dict]:
@@ -289,7 +293,7 @@ def merged_clearinghouse_state(wallet: str, dexes=None, fetch=None) -> dict:
         except Exception:                             # noqa: BLE001 - transport
             unreadable.append(dex)
             continue
-        if not isinstance(extra, dict):
+        if not isinstance(extra, dict) or not isinstance(extra.get("assetPositions"), list):
             unreadable.append(dex)
             continue
         positions.extend(extra.get("assetPositions") or [])
@@ -1000,10 +1004,20 @@ def build_candidate_fingerprint(fills: list[dict], state: dict,
         if "perp" in positions:
             positions = positions["perp"]
 
-    acct_val = round(float(positions.get("marginSummary", {}).get("accountValue", 0) or 0), 2) \
-        if isinstance(positions, dict) else 0
+    excluded = []
+    try:
+        acct_val = round(float(positions["marginSummary"]["accountValue"]), 2)
+        if not np.isfinite(acct_val):
+            raise ValueError("non-finite equity")
+    except (TypeError, ValueError, KeyError):
+        acct_val = None
+        excluded.append("account_size")
+    if (not isinstance(positions, dict) or not isinstance(positions.get("assetPositions"), list)
+            or positions.get("unreadable_dexes")):
+        excluded.append("leverage")
 
     return {
+        "excluded_dimensions": excluded,
         "asset_preferences": compute_asset_preferences(fills),
         "timing_profile": compute_timing_profile(fills),
         "leverage_profile": compute_leverage_profile(fills, positions),
@@ -1030,6 +1044,7 @@ def _summarize_fingerprint(fp: dict) -> dict:
     hd = fp.get("hold_duration", {})
 
     return {
+        "excluded_dimensions": fp.get("excluded_dimensions", []),
         # Carried so a stored scan can be compared on order habits without
         # re-fetching. The backtest needs strangers to have the same dimensions
         # the target has, or the self-match is scored on a dimension nobody else
@@ -1077,16 +1092,20 @@ def persist_candidate(result: dict) -> None:
     every run for ever after — which is what happened, and why the caller being
     fixed is not on its own enough.
     """
-    if result["wallet"].lower() == load_config()["target_wallet"].lower():
+    wallet = valid_wallet(result["wallet"])
+    if wallet == load_config()["target_wallet"].lower():
         return
     candidate_dir = DATA_DIR / "candidates"
     candidate_dir.mkdir(parents=True, exist_ok=True)
-    path = candidate_dir / f"{result['wallet'].lower()}.json"
+    path = candidate_dir / f"{wallet}.json"
     history = []
     existing = {}
     if path.exists():
-        with open(path) as f:
-            existing = json.load(f)
+        try:
+            with open(path) as f:
+                existing = json.load(f)
+        except (OSError, ValueError):
+            existing = {}
         history = existing.get("score_history", [])
 
     history.append({
@@ -1113,9 +1132,13 @@ def persist_candidate(result: dict) -> None:
         status = existing.get("status", "ACTIVE")
 
     candidate = {
-        "wallet": result["wallet"],
+        **existing,
+        "wallet": wallet,
         "first_seen": existing.get("first_seen", result["scanned_at"]),
         "last_seen": result["scanned_at"],
+        "last_checked": result["scanned_at"],
+        "last_successful_read": result["scanned_at"],
+        "last_scored": result["scanned_at"],
         "best_score": best_score,
         "latest_score": result["score"],
         "latest_scoring_schema": th.SCORING_SCHEMA,
@@ -1125,15 +1148,10 @@ def persist_candidate(result: dict) -> None:
         "status": status,
         "recent_avg_score": round(recent_avg, 4) if recent_avg is not None else None,
     }
-    with open(path, "w") as f:
-        json.dump(candidate, f, indent=2)
-
-    latest = []
-    for fp in candidate_dir.glob("0x*.json"):
-        with open(fp) as f:
-            latest.append(json.load(f))
-    latest.sort(key=lambda c: c.get("best_score", 0), reverse=True)
-    save_latest(str(candidate_dir), {"candidates": latest[:50]})
+    atomic_write_json(path, candidate)
+    latest = iter_candidates(DATA_DIR)
+    latest.sort(key=lambda c: (-(c.get("latest_score") or 0), c["wallet"]))
+    save_latest(str(candidate_dir), {"candidates": latest[:50], "total_candidates": len(latest)})
 
 
 def tooling_fingerprint(wallet: str, fetch=None) -> dict | None:
@@ -1161,8 +1179,12 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
     min_fills = config["scanner"].get("min_fills_for_comparison", 20)
 
     fills = get_candidate_fills(wallet, lookback_days)
+    if not _record_fill_read(wallet, fills, source):
+        return None
     if len(fills) < min_fills:
         fills = get_candidate_fills(wallet, lookback_days * 2)
+        if not _record_fill_read(wallet, fills, source):
+            return None
 
     # Accept thin histories for targeted scans — a fresh wallet won't have many fills yet
     floor = max(5, min_fills // 4)
@@ -1641,10 +1663,10 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         return loaded if isinstance(loaded, dict) else {}
 
     try:
-        roster_doc, cand_doc = _doc("roster"), _doc("candidates")
+        roster_doc = _doc("roster")
         added = 0
         for addr, meta in roster_rescore_targets(config, roster_doc,
-                                                 cand_doc.get("candidates")).items():
+                                                 iter_candidates(DATA_DIR)).items():
             if addr not in priority:
                 priority[addr] = meta
                 added += 1
@@ -1754,7 +1776,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
 
         # Persist anything watchlisted or better — suppressed candidates keep their
         # evidence and stay visible rather than being discarded.
-        if disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold:
+        if (disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold
+                or (DATA_DIR / "candidates" / f"{wallet.lower()}.json").exists()):
             persist_candidate(result)
 
         promoted = disp["action"] == th.ACTION_ALERT
@@ -1848,6 +1871,11 @@ def scan_leaderboard():
             print(f"[scanner] Scanned {scanned}/{min(len(leaderboard), max_wallets)}...")
 
         fills = get_candidate_fills(wallet, lookback_days)
+        if (DATA_DIR / "candidates" / f"{wallet.lower()}.json").exists():
+            if not _record_fill_read(wallet, fills, "leaderboard"):
+                continue
+        elif getattr(fills, "read", {}).get("status", "ok") != "ok":
+            continue
         if len(fills) < min_fills:
             continue
 
@@ -1914,7 +1942,8 @@ def scan_leaderboard():
         # persistent watchlist — suppression downgrades, it never discards.
         if disp["action"] != th.ACTION_BACKGROUND:
             results.append(result)
-        if disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold:
+        if (disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold
+                or (DATA_DIR / "candidates" / f"{wallet.lower()}.json").exists()):
             persist_candidate(result)
 
         if disp["action"] == th.ACTION_ALERT:

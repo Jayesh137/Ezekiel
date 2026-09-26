@@ -270,10 +270,11 @@ def _gather_signals() -> dict:
             signals["hl_native_outbound"] = False
 
     # Top behavioral candidate
-    cand_path = DATA_DIR / "candidates" / "latest.json"
-    if cand_path.exists():
+    from src.candidate_registry import iter_candidates
+
+    if (DATA_DIR / "candidates").exists():
         try:
-            cands = json.load(open(cand_path)).get("candidates", [])
+            cands = iter_candidates(DATA_DIR)
             # A score from a scorer the backtest does not validate is history,
             # not a present-tense match. Measured 2026-09-16: the top candidate
             # here was a single scan from 2026-06-30, paid 22 points.

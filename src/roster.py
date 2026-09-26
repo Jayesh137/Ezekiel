@@ -763,7 +763,9 @@ def build_roster(config: dict | None = None) -> dict:
             e["evidence"]["correlation_gap_hours"] = match.get("gap_hours")
             e["evidence"]["competing_deposits"] = match.get("competing_deposits")
 
-    for cand in _read(DATA_DIR / "candidates" / "latest.json", "candidates"):
+    from src.candidate_registry import iter_candidates
+
+    for cand in iter_candidates(DATA_DIR):
         a = (cand.get("wallet") or "").lower()
         if not a or a == target:
             continue
