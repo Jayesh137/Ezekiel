@@ -4,6 +4,24 @@ from src.candidate_registry import valid_wallet
 from src.movements import event_identity
 
 
+def _matches_source_burn(record, message):
+    """Bind raw token movement and sender roles, never a converted dollar value."""
+    from decimal import Decimal, InvalidOperation
+    token = str(message.get('burn_token') or '').lower()
+    if len(token) != 66 or not token.startswith('0x' + '0' * 24):
+        return False
+    burned = _address('0x' + token[-40:])
+    sender = _address(message.get('message_sender'))
+    if (not burned or burned != _address(record.get('token_address')) or not sender
+            or sender not in {_address(record.get('src')), _address(record.get('dst'))}):
+        return False
+    try:
+        amount, burn = Decimal(str(record.get('amount'))), Decimal(str(message.get('amount_usd')))
+        return amount.is_finite() and burn.is_finite() and amount > 0 and amount == burn
+    except InvalidOperation:
+        return False
+
+
 def decode_source_messages(payload, tx_hash, source_domain):
     """Decode attested V2 messages returned for a specific source transaction.
 
@@ -54,6 +72,9 @@ def resolve_source_routes(records, decodes, store, *, fetch=None, max_queries=20
     for event in store.observations("cctp_sources"):
         cached.setdefault((event["source_domain"], event["source_tx_hash"]), []).append(event)
     enriched, output, errors, spent = [], dict(decodes), [], 0
+    by_transaction = {}
+    for record in records:
+        by_transaction.setdefault((record.get('chain'), (record.get('tx_hash') or '').lower()), []).append(record)
     deadline = time.monotonic() + seconds
     for record in records:
         tx, chain = (record.get("tx_hash") or "").lower(), record.get("chain")
@@ -83,12 +104,19 @@ def resolve_source_routes(records, decodes, store, *, fetch=None, max_queries=20
         messages = cached.get(key, [])
         # A transaction can contain multiple burns and fees. Only a unique
         # matching token movement supports assigning a message to this record.
-        matching = [m for m in messages if record.get("amount_usd") is not None
-                    and abs(float(record["amount_usd"]) - m["amount_usd"]) < .000001]
+        matching = [m for m in messages if _matches_source_burn(record, m)]
+        if len(matching) == 1 and sum(_matches_source_burn(r, matching[0])
+                                     for r in by_transaction[(chain, tx)]) != 1:
+            matching = []
         if len(matching) == 1:
             message = matching[0]
             enriched.append({**record, "protocol_message_id": message["protocol_message_id"],
                              "protocol_id_verified": True, "route_decode": {**decoded, **message}})
+        elif messages:
+            # A transaction-level recipient cannot rescue an unbound movement:
+            # batch burns, another token or multiple matching legs stay open.
+            enriched.append({**record, 'route_decode': {'protocol': decoded.get('protocol'),
+                                                       'error': 'source_message_not_bound'}})
         else:
             enriched.append(record)
     return enriched, output, {"queries": spent, "errors": errors}
@@ -119,7 +147,8 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
 
     for rec in records:
         source = _address(rec.get("src"))
-        if source not in cluster or rec.get("spam") or rec.get("value_basis") == "impostor":
+        destination = _address(rec.get("dst"))
+        if (source not in cluster and destination not in cluster) or rec.get("spam") or rec.get("value_basis") == "impostor":
             continue
         event_id = event_identity(rec)
         if event_id in seen:
@@ -129,6 +158,16 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
         decoded = rec.get("route_decode") or bridge_decodes.get(f"{chain}:{tx}", bridge_decodes.get(tx)) or {}
         if not isinstance(decoded, dict) or decoded.get("heuristic") or decoded.get("error"):
             decoded = {}
+        if source and source not in cluster and destination in cluster:
+            # This is the observed immediate transfer source, never an inferred
+            # original customer behind an exchange or shared bridge.
+            route = {"id": event_id, "original_funder": source, "recipient": destination,
+                     "source_chain": chain, "source_tx": tx, "amount_usd": rec.get("amount_usd"),
+                     "ts_ms": int((rec.get("ts") or 0) * 1000), "assertion": "observed_transfer",
+                     "parent_event_ids": [event_id], "confirms_owner": False}
+            routes.append(route)
+            discover(source, route)
+            continue
         matches = messages.get(rec.get("protocol_message_id"), []) if rec.get("protocol_id_verified") else []
         matches = [m for m in matches if m.get("direction") == "in"]
         endpoints = {_address(m.get("hl_account")) for m in matches} - {None}
@@ -144,7 +183,7 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
             recipient = next(iter(endpoints))
             matching = [m for m in matches if _address(m.get("hl_account")) == recipient]
             parents = [event_id] + [str(m.get("event_id") or event_identity(m)) for m in matching]
-            route = {**base, "hl_account": recipient, "destination_chain": "hyperliquid",
+            route = {**base, "hl_account": recipient, "recipient": recipient, "destination_chain": "hyperliquid",
                      "message_sender": matching[0].get("counterparty") if matching else None,
                      "parent_event_ids": sorted(set(parents)),
                      "assertion": "protocol_route" if matching else "funding_instruction",

@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   issues: write
+  actions: read
 
 concurrency:
   group: data-commit
@@ -31,6 +32,14 @@ jobs:
           cache: 'pip'
       - id: deps
         run: pip install -r requirements-analysis.txt
+      # Use the scanner's dated control cohort. This copy is never published
+      # as a checkpoint; a failed restore cannot invent historical controls.
+      - name: Restore historical evaluation cohort
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/discovery_artifacts.py restore --read-only --state data/.local/analysis-state.json
       # Roll closed days into archives and drop cross-file duplicates. Without a
       # scheduled run the storage bound is a one-off: per-minute snapshots and
       # re-polled historicalOrders regrow data/ to ~800MB within weeks, which is

@@ -5,17 +5,16 @@
 // Plain ES module with no SvelteKit aliases, so node --test can import it.
 
 export const TIER_RANK = { CONFIRMED: 0, PROBABLE: 1, POSSIBLE: 2, WATCH: 3 };
-/** Two or more independent vectors agree. The only wallets the app calls
- *  likely; everything else is a lead. */
+/** Keep stored tier keys compatible. These are review priorities, not identities. */
 export const LIKELY_TIERS = ['CONFIRMED', 'PROBABLE'];
 export const REVIEW_TIERS = ['CONFIRMED', 'PROBABLE', 'POSSIBLE'];
 /** The watch's own outgrew-target band (scripts/check_watchlist.py). */
 export const SIZE_BAND = 1.15;
 
 export const TIER_LABEL = {
-	CONFIRMED: 'Confirmed',
-	PROBABLE: 'Probable',
-	POSSIBLE: 'Possible',
+	CONFIRMED: 'Configured / legacy',
+	PROBABLE: 'Priority lead',
+	POSSIBLE: 'Possible lead',
 	WATCH: 'Watch',
 	INFRASTRUCTURE: 'Service'
 };
@@ -25,12 +24,12 @@ export const TIER_LABEL = {
 export const VECTOR_LABEL = {
 	transfer: 'Observed transfer',
 	linkage: 'Shared funder / deposit address',
-	correlation: 'Exit amount re-appeared as a deposit',
+	correlation: 'Amount and timing match',
 	behavioural: 'Trades like the target',
 	hl_native: 'Two-way flow inside Hyperliquid',
 	shared_agent: 'Shares an agent',
 	explicit_link: 'Explicit link (sub-account / role)',
-	dormancy_handoff: 'Born inside his silence',
+	dormancy_handoff: 'Activity near an observed pause',
 	referral: 'Referral link'
 };
 

@@ -102,3 +102,31 @@ def test_offline_report_keeps_sparse_funding_lead_and_reports_missing_cache(tmp_
     assert report['coverage']['candidates_with_fills'] == 0
     assert report['coverage']['cached_fills_status'] == 'missing'
     assert (tmp_path / 'investigations' / 'latest.json').exists()
+def test_numeric_string_snapshots_and_fill_references_are_normalised():
+    from src.episodes import build_episodes
+    from src.successor_hypotheses import _changes, _states
+    account = {'wallet': '0x' + '1' * 40, 'positions_history': [
+        {'ts_ms': '1000', 'positions': {'BTC': 1}}]}
+    assert _states(account, 2000)[0]['ts_ms'] == 1000
+    fill = {'wallet': account['wallet'], 'time': 1000, 'tid': 1, 'coin': 'BTC',
+            'sz': '1', 'px': '10', 'side': 'B', 'startPosition': '0'}
+    account = {'wallet': account['wallet'], 'fills': [fill, {**fill, 'time': '1000'}]}
+    changes = _changes(account, 2000, True)
+    episodes = build_episodes(account['fills'])
+    assert changes[0]['quantity'] == 1
+    assert changes[0]['parent_event_ids'] == episodes[0]['parent_event_ids']
+
+
+def test_busy_funding_queue_cannot_starve_unfunded_public_discoveries(tmp_path):
+    from scripts.check_successor_hypotheses import run
+    from src.candidate_registry import observe_candidate
+    factual = ['0x' + f'{i:040x}' for i in range(10, 15)]
+    for wallet in factual:
+        observe_candidate(wallet, {'source': 'funding_route', 'positive': True}, tmp_path)
+    observe_candidate(B, {'source': 'public_trades', 'positive': True}, tmp_path)
+    first = run({'target_wallet': A}, data_dir=tmp_path, as_of_ms=1000, limit=5)
+    wallets = {r['wallet'] for r in first['investigations']}
+    assert B in wallets and len(wallets & set(factual)) == 4
+    missed = set(factual) - wallets
+    second = run({'target_wallet': A}, data_dir=tmp_path, as_of_ms=2000, limit=5)
+    assert missed <= {r['wallet'] for r in second['investigations']}

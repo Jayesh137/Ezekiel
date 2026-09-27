@@ -194,14 +194,19 @@ class DiscoveryStore:
                                 (max(1, max_events),)).fetchone()
         cutoff = max(before_ms - 1, extra[0] if extra else -1, self.meta("pruned_through_ms", -1))
         with self.db:
-            self.db.execute("DELETE FROM discovery_observations WHERE observed_at_ms<?", (before_ms,))
+            self.db.execute("DELETE FROM discovery_observations WHERE observed_at_ms<? AND source!='authority_actions'", (before_ms,))
+            self.db.execute("DELETE FROM discovery_observations WHERE source='authority_actions' AND observed_at_ms<?",
+                            (before_ms - 700 * 86400_000,))
             self.db.execute("DELETE FROM market_participants WHERE ts<=?", (cutoff,))
             self.db.execute("DELETE FROM market_events WHERE ts<=?", (cutoff,))
             self.db.execute("INSERT OR REPLACE INTO discovery_meta VALUES ('pruned_through_ms',?)", (json.dumps(cutoff),))
         self.db.execute("PRAGMA wal_checkpoint(PASSIVE)")
 
     def export_summary(self) -> dict:
-        return {"wallets_observed": self.db.execute("SELECT count(*) FROM discovered_wallets").fetchone()[0],
+        return {"computed_at_ms": int(time.time() * 1000),
+                "last_successful_read_ms": self.meta("last_successful_market_read_ms"),
+                "last_positive_observation_ms": self.meta("last_positive_market_observation_ms"),
+                "wallets_observed": self.db.execute("SELECT count(*) FROM discovered_wallets").fetchone()[0],
                 "events_retained": self.db.execute("SELECT count(*) FROM market_events").fetchone()[0],
                 "coverage": self.coverage(), "candidates": self.candidates(limit=100),
                 "identity_claim": False}

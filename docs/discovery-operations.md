@@ -80,8 +80,10 @@ and three observed following patterns after a dated migration. All new research
 outputs have `promotable: false`; experimental timing alone cannot send an alert.
 
 The queue reads up to 10,000 cached fills per candidate, examines at most 100
-candidates by default (200 maximum), rotates oldest investigations within source
-priority, and publishes bounded references plus original counts. Scheduled wiring
+candidates by default (200 maximum), reserves 20% of capacity for discoveries without
+a funding/authority link, rotates oldest investigations within both groups, and
+publishes bounded references plus original counts. Unused capacity crosses groups;
+a one-wallet budget takes the oldest investigation regardless of source. Scheduled wiring
 and cache persistence are described with the workflow integration below.
 
 ## Evidence quality and replay
@@ -127,3 +129,113 @@ exercise the pipeline. Their success is not a claim of real-world identification
 accuracy. The false-identity-alert count is structural while research promotion is
 disabled. `data/quality/latest.json` exposes operational coverage independently of
 whether a labelled replay has ever been run.
+
+## Scheduled runtime and persistence
+
+The hourly scan requests this order: restore its checkpoint and import observation
+batches; poll up to 12 public markets; index stored routes and resolve at most 20
+source messages; enrich candidates; rank successor investigations; publish quality;
+compact, snapshot and upload the database; then remove acknowledged older artifacts.
+Scan has a 40-minute job backstop and bounded steps. Scheduling is intermittent:
+the cron expression is a request, and existing run history shows substantial delays.
+There is no claim of complete public-market coverage or always-on hosting.
+
+`scan.yml` is the **only authoritative checkpoint writer**. Watch remains in its
+independent `watch-data` concurrency group and trace remains in `data-commit`.
+They each upload a uniquely named observation shard from their temporary store,
+without restoring or overwriting the scanner's scheduling/cohort state. Scan
+imports facts idempotently by event and artifact IDs, at most 40 batches per run.
+One corrupt shard remains pending and does not invalidate a valid checkpoint.
+Daily analysis restores a checkpoint copy for historical controls and never
+publishes it back; its temporary additional observations do not update the owner.
+
+Artifacts are scoped to a hash of the branch name and named by run ID/attempt.
+The repository workflow token supplies artifact permissions; no external paid key
+is required. Only scan has `actions: write` for cleanup; analysis needs `actions: read`.
+Observation shards are deleted only after a newly uploaded checkpoint is confirmed
+in the artifact listing. The latest two checkpoints remain; artifacts otherwise
+expire after seven days. Listing/import/download/cleanup work is bounded. The
+checkpoint has limits of 512 MiB uncompressed and 48 MiB compressed. Repository
+artifact quotas can still be exhausted if imports stop; an upload failure is a
+visible workflow failure, never permission to buy storage or discard unseen facts.
+
+Scheduled compaction retains at most 100,000 market events within 30 days,
+250,000 fills within 90 days globally, and 100,000 generic observations. Explicit
+authority can survive up to 730 days subject to that generic row cap. Evaluation
+profiles have their own 90-day/10,000-row cap. Wallet aggregates survive market
+pruning; history outside these limits is not claimed complete. When fills are
+pruned, their coverage claims are invalidated. Standalone collection without a
+checkpoint uses the larger 500,000-event cap described above.
+
+`data/discovery/state.json` records restore status, imported/pending/expired
+batches, errors and checkpoint preparation. `cold_start` or `state_lost` explicitly
+marks absent prior history. A restore error prevents dependent database writers
+from running, and the job still publishes its failure report. Successful database
+restoration does not mean the subsequent public reads succeeded: the market
+summary keeps last attempt, last successful read and last positive observation
+separate. Cross-workflow health checks monitor discovery, routes and investigations.
+
+If a restore fails, inspect the scan's artifact error before rerunning. Preserve
+both retained checkpoints and pending observation artifacts. Download an intact
+checkpoint artifact ZIP to recover locally while no process has the destination
+database open:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from src.discovery_state import restore_archive; restore_archive('checkpoint.zip', 'data/.local/recovered.sqlite3')"
+.\.venv\Scripts\python.exe scripts/collect_market_discovery.py --once --db data/.local/recovered.sqlite3 --output-dir data/.local/recovery-report
+```
+
+Restoration validates archive contents and SQLite integrity before replacing a
+file. Use a new path for recovery; do not replace a live database. If all artifacts
+expired, the JSON candidate registry and collected target files remain, but missing
+raw discovery history and the held-out cohort cannot be reconstructed by assertion.
+Resume collection and let prospective validation accumulate again. No automated
+checkpoint fallback hides loss by silently substituting an older copy.
+
+Sources: [GitHub artifact endpoints](https://docs.github.com/en/rest/actions/artifacts)
+and [upload-artifact](https://github.com/actions/upload-artifact).
+
+## Operating the investigation queue
+
+The new Investigations page prioritises observed funding/return routes and authority
+connections, then shows position handoffs and observed sessions. These priority
+weights are research choices, not calibrated ownership probabilities. Inspect
+counterparties and amount/context, especially for unsolicited small transfers or
+exchange payouts. An observed return records the immediate transfer source; it
+does not reveal the original customer behind a service.
+
+Source-message binding checks the burned token, raw amount and sender relationship,
+and requires a unique transfer leg. A matching dollar value or a transaction-level
+recipient cannot substitute for this binding in an ambiguous batch.
+
+Use the funding/authority filter for factual connections and the sparse-session
+filter for candidates needing more observation. Each row supplies a next check,
+confounders, conflicting evidence and raw supporting event references. Unresolved
+routes remain a separate queue with the next query. A bridge/exchange classified
+as a destination is distinguished from a configured controlled recipient. Missing
+reports show “not collected”; an empty list cannot establish that no other wallet
+exists. The dashboard reads reports on `main`; a local branch preview does not
+publish branch data or silently substitute demonstration leads.
+
+For a manual local cycle, after public collection, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/index_discovery_routes.py --resolve-sources
+.\.venv\Scripts\python.exe src/scanner.py
+.\.venv\Scripts\python.exe scripts/check_successor_hypotheses.py
+.\.venv\Scripts\python.exe scripts/evaluate_discovery.py --quality-only
+.\.venv\Scripts\python.exe scripts/discovery_artifacts.py snapshot --kind state
+```
+
+The existing scanner follows configured alert policy; collection, route indexing,
+investigation ranking and replay themselves do not send notifications. Local
+snapshotting needs no GitHub token and creates `data/.local/artifact/snapshot.sqlite3.gz`.
+It does not upload or deploy anything. Install `requirements.txt` for these commands;
+the scheduled daily fingerprint rebuild uses `requirements-analysis.txt`.
+
+The most valuable next operational evidence is forward coverage: capture markets
+the trader actually trades, keep exploration rotating, investigate small accounts
+before their histories roll off, and measure where verified cases are lost in
+observation, selection, enrichment or ranking. Add dated verified cases without
+changing the held-out controls. More detectors do not compensate for missing
+observations or a pipeline that cannot retain and revisit them.

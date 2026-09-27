@@ -8,6 +8,7 @@ from src.episodes import (
     build_episodes,
     compare_episode_profiles,
     episode_profile,
+    fill_identity,
     number,
     regime_profiles,
 )
@@ -23,9 +24,9 @@ def _ref(row, prefix):
 
 
 def _states(account, cutoff):
-    return sorted([row for row in account.get('positions_history', [])
+    return sorted([{**row, 'ts_ms': number(row['ts_ms'])} for row in account.get('positions_history', [])
                    if isinstance(row, dict) and number(row.get('ts_ms')) is not None
-                   and row['ts_ms'] <= cutoff and isinstance(row.get('positions'), dict)
+                   and number(row['ts_ms']) <= cutoff and isinstance(row.get('positions'), dict)
                    and row.get('complete', True)], key=lambda row: row['ts_ms'])
 
 
@@ -38,7 +39,7 @@ def _changes(account, cutoff, opening):
             ts, before, size = number(fill.get('time')), number(fill.get('startPosition')), number(fill.get('sz'))
             if ts is None or ts > cutoff or before is None or size is None or size <= 0 or fill.get('side') not in ('A', 'B'):
                 continue
-            identity = f"fill:{account['wallet']}:{fill.get('coin')}:{ts}:{fill.get('tid', _ref(fill, 'fill'))}"
+            identity = fill_identity({**fill, 'wallet': account['wallet']})
             if identity in seen:
                 continue
             seen.add(identity)
@@ -96,8 +97,8 @@ def _handoffs(target, candidate, context, cutoff):
             if 0 <= delay <= 3 * DAY and .2 <= ratio <= 1.5:
                 common = any(event.get('coin') in (None, entry['coin'])
                              and number(event.get('ts_ms')) is not None
-                             and event['ts_ms'] <= cutoff
-                             and abs(event['ts_ms'] - exit_row['ts_ms']) <= 2 * 3600_000
+                             and number(event['ts_ms']) <= cutoff
+                             and abs(number(event['ts_ms']) - exit_row['ts_ms']) <= 2 * 3600_000
                              for event in context.get('market_events', []))
                 possibilities.append((abs(1 - ratio), delay, i, j, {
                     'coin': entry['coin'], 'direction': entry['direction'],
@@ -170,7 +171,7 @@ def find_successor_hypotheses(target: dict, candidates: list[dict], context: dic
     cluster = set(context.get('cluster', [])) | {target['wallet']}
     services = set(context.get('services', []))
     target_fills = [f for f in target.get('fills', []) if number(f.get('time')) is not None and float(f['time']) <= cutoff]
-    target_episodes = build_episodes(target_fills)
+    target_episodes = build_episodes([{**f, 'wallet': target['wallet']} for f in target_fills])
     target_profile = episode_profile(target_episodes)
     regimes = regime_profiles(target_episodes)
     results = []
@@ -194,7 +195,7 @@ def find_successor_hypotheses(target: dict, candidates: list[dict], context: dic
                        and a.get('parent_event_ids') and (number(a.get('observed_at_ms')) or 0) <= cutoff]
         handoffs = _handoffs(target, candidate, context, cutoff)
         disclosures = [d for d in context.get('disclosures', []) if d.get('wallet') in members
-                       and number(d.get('observed_at_ms')) is not None and d['observed_at_ms'] <= cutoff
+                       and number(d.get('observed_at_ms')) is not None and number(d['observed_at_ms']) <= cutoff
                        and str(d.get('url', '')).startswith(('https://', 'http://'))]
         confounders = set(comparison['confounders'])
         if any(h['common_market_event'] for h in handoffs):

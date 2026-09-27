@@ -62,10 +62,22 @@ def run(config, data_dir=DATA_DIR, *, as_of_ms=None, input_data=None, disclosure
     else:
         registry = iter_candidates(data_dir)
         candidate_total = len(registry)
-        # Prioritise independent factual sources, then oldest investigation.
-        registry.sort(key=lambda r: (-bool(set(r.get('discovery_sources', [])) & {'funding_route', 'authority_history'}),
-                                     r.get('last_investigated_ms', 0), r['wallet']))
-        registry = registry[:max(1, min(limit, 200))]
+        # Keep most capacity for factual connections, but never let a large
+        # funding queue indefinitely exclude wallets with no visible money link.
+        registry.sort(key=lambda r: (r.get('last_investigated_ms', 0), r['wallet']))
+        budget = max(1, min(limit, 200))
+        priority, exploration = [], []
+        for row in registry:
+            destination = priority if set(row.get('discovery_sources', [])) & {'funding_route', 'authority_history'} else exploration
+            destination.append(row)
+        if budget == 1:
+            registry = registry[:1]
+        else:
+            reserved = min(len(exploration), max(1, budget // 5))
+            chosen = priority[:budget - reserved] + exploration[:reserved]
+            selected = {row['wallet'] for row in chosen}
+            chosen += [row for row in registry if row['wallet'] not in selected][:budget - len(chosen)]
+            registry = chosen
         histories, cache_status = cached_fills(db_path or data_dir / '.local' / 'discovery.sqlite3',
                                                [r['wallet'] for r in registry], cutoff)
         target = {'wallet': config['target_wallet'].lower(),
@@ -78,7 +90,9 @@ def run(config, data_dir=DATA_DIR, *, as_of_ms=None, input_data=None, disclosure
                    'linked_groups': [{'wallets': r['accounts'], 'relationship': 'shared_authority',
                                       'parent_event_ids': r['parent_event_ids'], 'observed_at_ms': r['overlap_start_ms']}
                                      for r in authority.get('shared_authority', [])],
-                   'cluster': config.get('known_self_wallets', [])}
+                   'cluster': config.get('known_self_wallets', []),
+                   'services': [*config.get('excluded_addresses', []), *config.get('hl_shared_destinations', []),
+                                *config.get('discovery', {}).get('excluded_wallets', [])]}
     context = {**context, 'as_of_ms': cutoff, 'disclosures': disclosures or context.get('disclosures', [])}
     rows = find_successor_hypotheses(target, candidates, context)
     report = {'computed_at_ms': cutoff, 'research_only': True, 'identity_confirmed': False,

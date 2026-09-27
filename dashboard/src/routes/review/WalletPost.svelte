@@ -5,6 +5,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import { addressUrl, formatUSD, shortAddr } from '$lib/api.js';
 	import { TIER_LABEL, vectorLabel, bornLabel } from '$lib/review.js';
+	import { rosterTierLabel } from '$lib/discovery.js';
 	import Avatar from '$lib/ui/Avatar.svelte';
 	import Pips from '$lib/ui/Pips.svelte';
 
@@ -35,7 +36,7 @@
 			</span>
 		</div>
 		<div class="tags">
-			<span class="tier tier-{String(w.tier).toLowerCase()}">{TIER_LABEL[w.tier] || w.tier}</span>
+			<span class="tier tier-{String(w.tier).toLowerCase()}">{rosterTierLabel(w)}</span>
 			{#if w.status === 'new'}
 				<span class="flag new">New</span>
 			{:else if w.status === 'changed'}
@@ -47,7 +48,7 @@
 	<div class="evidence">
 		<Pips {count} />
 		<span>
-			{count} independent vector{count === 1 ? '' : 's'}
+			{count} evidence group{count === 1 ? '' : 's'}
 			{#if w.tier_dropped_from}<span class="peak">· peaked {TIER_LABEL[w.tier_dropped_from] || w.tier_dropped_from}</span>{/if}
 		</span>
 	</div>

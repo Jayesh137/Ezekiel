@@ -37,7 +37,7 @@ def run(config, data_dir=DATA_DIR, *, actions=None, route_input=None, output_dir
                 try:
                     for row in decode_records(path):
                         if isinstance(row, dict) and row.get("id") and not row.get("spam"):
-                            if row.get("src", "").lower() in cluster:
+                            if row.get("src", "").lower() in cluster or row.get("dst", "").lower() in cluster:
                                 records[row["id"]] = row
                 except (OSError, ValueError, EOFError) as exc:
                     read_errors.append(f"{path.name}: {exc}")
@@ -71,7 +71,7 @@ def run(config, data_dir=DATA_DIR, *, actions=None, route_input=None, output_dir
                   "source_message_reads": source_reads,
                   "retention": {"circle_rows_read": len(circle_events), "store_read_limit": 100_000}}
         for key in ("routes", "unresolved", "discoveries"):
-            report[key] = report[key][:1000]
+            report[key] = sorted(report[key], key=lambda r: r.get('ts_ms') or 0, reverse=True)[:1000]
         report["authority"] = {**authority, "intervals": authority["intervals"][:1000],
                                "shared_authority": authority["shared_authority"][:1000]}
         atomic_write_json(Path(output_dir or data_dir / "routes") / "latest.json", report)

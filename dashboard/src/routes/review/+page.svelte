@@ -3,6 +3,7 @@
 	// files, and review marks live only in this device's localStorage.
 	// Every rule lives in $lib/review.js; this file wires it to taps.
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import { fetchRoster, fetchWatchlist, shortAddr } from '$lib/api.js';
 	import {
 		sessionFeed, tabCounts, progress, dropped, dismissDropped, markReviewed, markStorySeen,
@@ -131,7 +132,7 @@
 	$: watchFresh = freshness(watchFreshIso(watch), now);
 	$: streak = storageOk ? state.streak?.count || 0 : 0;
 	$: tabs = [
-		{ value: 'likely', label: 'Likely', count: counts?.likely ?? null },
+		{ value: 'likely', label: 'Priority', count: counts?.likely ?? null },
 		{ value: 'leads', label: 'Leads', count: counts?.leads ?? null }
 	];
 	$: sheetTitle = sheet?.kind === 'watch' ? 'Close watch'
@@ -149,6 +150,7 @@
 		<div class="bar">
 			<span class="brand">Ezekiel</span>
 			<span class="spacer"></span>
+			<a href="{base}/discovery">Investigations</a>
 			{#if streak > 0}
 				<span class="streak" title="Days in a row you've checked in" aria-label="{streak} day streak">
 					<span aria-hidden="true">🔥</span> {streak}
@@ -198,13 +200,11 @@
 
 		<p class="tabnote">
 			{#if tab === 'likely'}
-				Two or more independent vectors agree. That is the strongest evidence
-				this project produces, because the ways the vectors can be fooled do
-				not overlap.
+				Configured seeds and leads supported by different evidence groups.
+				Groups can still share a cause; investigate before attributing ownership.
 			{:else}
-				One vector only. A lead, not a candidate: a single signal is the one
-				that has repeatedly turned out to be an exchange, a bot or a
-				coincidence.
+				Limited evidence. A connection may reflect a service, a shared strategy
+				or a coincidence. Check the underlying observations.
 			{/if}
 		</p>
 
@@ -229,7 +229,7 @@
 			{:else}
 				<div class="empty">
 					{#if tab === 'likely'}
-						<p class="title">No unknown wallet is likely today</p>
+						<p class="title">No new priority lead in this report</p>
 						<p class="sub">
 							Nothing outside the wallets you already know as his reaches two
 							agreeing vectors. That is a real finding, not an empty screen:
@@ -263,8 +263,8 @@
 				Both are watched by the pipeline and not listed here.
 				<br />
 			{/if}
-			Read-only. Reviews are stored on this device only. Tiers come from how many
-			independent vectors agree, never from one score.
+			Read-only. Reviews are stored on this device only. Tiers describe evidence
+			and review priority; they do not establish ownership.
 		</p>
 	{/if}
 </div>

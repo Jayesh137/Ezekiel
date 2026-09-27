@@ -102,6 +102,10 @@ def collect_once(config, store, fetch=None, now_ms=None):
             store.record_observation("poll", now_ms, market=coin, status="error", error=str(exc)[:200])
     # Committed events precede scheduler progress; a crash can repeat a page safely.
     store.set_meta("market_rotation", rotation + 1)
+    if successful:
+        store.set_meta("last_successful_market_read_ms", now_ms)
+    if totals['inserted'] or totals['duplicates']:
+        store.set_meta("last_positive_market_observation_ms", now_ms)
     return {**totals, "markets": markets, "errors": errors, "coverage": store.coverage(),
             "successful_market_reads": successful,
             "status": "error" if not successful else "partial" if errors or totals["rejected"] else "ok"}
@@ -138,6 +142,9 @@ def collect_stream(config, store, *, connect=None, fetch=None, seconds=300,
                     result = store.ingest_trades(data, int(clock() * 1000))
                     messages += 1
                     if clock() - last_record >= 30 or messages == 1:
+                        store.set_meta("last_successful_market_read_ms", int(clock() * 1000))
+                        if result['inserted'] or result['duplicates']:
+                            store.set_meta("last_positive_market_observation_ms", int(clock() * 1000))
                         store.record_observation("stream", int(clock() * 1000), reason="data_received",
                                                  markets=markets, status="ok", **result)
                         last_record = clock()

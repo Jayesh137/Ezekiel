@@ -11,7 +11,8 @@ detected, they're lost. Everything runs on free tiers.
 
 ## How it works
 
-Three independent detection vectors feed one risk posture:
+Several observation families feed the discovery process. Reports sharing the
+same underlying event count as dependent evidence:
 
 | Vector | Modules | Watches |
 |---|---|---|
@@ -24,6 +25,21 @@ grades each discovered wallet. `risk.py` collapses everything into a 0–100 sco
 
 Storage is JSON files committed to this repo; the dashboard reads them directly
 over `raw.githubusercontent.com`, so there is no server.
+
+The wallet-discovery improvements also observe public market participants outside
+the leaderboard, preserve small deposits and historical authority, join exact
+funding routes, revisit transfer recipients, and compare trading episodes and
+possible successor accounts. Raw discovery history uses an ignored SQLite store
+and bounded workflow artifacts; only small reports are committed. The scanner
+owns the checkpoint, while watch and trace jobs hand it observation batches.
+
+Use **Investigations** in the dashboard (also linked from phone Review) for each
+lead's evidence, alternative explanations and next useful check. Coverage,
+failed reads and unresolved routes stay visible. Research ranks are not ownership
+probabilities. No OpenAI API, AI model calls or paid data plan is required.
+See [discovery operations](docs/discovery-operations.md) for free polling, optional
+streaming, offline import/replay, persistence and recovery. These workflows must
+be present on the scheduled branch before the new collectors run there.
 
 ## Setup (Windows / PowerShell)
 

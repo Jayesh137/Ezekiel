@@ -3,6 +3,7 @@ from src.route_index import index_routes
 A = "0x" + "1" * 40
 B = "0x" + "2" * 40
 ROUTER = "0x" + "3" * 40
+TOKEN = "0x" + "4" * 40
 
 
 def test_exact_source_decode_finds_small_treasury_funded_hl_account():
@@ -14,6 +15,21 @@ def test_exact_source_decode_finds_small_treasury_funded_hl_account():
     assert result["discoveries"][0]["parent_event_ids"] == ["fund"]
     assert result["routes"][0]["original_funder"] == A
     assert result["routes"][0]["assertion"] == "funding_instruction"
+
+
+def test_route_index_output_reaches_successor_ranking_in_both_directions():
+    from src.successor_hypotheses import find_successor_hypotheses
+    records = [{"id": "fund", "chain": "base", "tx_hash": "tx", "src": A, "dst": ROUTER,
+                "amount_usd": 20, "ts": 100},
+               {"id": "return", "chain": "base", "tx_hash": "back", "src": B, "dst": A,
+                "amount_usd": 5, "ts": 200}]
+    index = index_routes(records, {"base:tx": {"protocol": "cctp_extension", "hl_account": B}}, [], {A})
+    rows = find_successor_hypotheses({'wallet': A}, [{'wallet': B}],
+                                    {'routes': index['routes'], 'as_of_ms': 300000})
+    assert rows[0]['funding_routes'][0]['id'] == 'fund'
+    assert rows[0]['return_routes'][0]['id'] == 'return'
+    assert rows[0]['priority'] >= 7
+    assert rows[0]['identity_confirmed'] is False
 
 
 def test_shared_router_and_similar_amount_cannot_create_exact_route():
@@ -96,10 +112,11 @@ def test_batched_burns_do_not_assign_last_decoded_recipient_to_every_transfer(tm
     from src.discovery_store import DiscoveryStore
     from src.route_index import resolve_source_routes
     records = [{"id": f"r{amount}", "chain": "base", "tx_hash": "tx", "src": A, "dst": ROUTER,
-                "amount_usd": amount} for amount in (10, 20)]
+                "amount_usd": amount, "amount": amount, "token_address": TOKEN} for amount in (10, 20)]
     decodes = {"tx": {"protocol": "cctp"}}
     messages = [{"event_id": str(amount), "source_domain": 6, "source_tx_hash": "tx", "protocol": "cctp",
-                 "protocol_message_id": f"6:{amount}", "hl_account": address, "amount_usd": amount}
+                 "protocol_message_id": f"6:{amount}", "hl_account": address, "amount_usd": amount,
+                 "burn_token": "0x" + "0" * 24 + TOKEN[2:], "message_sender": A}
                 for amount, address in ((10, B), (20, ROUTER))]
     with DiscoveryStore(tmp_path / "db") as store:
         store.ingest_observations("cctp_sources", messages, 1000)
@@ -108,3 +125,36 @@ def test_batched_burns_do_not_assign_last_decoded_recipient_to_every_transfer(tm
         by_id = {r["id"]: r for r in result["routes"]}
         assert by_id["r10"]["hl_account"] == B
         assert by_id["r20"]["hl_account"] == ROUTER
+
+
+def test_same_dollar_amount_on_another_token_or_sender_cannot_bind_a_burn(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    from src.route_index import resolve_source_routes
+    records = [{'id': key, 'chain': 'base', 'tx_hash': 'tx', 'src': A, 'dst': ROUTER,
+                'token_address': token, 'amount': 100, 'amount_usd': 100}
+               for key, token in [('right-token-wrong-sender', TOKEN), ('wrong-token', B)]]
+    message = {'event_id': 'message', 'source_domain': 6, 'source_tx_hash': 'tx',
+               'protocol': 'cctp', 'protocol_message_id': '6:1', 'amount_usd': 100,
+               'burn_token': '0x' + '0' * 24 + TOKEN[2:], 'message_sender': B, 'hl_account': B}
+    with DiscoveryStore(tmp_path / 'db') as store:
+        store.ingest_observations('cctp_sources', [message], 1000)
+        enriched, decoded, _ = resolve_source_routes(records, {'tx': {'protocol': 'cctp', 'hl_account': B}}, store)
+        report = index_routes(enriched, decoded, [], {A})
+        assert not report['discoveries']
+        assert len(report['unresolved']) == 2
+
+
+def test_one_message_cannot_resolve_two_matching_transfer_legs(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    from src.route_index import resolve_source_routes
+    records = [{'id': str(i), 'chain': 'base', 'tx_hash': 'tx', 'src': A, 'dst': ROUTER,
+                'token_address': TOKEN, 'amount': 100, 'amount_usd': 100} for i in range(2)]
+    message = {'event_id': 'message', 'source_domain': 6, 'source_tx_hash': 'tx',
+               'protocol': 'cctp', 'protocol_message_id': '6:1', 'amount_usd': 100,
+               'burn_token': '0x' + '0' * 24 + TOKEN[2:], 'message_sender': A, 'hl_account': B}
+    with DiscoveryStore(tmp_path / 'db') as store:
+        store.ingest_observations('cctp_sources', [message], 1000)
+        enriched, decoded, _ = resolve_source_routes(records, {'tx': {'protocol': 'cctp', 'hl_account': B}}, store)
+        report = index_routes(enriched, decoded, [], {A})
+        assert not report['discoveries']
+        assert len(report['unresolved']) == 2

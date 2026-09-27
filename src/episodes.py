@@ -17,10 +17,13 @@ def number(value):
         return None
 
 
-def _identity(row):
+def fill_identity(row):
+    ts = number(row.get('time'))
+    stamp = int(ts) if ts is not None and ts.is_integer() else ts
+    wallet = str(row.get('wallet') or '').lower()
     if row.get("tid") is not None:
-        return f"fill:{row.get('wallet', '')}:{row.get('coin')}:{row.get('time')}:{row['tid']}"
-    return "fill:" + hashlib.sha256(json.dumps(row, sort_keys=True).encode()).hexdigest()[:24]
+        return f"fill:{wallet}:{row.get('coin')}:{stamp}:{row['tid']}"
+    return "fill:" + hashlib.sha256(json.dumps({**row, 'time': stamp, 'wallet': wallet}, sort_keys=True).encode()).hexdigest()[:24]
 
 
 def build_episodes(fills: list[dict], orders: list[dict] | None = None) -> list[dict]:
@@ -31,7 +34,7 @@ def build_episodes(fills: list[dict], orders: list[dict] | None = None) -> list[
         ts, size, price = number(row.get("time")), number(row.get("sz")), number(row.get("px"))
         if ts is None or size is None or price is None or size <= 0 or price <= 0:
             continue
-        valid[_identity(row)] = {**row, 'time': ts}
+        valid[fill_identity(row)] = {**row, 'time': ts}
     ordered = sorted(valid.items(), key=lambda item: (item[1]["time"], item[0]))
     if not ordered:
         return []
