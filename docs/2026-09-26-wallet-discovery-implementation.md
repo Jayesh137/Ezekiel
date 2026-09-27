@@ -131,10 +131,9 @@ into an isolated database using the production restore routine. Integrity passed
 enforced the 250,000-fill cap. No control cohort had accumulated at that point;
 behavioural promotion remains unvalidated.
 
-Follow-up verification: **1,868 Python tests passed in 211.20 seconds**, followed
-by **55 focused tests** after the disjoint-window regression correction. Dashboard
-**52 tests**, production build/PWA, Ruff and isolated desktop/phone partial-scan
-rendering passed. The required pre-push suite also checks the final committed code.
+Follow-up verification on final committed code: **1,869 Python tests passed in
+207.36 seconds** through the required pre-push hook. Dashboard **52 tests**,
+production build/PWA, Ruff and isolated desktop/phone partial-scan rendering passed.
 
 Rate accounting source: [Hyperliquid rate limits](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits).
 
