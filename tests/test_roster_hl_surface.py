@@ -52,30 +52,29 @@ def _sub(master, value):
     return {"master": master, "name": "x", "account_value": value}
 
 
-def test_a_subaccount_of_the_target_is_confirmed(tmp_path, monkeypatch):
+def test_a_subaccount_relationship_is_explicit_but_owner_not_inferred(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch, surface={
         "subaccounts": {SUB: _sub(TARGET, 0.0)},
         "links": [{"kind": "subaccount", "address": SUB, "linked_to": TARGET}]})
     row = _rows()[SUB]
-    assert row["tier"] == roster.TIER_CONFIRMED
+    assert row["tier"] == roster.TIER_POSSIBLE
+    assert row['identity_confirmed'] is False
     assert roster.VECTOR_EXPLICIT in row["vectors"]
     assert TARGET not in _rows()
 
 
 def test_vectors_found_on_two_accounts_of_one_operator_agree(tmp_path, monkeypatch):
-    """Correlation on the master and dormancy on its sub-account are two
-    independent detectors describing one person — two vectors, not one each."""
+    """Explicitly linked accounts share context without manufacturing votes."""
     _setup(tmp_path, monkeypatch,
            surface={"subaccounts": {SUB: _sub(MASTER, 50_000.0)}},
            correlations={"matches": [{"wallet": MASTER, "confidence": 0.7}]},
            dormancy={"handoffs": {SUB: {"score": 0.43}}})
     rows = _rows()
     for wallet in (MASTER, SUB):
-        assert rows[wallet]["tier"] == roster.TIER_PROBABLE
-        assert set(rows[wallet]["vectors"]) == {roster.VECTOR_CORRELATION,
-                                                roster.VECTOR_DORMANCY}
+        assert rows[wallet]["tier"] == roster.TIER_POSSIBLE
+        assert set(rows[wallet]["vectors"]) == {roster.VECTOR_CORRELATION}
         assert rows[wallet]["evidence"]["operator_group"]["master"] == MASTER
-    assert rows[MASTER]["evidence"]["vectors_via_group"] == [roster.VECTOR_DORMANCY]
+    assert rows[MASTER]["evidence"]["vectors_via_group"] == []
     assert rows[SUB]["evidence"]["vectors_via_group"] == [roster.VECTOR_CORRELATION]
 
 
@@ -88,17 +87,19 @@ def test_a_service_neither_lends_nor_borrows_group_vectors(tmp_path, monkeypatch
            dormancy={"handoffs": {SUB: {"score": 0.43}}})
     rows = _rows()
     assert rows[EXCHANGE]["tier"] == roster.TIER_INFRASTRUCTURE
-    assert rows[SUB]["vectors"] == [roster.VECTOR_DORMANCY]
+    assert rows[SUB]["vectors"] == []
+    assert rows[SUB]['evidence']['dormancy_handoff']
     assert "operator_group" not in rows[SUB]["evidence"]
 
 
-def test_an_empty_subaccount_of_a_weak_master_gets_no_row(tmp_path, monkeypatch):
+def test_an_empty_subaccount_of_a_weak_master_is_watched_without_promotion(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch,
            surface={"subaccounts": {SUB: _sub(MASTER, 1500.0),
                                     EMPTY_SUB: _sub(MASTER, 0.0)}},
            correlations={"matches": [{"wallet": MASTER, "confidence": 0.7}]})
     rows = _rows()
-    assert SUB in rows and EMPTY_SUB not in rows
+    assert SUB in rows and EMPTY_SUB in rows
+    assert rows[EMPTY_SUB]['tier'] == roster.TIER_POSSIBLE
     assert rows[SUB]["evidence"]["subaccount_of"] == MASTER
 
 
@@ -109,8 +110,8 @@ def test_every_subaccount_of_a_probable_operator_gets_a_row(tmp_path, monkeypatc
            correlations={"matches": [{"wallet": MASTER, "confidence": 0.7}]},
            dormancy={"handoffs": {MASTER: {"score": 0.43}}})
     rows = _rows()
-    assert rows[MASTER]["tier"] == roster.TIER_PROBABLE
-    assert rows[EMPTY_SUB]["tier"] == roster.TIER_PROBABLE
+    assert rows[MASTER]["tier"] == roster.TIER_POSSIBLE
+    assert rows[EMPTY_SUB]["tier"] == roster.TIER_POSSIBLE
     assert rows[EMPTY_SUB]["evidence"]["subaccount_of"] == MASTER
 
 
@@ -139,7 +140,7 @@ def test_a_public_code_adds_no_rows(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch, surface={
         "links": [{"kind": "referral_pair", "address": MASTER, "linked_to": REFERRER,
                    "code_accounts": 5000}]})
-    assert _rows() == {}
+    assert set(_rows()) == {SELF}  # configured trusted seed remains visible
 
 
 def test_the_roster_builds_without_the_file(tmp_path, monkeypatch):

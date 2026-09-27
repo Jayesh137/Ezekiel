@@ -62,6 +62,22 @@ def test_empty_sides_are_untestable():
     assert cm.score(_fills([(0, 1)]), [])["verdict"] == "untestable"
 
 
+def test_one_target_decision_cannot_support_multiple_candidate_matches():
+    target = [{"coin": "BTC", "side": "B", "start": 100 * MS, "end": 101 * MS}]
+    candidates = [{"coin": "BTC", "side": "B", "start": i * MS, "end": i * MS}
+                  for i in (99, 101, 110)]
+    assert len(cm.pair(target, candidates)) == 1
+
+
+def test_synchronous_basket_is_one_session_and_uses_multiple_null_controls():
+    target = [{"coin": str(i), "side": "B", "start": 100 * MS, "end": 101 * MS} for i in range(20)]
+    result = cm.score_decisions(target, target)
+    assert result["verdict"] == "untestable"
+    assert result["independent_sessions"] == 1
+    assert len(result["null_controls"]) >= 4
+    assert result["promotable"] is False
+
+
 def test_report_orders_same_hand_first():
     target, lead = [], []
     for k in range(14):

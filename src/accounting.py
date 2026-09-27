@@ -22,6 +22,7 @@ transfers were invisible is worse than one that admits it cannot see them.
 """
 
 import json
+import math
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -100,6 +101,8 @@ def reconcile(records, target: str, roster: dict, known_self: set) -> dict:
             usd = float(usd)
         except (TypeError, ValueError):
             continue
+        if not math.isfinite(usd) or usd <= 0:
+            continue
         bucket = buckets[classify_destination(dst, roster, known_self)]
         bucket["usd"] += usd
         bucket["transfers"] += 1
@@ -123,6 +126,15 @@ def reconcile(records, target: str, roster: dict, known_self: set) -> dict:
               + out["buckets"][DEST_INFRASTRUCTURE]["usd"])
     out["traced_usd"] = round(traced, 2)
     out["traced_share"] = round(traced / total_usd, 4) if total_usd > 0 else 0.0
+    # Preserve legacy consumers, but name what the measure actually establishes.
+    out["destination_classified_usd"] = out["traced_usd"]
+    out["destination_classified_share"] = out["traced_share"]
+    controlled = out["buckets"][DEST_SELF]["usd"]
+    out["controlled_recipient_usd"] = controlled
+    out["controlled_recipient_share"] = round(controlled / total_usd, 4) if total_usd else 0.0
+    out["associated_recipient_usd"] = out["buckets"][DEST_IDENTIFIED]["usd"]
+    out["unresolved_infrastructure_usd"] = out["buckets"][DEST_INFRASTRUCTURE]["usd"]
+    out["accounting_basis"] = "historical_gross_transfers_not_distinct_capital"
     out["unpriced"] = {
         "transfers": unpriced["transfers"],
         "distinct_wallets": len(unpriced["wallets"]),
@@ -141,6 +153,19 @@ def build_accounting(config: dict | None = None) -> dict:
 
     from src.chain.collect import records_for
     result = reconcile(records_for(target), target, _roster_index(), known_self)
+    from src.correlator import collect_target_movements
+    movements = collect_target_movements(target, config=config, data_dir=DATA_DIR)
+    result["economic_routes"] = {
+        **movements["totals"], "coverage": movements["coverage"],
+        "resolved_count": len(movements["resolved"]),
+        "unresolved_count": len(movements["unresolved_exits"]),
+    }
+    result["movement_report"] = {
+        "computed_at": datetime.now(UTC).isoformat(), "target": target,
+        "coverage": movements["coverage"], "totals": movements["totals"],
+        "unresolved_routes": movements["unresolved_exits"][-1000:],
+        "resolved_routes": movements["resolved"][-1000:],
+    }
     result["computed_at"] = datetime.now(UTC).isoformat()
     result["target"] = target
     return result
@@ -148,6 +173,9 @@ def build_accounting(config: dict | None = None) -> dict:
 
 def main() -> int:
     acc = build_accounting()
+    movements = acc.pop("movement_report", None)
+    if movements is not None:
+        save_latest(str(DATA_DIR / "movements"), movements)
     save_latest(str(ACCOUNTING_DIR), acc)
     print(f"[accounting] ${acc['total_out_usd']:,.2f} left the target across "
           f"priced transfers")
@@ -157,8 +185,8 @@ def main() -> int:
             continue
         print(f"[accounting]   {name:<16} ${b['usd']:>16,.2f}  "
               f"{b['share'] * 100:>5.1f}%  {b['distinct_wallets']} wallet(s)")
-    print(f"[accounting] traced {acc['traced_share'] * 100:.1f}% "
-          f"(self + identified + infrastructure; leads excluded on purpose)")
+    print(f"[accounting] first destination classified {acc['destination_classified_share'] * 100:.1f}% "
+          f"(includes infrastructure; does not identify a future trading wallet)")
     up = acc["unpriced"]
     if up["transfers"]:
         print(f"[accounting] {up['transfers']} outbound transfer(s) could not be "

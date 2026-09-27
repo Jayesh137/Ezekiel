@@ -73,20 +73,20 @@ def _bytes32_to_address(value: str) -> str | None:
 def _hook_account(hook: str) -> str | None:
     """The account named by the CCTP extension's hook data.
 
-    Observed shape: the ASCII tag "cctp-forward", zero padding, one length
-    byte, the 20-byte account, then four zero bytes. The account is the last
-    non-zero content, so trailing zero bytes are stripped and the final 20
-    bytes taken.
+    Circle's CctpForwarderHookData uses version 0 at bytes 24-27 and the
+    recipient at bytes 32-51. Bytes after the recipient are destinationId
+    and optional extension data, not address padding. Magic/length fields
+    are not checked by the on-chain parser; we follow its version boundary.
     """
     h = (hook or "").lower()
     if h.startswith("0x"):
         h = h[2:]
-    while h.endswith("00"):
-        h = h[:-2]
-    if len(h) < 40:
+    if len(h) < 104 or len(h) % 2 or not re.fullmatch(r"[0-9a-f]+", h):
         return None
-    tail = h[-40:]
-    return "0x" + tail if _ADDR.match(tail) else None
+    if h[48:56] != "00000000":
+        return None
+    address = h[64:104]
+    return "0x" + address if address != "0" * 40 else None
 
 
 def decode_cctp(params: dict) -> dict | None:

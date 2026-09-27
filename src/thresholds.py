@@ -43,7 +43,9 @@ ACTION_BACKGROUND = "BACKGROUND"
 # per-active-day (episodes_per_active_day / fills_per_active_day). That moves
 # every activity score and the decision-frequency veto, so any ceiling proven
 # under 2026-07-27.1 is not evidence about this scorer and must not carry over.
-SCORING_SCHEMA = "2026-08-05.1"
+# 2026-09-26.1: live recent order parity, lifecycle deduplication, true cancel
+# rates and explicit historical feature masks invalidate earlier calibration.
+SCORING_SCHEMA = "2026-09-26.2"
 
 # Where the thresholds in force came from. Published in scans/latest.json and
 # rendered on the dashboard so the operating mode is never ambiguous.

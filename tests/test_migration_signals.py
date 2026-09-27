@@ -83,9 +83,11 @@ def test_collect_target_exits_includes_outbound_substrate_transfer_above_min(
     ]))
 
     exits = correlator.collect_target_exits(T, min_amount=100_000)
-    assert exits == [
+    assert [{k: e[k] for k in ("amount", "ts", "source", "ref")} for e in exits] == [
         {"amount": 250_000.0, "ts": 1000, "source": "l1_outbound", "ref": "0xexit"},
     ]
+    assert exits[0]["event_ids"] == ["a"]
+    assert exits[0]["resolution"] == "unresolved"
 
 
 def test_collect_target_exits_excludes_inbound_substrate_transfer(tmp_path, monkeypatch):
@@ -148,10 +150,11 @@ def test_collect_target_exits_still_includes_hl_withdrawals(tmp_path, monkeypatc
     ]))
 
     exits = correlator.collect_target_exits(T, min_amount=100_000)
-    assert exits == [
+    assert [{k: e[k] for k in ("amount", "ts", "source", "ref")} for e in exits] == [
         {"amount": 300_000.0, "ts": 1_700_000_000, "source": "hl_withdraw",
          "ref": "0xwithdraw"},
     ]
+    assert exits[0]["event_ids"] == ["hl:0xwithdraw"]
 
 
 def test_collect_target_exits_skips_malformed_amount_usd_rather_than_raising(

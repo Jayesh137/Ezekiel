@@ -23,6 +23,7 @@
 			{ href: `${base}/fingerprint`, label: 'Fingerprint', icon: 'pulse' },
 		] },
 		{ label: 'Discovery', items: [
+			{ href: `${base}/discovery`, label: 'Investigations', icon: 'crosshair' },
 			{ href: `${base}/scanner`, label: 'Scanner', icon: 'scan' },
 		] },
 	];
@@ -371,7 +372,7 @@
 		-webkit-backdrop-filter: blur(18px) saturate(1.4);
 		border-top: 1px solid var(--border-subtle);
 		padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
-		justify-content: space-around;
+		justify-content: flex-start;
 		align-items: center;
 		overflow-x: auto;
 	}
@@ -380,6 +381,7 @@
 	}
 	.mobile-nav a {
 		display: flex;
+		flex: 0 0 auto;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
@@ -387,7 +389,7 @@
 		color: var(--text-muted);
 		padding: 5px 6px;
 		border-radius: var(--radius-sm);
-		min-width: 44px;
+		min-width: 76px;
 		min-height: 44px;
 	}
 	.mobile-nav a.active { color: var(--text-primary); }

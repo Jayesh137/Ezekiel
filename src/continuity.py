@@ -218,7 +218,12 @@ def score_continuity(signals: dict, *, hop_count: int = 1,
     timeless = base - ageable
     confidence = _clamp((ageable * ad + timeless) * hd)
 
-    families = sorted(capped)
+    # Funding, flow structure and platform descriptions may all come from the
+    # same movement. Their score components are useful for ranking; their names
+    # do not provide independent corroboration.
+    signal_families = sorted(capped)
+    families = sorted({'financial' for f in capped if f != FAMILY_BEHAVIOUR}
+                      | ({'behaviour'} if signals.get('behavioural') else set()))
     if len(families) < MIN_FAMILIES_FOR_PROMOTION:
         blockers.append(
             f"only {len(families)} evidence family present "
@@ -236,7 +241,8 @@ def score_continuity(signals: dict, *, hop_count: int = 1,
     if ad < 1.0:
         reasons.append(f"evidence aged {age_days:.0f} days (decay x{ad})")
 
-    return {"confidence": round(confidence, 4), "families": families,
+    return {"confidence": round(confidence, 4), "families": families, 'signal_families': signal_families,
+            'score_kind': 'continuity_heuristic_not_probability', 'identity_confirmed': False,
             "reasons": reasons, "blockers": blockers,
             "hop_decay": hd, "age_decay": ad}
 
@@ -258,7 +264,8 @@ def lifecycle_state(*, is_service: bool = False, on_path: bool = False,
     an unbroken path, no contradictory behaviour, and — for the top state — the
     central alert disposition to agree.
     """
-    families = families or []
+    families = sorted({'financial' if f in (FAMILY_FLOW, FAMILY_FUNDING, FAMILY_STRUCTURE, FAMILY_PLATFORM)
+                       else 'behaviour' if f == FAMILY_BEHAVIOUR else f for f in (families or [])})
     reasons: list[str] = []
 
     if is_service:

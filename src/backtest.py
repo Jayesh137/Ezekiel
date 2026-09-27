@@ -1,5 +1,5 @@
 # src/backtest.py
-"""Self-match backtest: proof that the scorer actually recognizes Ezekiel.
+"""Self-match backtest: evaluate separation under stated historical coverage.
 
 Splits the target's own history into two disjoint time windows, fingerprints
 each with the exact code path candidates go through, and checks that
@@ -9,9 +9,11 @@ trusted — this runs after every fingerprint rebuild so scoring changes are
 validated instead of guessed.
 """
 
+import gzip
 import json
+import math
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,6 +34,7 @@ MIN_WINDOW_DAYS = 8
 # target is characterised from a comparable amount of behaviour to its strangers.
 TARGET_WINDOW_DAYS = 12
 PASS_MARGIN = 0.05
+MIN_STRANGERS = 20
 REPORT_PATH = DATA_DIR.parent / "profile" / "backtest.json"
 
 
@@ -203,8 +206,66 @@ def stranger_results(scan: dict, target: str) -> list[dict]:
     return [r for r in scan.get("results", []) if (r.get("wallet") or "").lower() != t]
 
 
+def load_state_asof(cutoff_ms: int, directory: Path | None = None,
+                    max_age_ms: int = 86_400_000) -> tuple[dict, dict]:
+    """Read timestamped account snapshots, including compacted daily archives.
+
+    Never consult latest.json. A snapshot after a historical window is future
+    information, even when its holdings happen to look plausible.
+    """
+    directory = Path(directory) if directory is not None else DATA_DIR / "account"
+    end = datetime.fromtimestamp(cutoff_ms / 1000, tz=UTC)
+    best = None
+    for day_offset in range(math.ceil(max_age_ms / 86_400_000) + 1):
+        day = (end - timedelta(days=day_offset)).strftime("%Y-%m-%d")
+        items = []
+        archive = directory / "archive" / f"{day}.jsonl.gz"
+        try:
+            if archive.exists():
+                with gzip.open(archive, "rt", encoding="utf-8") as stream:
+                    for line in stream:
+                        try:
+                            row = json.loads(line)
+                            items.append((row["t"], row["d"], str(archive)))
+                        except (ValueError, KeyError, TypeError):
+                            continue
+            for path in sorted((directory / day).glob("*.json")):
+                try:
+                    items.append((path.stem, json.loads(path.read_text()), str(path)))
+                except (OSError, ValueError):
+                    continue
+        except (OSError, EOFError):
+            continue
+        for hhmm, state, source in items:
+            try:
+                observed = datetime.strptime(f"{day} {hhmm}", "%Y-%m-%d %H-%M").replace(tzinfo=UTC)
+                timestamp = int(observed.timestamp() * 1000)
+                native = state.get("perp", state)
+                if not isinstance(native.get("marginSummary"), dict) or not isinstance(native.get("assetPositions"), list):
+                    continue
+                # An explicit server timestamp is more precise than a minute filename.
+                timestamp = max(timestamp, int(native.get("time") or timestamp))
+                if not cutoff_ms - max_age_ms <= timestamp <= cutoff_ms:
+                    continue
+                if best is None or timestamp > best[0]:
+                    best = timestamp, state, source
+            except (AttributeError, ValueError, TypeError, OverflowError):
+                continue
+    if best is None:
+        return {}, {"available": False, "reason": "no successful snapshot before cutoff within age limit"}
+    timestamp, state, source = best
+    native = state.get("perp", state)
+    dexes = state.get("hip3") or {}
+    if dexes:
+        from src.scanner import merged_clearinghouse_state
+        native = merged_clearinghouse_state("historical", dexes=list(dexes),
+                                           fetch=lambda request: dexes.get(request.get("dex"), native))
+    return native, {"available": True, "observed_at_ms": timestamp,
+                    "age_ms": cutoff_ms - timestamp, "source": source}
+
+
 def run_backtest() -> dict:
-    from src.fingerprint import load_fills, load_positions_latest
+    from src.fingerprint import load_fills
     from src.scanner import _effective_thresholds, build_candidate_fingerprint, compute_similarity
     from src.utils import load_config
 
@@ -215,6 +276,9 @@ def run_backtest() -> dict:
     report = {
         "run_at": datetime.now(UTC).isoformat(),
         "scoring_schema": th.SCORING_SCHEMA,
+        "validation_coverage": {"minimum_strangers": MIN_STRANGERS,
+                                "historical_positions_available": False,
+                                "status": "not_evaluated"},
         "older_fills": len(older),
         "recent_fills": len(recent),
         "older_distinct_days": older_days,
@@ -275,9 +339,14 @@ def run_backtest() -> dict:
               "the scorer. Alerting still runs on config thresholds.")
         return report
 
-    positions = load_positions_latest()
-    if isinstance(positions, dict) and "assetPositions" not in positions:
-        positions = positions.get("perp", positions)
+    older_positions, older_coverage = load_state_asof(max(f["time"] for f in older))
+    recent_positions, recent_coverage = load_state_asof(max(f["time"] for f in recent))
+    positions_available = bool(older_coverage["available"] and recent_coverage["available"]
+                              and older_coverage["observed_at_ms"] != recent_coverage["observed_at_ms"])
+    report["validation_coverage"] = {
+        "minimum_strangers": MIN_STRANGERS, "historical_positions_available": positions_available,
+        "older_positions": older_coverage, "recent_positions": recent_coverage,
+    }
     # Resolved once and threaded through: compute_similarity would otherwise
     # re-read backtest.json for every stranger it scores.
     config = load_config()
@@ -292,36 +361,32 @@ def run_backtest() -> dict:
     recent_orders = orders_in_window(all_orders, recent)
 
     # Same account on both sides is legitimate: it IS the same account.
-    target_fp = build_candidate_fingerprint(recent, positions, orders=recent_orders)
-    self_fp = build_candidate_fingerprint(older, positions, orders=older_orders)
+    target_fp = build_candidate_fingerprint(recent, recent_positions, orders=recent_orders)
+    self_fp = build_candidate_fingerprint(older, older_positions, orders=older_orders)
+    if not positions_available:
+        target_fp["excluded_dimensions"] = ["account_size", "leverage_profile"]
+        self_fp["excluded_dimensions"] = ["account_size", "leverage_profile"]
     self_score, self_dims, self_evidence = compute_similarity(target_fp, self_fp, eff)
 
-    # Strangers: fingerprint summaries from the latest scan sweep
+    # Fixed membership was selected before the trial, independently of scores.
+    # Only dated profiles observed before the cutoff may enter this lineup.
+    from src.evaluation_cohort import load_cohort_asof
+    cohort_rows, cohort = load_cohort_asof(DATA_DIR / '.local' / 'discovery.sqlite3',
+        max(f['time'] for f in recent), trial_start_ms=min(f['time'] for f in older))
+    report['heldout_cohort'] = cohort
+    report['validation_basis'] = 'fixed_heldout_asof'
     strangers = []
-    scans_path = DATA_DIR / "scans" / "latest.json"
-    if scans_path.exists():
-        try:
-            with open(scans_path) as f:
-                scan = json.load(f)
-            for r in stranger_results(scan, config["target_wallet"]):
-                cand_fp = r.get("fingerprint")
-                if not cand_fp:
-                    continue
-                # Give strangers the same dimension the target gets. Scoring the
-                # self-match on order_profile while strangers lack it would
-                # hand the target a dimension nobody else could earn - the same
-                # inflation the window split exists to prevent, arriving by a
-                # different door.
-                if "order_profile" not in cand_fp:
-                    from src.fingerprint import compute_order_profile
-                    from src.scanner import get_candidate_orders
-                    cand_fp = dict(cand_fp)
-                    cand_fp["order_profile"] = compute_order_profile(
-                        get_candidate_orders(r["wallet"]))
-                s, _, _ = compute_similarity(target_fp, cand_fp, eff)
-                strangers.append({"wallet": r["wallet"], "score": s})
-        except Exception as e:
-            print(f"[backtest] Could not score strangers: {e}")
+    excluded = {config['target_wallet'].lower(), *(w.lower() for w in config.get('known_self_wallets', []))}
+    for r in cohort_rows:
+        cand_fp = r.get('fingerprint')
+        wallet = r.get('wallet', '').lower()
+        if not cand_fp or wallet in excluded or any(row['wallet'] == wallet for row in strangers):
+            continue
+        s, dims, _ = compute_similarity(target_fp, cand_fp, eff)
+        strangers.append({'wallet': wallet, 'score': s,
+                          'independent_sessions': cand_fp.get('episode_profile', {}).get('session_count', 0),
+                          'as_of_ms': r.get('as_of_ms'),
+                          'feature_mask': sorted(k for k, value in dims.items() if value is not None)})
 
     strangers.sort(key=lambda s: s["score"], reverse=True)
     best_stranger = strangers[0]["score"] if strangers else None
@@ -340,7 +405,19 @@ def run_backtest() -> dict:
                         f"history: {', '.join(zeros)}")
     if vetoes:
         failures.append(f"self-match tripped style vetoes: {vetoes}")
-    passed = not failures
+    unsupported = []
+    if not cohort.get('eligible'):
+        unsupported.append(cohort.get('reason', 'no eligible fixed held-out cohort'))
+    if any(row['independent_sessions'] < 5 for row in strangers):
+        unsupported.append('held-out profiles need at least five independent trading sessions')
+    if len(strangers) < MIN_STRANGERS:
+        unsupported.append(f"only {len(strangers)} independent strangers; need {MIN_STRANGERS}")
+    if not positions_available:
+        unsupported.append("historical positions unavailable: account-state dimensions not validated")
+    self_mask = sorted(k for k, value in self_dims.items() if value is not None)
+    if any(row["feature_mask"] != self_mask for row in strangers):
+        unsupported.append("target and negative cohort have unequal feature availability")
+    passed = None if unsupported else not failures
 
     report.update({
         "self_score": self_score,
@@ -355,6 +432,10 @@ def run_backtest() -> dict:
         "margin_over_best_stranger": margin,
         "failures": failures,
         "passed": passed,
+        "unsupported": unsupported,
+        "reason": "; ".join(unsupported) if unsupported else None,
+        "feature_mask": self_mask,
+        "last_validated": _previous_validation() if unsupported else None,
     })
     _save(report)
 
@@ -364,7 +445,7 @@ def run_backtest() -> dict:
     # arrive. Say it out loud instead. Weekly cooldown — it fails every run until
     # someone changes the scorer, and repeating it daily would train the operator
     # to ignore it.
-    if not passed:
+    if passed is False:
         try:
             from src.alerts import alert_scorer_unreliable
             alert_scorer_unreliable(self_score, best_stranger, margin, rank,
@@ -374,7 +455,7 @@ def run_backtest() -> dict:
             print(f"[backtest] could not raise scorer alert: "
                   f"{type(exc).__name__}: {exc}")
 
-    status = "PASS" if passed else "FAIL"
+    status = "INCONCLUSIVE" if passed is None else "PASS" if passed else "FAIL"
     print(f"[backtest] {status}: self-match {self_score:.4f}, rank {rank} "
           f"of {len(strangers) + 1}, margin {margin}")
     for f in failures:

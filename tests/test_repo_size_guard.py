@@ -99,3 +99,11 @@ def test_main_exits_nonzero_only_on_a_hard_violation(tmp_path, capsys):
     assert rs.main([str(tmp_path)]) == 1
     out = capsys.readouterr().out
     assert "data/huge.json" in out and "100 MiB" in out
+def test_local_discovery_database_and_ignored_test_artifacts_are_not_git_blobs(tmp_path):
+    from scripts.check_repo_size import scan
+    for relative in ('data/.local/discovery.sqlite3', '.superpowers/sdd/replay/large.json'):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('wb') as handle:
+            handle.truncate(101 * 1024 * 1024)
+    assert scan(tmp_path)['ok'] is True

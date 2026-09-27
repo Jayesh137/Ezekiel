@@ -14,17 +14,21 @@ Measured 2026-09-10 this separates the target from every current lead:
 He places immediate-or-cancel slices by hand. They are bots.
 """
 
+from itertools import count
+
 import pytest
 
 from src.fingerprint import compute_order_profile
 from src.scanner import compare_order_profile
+
+_IDS = count(1)
 
 
 def _order(status="filled", order_type="Limit", tif="Ioc", **over):
     o = {"coin": "BTC", "orderType": order_type, "tif": tif,
          "reduceOnly": False, "isTrigger": False, "cloid": None}
     o.update(over)
-    return {"oid": 1, "order": o, "status": status}
+    return {"oid": next(_IDS), "order": o, "status": status}
 
 
 def test_profile_measures_the_submission_habits():

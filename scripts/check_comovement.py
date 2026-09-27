@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Who moves first: roster candidates against the target's recent decisions.
-
-A copier follows the target's fills; a second account run by the same hand
-moves with them or before them. One fills call per candidate over the same
-21-day window the scanner uses. Evidence for the roster, and a HIGH alert on
-a same-hand verdict — the one behavioural reading a copy-trader cannot fake.
-"""
+"""Compare observed decision timing; experimental patterns never alert alone."""
 
 import json
 import sys
@@ -126,7 +120,7 @@ def main() -> int:
     for wallet, r in list(report["results"].items())[:10]:
         print(f"[comovement]   {wallet[:12]}... {r['verdict']:<12} pairs={r.get('pairs', 0):<4} "
               f"lead={r.get('lead_share')} excess={r.get('excess')} — {r['reason']}")
-        if r["verdict"] == "same_hand":
+        if r["verdict"] == "same_hand" and r.get('promotable') is True:
             alert_same_hand(wallet, r)
     return 0
 

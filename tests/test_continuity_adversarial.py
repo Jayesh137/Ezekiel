@@ -359,7 +359,7 @@ def test_rejected_service_cannot_promote_without_reclassification():
     again = ct.lifecycle_state(is_service=False, on_path=True, transfer_count=9,
                                funded_by_target=True, has_unbroken_path=True,
                                trades_after_funding=True, confidence=0.99,
-                               families=[ct.FAMILY_FLOW, ct.FAMILY_FUNDING],
+                               families=[ct.FAMILY_FLOW, ct.FAMILY_BEHAVIOUR],
                                disposition_alert=True)
     assert again["state"] == ct.LIFECYCLE_HIGH_CONFIDENCE
 
@@ -528,7 +528,7 @@ def test_family_cap_blocks_corroboration_by_correlated_signals():
     flow_only = ct.score_continuity({
         "amount_similarity": 1.0, "temporal_proximity": 1.0,
         "split_merge": 1.0, "value_retained": 1.0})
-    assert flow_only["families"] == [ct.FAMILY_FLOW]
+    assert flow_only["families"] == ['financial']
     assert flow_only["confidence"] <= ct.FAMILY_CAP
     assert any("needs 2 independent families" in b for b in flow_only["blockers"])
 
@@ -546,7 +546,7 @@ def test_single_transfer_or_volume_alone_never_promotes():
 
 def test_one_behavioural_match_alone_never_promotes():
     s = ct.score_continuity({"behavioural": 1.0})
-    assert s["families"] == [ct.FAMILY_BEHAVIOUR]
+    assert s["families"] == ['behaviour']
     assert s["blockers"]
     life = ct.lifecycle_state(on_path=True, funded_by_target=True,
                               has_unbroken_path=True, trades_after_funding=True,
@@ -579,7 +579,7 @@ def test_contradictory_behaviour_blocks_promotion():
 def test_lifecycle_is_deterministic_and_idempotent():
     kw = dict(on_path=True, transfer_count=4, funded_by_target=True,
               has_unbroken_path=True, trades_after_funding=True, confidence=0.72,
-              families=[ct.FAMILY_FLOW, ct.FAMILY_FUNDING], disposition_alert=True)
+              families=[ct.FAMILY_FLOW, ct.FAMILY_BEHAVIOUR], disposition_alert=True)
     runs = [ct.lifecycle_state(**kw) for _ in range(5)]
     assert all(r == runs[0] for r in runs)
     assert runs[0]["state"] == ct.LIFECYCLE_HIGH_CONFIDENCE
@@ -607,7 +607,7 @@ def test_dormancy_is_reported_even_when_it_does_not_demote():
     tracker that hides the silence misleads about where the trader is now."""
     kw = dict(on_path=True, transfer_count=4, funded_by_target=True,
               has_unbroken_path=True, trades_after_funding=True, confidence=0.72,
-              families=[ct.FAMILY_FLOW, ct.FAMILY_FUNDING], disposition_alert=True)
+              families=[ct.FAMILY_FLOW, ct.FAMILY_BEHAVIOUR], disposition_alert=True)
     quiet = ct.lifecycle_state(**kw, days_inactive=200)
     assert quiet["state"] == ct.LIFECYCLE_HIGH_CONFIDENCE, "a strong lead survives"
     assert quiet["dormant"] is True and quiet["days_inactive"] == 200

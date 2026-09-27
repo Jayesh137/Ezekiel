@@ -7,7 +7,7 @@ touches Hyperliquid, and the event carries identities the rest of the project
 could only infer:
 
 - `MessageReceived` — a deposit INTO Hyperliquid. Its burn message names the
-  source domain, the `messageSender` who burned USDC on the source chain (an
+  source domain, the `messageSender` who called the burn on the source chain (an
   EVM address, or a Solana pubkey, as bytes32), the amount, and hook data
   tagged `cctp-forward` naming the HyperCore account credited.
 - `MessageSent` — a withdrawal OUT of Hyperliquid (`sendToEvmWithData`). Its
@@ -31,6 +31,10 @@ Two tripwires come out of it, both observed transfers rather than inferences:
   sentinel's logic, read from the Hyperliquid side.
 
 Pure: scripts/check_circle_flows.py does the I/O.
+
+`messageSender` can be a router. It is not necessarily the original funder.
+The decoded hook names an instructed recipient; credit confirmation needs a
+forwarding event or HyperCore ledger observation. Historical indexing can lag.
 """
 
 MESSAGE_TRANSMITTER_V2 = "0x81d40f21f12a8f0e3252bccb954d722d4c464b64"
@@ -100,6 +104,13 @@ def decode_received(log: dict) -> dict | None:
         return None
     return {
         "direction": "in", "domain": domain,
+        "event_id": f"hyperevm:{log.get('transactionHash')}:{log.get('logIndex', 'received')}",
+        "protocol_message_id": f"{domain}:{topics[2].lower()}" if len(topics) > 2 else None,
+        "protocol_id_verified": len(topics) > 2 and topics[2].lower() != "0x" + "0" * 64,
+        "message_sender": body["message_sender"], "original_funder": None,
+        "protocol_sender_raw": "0x" + _word(h, 1),
+        "burn_token": body["burn_token"], "mint_recipient": body["mint_recipient"],
+        "credit_confirmed": False,
         "chain": CCTP_DOMAINS.get(domain, f"domain-{domain}"),
         "counterparty": body["message_sender"],
         "counterparty_raw": body["message_sender_raw"],
@@ -141,6 +152,11 @@ def decode_sent(log: dict) -> dict | None:
         return None
     return {
         "direction": "out", "domain": destination,
+        "event_id": f"hyperevm:{log.get('transactionHash')}:{log.get('logIndex', 'sent')}",
+        "protocol_message_id": f"{source}:0x{message[24:88]}" if int(message[24:88], 16) else None,
+        "protocol_id_verified": bool(int(message[24:88], 16)),
+        "message_sender": body["message_sender"], "original_funder": None,
+        "burn_token": body["burn_token"], "mint_recipient": body["mint_recipient"],
         "chain": CCTP_DOMAINS.get(destination, f"domain-{destination}"),
         "counterparty": body["mint_recipient"],
         "counterparty_raw": body["mint_recipient_raw"],

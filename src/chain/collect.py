@@ -564,7 +564,7 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
     # Without a key every request returns "Invalid API Key", which would burn
     # the whole budget producing nothing while looking like a rate-limit
     # problem. Named skip instead, matching expand_frontier's existing pattern.
-    if not os.environ.get("ETHERSCAN_API_KEY"):
+    if not os.environ.get("ETHERSCAN_API_KEY") and not any(c.get("reader") == "blockscout" for c in chains):
         result["status"] = "skipped_no_api_key"
         for chain in chains:
             blank = _blank_chain_result()
@@ -578,6 +578,11 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
         name = chain["name"]
         chain_result = _blank_chain_result()
         result["chains"][name] = chain_result
+        chain_result["reader"] = chain.get("reader", "etherscan")
+        if not os.environ.get("ETHERSCAN_API_KEY") and chain.get("reader") != "blockscout":
+            chain_result["error"] = "skipped_no_api_key"
+            result["unsupported_sources"].append(name)
+            continue
 
         # Already settled this run: report it, spend nothing.
         if plan_refused is not None and name in plan_refused:
@@ -611,8 +616,17 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             key = f"{name}:{addr}:{kind}"
             start = int(cursors.get(key, 0) or 0)
             before = budget.calls_used
+            reader_args = {}
+            if chain.get('reader') == 'blockscout':
+                pending = dict(cursors.get(key + ':backfill') or {})
+                reader_args['continuation'] = pending
             walk, error = fetch_kind(addr, chain, kind, start, budget,
-                                     page_size=page_size, max_pages=max_pages)
+                                     page_size=page_size, max_pages=max_pages, **reader_args)
+            if reader_args:
+                if pending:
+                    cursors[key + ':backfill'] = pending
+                else:
+                    cursors.pop(key + ':backfill', None)
             chain_result["calls"] += budget.calls_used - before
             chain_result["gaps"].extend(walk.possible_gaps)
             chain_result["truncated"] = chain_result["truncated"] or walk.truncated
@@ -651,7 +665,7 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             # page comes back short, which says what the API returned, not what
             # exists — see client.newest_block for the live case where those
             # differed by 220 million blocks and nothing noticed.
-            if error is None and cluster:
+            if error is None and (cluster or chain.get('reader') == 'blockscout'):
                 newest, probe_err = newest_block(addr, chain, kind, budget)
                 chain_result["calls"] += 1
                 if probe_err:

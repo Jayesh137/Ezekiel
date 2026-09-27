@@ -11,7 +11,8 @@ detected, they're lost. Everything runs on free tiers.
 
 ## How it works
 
-Three independent detection vectors feed one risk posture:
+Several observation families feed the discovery process. Reports sharing the
+same underlying event count as dependent evidence:
 
 | Vector | Modules | Watches |
 |---|---|---|
@@ -25,6 +26,21 @@ grades each discovered wallet. `risk.py` collapses everything into a 0–100 sco
 Storage is JSON files committed to this repo; the dashboard reads them directly
 over `raw.githubusercontent.com`, so there is no server.
 
+The wallet-discovery improvements also observe public market participants outside
+the leaderboard, preserve small deposits and historical authority, join exact
+funding routes, revisit transfer recipients, and compare trading episodes and
+possible successor accounts. Raw discovery history uses an ignored SQLite store
+and bounded workflow artifacts; only small reports are committed. The scanner
+owns the checkpoint, while watch and trace jobs hand it observation batches.
+
+Use **Investigations** in the dashboard (also linked from phone Review) for each
+lead's evidence, alternative explanations and next useful check. Coverage,
+failed reads and unresolved routes stay visible. Research ranks are not ownership
+probabilities. No OpenAI API, AI model calls or paid data plan is required.
+See [discovery operations](docs/discovery-operations.md) for free polling, optional
+streaming, offline import/replay, persistence and recovery. These workflows must
+be present on the scheduled branch before the new collectors run there.
+
 ## Setup (Windows / PowerShell)
 
 Requires Python 3.12 and Node 22.
@@ -35,7 +51,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 1539 passed
+.\.venv\Scripts\python.exe -m pytest -q          # full offline regression suite
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
@@ -76,10 +92,10 @@ cd dashboard; npm run dev                         # dashboard at localhost:5173
 Before trusting a change to scoring or matching:
 
 1. `pytest -q` — all green.
-2. `python src/backtest.py` — must PASS. It exits non-zero if the scorer can't
-   rank the trader above every stranger, or if any dimension scores **0.0**
-   against their own history. `None` means "excluded, too little data" and is
-   fine; a hard `0.0` is always a bug — it votes against the real trader.
+2. `python src/backtest.py` — inspect the verdict and coverage. A new installation
+   remains inconclusive until dated, fixed control profiles and matched features
+   support the trial. Inconclusive is not a pass. A supported failed trial exits
+   non-zero; investigate its dimensions before enabling behavioural promotion.
 3. `python src/heartbeat.py` — exits non-zero when data is stale.
 4. `npm run build` in `dashboard/`.
 

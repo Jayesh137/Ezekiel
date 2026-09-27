@@ -1226,7 +1226,7 @@ def alert_circle_flow(kind: str, row: dict, hl_state: dict | None) -> bool:
         f"{hl_line}\n"
         f"Read from Circle's MessageTransmitter events on HyperEVM: both ends are\n"
         f"named by the protocol, not inferred. An account he funds, or that pays\n"
-        f"him, is his until shown otherwise - but a transfer is still not ownership.\n"
+        f"him, is a financial association to investigate; a transfer does not establish ownership.\n"
     )
     key = f"circle_{kind}_{(row.get('tx_hash') or '').lower()}"
     return _send_with_cooldown(key, 168, subject, body)
@@ -1294,19 +1294,20 @@ def alert_watchlist_change(wallet: str, changes: list, why: str | None = None) -
 
 
 def alert_same_hand(wallet: str, result: dict) -> bool:
-    """Fire when a wallet's decisions lead or tie the target's too often to be a copier."""
-    subject = "[EZEKIEL] HIGH: Wallet Moves With or Before the Target (not a copier)"
+    """Notify only when a separately validated promotion policy permits it."""
+    if result.get('promotable') is not True:
+        return False
+    subject = "[EZEKIEL] HIGH: Leading Trade-Timing Pattern to Investigate"
     body = (
         f"{address_line(wallet, 'Wallet')}\n"
-        f"Paired decisions: {result.get('pairs')} (excess over a day-shifted control "
+        f"Paired decisions: {result.get('pairs')} (excess over shifted controls "
         f"{result.get('excess'):+.2f})\n"
         f"Leads or ties the target: {result.get('lead_share'):.0%}\n"
         f"Median lag: {result.get('median_lag_min')} min\n"
         f"Coins: {', '.join(result.get('coins') or [])[:200]}\n\n"
-        f"A copy-trader reacts after the target's fills reach the tape. A wallet\n"
-        f"that moves first, this often, is either the same hand or shares his\n"
-        f"signal source. Corroborate with flow, a shared deposit address, an\n"
-        f"agent or an explicit link before concluding.\n"
+        f"Timing can reflect common news, shared signals or execution software.\n"
+        f"Review independent funding and protocol observations. This pattern\n"
+        f"does not establish common ownership.\n"
     )
     return _send_with_cooldown(f"same_hand_{wallet.lower()}", 72, subject, body)
 

@@ -20,8 +20,8 @@ def load_config():
 
 # --- Hyperliquid API ---
 
-def hl_post(request_body: dict, retries: int = 3) -> dict | list:
-    """POST to Hyperliquid info endpoint with retry on rate limit."""
+def hl_read(request_body: dict, retries: int = 3) -> dict:
+    """A successful empty response is different from a failed observation."""
     config = load_config()
     last_error = None
     for attempt in range(retries):
@@ -34,12 +34,14 @@ def hl_post(request_body: dict, retries: int = 3) -> dict | list:
                 timeout=(10, 30),
             )
             if resp.status_code == 429:
+                last_error = "rate limited"
                 wait = 2 ** (attempt + 1)
                 print(f"[api] Rate limited, waiting {wait}s...")
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
-            return resp.json()
+            return {"ok": True, "data": resp.json(), "error": None,
+                    "observed_at": datetime.now(UTC).isoformat(), "attempts": attempt + 1}
         except requests.exceptions.Timeout:
             last_error = f"Timeout on attempt {attempt + 1}"
             print(f"[api] {last_error} for {request_body.get('type', 'unknown')}")
@@ -48,7 +50,18 @@ def hl_post(request_body: dict, retries: int = 3) -> dict | list:
             print(f"[api] Error on attempt {attempt + 1}: {e}")
             if attempt < retries - 1:
                 time.sleep(2 ** attempt)
+        except ValueError as exc:
+            last_error = f"Invalid JSON: {exc}"
     print(f"[api] All {retries} attempts failed for {request_body.get('type', 'unknown')}: {last_error}")
+    return {"ok": False, "data": None, "error": last_error,
+            "observed_at": datetime.now(UTC).isoformat(), "attempts": retries}
+
+
+def hl_post(request_body: dict, retries: int = 3) -> dict | list:
+    """Compatibility interface; new observers should use hl_read."""
+    result = hl_read(request_body, retries=retries)
+    if result["ok"]:
+        return result["data"]
     return [] if "user" in str(request_body.get("type", "")) else {}
 
 # --- Etherscan V2 API ---

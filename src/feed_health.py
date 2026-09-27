@@ -37,6 +37,9 @@ OTHER_FEEDS = {
     "behavioural scan": ("scans/latest.json", "scan_time", 720),
     "amount correlation": ("correlations/latest.json", "computed_at", 2_160),
     "migration risk": ("risk/latest.json", "computed_at", 360),
+    "public wallet discovery": ("discovery/latest.json", "last_successful_read_ms", 720),
+    "funding route index": ("routes/latest.json", "computed_at_ms", 720),
+    "successor investigations": ("investigations/latest.json", "computed_at_ms", 720),
 }
 GROUPS = {"watch": WATCH_FEEDS, "other": OTHER_FEEDS}
 
@@ -128,6 +131,15 @@ def _dormancy(doc: dict):
     return "0 candidates scored" if doc.get("candidates_scored") == 0 else None
 
 
+def _discovery(doc: dict):
+    run = doc.get('last_run') or {}
+    if run.get('status') == 'error':
+        return 'every requested public market read failed'
+    if run.get('rejected', 0) and not (run.get('inserted', 0) or run.get('duplicates', 0)):
+        return 'public market rows could not be ingested'
+    return None
+
+
 # feed name -> a function answering "is this fresh reading blind?" with a reason.
 BLIND_CHECKS = {
     "close watch": _watch,
@@ -139,13 +151,15 @@ BLIND_CHECKS = {
     "dormancy handoff": _dormancy,
     "behavioural scan": _scan,
     "amount correlation": _correlation,
+    "public wallet discovery": _discovery,
 }
 
 
 def _age_minutes(stamp, now: datetime) -> float | None:
     try:
-        when = datetime.fromisoformat(str(stamp))
-    except (TypeError, ValueError):
+        when = (datetime.fromtimestamp(stamp / 1000, UTC) if isinstance(stamp, (int, float))
+                and not isinstance(stamp, bool) else datetime.fromisoformat(str(stamp)))
+    except (TypeError, ValueError, OverflowError, OSError):
         return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)

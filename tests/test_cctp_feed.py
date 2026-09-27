@@ -30,6 +30,29 @@ def _credit(t_ms, amount):
                       "usdcValue": str(amount), "user": SYS, "destination": F, "fee": "0.0"}}
 
 
+def test_same_timestamp_saturation_is_reported_without_skipping(monkeypatch):
+    monkeypatch.setattr(cf, "PAGE_ROWS", 2)
+    rows = [_send(1000, "0x" + "1" * 40, 200_000, h="a"),
+            _send(1000, "0x" + "2" * 40, 200_000, h="b")]
+    _deposits, cursor, error = cf.walk(lambda body: rows, F, 0, 3000, excluded=set(), max_calls=3)
+    assert cursor == 1000
+    assert "saturat" in error
+
+
+def test_small_circle_deposit_is_retained_in_cheap_store(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    wallet = "0x" + "2" * 40
+    def post(body):
+        if body["type"] == "spotMeta":
+            return {"tokens": [{"index": 0, "evmContract": {"address": F}}]}
+        return [_send(10_000, wallet, 5)]
+    db = tmp_path / "discovery.sqlite3"
+    cf.refresh_pool(post, excluded=set(), now_ms=20_000, path=tmp_path / "pool.json",
+                    discovery_path=db, sleep=_nosleep)
+    with DiscoveryStore(db) as store:
+        assert store.observations("cctp_deposits")[0]["wallet"] == wallet
+
+
 # --- parse_page -------------------------------------------------------------
 
 def test_a_page_yields_the_forwarders_large_usdc_sends_to_fresh_accounts():
@@ -63,13 +86,13 @@ def _venue(pages):
 def test_walk_advances_past_full_pages_and_stops_at_a_short_one():
     full = [_send(10_000 + i, f"0x{i + 1:040x}", 100_000) for i in range(cf.PAGE_ROWS)]
     tail = [_send(20_000, "0xlast", 100_000, h="0xlast")]
-    post, calls = _venue({0: full, 10_000 + cf.PAGE_ROWS - 1 + 1: tail})
+    post, calls = _venue({0: full, 10_000 + cf.PAGE_ROWS - 1: [full[-1], *tail]})
 
     deposits, cursor, err = cf.walk(post, F, 0, 99_999, excluded=set(), max_calls=10)
 
     assert err is None and cursor == 99_999
     assert len(deposits) == cf.PAGE_ROWS + 1
-    assert [c["startTime"] for c in calls] == [0, 10_000 + cf.PAGE_ROWS]
+    assert [c["startTime"] for c in calls] == [0, 10_000 + cf.PAGE_ROWS - 1]
     assert all(c["endTime"] == 99_999 and c["user"] == F for c in calls)
 
 
@@ -80,7 +103,7 @@ def test_walk_reports_an_exhausted_budget_and_keeps_the_cursor_where_it_stopped(
     deposits, cursor, err = cf.walk(post, F, 0, 99_999, excluded=set(), max_calls=1)
 
     assert "call budget (1) exhausted" in err and "incomplete" in err
-    assert cursor == 10_000 + cf.PAGE_ROWS          # the next unread millisecond
+    assert cursor == 10_000 + cf.PAGE_ROWS - 1     # overlap the last observed millisecond
     assert len(deposits) == cf.PAGE_ROWS and len(calls) == 1
 
 
@@ -95,11 +118,11 @@ def test_walk_reports_a_non_list_answer_as_unreadable_not_empty():
     assert cursor == 5 and "ConnectionError" in err
 
 
-def test_walk_always_moves_forward_when_a_whole_page_shares_one_timestamp():
+def test_walk_checks_same_timestamp_boundary_before_moving_forward():
     same = [_send(500, f"0x{i + 1:040x}", 100_000) for i in range(cf.PAGE_ROWS)]
-    post, calls = _venue({0: same, 501: []})
+    post, calls = _venue({0: same, 500: []})
     deposits, cursor, err = cf.walk(post, F, 0, 99_999, excluded=set(), max_calls=5)
-    assert err is None and [c["startTime"] for c in calls] == [0, 501]
+    assert err is None and [c["startTime"] for c in calls] == [0, 500]
 
 
 def test_walk_reads_nothing_when_already_at_the_present():

@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
+from src.episodes import build_episodes, compact_profile, episode_profile, regime_profiles
+from src.thresholds import SCORING_SCHEMA
 from src.utils import DATA_DIR, load_all_records, load_config, save_latest
 
 
@@ -138,6 +140,38 @@ def _sig(value: float, digits: int = 6) -> float:
     return float(f"%.{digits}g" % value)
 
 
+def normalise_orders(orders: list[dict], *, start_ms: float | None = None,
+                     end_ms: float | None = None) -> list[dict]:
+    """Latest observed lifecycle per account/order, without using future statuses."""
+    latest = {}
+    for index, rec in enumerate(orders or []):
+        if not isinstance(rec, dict) or not isinstance(rec.get("order"), dict):
+            continue
+        order = rec["order"]
+        raw_time = rec.get("statusTimestamp") or order.get("timestamp")
+        try:
+            timestamp = float(raw_time) if raw_time is not None else None
+        except (TypeError, ValueError, OverflowError):
+            timestamp = None
+        if timestamp is not None and not math.isfinite(timestamp):
+            timestamp = None
+        if (start_ms is not None or end_ms is not None) and timestamp is None:
+            continue
+        if (start_ms is not None and timestamp < start_ms) or (end_ms is not None and timestamp > end_ms):
+            continue
+        oid = order.get("oid", rec.get("oid"))
+        identity = (str(rec.get("wallet") or rec.get("user") or "").lower(), str(oid)) \
+            if oid is not None else ("anonymous", str(index))
+        # Equal timestamps occur in stored repeated snapshots. Terminal status
+        # takes precedence over open; a stable tie avoids input-order effects.
+        status = str(rec.get("status") or "unknown")
+        terminal = status.lower() == "filled" or status.lower().endswith(("canceled", "cancelled", "rejected", "expired"))
+        rank = (timestamp or 0, terminal, status)
+        if identity not in latest or rank > latest[identity][0]:
+            latest[identity] = (rank, rec)
+    return [item[1] for item in latest.values()]
+
+
 def compute_order_profile(orders: list[dict]) -> dict:
     """How a trader OPERATES, from the orders themselves rather than the fills.
 
@@ -151,9 +185,8 @@ def compute_order_profile(orders: list[dict]) -> dict:
       tif         Gtc / Alo / Ioc / FrontendMarket — a UI-vs-API tell.
       reduceOnly  whether closes are flagged, which is a discipline.
       isTrigger   TP/SL usage, a risk habit rather than a directional one.
-      cloid       a client order id means PROGRAMMATIC placement. Whether
-                  someone trades by hand or through their own code is one of
-                  the most durable things about them.
+      cloid       client-ID use can describe execution tooling; its absence
+                  does not prove manual trading or identify a person.
 
     Deliberately distinct from `entry_exit_style`, which infers a market/limit
     ratio from fills. This reads what was actually submitted.
@@ -165,7 +198,7 @@ def compute_order_profile(orders: list[dict]) -> dict:
     reduce_only = 0
     triggers = 0
     with_cloid = 0
-    for rec in orders or []:
+    for rec in normalise_orders(orders):
         o = rec.get("order") if isinstance(rec, dict) else None
         if not isinstance(o, dict):
             continue
@@ -187,14 +220,17 @@ def compute_order_profile(orders: list[dict]) -> dict:
     def dist(counter):
         return {k: round(v / total, 4) for k, v in counter.most_common(12)}
 
-    filled = status.get("filled", 0)
+    cancelled = sum(n for name, n in status.items() if name.lower().endswith(("canceled", "cancelled")))
+    terminal = cancelled + sum(n for name, n in status.items()
+                              if name.lower() == "filled" or name.lower().endswith(("rejected", "expired")))
     return {
         "weight": 0.10,
         "orders": total,
         "status_mix": dist(status),
         "order_type_mix": dist(order_type),
         "tif_mix": dist(tif),
-        "cancel_rate": round(1.0 - (filled / total), 4),
+        "cancel_rate": round(cancelled / terminal, 4) if terminal else None,
+        "terminal_orders": terminal,
         "reduce_only_rate": round(reduce_only / total, 4),
         "trigger_rate": round(triggers / total, 4),
         "programmatic_rate": round(with_cloid / total, 4),
@@ -706,6 +742,8 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
     if fills is None:
         fills = load_fills()
     funding = load_funding()
+    orders = load_orders()
+    episodes = build_episodes(fills, orders)
     positions = load_positions_latest()
 
     # Use perp positions if available
@@ -729,6 +767,7 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
 
     fingerprint = {
         "version": "1.0",
+        "scoring_schema": SCORING_SCHEMA,
         "computed_at": datetime.now(UTC).isoformat(),
         "data_range": data_range,
         "asset_preferences": compute_asset_preferences(fills),
@@ -741,7 +780,9 @@ def build_fingerprint(fills: list[dict] | None = None) -> dict:
         "trade_sequencing": compute_trade_sequencing(fills),
         "account_characteristics": compute_account_characteristics(positions, fills),
         "style_profile": compute_style_profile(fills),
-        "order_profile": compute_order_profile(load_orders()),
+        "order_profile": compute_order_profile(orders),
+        'episode_profile': compact_profile(episode_profile(episodes)),
+        'episode_regimes': [{**r, 'profile': compact_profile(r['profile'])} for r in regime_profiles(episodes)[-12:]],
     }
 
     return fingerprint
@@ -751,10 +792,14 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
     """Build a fingerprint from only the most recent fills.
     Used by the scanner for fair apples-to-apples comparison with candidate mini-fingerprints
     (which are also built from a short lookback window)."""
-    cutoff_ms = (_time.time() - lookback_days * 86400) * 1000
-    recent = [f for f in fills if f.get("time", 0) >= cutoff_ms]
+    end_ms = _time.time() * 1000
+    cutoff_ms = end_ms - lookback_days * 86_400_000
+    recent = [f for f in fills if cutoff_ms <= f.get("time", 0) <= end_ms]
     if len(recent) < 20:
         return {}
+
+    orders = normalise_orders(load_orders(), start_ms=cutoff_ms, end_ms=end_ms)
+    episodes = build_episodes(recent, orders)
 
     positions = load_positions_latest()
     if isinstance(positions, dict) and "assetPositions" not in positions:
@@ -763,6 +808,7 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
 
     return {
         "version": "1.0-recent",
+        "scoring_schema": SCORING_SCHEMA,
         "computed_at": datetime.now(UTC).isoformat(),
         "lookback_days": lookback_days,
         "data_range": {"total_fills": len(recent)},
@@ -775,6 +821,9 @@ def build_fingerprint_recent(fills: list[dict], lookback_days: int = 21) -> dict
         "trade_sequencing": compute_trade_sequencing(recent),
         "account_characteristics": compute_account_characteristics(positions, recent),
         "style_profile": compute_style_profile(recent),
+        "order_profile": compute_order_profile(orders),
+        'episode_profile': compact_profile(episode_profile(episodes)),
+        'episode_regimes': [{**r, 'profile': compact_profile(r['profile'])} for r in regime_profiles(episodes)],
     }
 
 

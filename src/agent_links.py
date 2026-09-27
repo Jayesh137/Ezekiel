@@ -7,9 +7,9 @@ can be a payment to a stranger, an amount match can be coincidence, and a tradin
 style can be imitated — but authorising an agent is a deliberate act of control
 by the account owner.
 
-So two accounts that authorise the SAME agent address are controlled by the same
-person, near enough that this deserves to outrank everything else the system
-measures.
+Two accounts authorising the same agent share an operator. A trading service
+or delegate can operate accounts owned by different people; this is an explicit
+permission relationship, not proof of beneficial ownership.
 
 The data was already being collected and used by nothing. It was also being
 collected wrongly: `extraAgents` returns `[]` for an account with no agents,
@@ -71,7 +71,7 @@ def normalise_agents(payload) -> list[dict]:
         out.append({
             "address": addr,
             "name": entry.get("name") if isinstance(entry, dict) else None,
-            "valid_until": entry.get("validUntil") if isinstance(entry, dict) else None,
+            "valid_until": entry.get("validUntil", entry.get("valid_until")) if isinstance(entry, dict) else None,
         })
     return out
 
@@ -103,7 +103,7 @@ def multisig_signers(payload) -> list[str] | None:
     return out
 
 
-def agent_index(by_wallet: dict) -> dict:
+def agent_index(by_wallet: dict, as_of_ms: int | None = None) -> dict:
     """agent address -> the set of accounts that authorised it.
 
     `by_wallet` maps account -> list of agent entries (or raw payloads).
@@ -114,6 +114,12 @@ def agent_index(by_wallet: dict) -> dict:
         if not w:
             continue
         for agent in normalise_agents(agents):
+            if as_of_ms is not None and agent.get("valid_until") is not None:
+                try:
+                    if int(agent["valid_until"]) <= as_of_ms:
+                        continue
+                except (TypeError, ValueError):
+                    continue
             index.setdefault(agent["address"], set()).add(w)
     return index
 
@@ -121,8 +127,7 @@ def agent_index(by_wallet: dict) -> dict:
 def shared_agents(index: dict) -> dict:
     """Agents authorised by more than one account.
 
-    The whole point of the module. An agent with two masters means those two
-    accounts are operated by the same person.
+    This identifies a shared authorised operator, which may be a service.
     """
     return {agent: sorted(accounts) for agent, accounts in (index or {}).items()
             if len(accounts) > 1}
@@ -189,9 +194,12 @@ def naming_families(by_wallet: dict) -> dict:
 
 def build_agent_links(by_wallet: dict, target: str) -> dict:
     """The full picture: index, shared agents, and anything linked to the target."""
-    index = agent_index(by_wallet)
+    stamp = datetime.now(UTC)
+    index = agent_index(by_wallet, as_of_ms=int(stamp.timestamp() * 1000))
     return {
-        "computed_at": datetime.now(UTC).isoformat(),
+        "computed_at": stamp.isoformat(),
+        "assertion": "shared_operator",
+        "confirms_owner": False,
         "target": (target or "").lower(),
         "wallets_checked": len(by_wallet or {}),
         "agents_seen": len(index),

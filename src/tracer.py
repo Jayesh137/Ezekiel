@@ -675,22 +675,13 @@ def _crossref_findings_with_candidates(findings: list[dict],
         wallet "matches the behavioral fingerprint" — live data had a candidate at
         best 0.7113 whose current score was 0.1322.
     """
-    import json as _json
+    from src.candidate_registry import iter_candidates
 
     hl_findings = [f for f in findings if f.get("deposited_to_hl")]
     if not hl_findings:
         return
 
-    candidates_path = DATA_DIR / "candidates" / "latest.json"
-    if not candidates_path.exists():
-        return
-
-    try:
-        with open(candidates_path) as f:
-            data = _json.load(f)
-        candidates = {c["wallet"].lower(): c for c in data.get("candidates", [])}
-    except Exception:
-        return
+    candidates = {c["wallet"].lower(): c for c in iter_candidates(DATA_DIR)}
 
     if eff is None:
         report = th.load_backtest_report(DATA_DIR.parent / "profile")

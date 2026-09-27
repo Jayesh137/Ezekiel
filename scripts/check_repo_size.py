@@ -24,6 +24,7 @@ looked sudden: the version on origin was 104.23 MB — 99.4 MiB — and under it
 A check written in decimal MB would have cried wolf for days and been ignored.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -38,17 +39,22 @@ MIB = 1024 * 1024
 # Never scanned: not pushed as blobs, and routinely larger than the limit.
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__",
              ".pytest_cache", ".ruff_cache", "build", ".svelte-kit"}
+LOCAL_ONLY = {('data', '.local'), ('.superpowers', 'sdd')}
 
 
 def scan(root: Path | str = ".") -> dict:
     """Every file at or above the warning band, worst first. Pure apart from I/O."""
     root = Path(root)
     over_limit, warning = [], []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if SKIP_DIRS & set(path.relative_to(root).parts):
-            continue
+    # Prune ignored trees before walking them: raw SQLite artifacts and local
+    # replay fixtures are never Git blobs and must not block JSON publication.
+    paths = []
+    for directory, subdirs, files in os.walk(root):
+        relative = Path(directory).relative_to(root).parts
+        subdirs[:] = [name for name in subdirs if name not in SKIP_DIRS
+                      and (*relative, name) not in LOCAL_ONLY]
+        paths.extend(Path(directory) / name for name in files)
+    for path in paths:
         try:
             size = path.stat().st_size
         except OSError:

@@ -11,10 +11,10 @@ FROM `0x6b9e7731…` — which is exactly the shape of the target's own 18 Circl
 deposits ($66.46M, decoded 2026-09-10 from the Arbitrum side and matched here
 from the Hyperliquid side on 2026-09-12).
 
-That makes the forwarder's ledger a complete feed of every Circle deposit
+That makes the forwarder's ledger an observable feed of Circle deposits
 into every Hyperliquid account: `userNonFundingLedgerUpdates` on it, walked
-by `startTime`, names the recipient and the amount, with no API key and no
-page ceiling. A fresh wallet funded from a CEX on Ethereum or Base and
+by `startTime`, names the recipient and the amount without a key. Retention
+and identical-timestamp page saturation can limit historical coverage. A fresh wallet funded from a CEX on Ethereum or Base and
 deposited through Circle — the CEX-gap migration this project fears most —
 enters the candidate pool through this file and nowhere else.
 
@@ -35,6 +35,7 @@ Two rules carried over from the bridge reader:
 """
 
 import json
+import math
 import sys
 import time
 from datetime import UTC, datetime
@@ -53,7 +54,7 @@ FORWARDER_FALLBACK = "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"
 # Observed page ceiling. A page this long may have more behind it.
 PAGE_ROWS = 2000
 
-# Sends below this are never stored. The pool is rewritten every run and
+# Sends below this stay in the ignored discovery store. The JSON pool is rewritten every run and
 # lives in git history, so it holds only what a consumer can use: the
 # correlator's floor is $100k, and a smaller deposit never reaches the
 # scanner's 120-wallet priority cap among thousands of larger ones.
@@ -152,7 +153,7 @@ def parse_page(rows: list, forwarder: str, excluded, floor_usd: float = STORE_FL
             ts = int(e.get("time") or 0) // 1000
         except (TypeError, ValueError):
             continue
-        if amount < floor_usd or not ts:
+        if not math.isfinite(amount) or amount <= 0 or amount < floor_usd or not ts:
             continue
         out.append({"wallet": dest, "amount": amount, "ts": ts,
                     "hash": e.get("hash"), "via": "cctp"})
@@ -162,7 +163,7 @@ def parse_page(rows: list, forwarder: str, excluded, floor_usd: float = STORE_FL
 def walk(post, forwarder: str, start_ms: int, end_ms: int, *, excluded, max_calls: int,
          floor_usd: float = STORE_FLOOR_USD, seconds: float | None = None,
          pace_seconds: float = 0.0, sleep=time.sleep,
-         clock=time.monotonic) -> tuple[list[dict], int, str | None]:
+         clock=time.monotonic, observe=None) -> tuple[list[dict], int, str | None]:
     """Read the forwarder's ledger from `start_ms` towards `end_ms`.
 
     Returns (deposits, cursor_ms, error). The cursor is the first millisecond
@@ -170,6 +171,7 @@ def walk(post, forwarder: str, start_ms: int, end_ms: int, *, excluded, max_call
     stopped. `error` is set whenever the cursor did not reach `end_ms`.
     """
     deposits: list[dict] = []
+    seen = set()
     cursor = int(start_ms)
     calls = 0
     started = clock()
@@ -188,12 +190,21 @@ def walk(post, forwarder: str, start_ms: int, end_ms: int, *, excluded, max_call
         calls += 1
         if not isinstance(rows, list):
             return deposits, cursor, f"unreadable at {cursor}: unexpected payload"
-        deposits.extend(parse_page(rows, forwarder, excluded, floor_usd))
+        if observe:
+            observe(parse_page(rows, forwarder, set(), floor_usd=0))
+        for deposit in parse_page(rows, forwarder, excluded, floor_usd):
+            identity = (deposit.get("hash"), deposit["wallet"], deposit["ts"], deposit["amount"])
+            if identity not in seen:
+                seen.add(identity)
+                deposits.append(deposit)
         if len(rows) < PAGE_ROWS:
             return deposits, int(end_ms), None
         newest = max(int(e.get("time") or 0) for e in rows if isinstance(e, dict))
-        # Always move forward, even if a whole page shared one timestamp.
-        cursor = max(cursor + 1, newest + 1)
+        # Re-read the boundary. Advancing by one millisecond can skip another
+        # deposit at that time. If the entire boundary saturates, record a gap.
+        if newest <= cursor:
+            return deposits, cursor, f"timestamp saturation at {cursor}; unread deposits may remain"
+        cursor = newest
         if pace_seconds and cursor < end_ms:
             sleep(pace_seconds)
     return deposits, int(end_ms), None
@@ -225,7 +236,8 @@ def refresh_pool(post, *, excluded, now_ms: int | None = None, pool_days: int = 
                  max_calls: int = 120, seconds: float | None = None,
                  path: Path | None = None, floor_usd: float = STORE_FLOOR_USD,
                  forwarder_fallback: str = FORWARDER_FALLBACK,
-                 pace_seconds: float = PACE_SECONDS, sleep=time.sleep) -> tuple[list[dict], str | None]:
+                 pace_seconds: float = PACE_SECONDS, sleep=time.sleep,
+                 discovery_path: Path | None = None) -> tuple[list[dict], str | None]:
     """Bring the stored pool up to the present, bounded. (deposits, error).
 
     The first run walks the whole window from `cutoff`; later runs resume
@@ -238,6 +250,10 @@ def refresh_pool(post, *, excluded, now_ms: int | None = None, pool_days: int = 
     # Resolved at call time through utils.DATA_DIR, which the test suite
     # repoints: a module-level path captured at import would write the real
     # pool from a test, as this one did once before the guard existed.
+    local_root = Path(path).parent if path is not None else utils.DATA_DIR
+    import os
+    discovery_path = (discovery_path or os.environ.get('DISCOVERY_OBSERVATION_DB')
+                      or local_root / ".local" / "discovery.sqlite3")
     path = Path(path or (utils.DATA_DIR / "correlations" / POOL_NAME))
     pool = load_pool(path)
 
@@ -248,9 +264,13 @@ def refresh_pool(post, *, excluded, now_ms: int | None = None, pool_days: int = 
         existing, cursor = [], 0
     start = max(cursor, cutoff_s * 1000)
 
-    fresh, new_cursor, error = walk(post, forwarder, start, now_ms, excluded=excluded,
-                                    max_calls=max_calls, floor_usd=floor_usd, seconds=seconds,
-                                    pace_seconds=pace_seconds, sleep=sleep)
+    from src.discovery_store import DiscoveryStore
+    with DiscoveryStore(discovery_path) as store:
+        def retain(rows):
+            store.ingest_observations("cctp_deposits", rows, now_ms)
+        fresh, new_cursor, error = walk(post, forwarder, start, now_ms, excluded=excluded,
+                                        max_calls=max_calls, floor_usd=floor_usd, seconds=seconds,
+                                        pace_seconds=pace_seconds, sleep=sleep, observe=retain)
     deposits = merge(existing, fresh, cutoff_s)
     if note:
         error = f"{note}; {error}" if error else note

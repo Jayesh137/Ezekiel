@@ -227,6 +227,12 @@ def main() -> int:
         print(f"[circle] HyperEVM unreadable: {type(exc).__name__}: {exc} — cursor kept")
         return 0
 
+    # Persist all decoded observations before advancing the JSON cursor. Small
+    # and non-cluster deposits can become useful when a later source leg joins.
+    from src.discovery_store import DiscoveryStore
+    with DiscoveryStore(utils.DATA_DIR / ".local" / "discovery.sqlite3") as store:
+        store.ingest_observations("circle", rows, int(time.time() * 1000))
+
     found = []
     for row in rows:
         kind = cf.classify(row, his_evm, his_raw, cluster)

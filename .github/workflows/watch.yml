@@ -54,7 +54,7 @@ jobs:
     # above the sum of its step timeouts (8 + 3 + 5), or a slow run is
     # CANCELLED and the commit step never persists what the others read.
     # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 + 2 = 22).
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -145,9 +145,25 @@ jobs:
       # Every writer rewrites its own file whole, so a file not updated this
       # run keeps the previous value. (Job CANCELLATION still skips this — only
       # a step-level failure is survivable.)
+      - name: Preserve observations for the discovery scanner
+        id: discovery_snapshot
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 2
+        run: python scripts/discovery_artifacts.py snapshot --kind observations
+      - uses: actions/upload-artifact@v4
+        id: observation_upload
+        if: ${{ !cancelled() && steps.discovery_snapshot.conclusion == 'success' && steps.discovery_snapshot.outputs.artifact_path != '' }}
+        with:
+          name: ${{ steps.discovery_snapshot.outputs.artifact_name }}
+          path: ${{ steps.discovery_snapshot.outputs.artifact_path }}
+          retention-days: 7
+          compression-level: 0
+          include-hidden-files: true
+          if-no-files-found: error
       - name: Commit and push
         if: always()
         run: |
+          python scripts/discovery_cursor_guard.py --producer circle --snapshot '${{ steps.discovery_snapshot.conclusion }}' --upload '${{ steps.observation_upload.conclusion }}' --artifact '${{ steps.observation_upload.outputs.artifact-id }}'
           # Before anything else: a blob over 100 MiB is refused by GitHub's
           # pre-receive hook, which fails the push AFTER the work is done and
           # throws the run's whole reading away. On 2026-09-12 the transfer

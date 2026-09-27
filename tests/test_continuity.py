@@ -200,7 +200,7 @@ def test_first_gas_plus_trading_needs_independent_corroboration():
     only_funding = ct.score_continuity(
         {"first_gas": True, "direct_from_target": True, "funded_before_trading": True},
         hop_count=1)
-    assert only_funding["families"] == ["FUNDING"]
+    assert only_funding["families"] == ["financial"]
     assert any("independent families" in b for b in only_funding["blockers"])
 
     corroborated = ct.score_continuity(

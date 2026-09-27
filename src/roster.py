@@ -1,21 +1,9 @@
 # src/roster.py
-"""One ranked view of every wallet plausibly belonging to the target.
+"""One investigation roster, retaining each detector's observations and limits.
 
-Five detectors run independently and each writes its own file: the transfer
-graph, the HL-native ledger analyser, the deposit/withdrawal correlator, the
-behavioural scanner and the HyperEVM watcher. Read one at a time they answer
-different questions, and a wallet showing up weakly in three of them looks
-weaker than a wallet showing up strongly in one.
-
-That is backwards, and it is the whole reason this exists. Independent vectors
-agreeing is the strongest evidence this project can produce, because the ways
-they can be fooled do not overlap: an amount coincidence does not also fake a
-shared deposit address, and a shared deposit address does not also fake a
-trading style. The roster's job is to count them.
-
-Nothing here re-derives evidence. It reads what the detectors already wrote,
-attributes each wallet to the vectors supporting it, and tiers on that count —
-so a change inside one detector cannot silently move a tier here.
+Reports sharing parent observations are dependent; legacy financial reports
+are conservatively grouped. CONFIRMED denotes an operator-configured trusted
+seed. Other tiers prioritise investigation and do not confirm ownership.
 """
 
 import json
@@ -25,6 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src import thresholds as th
+from src.evidence import aggregate_evidence, vector_observations
 from src.utils import (
     DATA_DIR,
     candidate_scored_by_current_scorer,
@@ -42,13 +32,9 @@ VECTOR_LINKAGE = "linkage"          # shared funder or shared deposit address
 VECTOR_CORRELATION = "correlation"  # exit amount re-appeared as a deposit
 VECTOR_BEHAVIOURAL = "behavioural"  # trades like the target
 VECTOR_HL_NATIVE = "hl_native"      # two-way flow entirely inside Hyperliquid
-# Strongest of all: an agent is an address an account EXPLICITLY authorised to
-# trade for it, so two accounts sharing one are the same operator. Not a
-# coincidence of flow or of style but a deliberate act of control.
+# Explicit shared trading authority; a delegate can serve multiple owners.
 VECTOR_AGENT = "shared_agent"
-# Hyperliquid itself declaring the relationship: an address that is a cluster
-# wallet's agent or sub-account, or its declared staking partner. Like a
-# shared agent, an act of control rather than an inference.
+# A protocol-declared relationship, whose precise role stays in evidence.
 VECTOR_EXPLICIT = "explicit_link"
 # One wallet goes quiet, another is born. The only vector that needs NO
 # connection between the two, which is exactly why it has to count: a wallet
@@ -193,33 +179,28 @@ def _read(path: Path, key: str) -> list:
 
 
 def assign_tier(vectors: set, confidence: float, is_service: bool,
-                known_self: bool) -> str:
-    """Tier from the NUMBER of independent vectors, not from any one score.
-
-    `known_self` is operator ground truth from config and outranks measurement.
-
-    The top tier requires two independent vectors because each vector has a
-    known way of being wrong alone: an amount match can be coincidence — measured
-    live, three wallets matched on amount and every one was style-vetoed as a
-    different trader — a transfer can be a payment to a stranger, and behavioural
-    similarity is only as good as a scorer that currently cannot pick the target
-    out of a lineup.
-    """
+                known_self: bool, evidence_summary: dict | None = None) -> str:
+    """Investigation priority. Only configured trusted seeds are CONFIRMED."""
     if is_service:
         return TIER_INFRASTRUCTURE
     if known_self:
         return TIER_CONFIRMED
-    # A shared agent is a deliberate act of control by the account owner, not an
-    # inference from flow. It is the one signal strong enough to stand alone.
-    if VECTOR_AGENT in vectors or VECTOR_EXPLICIT in vectors:
-        return TIER_CONFIRMED
-    if len(vectors) >= 2 and confidence >= 0.60:
-        return TIER_CONFIRMED
-    if len(vectors) >= 2 or confidence >= 0.60:
+    summary = evidence_summary or aggregate_evidence(vector_observations(vectors))
+    categories = {c for c, groups in summary['categories'].items() if groups}
+    # Multiple detector names or a high graph score are not independent facts.
+    # Behaviour only reaches this interface after its separate validation gate.
+    support = categories & {'protocol', 'financial', 'behaviour'}
+    if summary['independent_groups'] >= 2 and len(support) >= 2 and 'financial' in support:
         return TIER_PROBABLE
     if confidence >= 0.40 or vectors:
         return TIER_POSSIBLE
     return TIER_WATCH
+
+
+def resolved_behavioural_thresholds(config: dict | None = None) -> dict:
+    config = config if config is not None else load_config()
+    raw = config.get("alert_thresholds") or load_config()["alert_thresholds"]
+    return th.resolve(raw, th.load_backtest_report(DATA_DIR.parent / "profile"))
 
 
 def behavioural_is_trustworthy() -> bool:
@@ -249,8 +230,8 @@ def behavioural_is_trustworthy() -> bool:
     for a wallet that scores 0.45 with a style veto when re-scored live.
     """
     try:
-        with open(DATA_DIR.parent / "profile" / "backtest.json") as f:
-            return bool(json.load(f).get("passed"))
+        return resolved_behavioural_thresholds().get("policy") in {
+            th.SRC_CURRENT_VALIDATED, th.SRC_CARRIED_FORWARD}
     except (OSError, ValueError, AttributeError):
         return False
 
@@ -566,18 +547,11 @@ def read_hl_surface(doc: dict, entry, wallets: dict, target: str) -> dict:
 
 
 def apply_operator_groups(wallets: dict, subaccounts: dict, entry, target: str) -> None:
-    """A master and its sub-accounts are one operator: tier each on their union.
+    """Share context across explicit account relationships, never ownership.
 
-    Hyperliquid lets only a master create a sub-account, so a vector found on
-    any account in the group is a vector found on the person running all of
-    them. This is not double counting — each vector still comes from its own
-    detector — it is attributing independent findings to accounts one person
-    provably controls. A service neither lends nor borrows: an exchange's
-    sub-account says nothing about a trader.
-
-    A group we already believe is his (PROBABLE or better) gets a row for EVERY
-    sub-account, funded or not: an empty sub-account of his is where he would
-    move next, and it only needs to be on the list to be read.
+    Empty enumerated subaccounts remain visible for future observation. A
+    service neither lends nor borrows group evidence. Dependence is counted
+    after context is combined, so two detector names cannot mint extra votes.
     """
     groups: dict[str, set] = {}
     for sub, detail in subaccounts.items():
@@ -594,12 +568,12 @@ def apply_operator_groups(wallets: dict, subaccounts: dict, entry, target: str) 
             continue
         union = set().union(*(wallets[m]["vectors"] for m in present))
         confidence = max(wallets[m]["confidence"] for m in present)
-        known = any(wallets[m]["known_self"] for m in present)
-        if assign_tier(union, confidence, False, known) in (TIER_CONFIRMED, TIER_PROBABLE):
-            for m in members:
-                if m not in wallets:
-                    entry(m)["evidence"]["subaccount_of"] = master
-            present = [m for m in members if m in wallets]
+        # An explicitly enumerated empty subaccount is useful future coverage
+        # even for a weak lead. Listing it never upgrades ownership confidence.
+        for m in members:
+            if m not in wallets:
+                entry(m)["evidence"]["subaccount_of"] = master
+        present = [m for m in members if m in wallets]
         if len(present) < 2:
             continue
         for m in present:
@@ -617,6 +591,7 @@ def build_roster(config: dict | None = None) -> dict:
     known_self = {(w or "").lower() for w in config.get("known_self_wallets", [])}
 
     trust_behavioural = behavioural_is_trustworthy()
+    behavioural_threshold = th.behavioural_gate(resolved_behavioural_thresholds(config))
     wallets: dict[str, dict] = {}
 
     def entry(addr: str) -> dict:
@@ -624,8 +599,12 @@ def build_roster(config: dict | None = None) -> dict:
         return wallets.setdefault(a, {
             "wallet": a, "vectors": set(), "confidence": 0.0,
             "classification": None, "reasons": [], "evidence": {},
-            "is_service": False, "known_self": a in known_self,
+            "is_service": False, "known_self": a in known_self, '_observations': [],
         })
+
+    for address in known_self:
+        if address != target:
+            entry(address)
 
     for node in _read(DATA_DIR / "transfer_graph" / "latest.json", "nodes"):
         a = (node.get("wallet") or "").lower()
@@ -755,11 +734,16 @@ def build_roster(config: dict | None = None) -> dict:
             e["evidence"]["correlation_gap_hours"] = match.get("gap_hours")
             e["evidence"]["competing_deposits"] = match.get("competing_deposits")
 
-    for cand in _read(DATA_DIR / "candidates" / "latest.json", "candidates"):
+    from src.candidate_registry import iter_candidates
+
+    for cand in iter_candidates(DATA_DIR):
         a = (cand.get("wallet") or "").lower()
         if not a or a == target:
             continue
         e = entry(a)
+        e['_observations'].extend(o for o in cand.get('observations', [])
+                                  if o.get('positive') and o.get('status', 'ok') == 'ok'
+                                  and o.get('source') in ('funding_route', 'authority_history'))
         score = float(cand.get("latest_score") or 0)
         e["evidence"]["behavioural_score"] = score
         e["evidence"]["behavioural_tier"] = cand.get("latest_tier")
@@ -773,7 +757,8 @@ def build_roster(config: dict | None = None) -> dict:
         # a vetoed wallet must not also cast a behavioural vote for being the
         # same one. And the backtest validates one scorer: a score from any
         # other is history, not evidence.
-        if score >= 0.65 and not vetoes and trust_behavioural and current:
+        e["evidence"]["behavioural_threshold"] = behavioural_threshold
+        if score >= behavioural_threshold and not vetoes and trust_behavioural and current:
             e["vectors"].add(VECTOR_BEHAVIOURAL)
 
     # Wallets sharing an authorised agent with the target.
@@ -852,13 +837,11 @@ def build_roster(config: dict | None = None) -> dict:
         if not a or a == target or not (h or {}).get("score"):
             continue
         e = entry(a)
-        e["vectors"].add(VECTOR_DORMANCY)
         e["evidence"]["dormancy_handoff"] = {
             k: h.get(k) for k in ("score", "gap_length", "delay_days",
                                   "candidate_first_day")}
 
-    # Lead/lag co-movement: evidence, and the one behavioural reading a copier
-    # cannot fake. A `same_hand` verdict still needs an independent vector.
+    # Experimental timing is context; news and shared signals remain confounders.
     try:
         with open(DATA_DIR / "comovement" / "latest.json") as f:
             comove = json.load(f).get("results") or {}
@@ -910,11 +893,22 @@ def build_roster(config: dict | None = None) -> dict:
     rows = []
     for e in wallets.values():
         e["vectors"] = sorted(e["vectors"])
-        e["vector_count"] = len(e["vectors"])
+        e['detector_count'] = len(e['vectors'])
+        observations = e.pop('_observations') + vector_observations(e['vectors'])
+        for observation in observations:
+            if observation.get('source') in ('funding_route', 'authority_history'):
+                observation = dict(observation)
+                observation['category'] = 'financial' if observation['source'] == 'funding_route' else 'protocol'
+            e.setdefault('observations', []).append(observation)
+        summary = aggregate_evidence(e.get('observations', []))
+        e['evidence_summary'] = summary
+        e['vector_count'] = summary['independent_groups']
+        e['identity_confirmed'] = e['known_self']
+        e['tier_basis'] = 'configured_trusted_seed' if e['known_self'] else 'investigation_priority_not_ownership'
         confidence = max(e["confidence"],
                          float(e["evidence"].get("group_confidence") or 0))
         e["tier"] = assign_tier(set(e["vectors"]), confidence,
-                                e["is_service"], e["known_self"])
+                                e["is_service"], e["known_self"], summary)
         rows.append(e)
 
     carry_peak_tier(rows, load_roster())
@@ -935,6 +929,7 @@ def build_roster(config: dict | None = None) -> dict:
         # one with five, rather than wondering why nothing is behavioural.
         "behavioural_counts_as_a_vector": trust_behavioural,
         "tier_counts": counts,
+        'tier_semantics': 'CONFIRMED=configured trusted seed; other tiers=investigation priority',
         # A wallet that LOST a vector since the last run. Recorded, not alerted.
         "demoted_count": len(demoted),
         "demoted": [{"wallet": r["wallet"], "tier": r["tier"],

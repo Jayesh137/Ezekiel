@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { fetchRoster, formatUSD, formatTime } from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
+	import { rosterTierLabel } from '$lib/discovery.js';
 	// One label table for every page: each vector is a different way of being
 	// right, so the label says what was observed rather than repeating a score.
 	import { VECTOR_LABEL } from '$lib/review.js';
@@ -23,9 +24,9 @@
 	);
 
 	const TIER_LABEL = {
-		CONFIRMED: 'Confirmed',
-		PROBABLE: 'Probable',
-		POSSIBLE: 'Possible',
+		CONFIRMED: 'Configured seeds / legacy inferences',
+		PROBABLE: 'Priority leads',
+		POSSIBLE: 'Possible leads',
 		WATCH: 'Watch',
 		INFRASTRUCTURE: 'Exchange / bridge / service'
 	};
@@ -48,10 +49,9 @@
 
 <h1>Wallet roster</h1>
 <p class="lede">
-	Every detector's output merged into one list, tiered on <strong>how many
-	independent vectors agree</strong> — not on any single score. Independent
-	agreement is the strongest evidence here, because the ways the vectors can be
-	fooled do not overlap.
+	Observations from every detector, grouped by their underlying evidence.
+	Several detectors can describe the same event. A priority lead needs support
+	from different evidence groups, and shared causes can still explain a match.
 </p>
 
 {#if loading}
@@ -86,9 +86,9 @@
 			<tr>
 				<th>Wallet</th>
 				<th>Tier</th>
-				<th class="num">Vectors</th>
-				<th class="num" title="Transfer-graph confidence. A wallet the graph never scored has no reading here and shows — , never 0%.">Confidence</th>
-				<th class="num" title="Chase priority: the best score any vector gives this wallet. Different scales, so it orders the queue and is not a confidence.">Strength</th>
+				<th class="num">Groups</th>
+				<th class="num" title="Transfer graph heuristic, not a probability of ownership. Missing means unscored.">Graph score</th>
+				<th class="num" title="Best detector score; useful for review order, not comparable probabilities.">Priority score</th>
 				<th>Supported by</th>
 			</tr>
 		</thead>
@@ -96,15 +96,15 @@
 			{#each rows as w (w.wallet)}
 				<tr class="row" on:click={() => toggle(w.wallet)}>
 					<td><Addr address={w.wallet} stopPropagation /></td>
-					<td><span class="badge {TIER_BADGE[w.tier] || 'badge-grey'}">{TIER_LABEL[w.tier] || w.tier}</span></td>
+					<td><span class="badge {TIER_BADGE[w.tier] || 'badge-grey'}">{rosterTierLabel(w)}</span></td>
 					<td class="num">{w.vector_count}</td>
 					<!-- Rule 6 in the UI: `confidence` is produced by the transfer graph
 					     alone, so a wallet reached by correlation, dormancy or an explicit
 					     link has no reading here. Rendering that as 0% prices a missing
 					     value as a measured zero, and put a 0.9974 correlation lead on
 					     screen showing "0%" at rank 2. -->
-					<td class="num">{w.confidence ? (w.confidence * 100).toFixed(0) + '%' : '—'}</td>
-					<td class="num">{w.rank_strength ? (w.rank_strength * 100).toFixed(0) + '%' : '—'}</td>
+					<td class="num">{w.confidence != null ? w.confidence.toFixed(2) : '—'}</td>
+					<td class="num">{w.rank_strength != null ? w.rank_strength.toFixed(2) : '—'}</td>
 					<td class="vectors">
 						{#each w.vectors as v}<span class="chip">{VECTOR_LABEL[v] || v}</span>{/each}
 						{#if !w.vectors.length}<span class="text-muted">—</span>{/if}

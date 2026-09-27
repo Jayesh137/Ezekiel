@@ -22,6 +22,7 @@ from src.alerts import (
     alert_vault_match,
     alert_xyz_signature_match,
 )
+from src.candidate_registry import iter_candidates, observe_candidate, valid_wallet
 from src.fingerprint import (
     build_fingerprint,
     compute_asset_preferences,
@@ -33,6 +34,7 @@ from src.thresholds import VETO_BONUS_CEILING, VETO_SCORE_CAP
 from src.utils import (
     DATA_DIR,
     append_records,
+    atomic_write_json,
     hl_post,
     load_config,
     read_cursor,
@@ -194,19 +196,21 @@ def select_leaderboard_wallets(rows: list[dict], max_wallets: int) -> list[dict]
 
 
 def get_candidate_fills(wallet: str, lookback_days: int = 7) -> list[dict]:
-    """Get recent fills for a candidate wallet."""
+    """Read and retain the available history, with explicit coverage metadata."""
+    from src.history import FillBatch, cached_fill_history
+
     now_ms = int(time.time() * 1000)
     start_ms = now_ms - (lookback_days * 24 * 60 * 60 * 1000)
+    result = cached_fill_history(wallet, start_ms, now_ms,
+                                 db_path=DATA_DIR / ".local" / "discovery.sqlite3")
+    return FillBatch(result)
 
-    try:
-        fills = hl_post({
-            "type": "userFillsByTime",
-            "user": wallet,
-            "startTime": start_ms,
-        })
-        return fills if isinstance(fills, list) else []
-    except Exception:
-        return []
+
+def _record_fill_read(wallet: str, fills: list, source: str) -> bool:
+    read = getattr(fills, "read", {"status": "ok"})
+    observe_candidate(wallet, {**read, "source": source, "positive": bool(fills)
+                              and read["status"] == "ok"}, DATA_DIR)
+    return read["status"] == "ok"
 
 
 def get_candidate_orders(wallet: str) -> list[dict]:
@@ -289,7 +293,7 @@ def merged_clearinghouse_state(wallet: str, dexes=None, fetch=None) -> dict:
         except Exception:                             # noqa: BLE001 - transport
             unreadable.append(dex)
             continue
-        if not isinstance(extra, dict):
+        if not isinstance(extra, dict) or not isinstance(extra.get("assetPositions"), list):
             unreadable.append(dex)
             continue
         positions.extend(extra.get("assetPositions") or [])
@@ -364,27 +368,29 @@ def compare_order_profile(fp_a: dict, fp_b: dict) -> float | None:
     rule hold_duration and the style dims follow.
 
     The target's own profile is sharply specific: 94.6% Limit orders at `Ioc`,
-    zero cancels, zero triggers, zero client order ids. That is TWAP slicing by
-    hand, and it looks nothing like a trader resting Gtc orders and cancelling
-    them, which is exactly the kind of distinction fills alone cannot draw.
+    zero cancels, zero triggers, zero client order ids. That differs from
+    resting Gtc orders and cancelling them, but does not prove manual execution
+    or common ownership: automated systems can use either submission style.
     """
     a = fp_a.get("order_profile") or {}
     b = fp_b.get("order_profile") or {}
     if not a.get("orders") or not b.get("orders"):
         return None
 
-    parts = [
-        _dist_similarity(a.get("order_type_mix"), b.get("order_type_mix")),
-        _dist_similarity(a.get("tif_mix"), b.get("tif_mix")),
-        _dist_similarity(a.get("status_mix"), b.get("status_mix")),
-    ]
+    parts = []
+    for key in ("order_type_mix", "tif_mix", "status_mix"):
+        left = {k: v for k, v in (a.get(key) or {}).items() if k != "unknown"}
+        right = {k: v for k, v in (b.get(key) or {}).items() if k != "unknown"}
+        if left and right:
+            parts.append(_dist_similarity(left, right))
     # Rates are proportions already, so closeness is 1 - |difference|.
     parts.extend(
-        1.0 - abs(float(a.get(key, 0)) - float(b.get(key, 0)))
+        1.0 - abs(float(a[key]) - float(b[key]))
         for key in ("cancel_rate", "reduce_only_rate", "trigger_rate",
                     "programmatic_rate")
+        if a.get(key) is not None and b.get(key) is not None
     )
-    return float(sum(parts) / len(parts))
+    return float(sum(parts) / len(parts)) if parts else None
 
 
 def get_asset_overlap(fp_a: dict, fp_b: dict) -> dict:
@@ -840,6 +846,9 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
     }
     for name, val in style_dims.items():
         dimensions[name] = round(val, 4) if val is not None else None
+    for name in set(ezekiel_fp.get("excluded_dimensions", [])) | set(candidate_fp.get("excluded_dimensions", [])):
+        if name in dimensions:
+            dimensions[name] = None
 
     # Dynamic weights: discount account_size for fresh/small candidate wallets.
     # A migrated trader starts with a new account — size comparison is misleading early on.
@@ -958,6 +967,9 @@ def compute_similarity(ezekiel_fp: dict, candidate_fp: dict,
         } if shared_markets else {},
     }
     evidence["reasons"].extend(market_reasons)
+    from src.episodes import compare_episode_profiles
+    evidence['episodes'] = compare_episode_profiles(ezekiel_fp.get('episode_profile', {}),
+                                                   candidate_fp.get('episode_profile', {}))
     return score, dimensions, evidence
 
 
@@ -982,6 +994,7 @@ def build_candidate_fingerprint(fills: list[dict], state: dict,
     sweep is scored exactly as before rather than penalised for data nobody
     fetched.
     """
+    from src.episodes import build_episodes, compact_profile, episode_profile
     from src.fingerprint import (
         compute_entry_exit_style,
         compute_hold_duration,
@@ -995,10 +1008,21 @@ def build_candidate_fingerprint(fills: list[dict], state: dict,
         if "perp" in positions:
             positions = positions["perp"]
 
-    acct_val = round(float(positions.get("marginSummary", {}).get("accountValue", 0) or 0), 2) \
-        if isinstance(positions, dict) else 0
+    excluded = []
+    try:
+        acct_val = round(float(positions["marginSummary"]["accountValue"]), 2)
+        if not np.isfinite(acct_val):
+            raise ValueError("non-finite equity")
+    except (TypeError, ValueError, KeyError):
+        acct_val = None
+        excluded.append("account_size")
+    if (not isinstance(positions, dict) or not isinstance(positions.get("assetPositions"), list)
+            or positions.get("unreadable_dexes")):
+        excluded.append("leverage")
 
     return {
+        "excluded_dimensions": excluded,
+        'episode_profile': compact_profile(episode_profile(build_episodes(fills, orders))),
         "asset_preferences": compute_asset_preferences(fills),
         "timing_profile": compute_timing_profile(fills),
         "leverage_profile": compute_leverage_profile(fills, positions),
@@ -1025,6 +1049,8 @@ def _summarize_fingerprint(fp: dict) -> dict:
     hd = fp.get("hold_duration", {})
 
     return {
+        "excluded_dimensions": fp.get("excluded_dimensions", []),
+        'episode_profile': fp.get('episode_profile', {}),
         # Carried so a stored scan can be compared on order habits without
         # re-fetching. The backtest needs strangers to have the same dimensions
         # the target has, or the self-match is scored on a dimension nobody else
@@ -1072,16 +1098,20 @@ def persist_candidate(result: dict) -> None:
     every run for ever after — which is what happened, and why the caller being
     fixed is not on its own enough.
     """
-    if result["wallet"].lower() == load_config()["target_wallet"].lower():
+    wallet = valid_wallet(result["wallet"])
+    if wallet == load_config()["target_wallet"].lower():
         return
     candidate_dir = DATA_DIR / "candidates"
     candidate_dir.mkdir(parents=True, exist_ok=True)
-    path = candidate_dir / f"{result['wallet'].lower()}.json"
+    path = candidate_dir / f"{wallet}.json"
     history = []
     existing = {}
     if path.exists():
-        with open(path) as f:
-            existing = json.load(f)
+        try:
+            with open(path) as f:
+                existing = json.load(f)
+        except (OSError, ValueError):
+            existing = {}
         history = existing.get("score_history", [])
 
     history.append({
@@ -1108,9 +1138,13 @@ def persist_candidate(result: dict) -> None:
         status = existing.get("status", "ACTIVE")
 
     candidate = {
-        "wallet": result["wallet"],
+        **existing,
+        "wallet": wallet,
         "first_seen": existing.get("first_seen", result["scanned_at"]),
         "last_seen": result["scanned_at"],
+        "last_checked": result["scanned_at"],
+        "last_successful_read": result["scanned_at"],
+        "last_scored": result["scanned_at"],
         "best_score": best_score,
         "latest_score": result["score"],
         "latest_scoring_schema": th.SCORING_SCHEMA,
@@ -1120,15 +1154,10 @@ def persist_candidate(result: dict) -> None:
         "status": status,
         "recent_avg_score": round(recent_avg, 4) if recent_avg is not None else None,
     }
-    with open(path, "w") as f:
-        json.dump(candidate, f, indent=2)
-
-    latest = []
-    for fp in candidate_dir.glob("0x*.json"):
-        with open(fp) as f:
-            latest.append(json.load(f))
-    latest.sort(key=lambda c: c.get("best_score", 0), reverse=True)
-    save_latest(str(candidate_dir), {"candidates": latest[:50]})
+    atomic_write_json(path, candidate)
+    latest = iter_candidates(DATA_DIR)
+    latest.sort(key=lambda c: (-(c.get("latest_score") or 0), c["wallet"]))
+    save_latest(str(candidate_dir), {"candidates": latest[:50], "total_candidates": len(latest)})
 
 
 def tooling_fingerprint(wallet: str, fetch=None) -> dict | None:
@@ -1147,6 +1176,43 @@ def tooling_fingerprint(wallet: str, fetch=None) -> dict | None:
             "requests_per_1k_usd": round(used / (vlm / 1000.0), 4)}
 
 
+def discovery_targets(config: dict) -> dict:
+    """Reserve a small, balance-independent scan allocation for public activity."""
+    from src.discovery_store import DiscoveryStore
+
+    path = DATA_DIR / ".local" / "discovery.sqlite3"
+    if not path.exists():
+        return {}
+    with DiscoveryStore(path) as store:
+        return select_discovery_targets(store, config, int(time.time() * 1000))
+
+
+def select_discovery_targets(store, config, now_ms):
+    """The same bounded allocation is used by scheduled scans and offline replay."""
+    from src.market_discovery import exclusions
+    store.set_exclusions(exclusions(config))
+    limit = max(0, min(50, int(config.get('discovery', {}).get('scan_budget', 20))))
+    deposits = store.deposit_candidates(limit=min(5, limit // 3), now_ms=now_ms)
+    trades = store.candidates(limit=limit - len(deposits), now_ms=now_ms)
+    return {r['wallet']: {'source': r['source'], 'discovery': r} for r in deposits + trades}
+
+
+def matched_population(result):
+    from src.evaluation_cohort import cohort_wallets
+    mask = sorted(k for k, v in result.get('dimensions', {}).items() if v is not None)
+    excluded = set(cohort_wallets(DATA_DIR / '.local' / 'discovery.sqlite3')) | {result.get('wallet', '').lower()}
+    return calibration.load_population(mask, excluded_wallets=excluded) if mask else []
+
+
+def _mark_discovery_checked(wallet, status):
+    from src.discovery_store import DiscoveryStore
+
+    path = DATA_DIR / ".local" / "discovery.sqlite3"
+    if path.exists():
+        with DiscoveryStore(path) as store:
+            store.mark_checked(wallet, int(time.time() * 1000), status)
+
+
 def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
                           source: str = "targeted", eff: dict | None = None,
                           market_freq: dict | None = None) -> dict | None:
@@ -1156,8 +1222,12 @@ def scan_specific_wallet(wallet: str, ezekiel_fp: dict, config: dict,
     min_fills = config["scanner"].get("min_fills_for_comparison", 20)
 
     fills = get_candidate_fills(wallet, lookback_days)
+    if not _record_fill_read(wallet, fills, source):
+        return None
     if len(fills) < min_fills:
         fills = get_candidate_fills(wallet, lookback_days * 2)
+        if not _record_fill_read(wallet, fills, source):
+            return None
 
     # Accept thin histories for targeted scans — a fresh wallet won't have many fills yet
     floor = max(5, min_fills // 4)
@@ -1636,10 +1706,10 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         return loaded if isinstance(loaded, dict) else {}
 
     try:
-        roster_doc, cand_doc = _doc("roster"), _doc("candidates")
+        roster_doc = _doc("roster")
         added = 0
         for addr, meta in roster_rescore_targets(config, roster_doc,
-                                                 cand_doc.get("candidates")).items():
+                                                 iter_candidates(DATA_DIR)).items():
             if addr not in priority:
                 priority[addr] = meta
                 added += 1
@@ -1662,6 +1732,18 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     priority = {addr: meta for addr, meta in priority.items()
                 if addr.lower() != target_lower}
 
+    # These accounts need neither leaderboard rank nor a minimum balance. A
+    # public trade is only a retrieval source, never independent corroboration.
+    for wallet, meta in discovery_targets(config).items():
+        priority.setdefault(wallet, meta)
+    try:
+        for row in _doc("routes").get("discoveries", [])[:30]:
+            wallet = valid_wallet(row.get("wallet"))
+            if wallet != target_lower:
+                priority.setdefault(wallet, {"source": "funding_route", "route": row})
+    except (ValueError, OSError, TypeError):
+        pass
+
     if not priority:
         print("[scanner] No priority targets to scan")
         return []
@@ -1677,10 +1759,14 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         source = meta.get("source", "targeted")
         result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source, eff=eff,
                                       market_freq=market_freq)
+        if meta.get("discovery"):
+            _mark_discovery_checked(wallet, "ok" if result is not None else "error")
         if result is None:
             continue
 
         score = result["score"]
+        candidate_population = matched_population(result)
+        result['calibration_population_size'] = len(candidate_population)
         print(f"[scanner] Priority {wallet[:10]}... ({source}): {score:.4f}")
 
         vetoes = result["evidence"].get("vetoes")
@@ -1697,7 +1783,7 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         # corroborated — the market itself is not corroboration.
         if rare and alertable and _is_corroborated(result, source) \
                 and _market_alert_allowed(rare):
-            md = evaluate_candidate(wallet, score, eff, population, vetoes,
+            md = evaluate_candidate(wallet, score, eff, candidate_population, vetoes,
                                     rare_overlap=True,
                                     score_without_market_bonus=_market_free_score(result),
                                     corroborated=True)
@@ -1741,7 +1827,7 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
             score = _apply_linkage(result, target_addr, target_l1)
 
         # One disposition decides promote / watchlist / drop for every route below.
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes, bool(rare),
+        disp = evaluate_candidate(wallet, score, eff, candidate_population, vetoes, bool(rare),
                                   _market_free_score(result),
                                   corroborated=_is_corroborated(result, source))
         result["disposition"] = disp
@@ -1749,7 +1835,8 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
 
         # Persist anything watchlisted or better — suppressed candidates keep their
         # evidence and stay visible rather than being discarded.
-        if disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold:
+        if (disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold
+                or (DATA_DIR / "candidates" / f"{wallet.lower()}.json").exists()):
             persist_candidate(result)
 
         promoted = disp["action"] == th.ACTION_ALERT
@@ -1827,6 +1914,7 @@ def scan_leaderboard():
     scanned = 0
     sweep_scores = []  # this sweep's scores → next sweep's null distribution
     sweep_markets = {}  # eligible wallet → markets traded → rarity calibration
+    cohort_profiles = []
 
     # Largest accounts first, not the API's arbitrary order — see
     # select_leaderboard_wallets for why the previous slice excluded the
@@ -1843,13 +1931,23 @@ def scan_leaderboard():
             print(f"[scanner] Scanned {scanned}/{min(len(leaderboard), max_wallets)}...")
 
         fills = get_candidate_fills(wallet, lookback_days)
+        if (DATA_DIR / "candidates" / f"{wallet.lower()}.json").exists():
+            if not _record_fill_read(wallet, fills, "leaderboard"):
+                continue
+        elif getattr(fills, "read", {}).get("status", "ok") != "ok":
+            continue
         if len(fills) < min_fills:
             continue
 
         state = get_candidate_state(wallet)
         candidate_fp = build_candidate_fingerprint(fills, state)
         score, dimensions, evidence = compute_similarity(ezekiel_fp, candidate_fp, eff, market_freq)
-        sweep_scores.append(score)
+        cohort_profiles.append({'wallet': wallet.lower(), 'source': 'leaderboard',
+                                'fingerprint': _summarize_fingerprint(candidate_fp)})
+        candidate_population = matched_population({'wallet': wallet, 'dimensions': dimensions})
+        sweep_scores.append({"wallet": wallet.lower(), "score": score,
+                             "feature_mask": sorted(k for k, value in dimensions.items() if value is not None),
+                             "scoring_schema": th.SCORING_SCHEMA})
         # This wallet cleared min_fills and was fingerprinted, so it belongs in the
         # rarity denominator. Recording only eligible wallets keeps the frequency
         # table describing the same population the scores come from.
@@ -1859,7 +1957,8 @@ def scan_leaderboard():
         result = {
             "wallet": wallet,
             "score": score,
-            "score_percentile": calibration.score_percentile(score, population),
+            "score_percentile": calibration.score_percentile(score, candidate_population),
+            'calibration_population_size': len(candidate_population),
             "dimensions": dimensions,
             "evidence": evidence,
             "fills_count": len(fills),
@@ -1881,7 +1980,7 @@ def scan_leaderboard():
         # A leaderboard wallet has no independent evidence by construction — it was
         # not reached via fund flow, HL-native transfer or correlation. So a shared
         # market, however rare, can only earn it a watchlist slot here.
-        disp = evaluate_candidate(wallet, score, eff, population, vetoes,
+        disp = evaluate_candidate(wallet, score, eff, candidate_population, vetoes,
                                   bool(shared_markets),
                                   _market_free_score(result),
                                   corroborated=_is_corroborated(result))
@@ -1907,7 +2006,8 @@ def scan_leaderboard():
         # persistent watchlist — suppression downgrades, it never discards.
         if disp["action"] != th.ACTION_BACKGROUND:
             results.append(result)
-        if disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold:
+        if (disp["action"] != th.ACTION_BACKGROUND or score >= candidate_threshold
+                or (DATA_DIR / "candidates" / f"{wallet.lower()}.json").exists()):
             persist_candidate(result)
 
         if disp["action"] == th.ACTION_ALERT:
@@ -1921,6 +2021,24 @@ def scan_leaderboard():
     print(f"[scanner] Top 5 scores: {top_scores[:5]}")
 
     pop_size = calibration.record_population_scores(sweep_scores)
+    from src.evaluation_cohort import (
+        cohort_wallets,
+        freeze_cohort,
+        record_profiles,
+        refresh_cohort_orders,
+    )
+    cohort_path = DATA_DIR / '.local' / 'discovery.sqlite3'
+    if cohort_profiles:
+        cohort_stamp = int(time.time() * 1000)
+        heldout = set(cohort_wallets(cohort_path))
+        # After selection, a fills-only sweep cannot overwrite a control's
+        # complete dated order observation or turn a failed fetch into zero.
+        record_profiles([r for r in cohort_profiles if r['wallet'] not in heldout], cohort_stamp, cohort_path)
+        freeze_cohort(cohort_path, cohort_stamp, excluded={target, *config.get('known_self_wallets', [])})
+        controls = cohort_profiles + [{'wallet': r['wallet'].lower(), 'fingerprint': r['fingerprint']}
+                                       for r in priority_results if isinstance(r.get('fingerprint'), dict)]
+        order_coverage = refresh_cohort_orders(controls, cohort_path)
+        print(f'[scanner] Held-out order observations: {order_coverage}')
     print(f"[scanner] Calibration population: {pop_size} samples")
 
     market_summary = calibration.record_market_observation(sweep_markets)
@@ -2007,11 +2125,11 @@ def scan_leaderboard():
                 # bypassing it, so vetoes, the percentile gate and the
                 # market-bonus protection all still apply.
                 corr_disp = evaluate_candidate(
-                    top["wallet"], top["score"], eff, population,
+                    top["wallet"], top["score"], eff, matched_population(top),
                     top.get("evidence", {}).get("vetoes"),
                     rare_overlap=bool(_measured_rare_markets(top)),
                     score_without_market_bonus=_market_free_score(top),
-                    corroborated=True,
+                    corroborated=_is_corroborated(top),
                 )
                 if top["score"] >= corr_threshold and corr_disp["action"] == th.ACTION_ALERT:
                     print(f"[scanner] MIGRATION CORRELATION: {days_silent:.1f}d silence + {top['score']:.4f} candidate")

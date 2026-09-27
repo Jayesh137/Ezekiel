@@ -44,7 +44,8 @@ def test_the_helper_refuses_a_missing_or_retired_schema():
 def _roster(tmp_path, monkeypatch, cand):
     monkeypatch.setattr(roster, "DATA_DIR", tmp_path)
     (tmp_path.parent / "profile").mkdir(parents=True, exist_ok=True)
-    (tmp_path.parent / "profile" / "backtest.json").write_text(json.dumps({"passed": True}))
+    (tmp_path.parent / "profile" / "backtest.json").write_text(json.dumps({
+        "passed": True, "self_score": .75, "scoring_schema": th.SCORING_SCHEMA}))
     (tmp_path / "candidates").mkdir(parents=True, exist_ok=True)
     (tmp_path / "candidates" / "latest.json").write_text(json.dumps({"candidates": [cand]}))
     return roster.build_roster({"target_wallet": TARGET})["wallets"][0]

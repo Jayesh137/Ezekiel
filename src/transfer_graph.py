@@ -1468,11 +1468,11 @@ def _load_behavioural_scores() -> tuple[dict, set]:
     """Behavioural similarity per wallet, and which wallets are actively trading."""
     scores: dict[str, float] = {}
     active: set = set()
-    path = DATA_DIR / "candidates" / "latest.json"
-    if path.exists():
+    from src.candidate_registry import iter_candidates
+
+    if (DATA_DIR / "candidates").exists():
         try:
-            with open(path) as f:
-                payload = json.load(f)
+            payload = {"candidates": iter_candidates(DATA_DIR)}
             # save_latest writes dict OR list, and data/portfolio/latest.json
             # really is a list — a wrongly shaped file used to raise
             # AttributeError past the except clause and kill the whole job.
@@ -1514,16 +1514,12 @@ def _load_behavioural_scores() -> tuple[dict, set]:
 def _load_linkage_evidence() -> dict:
     """Shared-funder / address-reuse evidence already gathered by the scanner."""
     out: dict[str, dict] = {}
-    path = DATA_DIR / "candidates" / "latest.json"
-    if path.exists():
-        try:
-            with open(path) as f:
-                for c in json.load(f).get("candidates", []):
-                    link = (c.get("latest_evidence") or {}).get("linkage")
-                    if link:
-                        out[(c.get("wallet") or "").lower()] = link
-        except (OSError, ValueError):
-            pass
+    from src.candidate_registry import iter_candidates
+
+    for c in iter_candidates(DATA_DIR):
+        link = (c.get("latest_evidence") or {}).get("linkage")
+        if link:
+            out[c["wallet"].lower()] = link
     return out
 
 
@@ -2032,7 +2028,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                     now_ts: float | None = None,
                     known_services: set | None = None,
                     already_expanded: list | None = None,
-                    never_services: set | None = None) -> tuple[list[dict], dict]:
+                    never_services: set | None = None,
+                    refresh_state: dict | None = None) -> tuple[list[dict], dict]:
     """Iteratively widen the graph, level by level, under a hard budget.
 
     Replaces a single round that only looked up the target's DIRECT recipients:
@@ -2085,6 +2082,13 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     from src.chain.chains import enabled_chains
     from src.chain.collect import records_for, sweep_wallet
     from src.chain.spam import ground_truth_addresses as spam_ground_truth
+    from src.surveillance import record_refresh, schedule_refreshes
+
+    due, refreshes = schedule_refreshes(
+        already_expanded or [], edges, target, refresh_state or {}, now_ts,
+        max(1, budget["max_expansions"] // 4) if budget["max_expansions"] else 0)
+    diag["refresh_state"] = refreshes
+    diag["refreshed_wallets"] = []
 
     sweep_chains = enabled_chains(load_config())
     # Expansion spans every enabled chain. "arbitrum_l1" was the honest label
@@ -2113,7 +2117,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             if name and name not in diag["unsupported_sources"]:
                 diag["unsupported_sources"].append(name)
 
-    if not os.environ.get("ETHERSCAN_API_KEY"):
+    if not os.environ.get("ETHERSCAN_API_KEY") and not any(c.get("reader") == "blockscout" for c in sweep_chains):
         diag["status"] = "skipped_no_api_key"
         degrade(all_chain_names)
         print("[graph] ETHERSCAN_API_KEY absent - L1 frontier expansion SKIPPED. "
@@ -2162,6 +2166,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     # defect this ordering exists to prevent (see `expanded_ledger` below).
     explored = dict.fromkeys((w or "").lower()
                              for w in (already_expanded or []) if w)
+    due_order = {row["wallet"]: i for i, row in enumerate(due)}
+    for wallet in due_order:
+        explored.pop(wallet, None)
     calls = 0
     added = []
     stopped_reason = None
@@ -2171,6 +2178,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     # what counts as a real transfer.
     walkable = _expandable_edges(edges, dust_usd)
     queue = []
+    queue.extend((item["depth"], item["wallet"]) for item in due)
     queue.extend((int(item.get("depth", 1)), w)
                  for item in (resume or [])
                  if (w := (item.get("wallet") or "").lower()) and w != target)
@@ -2182,12 +2190,13 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
 
     expanded_now = set()
     try:
-        depth = 1
-        while depth <= max_depth:
+        passes = [(r["depth"], r["wallet"]) for r in due if r["depth"] <= max_depth]
+        passes.extend((depth, None) for depth in range(1, max_depth + 1))
+        for depth, refresh_wallet in passes:
             level = [(d, w) for d, w in queue
-                     if d == depth and w not in explored and w != target]
+                     if d == depth and w not in explored and w != target
+                     and (w == refresh_wallet if refresh_wallet else w not in due_order)]
             if not level:
-                depth += 1
                 continue
 
             ranked = []
@@ -2200,7 +2209,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 ranked.append((pr, w, d, prof))
             # Deterministic: address breaks priority ties so two runs over the
             # same data expand the same wallets in the same order.
-            ranked.sort(key=lambda x: (-x[0], x[1]))
+            ranked.sort(key=lambda x: (due_order.get(x[1], len(due_order)), -x[0], x[1]))
 
             for pr, wallet, d, prof in ranked[:branching]:
                 if calls >= max_calls:
@@ -2253,6 +2262,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                         par_contracts=_par_contracts())
                     rows = records_for(wallet)
                 except Exception as exc:
+                    record_refresh(refreshes, wallet, now_ts, d, error=str(exc))
                     # One address failing must not abandon the rest of the walk.
                     # The wallet stays OUT of `explored` so it is retried next
                     # run rather than being recorded as finished.
@@ -2288,6 +2298,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 # Recorded, never forgiven silently.
                 uncovered((sweep or {}).get("unsupported_sources") or [])
                 if degraded or status != "ok":
+                    record_refresh(refreshes, wallet, now_ts, d, error=f"sweep {status}")
                     named = ", ".join(degraded) or "unknown chain(s)"
                     diag["partial_failures"].append(
                         {"wallet": wallet, "depth": d,
@@ -2298,6 +2309,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                            f"sweep {status}; could not read {named}", pr)
                     continue
                 explored[wallet] = None
+                record_refresh(refreshes, wallet, now_ts, d)
+                if wallet in due_order:
+                    diag["refreshed_wallets"].append(wallet)
                 expanded_now.add(wallet)
                 diag["deepest_expanded"] = max(diag["deepest_expanded"], d)
                 # The wallet just swept is a sender we observed; see
@@ -2329,7 +2343,6 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
             services = detect_services(edges, {(a or "").lower()
                                                for a in (known_services or set())},
                                        never_services=never_services)
-            depth += 1
     except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
         diag["error"] = str(exc)[:200]
@@ -2342,7 +2355,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     # the same address twice.
     shallowest: dict[str, int] = {}
     for d, w in queue:
-        if w in explored or w == target or w in services:
+        if w in explored or w in due_order or w == target or w in services:
             continue
         if d > max_depth:
             continue
@@ -2373,7 +2386,12 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     # expanded that run sorted above it, so all nine were dropped and re-walked
     # on the next run, and on every run after that. The frontier spent its
     # whole budget re-doing the upper half of the address space.
-    diag["expanded_ledger"] = list(explored)[-max_ledger:]
+    historical = dict.fromkeys((w or "").lower() for w in (already_expanded or []) if w)
+    for wallet in expanded_now:
+        historical.pop(wallet, None)
+    historical.update(explored)
+    diag["expanded_ledger"] = list(historical)[-max_ledger:]
+    diag["refresh_state"] = {w: refreshes[w] for w in diag["expanded_ledger"] if w in refreshes}
     diag["frontier_size"] = len(explored) + len(pending)
     # Eligible = deduplicated, in-depth, not already expanded, not a service.
     diag["frontier_eligible"] = len(pending)
@@ -2884,7 +2902,8 @@ def run_transfer_graph(expand: bool = True) -> dict:
             edges, expansion = expand_frontier(
                 edges, target, cfg, resume=resume,
                 known_services=known_services, already_expanded=already,
-                never_services=persons_on_record())
+                never_services=persons_on_record(),
+                refresh_state=prev_expansion.get("refresh_state") or {})
         write_cursor("transfer_graph_last_expansion_ms", now_ms())
     else:
         from src.chain.chains import enabled_chains
@@ -2975,8 +2994,9 @@ def run_transfer_graph(expand: bool = True) -> dict:
                   f"{type(exc).__name__}: {exc}")
     # A run that did not expand must not erase what earlier runs finished.
     if expansion.get("status") in ("disabled", "skipped_no_api_key"):
-        expansion.setdefault("expanded_ledger", prev_health.get("expanded_ledger") or [])
-        expansion.setdefault("frontier_queue", prev_health.get("frontier_queue") or [])
+        expansion["expanded_ledger"] = prev_health.get("expanded_ledger") or []
+        expansion["frontier_queue"] = prev_health.get("frontier_queue") or []
+        expansion.setdefault("refresh_state", prev_health.get("refresh_state") or {})
 
     correlations = _load_correlations()
     # Correlation-derived nodes. Without these a wallet re-linked across a CEX

@@ -38,6 +38,14 @@ export async function fetchLatest(dataType) {
 	return fetchJSON(`data/${dataType}/latest.json`);
 }
 
+/** Small optional reports; no per-wallet or raw-history downloads. */
+export async function fetchDiscovery() {
+	const keys = ['discovery', 'routes', 'investigations', 'quality', 'accounting'];
+	const reports = await Promise.all(keys.map(fetchLatest));
+	return { ...Object.fromEntries(keys.map((key, i) => [key, reports[i]])),
+		state: await fetchJSON('data/discovery/state.json') };
+}
+
 /**
  * Fetch daily records for a data type and date.
  * @param {string} dataType - e.g., "fills", "funding"
@@ -683,7 +691,10 @@ export const DETECTOR_FEEDS = [
 	{ name: 'Shared agents', path: 'data/agent_links/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Dormancy handoff', path: 'data/dormancy/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Behavioural scan', path: 'data/scans/latest.json', key: 'scan_time', limitMin: 720 },
-	{ name: 'Amount correlation', path: 'data/correlations/latest.json', key: 'computed_at', limitMin: 2160 }
+	{ name: 'Amount correlation', path: 'data/correlations/latest.json', key: 'computed_at', limitMin: 2160 },
+	{ name: 'Public wallet discovery', path: 'data/discovery/latest.json', key: 'last_successful_read_ms', limitMin: 720 },
+	{ name: 'Funding route index', path: 'data/routes/latest.json', key: 'computed_at_ms', limitMin: 720 },
+	{ name: 'Successor investigations', path: 'data/investigations/latest.json', key: 'computed_at_ms', limitMin: 720 }
 ];
 
 /**
@@ -693,8 +704,8 @@ export const DETECTOR_FEEDS = [
  */
 export function feedFreshness(doc, key, limitMin, nowMs = Date.now()) {
 	if (!doc || typeof doc !== 'object') return { status: 'missing', ageMin: null };
-	const t = Date.parse(doc[key]);
-	if (Number.isNaN(t)) return { status: 'missing', ageMin: null };
+	const t = typeof doc[key] === 'number' ? doc[key] : Date.parse(doc[key]);
+	if (!Number.isFinite(t)) return { status: 'missing', ageMin: null };
 	const ageMin = Math.max(0, Math.round((nowMs - t) / 60000));
 	return { status: ageMin > limitMin ? 'stale' : 'fresh', ageMin };
 }
