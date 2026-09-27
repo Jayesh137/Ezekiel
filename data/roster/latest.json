@@ -1,14 +1,14 @@
 {
-  "computed_at": "2026-09-27T10:04:28.609173+00:00",
+  "computed_at": "2026-09-27T10:44:34.468401+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 388,
   "behavioural_counts_as_a_vector": true,
   "tier_counts": {
     "CONFIRMED": 2,
     "PROBABLE": 3,
-    "POSSIBLE": 32,
+    "POSSIBLE": 33,
     "WATCH": 169,
-    "INFRASTRUCTURE": 182
+    "INFRASTRUCTURE": 181
   },
   "demoted_count": 57,
   "demoted": [
@@ -806,10 +806,9 @@
         "correlation_confidence": 0.6066,
         "correlation_gap_hours": 257.7,
         "competing_deposits": 4,
-        "portfolio_overlap": 0.0413,
+        "portfolio_overlap": 0.0372,
         "shared_rare_markets": [
-          "CHIP",
-          "VVV"
+          "CHIP"
         ],
         "hl_role": "user",
         "hl_account_value": 1271694.093508,
@@ -919,7 +918,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (12 separate movements)",
-        "Last movement 136 days ago \u2014 transfer evidence aged to 88%",
+        "Last movement 136 days ago \u2014 transfer evidence aged to 87%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -953,6 +952,45 @@
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.4921
+    },
+    {
+      "wallet": "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24",
+      "vectors": [
+        "transfer"
+      ],
+      "confidence": 0.43,
+      "classification": "OPERATIONAL_COUNTERPARTY",
+      "reasons": [
+        "Sent funds to the target wallet",
+        "Repeated transfers (25 separate movements)",
+        "Transfer happened entirely inside Hyperliquid (no L1 trace)",
+        "Actively trading on Hyperliquid after receiving funds"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 97866017.01,
+          "edge_count": 25,
+          "unvalued_edge_count": 0
+        },
+        "depth": 1,
+        "chains": [
+          "hyperliquid"
+        ],
+        "hl_out_usd": 0.0,
+        "hl_in_usd": 97866017.01,
+        "hl_role": "user",
+        "hl_account_value": 31.000002,
+        "hl_birth_ms": 1764197760065
+      },
+      "is_service": false,
+      "known_self": false,
+      "vector_count": 1,
+      "tier": "POSSIBLE",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.43
     },
     {
       "wallet": "0x84abc08c0ea62e687c370154de1f38ea462f4d37",
@@ -996,7 +1034,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.2976,
+      "confidence": 0.2975,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Received funds directly from the target wallet",
@@ -1027,7 +1065,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.2976
+      "rank_strength": 0.2975
     },
     {
       "wallet": "0x36715f6408819492c27c1a1538156af9a2bfe963",
@@ -2671,7 +2709,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (12 separate movements)",
-        "Last movement 578 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 579 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -4008,7 +4046,7 @@
       "confidence": 0.0,
       "classification": "DIRECT_RECIPIENT",
       "reasons": [
-        "Last movement 161 days ago \u2014 transfer evidence aged to 80%",
+        "Last movement 162 days ago \u2014 transfer evidence aged to 80%",
         "Reached at 2 hops from target \u2014 confidence discounted",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
@@ -9118,42 +9156,6 @@
       "vector_count": 1,
       "tier": "INFRASTRUCTURE",
       "peak_tier": "INFRASTRUCTURE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.0
-    },
-    {
-      "wallet": "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24",
-      "vectors": [
-        "transfer"
-      ],
-      "confidence": 0.0,
-      "classification": "SERVICE",
-      "reasons": [
-        "Excluded: high HL fan-out (583 distinct recipients)"
-      ],
-      "evidence": {
-        "service_reason": "high HL fan-out (583 distinct recipients)",
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 97866017.01,
-          "edge_count": 25,
-          "unvalued_edge_count": 0
-        },
-        "depth": 1,
-        "chains": [
-          "hyperliquid"
-        ],
-        "hl_out_usd": 0.0,
-        "hl_in_usd": 97866017.01,
-        "hl_role": "user",
-        "hl_account_value": 31.000002,
-        "hl_birth_ms": 1764197760065
-      },
-      "is_service": true,
-      "known_self": false,
-      "vector_count": 1,
-      "tier": "INFRASTRUCTURE",
-      "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
       "rank_strength": 0.0
     },
