@@ -28,6 +28,7 @@ def quality_report(data_dir=DATA_DIR):
     discovery = read(data_dir / 'discovery' / 'latest.json')
     investigations = read(data_dir / 'investigations' / 'latest.json')
     evaluation = read(data_dir / 'discovery_evaluation' / 'latest.json')
+    scan = read(data_dir / 'scans' / 'latest.json')
     unresolved = routes.get('unresolved', [])
     report = {'computed_at_ms': int(time.time() * 1000), 'promotion_validated': False,
               'candidate_count': len(candidates),
@@ -37,6 +38,7 @@ def quality_report(data_dir=DATA_DIR):
               'heldout_wallet_count': len(cohort_wallets(data_dir / '.local' / 'discovery.sqlite3')),
               'discovery_coverage': discovery.get('coverage', {}),
               'investigation_coverage': investigations.get('coverage', {}),
+              'scanner_coverage': {**scan.get('collection', {}), 'scan_time': scan.get('scan_time')},
               'unresolved_route_count': routes.get('counts', {}).get('unresolved', len(unresolved)),
               'next_route_queries': [{'id': r.get('id'), 'next_query': r.get('next_query'),
                                       'reason': r.get('reason')} for r in unresolved[:20]],

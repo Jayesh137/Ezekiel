@@ -203,6 +203,10 @@ def get_candidate_fills(wallet: str, lookback_days: int = 7) -> list[dict]:
     start_ms = now_ms - (lookback_days * 24 * 60 * 60 * 1000)
     result = cached_fill_history(wallet, start_ms, now_ms,
                                  db_path=DATA_DIR / ".local" / "discovery.sqlite3")
+    from src.hl_budget import current_budget
+    budget = current_budget()
+    if budget and result['status'] != 'ok':
+        budget.incomplete_histories += 1
     return FillBatch(result)
 
 
@@ -1755,7 +1759,21 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     target_addr = config["target_wallet"]
     results = []
 
-    for wallet, meta in priority.items():
+    from src.hl_budget import current_budget
+    from src.scan_progress import ScanProgress, priority_order
+    budget = current_budget()
+    progress = ScanProgress(DATA_DIR / '.local' / 'discovery.sqlite3', 'priority') if budget else None
+    selected = priority_order(priority, progress.attempts,
+                               config['scanner'].get('max_priority_per_run', 80)) if progress else list(priority)
+    attempted = 0
+    for wallet in selected:
+        if budget and (not budget.can_continue() or budget.clock() - budget.started >= 420):
+            break
+        meta = priority[wallet]
+        if progress:
+            progress.mark(wallet, int(time.time() * 1000))
+            budget.attempted_wallets.add(wallet.lower())
+        attempted += 1
         source = meta.get("source", "targeted")
         result = scan_specific_wallet(wallet, ezekiel_fp, config, source=source, eff=eff,
                                       market_freq=market_freq)
@@ -1855,10 +1873,19 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
         time.sleep(0.5)
 
     results.sort(key=lambda r: r["score"], reverse=True)
+    if budget:
+        budget.phase_coverage['priority'] = {'requested': len(priority), 'attempted': attempted,
+                                             'deferred': len(priority) - attempted}
     return results
 
 
 def scan_leaderboard():
+    from src.hl_budget import ReadBudget
+    with ReadBudget(seconds=900):
+        return _scan_leaderboard()
+
+
+def _scan_leaderboard():
     """Main scanning loop: check leaderboard wallets against fingerprint."""
     config = load_config()
     target = config["target_wallet"].lower()
@@ -1915,17 +1942,31 @@ def scan_leaderboard():
     sweep_scores = []  # this sweep's scores → next sweep's null distribution
     sweep_markets = {}  # eligible wallet → markets traded → rarity calibration
     cohort_profiles = []
+    from src.evaluation_cohort import cohort_wallets
+    from src.hl_budget import current_budget
+    from src.scan_progress import ScanProgress
+    budget = current_budget()
+    progress = ScanProgress(DATA_DIR / '.local' / 'discovery.sqlite3', 'leaderboard')
+    heldout = set(cohort_wallets(DATA_DIR / '.local' / 'discovery.sqlite3'))
 
     # Largest accounts first, not the API's arbitrary order — see
     # select_leaderboard_wallets for why the previous slice excluded the
     # target himself and 80% of the wallets he could plausibly have become.
-    for entry in select_leaderboard_wallets(leaderboard, max_wallets):
+    entries = select_leaderboard_wallets(leaderboard, max_wallets)
+    def entry_wallet(entry):
+        return entry.get('ethAddress', entry.get('address', '')).lower()
+    entries.sort(key=lambda e: (progress.attempts.get(entry_wallet(e), 0),
+                                entry_wallet(e) not in heldout, entry_wallet(e)))
+    for entry in entries:
+        if budget and (not budget.can_continue() or budget.clock() - budget.started >= 780):
+            break
         wallet = entry.get("ethAddress", entry.get("address", ""))
         if not wallet or wallet.lower() == target:
             continue
-        if wallet.lower() in priority_wallets:
+        if wallet.lower() in priority_wallets or (budget and wallet.lower() in budget.attempted_wallets):
             continue  # Already scanned in priority phase
 
+        progress.mark(wallet.lower(), int(time.time() * 1000))
         scanned += 1
         if scanned % 50 == 0:
             print(f"[scanner] Scanned {scanned}/{min(len(leaderboard), max_wallets)}...")
@@ -2028,15 +2069,16 @@ def scan_leaderboard():
         refresh_cohort_orders,
     )
     cohort_path = DATA_DIR / '.local' / 'discovery.sqlite3'
-    if cohort_profiles:
+    priority_profiles = [{'wallet': r['wallet'].lower(), 'fingerprint': r['fingerprint']}
+                         for r in priority_results if isinstance(r.get('fingerprint'), dict)]
+    if cohort_profiles or priority_profiles:
         cohort_stamp = int(time.time() * 1000)
         heldout = set(cohort_wallets(cohort_path))
         # After selection, a fills-only sweep cannot overwrite a control's
         # complete dated order observation or turn a failed fetch into zero.
         record_profiles([r for r in cohort_profiles if r['wallet'] not in heldout], cohort_stamp, cohort_path)
         freeze_cohort(cohort_path, cohort_stamp, excluded={target, *config.get('known_self_wallets', [])})
-        controls = cohort_profiles + [{'wallet': r['wallet'].lower(), 'fingerprint': r['fingerprint']}
-                                       for r in priority_results if isinstance(r.get('fingerprint'), dict)]
+        controls = cohort_profiles + priority_profiles
         order_coverage = refresh_cohort_orders(controls, cohort_path)
         print(f'[scanner] Held-out order observations: {order_coverage}')
     print(f"[scanner] Calibration population: {pop_size} samples")
@@ -2048,6 +2090,11 @@ def scan_leaderboard():
           f"{'ACTIVE' if market_summary['sufficient'] else 'INSUFFICIENT'}")
 
     results.sort(key=lambda r: r["score"], reverse=True)
+    if budget:
+        eligible = sum(bool(entry_wallet(e)) and entry_wallet(e) != target
+                       and entry_wallet(e) not in budget.attempted_wallets for e in entries)
+        budget.phase_coverage['leaderboard'] = {'requested': eligible, 'attempted': scanned,
+                                                'deferred': max(0, eligible - scanned)}
 
     for i, r in enumerate(results):
         if i >= 20:
@@ -2055,8 +2102,9 @@ def scan_leaderboard():
 
     scan_result = {
         "scan_time": datetime.now(UTC).isoformat(),
-        "wallets_scanned": scanned + len(priority_wallets),
-        "priority_scanned": len(priority_wallets),
+        'collection': budget.report() if budget else {'status': 'unbudgeted'},
+        "wallets_scanned": scanned + (len(budget.attempted_wallets) if budget else len(priority_wallets)),
+        "priority_scanned": len(budget.attempted_wallets) if budget else len(priority_wallets),
         "matches_found": len(results),
         # Resolved effective thresholds — the dashboard reads these instead of
         # hardcoding 0.90/0.80, so UI tiers match the tiers the alerts used.
@@ -2142,7 +2190,7 @@ def scan_leaderboard():
     except Exception as e:
         print(f"[scanner] Migration correlation check failed: {e}")
 
-    print(f"[scanner] Scan complete: {scanned} leaderboard + {len(priority_wallets)} priority = {scan_result['wallets_scanned']} total, {len(results)} matches")
+    print(f"[scanner] Scan saved: {scan_result['wallets_scanned']} wallets attempted, {len(results)} matches; {scan_result['collection']}")
     return scan_result
 
 

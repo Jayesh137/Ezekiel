@@ -20,6 +20,12 @@ export function discoveryView(reports = {}, now = Date.now()) {
     : lastSuccessAgeHours > 12 ? {level: 'warn', label: 'Collection overdue'}
     : {level: 'ok', label: discovery.last_run?.status === 'partial' ? 'Partial snapshot coverage' : 'Snapshot coverage'};
   const warnings = [];
+  const scanner = quality?.scanner_coverage;
+  if (scanner?.status === 'partial') {
+    const deferred = Object.values(scanner.phases || {}).reduce((sum, phase) => sum + (count(phase?.deferred) || 0), 0);
+    const reason = scanner.stopped_reason === 'rate_limited' ? 'the public data rate limit' : 'the bounded collection window or incomplete reads';
+    warnings.push(`Wallet enrichment is partial due to ${reason}. ${deferred} checks are deferred; saved progress resumes on a later scan.`);
+  }
   if (state?.status === 'restore_error') warnings.push('History restore failed. Discovery enrichment is paused until it can be recovered.');
   if (['state_lost', 'cold_start'].includes(state?.status)) warnings.push('No previous checkpoint was available. Earlier raw observations may be missing.');
   if (state?.pending_shards) warnings.push(state.pending_shards === 1

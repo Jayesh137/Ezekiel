@@ -2,8 +2,9 @@
 
 The approved discovery overhaul is implemented on `improve/wallet-discovery`.
 The original uncommitted `docs/2026-09-25-wallet-discovery-review.md` is preserved.
-The user subsequently authorized release. Deployment and live verification are
-being completed after the independent review corrections below.
+The user subsequently authorized release. The overhaul and independent-review
+corrections were released in [PR #34](https://github.com/Jayesh137/Ezekiel/pull/34).
+Live verification then exposed the throttling/resumption issues addressed below.
 There are no OpenAI API calls, AI inference services or new mandatory paid keys.
 
 ## What changed
@@ -53,7 +54,8 @@ and branch-scoped artifacts. Checkpoint preparation is distinct from upload succ
 Missing/corrupt/expired artifacts and pending batches are reported explicitly.
 
 The dashboard reads committed reports on `main`; branch previews show “not collected”
-until reports exist there. The browser verification used synthetic fixtures only.
+until reports exist there. Both synthetic local fixtures and the deployed dashboard
+have been verified in isolated desktop and phone browser sessions.
 Infrastructure classification and configured controlled recipients have separate
 accounting labels. Existing mobile review links to Investigations and uses honest
 lead labels, including for legacy inferred confirmations.
@@ -72,8 +74,9 @@ the independent-review fixes and protocol-join regression:
 - PWA build check: **passed** (manifest, five required files, ten pages with tags).
 - Apps Script relay tests: **13 passed**.
 - Workflow independence/runtime regression checks: **passed**; all four modified
-  workflow YAML files parsed successfully. Production Actions execution is untested
-  because the branch was not pushed/deployed.
+  workflow YAML files parsed successfully. The release CI, Pages deployment and
+  live watch run **36314797322** passed. Live scan and trace observations uploaded
+  successfully even when enrichment steps hit their time limits.
 - Isolated headless Chrome: desktop 1440px and phone 390px rendering, search,
   evidence expansion, missing-report state, no horizontal overflow and no runtime
   exceptions **passed**. Screenshots were visually inspected. The in-app browser
@@ -95,6 +98,45 @@ returned a complete source message for transaction
 The decoder recovered the USDC token, $3.5M burn, extension sender, and target's
 Hyperliquid recipient, matching the stored transfer. This verifies one real route,
 not destination credit or coverage of every protocol version.
+
+## Live runtime follow-up
+
+Production scan **36341703379** exhausted its 22-minute step while repeating
+rate-limited fill requests. Trace **36338504480** exhausted its three-minute
+dormancy step. Upload and import succeeded, but these steps did not finish their
+reports. The follow-up addresses the measured causes:
+
+- Pace Hyperliquid reads by request/response weight at 600 weight/minute, within
+  the documented 1,200 weight/minute public IP allowance. A 2,000-fill response
+  costs more than a small state read. Stop the batch on HTTP 429 and publish
+  partial coverage, instead of retrying each remaining wallet.
+- Bound scanner reads to 15 minutes, reserve time for reports/control observations,
+  and retain oldest-attempt ordering in the checkpoint. Priority batches reserve
+  exploration slots; incomplete priority reads are not immediately repeated in
+  the leaderboard phase. Controls cannot monopolize every run.
+- Persist the last fully processed fill-page boundary atomically with its rows.
+  Next runs overlap that boundary, retain timestamp-saturation gaps, restart when
+  a wider lookback is needed, and invalidate coverage if retained fills are pruned.
+  Disjoint historical windows cannot masquerade as continuous history.
+- Check dormancy with portfolio birth first; only plausible handoff windows need
+  a recent-trades request. Use a two-minute read budget, persistent fair rotation,
+  and explicit failed/deferred coverage. Preserve unread prior findings as stale;
+  they cannot re-alert or appear as fresh roster evidence.
+- Show partial enrichment and deferred counts in Scanner and Investigations.
+
+The production checkpoint from scan **36341703379** was downloaded and restored
+into an isolated database using the production restore routine. Integrity passed:
+200 market events, 148 discovered accounts, 3,734 routing/authority observations,
+252,246 cached fills, and five acknowledged observation imports. Recompaction
+enforced the 250,000-fill cap. No control cohort had accumulated at that point;
+behavioural promotion remains unvalidated.
+
+Follow-up verification: **1,868 Python tests passed in 211.20 seconds**, followed
+by **55 focused tests** after the disjoint-window regression correction. Dashboard
+**52 tests**, production build/PWA, Ruff and isolated desktop/phone partial-scan
+rendering passed. The required pre-push suite also checks the final committed code.
+
+Rate accounting source: [Hyperliquid rate limits](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits).
 
 ## Limits and review status
 

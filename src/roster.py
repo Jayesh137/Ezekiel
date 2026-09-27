@@ -834,7 +834,7 @@ def build_roster(config: dict | None = None) -> dict:
         handoffs = {}
     for a, h in handoffs.items():
         a = (a or "").lower()
-        if not a or a == target or not (h or {}).get("score"):
+        if not a or a == target or not (h or {}).get("score") or h.get('stale'):
             continue
         e = entry(a)
         e["evidence"]["dormancy_handoff"] = {

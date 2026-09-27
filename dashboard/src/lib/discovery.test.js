@@ -38,3 +38,9 @@ test('legacy inferred confirmation is not presented as operator ground truth', (
   assert.equal(rosterTierLabel({tier: 'CONFIRMED', known_self: true}), 'Trusted seed');
   assert.equal(rosterTierLabel({tier: 'PROBABLE'}), 'Priority lead');
 });
+
+test('partial scanner enrichment stays visible alongside successful market collection', () => {
+  const view = discoveryView({quality: {scanner_coverage: {status: 'partial',
+    stopped_reason: 'rate_limited', phases: {priority: {deferred: 80}, leaderboard: {deferred: 450}}}}});
+  assert.ok(view.warnings.some(w => /530/.test(w) && /rate limit/i.test(w)));
+});

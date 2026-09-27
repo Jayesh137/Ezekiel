@@ -79,15 +79,13 @@ def refresh_cohort_orders(rows, db_path=None, *, fetch=None, limit=20, seconds=6
     from src.fingerprint import compute_order_profile, normalise_orders
     now = now or (lambda: int(time.time() * 1000))
     if fetch is None:
-        import requests
-
-        from src.utils import load_config
-        url = load_config()['hyperliquid_api']
+        from src.utils import hl_read
 
         def fetch(wallet, timeout):
-            response = requests.post(url, json={'type': 'historicalOrders', 'user': wallet}, timeout=timeout)
-            response.raise_for_status()
-            return response.json()
+            result = hl_read({'type': 'historicalOrders', 'user': wallet}, retries=1, timeout=timeout)
+            if not result['ok']:
+                raise RuntimeError(result['error'])
+            return result['data']
 
     path = _path(db_path)
     with DiscoveryStore(path) as store:
@@ -99,6 +97,10 @@ def refresh_cohort_orders(rows, db_path=None, *, fetch=None, limit=20, seconds=6
     report = {'attempted': 0, 'updated': 0, 'failed': 0, 'members': len(members),
               'profiles_available': len(available), 'errors': []}
     for wallet in scheduled:
+        from src.hl_budget import current_budget
+        budget = current_budget()
+        if budget and not budget.can_continue():
+            break
         remaining = deadline - clock()
         if remaining <= 0:
             break
