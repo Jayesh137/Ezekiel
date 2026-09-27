@@ -256,3 +256,33 @@ before their histories roll off, and measure where verified cases are lost in
 observation, selection, enrichment or ranking. Add dated verified cases without
 changing the held-out controls. More detectors do not compensate for missing
 observations or a pipeline that cannot retain and revisit them.
+
+## Throttling and resumable enrichment
+
+Scanner public reads use a 900-second budget and conservative response-weight
+pacing (600 weight/minute). Priority work stops taking new wallets after seven
+minutes, with a default 80-wallet cap and one exploration slot in five. Leaderboard
+work stops taking new wallets after 13 minutes, leaving time for held-out orders
+and publishing. These are collection limits; the workflow's step timeout remains
+a backstop for unrelated blocking work.
+
+An HTTP 429 ends that batch without repeated retries. `data/scans/latest.json`
+publishes `collection.status`, stop reason, read failures, incomplete histories
+and per-phase attempted/deferred counts. `wallets_scanned` is the count attempted,
+not a claim that each was fully enriched. The quality report and dashboard show
+partial coverage. The next run orders wallets by oldest attempt; scanner scheduling
+lives only in the authoritative checkpoint and cannot be overwritten by a shard.
+
+Partial fill pages commit observations and their inclusive continuation together.
+Only a successful available-history read updates complete coverage. Timestamp
+saturation remains unresolved; requesting an older start backfills the missing
+prefix. Local/global retention pruning invalidates affected continuation and
+coverage claims, so large or old histories can require reacquisition.
+
+Dormancy uses a separate 120-second budget and saves its fair-rotation state in
+`data/dormancy/latest.json`. Portfolio history rules out births outside plausible
+handoff windows before any trade fetch. Missing portfolio birth is unknown. A
+plausible birth still needs observed trades, and older observed trades veto the
+apparent birth. Failed/deferred checks retain previous findings marked `stale`;
+stale findings do not notify or enter current roster evidence. All handoffs remain
+research hypotheses, not ownership proof.

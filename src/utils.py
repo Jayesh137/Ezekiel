@@ -20,27 +20,45 @@ def load_config():
 
 # --- Hyperliquid API ---
 
-def hl_read(request_body: dict, retries: int = 3) -> dict:
+def hl_read(request_body: dict, retries: int = 3, *, timeout=None) -> dict:
     """A successful empty response is different from a failed observation."""
     config = load_config()
+    from src.hl_budget import current_budget
+    budget = current_budget()
+    if budget:
+        retries = 1  # Scheduled batches resume later instead of retrying every wallet.
     last_error = None
+    attempted = 0
     for attempt in range(retries):
+        if budget and not budget.before(request_body):
+            last_error = budget.stopped_reason
+            break
+        attempted += 1
         try:
+            request_timeout = budget.timeout() if budget else (10, 30)
+            if timeout is not None:
+                request_timeout = tuple(min(value, max(.1, timeout / 2)) for value in request_timeout)
             resp = requests.post(
                 config["hyperliquid_api"],
                 json=request_body,
                 headers={"Content-Type": "application/json"},
                 # (connect, read) — same reasoning as etherscan_get below.
-                timeout=(10, 30),
+                timeout=request_timeout,
             )
             if resp.status_code == 429:
                 last_error = "rate limited"
+                if budget:
+                    budget.stopped_reason = 'rate_limited'
+                    break
                 wait = 2 ** (attempt + 1)
                 print(f"[api] Rate limited, waiting {wait}s...")
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
-            return {"ok": True, "data": resp.json(), "error": None,
+            data = resp.json()
+            if budget:
+                budget.after(request_body, data)
+            return {"ok": True, "data": data, "error": None,
                     "observed_at": datetime.now(UTC).isoformat(), "attempts": attempt + 1}
         except requests.exceptions.Timeout:
             last_error = f"Timeout on attempt {attempt + 1}"
@@ -52,9 +70,11 @@ def hl_read(request_body: dict, retries: int = 3) -> dict:
                 time.sleep(2 ** attempt)
         except ValueError as exc:
             last_error = f"Invalid JSON: {exc}"
-    print(f"[api] All {retries} attempts failed for {request_body.get('type', 'unknown')}: {last_error}")
+    if budget and attempted:
+        budget.failed_reads += 1
+    print(f"[api] Read unavailable after {attempted} attempts for {request_body.get('type', 'unknown')}: {last_error}")
     return {"ok": False, "data": None, "error": last_error,
-            "observed_at": datetime.now(UTC).isoformat(), "attempts": retries}
+            "observed_at": datetime.now(UTC).isoformat(), "attempts": attempted}
 
 
 def hl_post(request_body: dict, retries: int = 3) -> dict | list:

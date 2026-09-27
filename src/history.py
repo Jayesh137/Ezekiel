@@ -69,6 +69,7 @@ def fetch_fill_history(wallet: str, start_ms: int, end_ms: int, fetch=None,
         gaps.append({"start_ms": cursor, "reason": "page_budget"})
     fills = sorted(rows.values(), key=lambda r: (r["time"], fill_id(wallet, r)))
     return {"fills": fills, "status": "ok" if complete else ("partial" if fills else "error"),
+            "next_cursor_ms": cursor,
             "coverage": {"start_ms": start_ms, "end_ms": end_ms, "pages": pages,
                          "complete_available_window": complete,
                          "server_retention_limit": RETENTION_LIMIT,
@@ -86,23 +87,46 @@ def cached_fill_history(wallet: str, start_ms: int, end_ms: int, *,
         db.execute("CREATE TABLE IF NOT EXISTS fills (wallet TEXT, event_id TEXT PRIMARY KEY, ts INTEGER, raw TEXT)")
         db.execute("CREATE INDEX IF NOT EXISTS fills_wallet_time ON fills(wallet, ts)")
         db.execute("CREATE TABLE IF NOT EXISTS fill_coverage (wallet TEXT PRIMARY KEY, start_ms INTEGER, end_ms INTEGER)")
+        db.execute("CREATE TABLE IF NOT EXISTS fill_progress (wallet TEXT PRIMARY KEY, start_ms INTEGER, cursor_ms INTEGER)")
         prior = db.execute("SELECT start_ms,end_ms FROM fill_coverage WHERE wallet=?", (wallet,)).fetchone()
         cursor = max(start_ms, prior[1] - 60_000) if prior and start_ms >= prior[0] else start_ms
+        pending = db.execute("SELECT start_ms,cursor_ms FROM fill_progress WHERE wallet=?", (wallet,)).fetchone()
+        # Resume only a compatible window. A wider lookback must first collect
+        # its missing prefix; a historical query must not jump beyond its end.
+        if pending and start_ms >= pending[0] and pending[1] <= end_ms:
+            cursor = max(cursor, pending[1])
         result = fetch_fill_history(wallet, cursor, end_ms, fetch=fetch, max_pages=max_pages)
         db.executemany("INSERT OR REPLACE INTO fills VALUES (?,?,?,?)",
                        [(wallet, fill_id(wallet, r), r["time"], json.dumps(r)) for r in result["fills"]])
         if result["status"] == "ok":
             # Only join windows that overlap. A disjoint window does not fill the gap.
-            covered_start = min(start_ms, prior[0]) if prior and start_ms <= prior[1] else start_ms
-            covered_end = max(end_ms, prior[1]) if prior and start_ms <= prior[1] else end_ms
+            overlaps = prior and start_ms <= prior[1] and end_ms >= prior[0]
+            covered_start = min(start_ms, prior[0]) if overlaps else start_ms
+            covered_end = max(end_ms, prior[1]) if overlaps else end_ms
             db.execute("INSERT OR REPLACE INTO fill_coverage VALUES (?,?,?)", (wallet, covered_start, covered_end))
             prior = (covered_start, covered_end)
+            db.execute("DELETE FROM fill_progress WHERE wallet=?", (wallet,))
+        else:
+            # Rows and continuation commit together. Never advance beyond a
+            # fully processed page or skip a saturated timestamp boundary.
+            db.execute("INSERT OR REPLACE INTO fill_progress VALUES (?,?,?)",
+                       (wallet, start_ms, result['next_cursor_ms']))
         # Retain at most 50k observed fills per enriched candidate. This limit is
         # separate from the upstream 10k limit and is declared to consumers.
-        db.execute("DELETE FROM fills WHERE wallet=? AND event_id NOT IN "
-                   "(SELECT event_id FROM fills WHERE wallet=? ORDER BY ts DESC LIMIT 50000)", (wallet, wallet))
+        trimmed = db.execute("DELETE FROM fills WHERE wallet=? AND event_id NOT IN "
+                             "(SELECT event_id FROM fills WHERE wallet=? ORDER BY ts DESC LIMIT 50000)",
+                             (wallet, wallet)).rowcount
+        if trimmed:
+            # Retained data can no longer substantiate the full cached prefix.
+            db.execute('DELETE FROM fill_coverage WHERE wallet=?', (wallet,))
+            db.execute('DELETE FROM fill_progress WHERE wallet=?', (wallet,))
+            prior = None
+            result['status'] = 'partial'
+            result['coverage']['complete_available_window'] = False
+            result['gaps'].append({'start_ms': start_ms, 'reason': 'local_retention'})
         result["fills"] = [json.loads(row[0]) for row in db.execute(
             "SELECT raw FROM fills WHERE wallet=? AND ts>=? AND ts<=? ORDER BY ts,event_id", (wallet, start_ms, end_ms))]
         result["last_successful_end_ms"] = prior[1] if prior else None
-        result["coverage"].update(requested_start_ms=start_ms, cached=True, local_retention_fills=50_000)
+        result["coverage"].update(start_ms=start_ms, fetched_start_ms=cursor,
+                                  requested_start_ms=start_ms, cached=True, local_retention_fills=50_000)
     return result

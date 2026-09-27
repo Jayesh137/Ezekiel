@@ -131,6 +131,9 @@ def compact(db_path, now_ms=None):
             if 'fill_coverage' in tables:
                 store.db.executemany('DELETE FROM fill_coverage WHERE wallet=?',
                                      [(w,) for w, count in before.items() if after.get(w, 0) != count])
+            if 'fill_progress' in tables:
+                store.db.executemany('DELETE FROM fill_progress WHERE wallet=?',
+                                     [(w,) for w, count in before.items() if after.get(w, 0) != count])
         store.db.execute('DELETE FROM discovery_observations WHERE rowid NOT IN '
                          '(SELECT rowid FROM discovery_observations ORDER BY observed_at_ms DESC LIMIT 100000)')
         store.db.commit()

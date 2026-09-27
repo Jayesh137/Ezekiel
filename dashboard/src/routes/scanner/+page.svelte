@@ -336,6 +336,15 @@
 		<p class="text-muted">No scan results yet. Run the scanner workflow.</p>
 	</div>
 {:else}
+	{#if scan.collection?.status === 'partial'}
+		<div class="card" role="status" style="margin-bottom:16px">
+			<strong>Partial scan</strong>
+			<p class="text-muted">{scan.collection.stopped_reason === 'rate_limited' ? 'The public data source limited requests.' : 'Some checks could not finish within this collection window.'} Saved observations remain available and unfinished wallets rotate into later scans. An unchecked wallet is not an inactive wallet.</p>
+			{#each Object.entries(scan.collection.phases || {}) as [phase, coverage]}
+				<div>{phase === 'priority' ? 'Priority wallets' : 'Leaderboard wallets'}: {coverage.attempted} attempted, {coverage.deferred} deferred</div>
+			{/each}
+		</div>
+	{/if}
 	<div class="grid-3" style="margin-bottom:24px">
 		<div class="card">
 			<div class="stat-value">{scan.wallets_scanned ?? 0}</div>

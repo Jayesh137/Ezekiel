@@ -245,6 +245,13 @@ def test_dormancy_handoff_is_research_context(tmp_path, monkeypatch):
     assert all(w["wallet"] != "0xzero" for w in out["wallets"])
 
 
+def test_stale_handoff_does_not_reappear_as_current_roster_evidence(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch, dormancy=('handoffs', {W: {'score': .9, 'stale': True}}),
+           correlations=('matches', [{'wallet': W, 'confidence': .7}]))
+    row = next(r for r in roster.build_roster({'target_wallet': TARGET})['wallets'] if r['wallet'] == W)
+    assert 'dormancy_handoff' not in row['evidence']
+
+
 # --- the transfer vote is money moved WITH him, not reach ---------------------------
 
 def test_a_two_hop_reach_through_a_stranger_casts_no_transfer_vote(tmp_path, monkeypatch):
