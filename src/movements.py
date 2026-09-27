@@ -9,6 +9,8 @@ import json
 import math
 import re
 
+from src.route_binding import bound_decode
+
 
 def positive_number(value) -> float | None:
     try:
@@ -28,8 +30,6 @@ def event_identity(record: dict) -> str:
 def reconcile_movements(records: list[dict], ledger: list[dict], cluster: set[str],
                         bridge_decodes: dict, min_amount: float = 0) -> dict:
     cluster = {str(wallet).lower() for wallet in cluster if wallet}
-    decodes = {str(ref).lower(): value for ref, value in (bridge_decodes or {}).items()
-               if isinstance(value, dict)}
     movements, seen, clean = [], set(), []
     coverage = {"unpriced_or_invalid": 0, "ignored_spam": 0,
                 "exact_withdrawal_pairs": 0, "basis": "stored_observations_only"}
@@ -93,7 +93,7 @@ def reconcile_movements(records: list[dict], ledger: list[dict], cluster: set[st
             coverage["unpriced_or_invalid"] += 1
             continue
         ref = str(row.get("tx_hash") or "").lower()
-        decoded = decodes.get(ref, {})
+        decoded = bound_decode(row)
         resolution, endpoint = "unresolved", destination or None
         if destination in cluster:
             resolution = "cluster_internal"

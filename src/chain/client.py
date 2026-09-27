@@ -83,7 +83,7 @@ def _rows_or_error(payload: dict) -> tuple[list[dict], str | None]:
 
 def fetch_kind(address: str, chain: dict, kind: str, start_block: int,
                budget: CallBudget, *, page_size: int = 1000,
-               max_pages: int = 50) -> tuple[WalkResult, str | None]:
+               max_pages: int = 50, continuation: dict | None = None) -> tuple[WalkResult, str | None]:
     """Every record of one kind for one address on one chain, from start_block.
 
     Returns whatever was collected plus an error string when the sweep did not
@@ -92,7 +92,8 @@ def fetch_kind(address: str, chain: dict, kind: str, start_block: int,
     """
     if chain.get("reader") == "blockscout":
         from src.chain import blockscout
-        return blockscout.fetch_kind(address, chain, kind, start_block, budget, max_pages=max_pages)
+        return blockscout.fetch_kind(address, chain, kind, start_block, budget,
+                                     max_pages=max_pages, continuation=continuation)
     action = ACTIONS[kind]
     error: str | None = None
 

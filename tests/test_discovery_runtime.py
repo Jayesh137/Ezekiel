@@ -30,4 +30,15 @@ def test_observer_jobs_publish_shards_and_never_restore_or_overwrite_checkpoint(
 def test_historical_validation_restores_cohort_read_only():
     text = workflow('analyze.yml')
     assert 'discovery_artifacts.py restore --read-only' in text
-    assert 'discovery_artifacts.py snapshot' not in text
+    assert 'snapshot --kind state' not in text
+    assert 'snapshot --kind observations --db data/.local/analysis-observations.sqlite3' in text
+    assert 'DISCOVERY_OBSERVATION_DB: data/.local/analysis-observations.sqlite3' in text
+
+
+def test_observer_publication_guard_is_inside_commit_step_before_staging():
+    for name in ('watch.yml', 'trace.yml', 'analyze.yml'):
+        text = workflow(name)
+        commit = text.split('- name: Commit and push')[1]
+        assert commit.index('discovery_cursor_guard.py') < commit.index('git add')
+        assert "steps.observation_upload.conclusion" in commit
+        assert "steps.observation_upload.outputs.artifact-id" in commit

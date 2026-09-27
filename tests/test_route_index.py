@@ -6,9 +6,16 @@ ROUTER = "0x" + "3" * 40
 TOKEN = "0x" + "4" * 40
 
 
+def bound_record(record, decoded):
+    from src.route_binding import transfer_binding
+    record = {'token_address': TOKEN, 'amount': 20, **record}
+    return {**record, 'route_decode': {**decoded, 'transfer_binding': transfer_binding(record)}}
+
+
 def test_exact_source_decode_finds_small_treasury_funded_hl_account():
     record = {"id": "fund", "chain": "base", "tx_hash": "tx", "src": A, "dst": ROUTER,
               "amount_usd": 20, "ts": 100}
+    record = bound_record(record, {'protocol': 'cctp_extension', 'hl_account': B})
     result = index_routes([record], {"base:tx": {"protocol": "cctp_extension", "hl_account": B,
                                                "recipient": ROUTER, "chain": "hyperevm"}}, [], {A})
     assert result["discoveries"][0]["wallet"] == B
@@ -23,6 +30,7 @@ def test_route_index_output_reaches_successor_ranking_in_both_directions():
                 "amount_usd": 20, "ts": 100},
                {"id": "return", "chain": "base", "tx_hash": "back", "src": B, "dst": A,
                 "amount_usd": 5, "ts": 200}]
+    records[0] = bound_record(records[0], {'protocol': 'cctp_extension', 'hl_account': B})
     index = index_routes(records, {"base:tx": {"protocol": "cctp_extension", "hl_account": B}}, [], {A})
     rows = find_successor_hypotheses({'wallet': A}, [{'wallet': B}],
                                     {'routes': index['routes'], 'as_of_ms': 300000})
@@ -44,6 +52,7 @@ def test_shared_router_and_similar_amount_cannot_create_exact_route():
 def test_protocol_message_identity_joins_without_claiming_router_is_funder():
     source = {"id": "burn", "chain": "base", "tx_hash": "tx", "src": A, "dst": ROUTER,
               "amount_usd": 100, "protocol_message_id": "6:nonce", "protocol_id_verified": True}
+    source = bound_record(source, {'protocol_message_id': '6:nonce', 'protocol_id_verified': True})
     dest = {"event_id": "mint", "direction": "in", "protocol_message_id": "6:nonce",
             "protocol_id_verified": True, "hl_account": B, "counterparty": ROUTER,
             "amount_usd": 99, "tx_hash": "receive"}
@@ -56,6 +65,7 @@ def test_protocol_message_identity_joins_without_claiming_router_is_funder():
 def test_conflicting_recipients_stay_unresolved():
     source = {"id": "burn", "chain": "base", "tx_hash": "tx", "src": A,
               "dst": ROUTER, "protocol_message_id": "6:n", "protocol_id_verified": True}
+    source = bound_record(source, {'protocol_message_id': '6:n', 'protocol_id_verified': True})
     dests = [{"event_id": w, "protocol_message_id": "6:n", "protocol_id_verified": True,
               "direction": "in", "hl_account": w} for w in (B, ROUTER)]
     result = index_routes([source], {}, dests, {A})
@@ -158,3 +168,84 @@ def test_one_message_cannot_resolve_two_matching_transfer_legs(tmp_path):
         report = index_routes(enriched, decoded, [], {A})
         assert not report['discoveries']
         assert len(report['unresolved']) == 2
+
+
+def test_transaction_decode_never_resolves_unbound_transfer_legs(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    from src.movements import reconcile_movements
+    from src.route_index import resolve_source_routes
+    records = [{'id': str(amount), 'chain': 'base', 'tx_hash': 'batch', 'src': A,
+                'dst': ROUTER, 'amount': amount, 'amount_usd': amount,
+                'token_address': TOKEN, 'ts': 100} for amount in (1000, 500000)]
+    decodes = {'batch': {'protocol': 'cctp_extension', 'hl_account': A}}
+    with DiscoveryStore(tmp_path / 'db') as store:
+        for fetch, budget in [(lambda *_: {}, 20), (None, 0)]:
+            enriched, decoded, _ = resolve_source_routes(records, decodes, store,
+                                                         fetch=fetch, max_queries=budget)
+            assert len(index_routes(enriched, decoded, [], {A})['unresolved']) == 2
+            result = reconcile_movements(enriched, [], {A}, decoded)
+            assert len(result['unresolved_exits']) == 2
+
+
+def test_bound_message_resolves_only_its_leg_in_both_consumers(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    from src.movements import reconcile_movements
+    from src.route_index import resolve_source_routes
+    records = [{'id': str(amount), 'chain': 'base', 'tx_hash': 'batch', 'src': A,
+                'dst': ROUTER, 'amount': amount, 'amount_usd': amount,
+                'token_address': TOKEN, 'ts': 100} for amount in (1000, 500000)]
+    message = {'event_id': 'message', 'source_domain': 6, 'source_tx_hash': 'batch',
+               'protocol': 'cctp', 'protocol_message_id': '6:1', 'amount_usd': 1000,
+               'burn_token': '0x' + '0' * 24 + TOKEN[2:], 'message_sender': A, 'hl_account': B}
+    with DiscoveryStore(tmp_path / 'db') as store:
+        store.ingest_observations('cctp_sources', [message], 1000)
+        enriched, decoded, _ = resolve_source_routes(records, {'batch': {'protocol': 'cctp'}}, store,
+                                                     max_queries=0)
+    routes = index_routes(enriched, decoded, [], {A})
+    movements = reconcile_movements(enriched, [], {A}, decoded)
+    assert [r['id'] for r in routes['routes']] == ['1000']
+    assert [r['id'] for r in movements['resolved']] == ['1000']
+    assert [r['id'] for r in movements['unresolved_exits']] == ['500000']
+    # Reusing a bound decode on another transfer/chain must fail closed.
+    changed = {**enriched[0], 'chain': 'arbitrum'}
+    assert not reconcile_movements([changed], [], {A}, decoded)['resolved']
+
+
+def test_duplicate_copies_of_one_transfer_do_not_make_binding_ambiguous(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    from src.route_index import resolve_source_routes
+    record = {'id': 'one', 'chain': 'base', 'tx_hash': 'batch', 'src': A, 'dst': ROUTER,
+              'amount': 1000, 'amount_usd': 1000, 'token_address': TOKEN, 'ts': 100}
+    message = {'event_id': 'message', 'source_domain': 6, 'source_tx_hash': 'batch',
+               'protocol': 'cctp', 'protocol_message_id': '6:1', 'amount_usd': 1000,
+               'burn_token': '0x' + '0' * 24 + TOKEN[2:], 'message_sender': A, 'hl_account': B}
+    with DiscoveryStore(tmp_path / 'db') as store:
+        store.ingest_observations('cctp_sources', [message], 1000)
+        enriched, decoded, _ = resolve_source_routes([record, record], {'batch': {'protocol': 'cctp'}},
+                                                     store, max_queries=0)
+    assert len(index_routes(enriched, decoded, [], {A})['routes']) == 1
+
+
+def test_unavailable_old_source_message_does_not_starve_other_transactions(tmp_path):
+    from src.discovery_store import DiscoveryStore
+    from src.route_index import resolve_source_routes
+    records = [{'id': tx, 'chain': 'base', 'tx_hash': tx, 'ts': 100} for tx in ('a', 'b')]
+    decodes = {tx: {'protocol': 'cctp'} for tx in ('a', 'b')}
+    calls = []
+    def unavailable(domain, tx):
+        calls.append(tx)
+        return {}
+    with DiscoveryStore(tmp_path / 'db') as store:
+        for _ in range(2):
+            resolve_source_routes(records, decodes, store, fetch=unavailable, max_queries=1)
+    assert set(calls) == {'a', 'b'}
+
+
+def test_protocol_join_cannot_reuse_a_binding_from_another_transfer():
+    record = bound_record({'id': 'burn', 'chain': 'base', 'tx_hash': 'tx', 'src': A, 'dst': ROUTER,
+                           'protocol_message_id': '6:n', 'protocol_id_verified': True},
+                          {'protocol_message_id': '6:n', 'protocol_id_verified': True})
+    record['amount'] = 100000
+    received = {'protocol_message_id': '6:n', 'protocol_id_verified': True, 'direction': 'in', 'hl_account': B}
+    report = index_routes([record], {}, [received], {A})
+    assert not report['routes'] and len(report['unresolved']) == 1

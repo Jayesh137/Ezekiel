@@ -2021,12 +2021,24 @@ def scan_leaderboard():
     print(f"[scanner] Top 5 scores: {top_scores[:5]}")
 
     pop_size = calibration.record_population_scores(sweep_scores)
-    from src.evaluation_cohort import freeze_cohort, record_profiles
+    from src.evaluation_cohort import (
+        cohort_wallets,
+        freeze_cohort,
+        record_profiles,
+        refresh_cohort_orders,
+    )
     cohort_path = DATA_DIR / '.local' / 'discovery.sqlite3'
     if cohort_profiles:
         cohort_stamp = int(time.time() * 1000)
-        record_profiles(cohort_profiles, cohort_stamp, cohort_path)
+        heldout = set(cohort_wallets(cohort_path))
+        # After selection, a fills-only sweep cannot overwrite a control's
+        # complete dated order observation or turn a failed fetch into zero.
+        record_profiles([r for r in cohort_profiles if r['wallet'] not in heldout], cohort_stamp, cohort_path)
         freeze_cohort(cohort_path, cohort_stamp, excluded={target, *config.get('known_self_wallets', [])})
+        controls = cohort_profiles + [{'wallet': r['wallet'].lower(), 'fingerprint': r['fingerprint']}
+                                       for r in priority_results if isinstance(r.get('fingerprint'), dict)]
+        order_coverage = refresh_cohort_orders(controls, cohort_path)
+        print(f'[scanner] Held-out order observations: {order_coverage}')
     print(f"[scanner] Calibration population: {pop_size} samples")
 
     market_summary = calibration.record_market_observation(sweep_markets)

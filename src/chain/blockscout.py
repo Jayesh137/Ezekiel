@@ -44,43 +44,63 @@ def normalise(row, kind):
     return result
 
 
-def fetch_kind(address, chain, kind, start_block, budget, *, max_pages=50, get=None, **unused):
+def fetch_kind(address, chain, kind, start_block, budget, *, max_pages=50, get=None,
+               continuation=None, **unused):
     get = get or _get
     host = HOSTS.get(chain["name"])
     if not host:
         return WalkResult([], start_block, 0, True, []), "unsupported_public_reader"
     url = f"{host}/api/v2/addresses/{address}/{PATHS[kind]}"
-    params = {"type": "ERC-20"} if kind == "erc20" else {}
+    base_params = {"type": "ERC-20"} if kind == "erc20" else {}
+    state = continuation if continuation is not None else {}
+    if state.get('start_block') != start_block:
+        state.clear()
+    resumed = isinstance(state.get('next_page_params'), dict) and bool(state['next_page_params'])
+    params = {**base_params, **(state.get('next_page_params') or {})}
     seen_pages, rows, pages, error, complete = set(), {}, 0, None, False
-    highest = start_block
-    for _ in range(max_pages):
+    highest = max(start_block, state.get('head_block', start_block))
+    if resumed:
+        seen_pages.add(json.dumps(state['next_page_params'], sort_keys=True))
+
+    def read(params):
+        nonlocal pages
+        budget.spend()
+        doc = get(url, params)
+        pages += 1
+        if not isinstance(doc, dict) or not isinstance(doc.get('items'), list) or 'next_page_params' not in doc:
+            raise ValueError('invalid Blockscout page')
+        if doc['next_page_params'] is not None and not isinstance(doc['next_page_params'], dict):
+            raise ValueError('invalid pagination cursor')
+        # Parse a whole page before committing its continuation.
+        parsed = [(int(raw['block_number']), normalise(raw, kind)) for raw in doc['items']]
+        for block, row in parsed:
+            if block >= start_block and row:
+                rows[default_row_key(row)] = row
+        return parsed, doc['next_page_params']
+
+    if resumed and max_pages > 1 and budget.can_spend(2):
+        # Keep observing new activity while historical pages catch up. This
+        # sample cannot advance the fixed sweep watermark or claim completeness.
         try:
-            budget.spend()
-            doc = get(url, params)
-            pages += 1
-            if not isinstance(doc, dict) or not isinstance(doc.get("items"), list) or "next_page_params" not in doc:
-                raise ValueError("invalid Blockscout page")
-            crossed_start = False
-            for raw in doc["items"]:
-                block = int(raw["block_number"])
-                if block < start_block:
-                    crossed_start = True
-                    continue
-                highest = max(highest, block)
-                row = normalise(raw, kind)
-                if row:
-                    rows[default_row_key(row)] = row
-            next_page = doc["next_page_params"]
+            read(base_params)
+        except Exception as exc:
+            error = f'blockscout:head_refresh:{type(exc).__name__}:{exc}'
+    for _ in range(max(0, max_pages - pages)):
+        try:
+            parsed, next_page = read(params)
+            if not resumed and not state:
+                highest = max([start_block, *(block for block, _ in parsed)])
+            crossed_start = any(block < start_block for block, _ in parsed)
             if not next_page or crossed_start:
                 complete = True
+                state.clear()
                 break
-            if not isinstance(next_page, dict):
-                raise ValueError("invalid pagination cursor")
             identity = json.dumps(next_page, sort_keys=True)
             if identity in seen_pages:
                 raise ValueError("repeated pagination cursor")
             seen_pages.add(identity)
-            params = {**params, **next_page}
+            state.update(start_block=start_block, head_block=highest, next_page_params=next_page)
+            params = {**base_params, **next_page}
         except Exception as exc:
             error = f"blockscout:{type(exc).__name__}:{exc}"
             break

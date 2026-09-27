@@ -147,7 +147,14 @@ without restoring or overwriting the scanner's scheduling/cohort state. Scan
 imports facts idempotently by event and artifact IDs, at most 40 batches per run.
 One corrupt shard remains pending and does not invalidate a valid checkpoint.
 Daily analysis restores a checkpoint copy for historical controls and never
-publishes it back; its temporary additional observations do not update the owner.
+publishes it back. Its new CCTP observations go into a separate temporary database
+and observation shard for the owner to import.
+
+Observer jobs publish their source cursors only after a successful snapshot and
+acknowledged upload. Failed/skipped publication restores only Circle's `last_block`
+or CCTP's `cursor_ms` and `forwarder`, retaining unrelated reports and alert receipts.
+The next job replays the unsaved range. Authority snapshots, which cannot be replayed
+after revocation, enter a JSON retry outbox until a shard durably contains them.
 
 Artifacts are scoped to a hash of the branch name and named by run ID/attempt.
 The repository workflow token supplies artifact permissions; no external paid key
@@ -162,7 +169,11 @@ visible workflow failure, never permission to buy storage or discard unseen fact
 Scheduled compaction retains at most 100,000 market events within 30 days,
 250,000 fills within 90 days globally, and 100,000 generic observations. Explicit
 authority can survive up to 730 days subject to that generic row cap. Evaluation
-profiles have their own 90-day/10,000-row cap. Wallet aggregates survive market
+profiles have their own 90-day/10,000-row cap, keeping the first and last profile
+per member per UTC day. Frozen membership excludes new nonmembers from retention.
+Up to 20 members receive strict order reads per scan within 60 seconds; failures
+preserve previous profiles and successful empty reads remain explicitly unsupported.
+Wallet aggregates survive market
 pruning; history outside these limits is not claimed complete. When fills are
 pruned, their coverage claims are invalidated. Standalone collection without a
 checkpoint uses the larger 500,000-event cap described above.
@@ -207,6 +218,12 @@ does not reveal the original customer behind a service.
 Source-message binding checks the burned token, raw amount and sender relationship,
 and requires a unique transfer leg. A matching dollar value or a transaction-level
 recipient cannot substitute for this binding in an ambiguous batch.
+Both movement accounting and route discovery consume the same transfer-bound
+proof. Old transaction-only caches remain clues. Unavailable source messages rotate
+behind unattempted transactions, so one missing old receipt cannot monopolize reads.
+Blockscout retains its opaque page continuation separately from the numeric forward
+cursor. Resumed backfills also sample fresh activity when the budget permits; that
+sample never claims complete history or advances past unread older pages.
 
 Use the funding/authority filter for factual connections and the sparse-session
 filter for candidates needing more observation. Each row supplies a next check,

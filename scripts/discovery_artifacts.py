@@ -169,6 +169,10 @@ def main():
             parser.error('--artifact-id is required for cleanup')
         print(json.dumps(cleanup(GitHubArtifacts(), args.db, args.branch, args.artifact_id)))
         return 0
+    pending = DATA_DIR / 'agent_links' / 'pending_observations.json'
+    if args.kind == 'observations' and pending.exists():
+        with DiscoveryStore(args.db) as store:
+            store.ingest_observations('authority_actions', json.loads(pending.read_text()), int(time.time() * 1000))
     if not args.db.exists():
         print('No observation store was created; no artifact to publish.')
         return 0

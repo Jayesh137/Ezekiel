@@ -251,7 +251,9 @@ def refresh_pool(post, *, excluded, now_ms: int | None = None, pool_days: int = 
     # repoints: a module-level path captured at import would write the real
     # pool from a test, as this one did once before the guard existed.
     local_root = Path(path).parent if path is not None else utils.DATA_DIR
-    discovery_path = discovery_path or local_root / ".local" / "discovery.sqlite3"
+    import os
+    discovery_path = (discovery_path or os.environ.get('DISCOVERY_OBSERVATION_DB')
+                      or local_root / ".local" / "discovery.sqlite3")
     path = Path(path or (utils.DATA_DIR / "correlations" / POOL_NAME))
     pool = load_pool(path)
 

@@ -616,8 +616,17 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             key = f"{name}:{addr}:{kind}"
             start = int(cursors.get(key, 0) or 0)
             before = budget.calls_used
+            reader_args = {}
+            if chain.get('reader') == 'blockscout':
+                pending = dict(cursors.get(key + ':backfill') or {})
+                reader_args['continuation'] = pending
             walk, error = fetch_kind(addr, chain, kind, start, budget,
-                                     page_size=page_size, max_pages=max_pages)
+                                     page_size=page_size, max_pages=max_pages, **reader_args)
+            if reader_args:
+                if pending:
+                    cursors[key + ':backfill'] = pending
+                else:
+                    cursors.pop(key + ':backfill', None)
             chain_result["calls"] += budget.calls_used - before
             chain_result["gaps"].extend(walk.possible_gaps)
             chain_result["truncated"] = chain_result["truncated"] or walk.truncated
@@ -656,7 +665,7 @@ def sweep_wallet(address: str, chains: list[dict], budget, *, cluster: bool = Fa
             # page comes back short, which says what the API returned, not what
             # exists — see client.newest_block for the live case where those
             # differed by 220 million blocks and nothing noticed.
-            if error is None and cluster:
+            if error is None and (cluster or chain.get('reader') == 'blockscout'):
                 newest, probe_err = newest_block(addr, chain, kind, budget)
                 chain_result["calls"] += 1
                 if probe_err:

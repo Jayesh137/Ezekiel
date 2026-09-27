@@ -204,6 +204,13 @@ def collect_target_movements(target: str, min_amount: float = 0, *,
         decodes = {}
     if not isinstance(decodes, dict):
         decodes = {}
+    try:
+        bindings = json.loads((directory / 'routes' / 'bindings.json').read_text())
+    except (OSError, ValueError):
+        bindings = {}
+    if isinstance(bindings, dict):
+        records = [{**row, 'route_decode': row.get('route_decode') or bindings.get(row.get('id'))}
+                   for row in records]
     result = reconcile_movements(records, ledger, cluster, decodes, min_amount)
     circle = unpaired_cctp_exits(target, ledger, min_amount, config=config)
     result["unresolved_exits"].extend({**row, "id": f"hl-cctp:{row['ref']}",

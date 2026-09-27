@@ -51,7 +51,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest ruff
 
 # 2. Verify
-.\.venv\Scripts\python.exe -m pytest -q          # expect: 1539 passed
+.\.venv\Scripts\python.exe -m pytest -q          # full offline regression suite
 .\.venv\Scripts\python.exe -m ruff check src/ tests/ scripts/   # expect: All checks passed!
 
 # 3. Dashboard
@@ -92,10 +92,10 @@ cd dashboard; npm run dev                         # dashboard at localhost:5173
 Before trusting a change to scoring or matching:
 
 1. `pytest -q` — all green.
-2. `python src/backtest.py` — must PASS. It exits non-zero if the scorer can't
-   rank the trader above every stranger, or if any dimension scores **0.0**
-   against their own history. `None` means "excluded, too little data" and is
-   fine; a hard `0.0` is always a bug — it votes against the real trader.
+2. `python src/backtest.py` — inspect the verdict and coverage. A new installation
+   remains inconclusive until dated, fixed control profiles and matched features
+   support the trial. Inconclusive is not a pass. A supported failed trial exits
+   non-zero; investigate its dimensions before enabling behavioural promotion.
 3. `python src/heartbeat.py` — exits non-zero when data is stale.
 4. `npm run build` in `dashboard/`.
 

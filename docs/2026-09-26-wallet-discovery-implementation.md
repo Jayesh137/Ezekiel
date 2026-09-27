@@ -2,8 +2,8 @@
 
 The approved discovery overhaul is implemented on `improve/wallet-discovery`.
 The original uncommitted `docs/2026-09-25-wallet-discovery-review.md` is preserved.
-Nothing was pushed or deployed. Scheduled operation begins only when these changes
-are installed on the scheduled branch; this report does not claim they are live.
+The user subsequently authorized release. Deployment and live verification are
+being completed after the independent review corrections below.
 There are no OpenAI API calls, AI inference services or new mandatory paid keys.
 
 ## What changed
@@ -61,9 +61,9 @@ lead labels, including for legacy inferred confirmations.
 ## Verification
 
 Verification ran on 26–27 September 2026, with the final full regression after
-the burn-binding and investigation-queue fixes:
+the independent-review fixes and protocol-join regression:
 
-- Full Python suite: **1,833 passed in 249.43 seconds**. Baseline: 1,696 passed.
+- Full Python suite: **1,851 passed in 141.90 seconds**. Baseline: 1,696 passed.
 - Ruff: **all checks passed**.
 - Dashboard unit tests: **51 passed**. Baseline: 47 passed.
 - Production dashboard build: **passed**; existing Svelte accessibility warnings
@@ -89,14 +89,24 @@ remain in the ignored `.superpowers/sdd/2026-09-26-wallet-discovery/` workspace.
 Read-only live probes during implementation observed the public Hyperliquid trade
 schema (20 events / 22 wallets in an isolated collector run) and successful responses
 from six Base/Optimism transfer endpoints. They changed no historical production
-observations and sent no notifications. The Circle source-message lookup has fixture
-coverage but was not independently verified live.
+observations and sent no notifications. A subsequent read-only Circle Iris probe
+returned a complete source message for transaction
+`0xff8c1906227c7ddd80cf00b4541a75aaa6c96b8e560c43502243759b71980e0a` on Arbitrum.
+The decoder recovered the USDC token, $3.5M burn, extension sender, and target's
+Hyperliquid recipient, matching the stored transfer. This verifies one real route,
+not destination credit or coverage of every protocol version.
 
 ## Limits and review status
 
-The available independent agent was stopped by the session's usage limit. A manual
-integration review and the verification above were completed; this is **not an
-independent whole-branch review**. That review remains advisable before deployment.
+An independent whole-branch review subsequently completed and found four issues:
+transaction-wide route attribution, non-resumable Blockscout backfills, observer
+cursors advancing despite failed artifact uploads, and control profiles missing
+order data. All four have regression coverage and implementation corrections.
+The review also prompted fair source-message retries, daily control-history
+retention, and an authority snapshot retry outbox. Helper agents reached their
+usage limit before implementing fixes; the primary session implemented and
+verified them. The final patches have manual integration review rather than a
+second independent agent review.
 
 No newly attributed wallet was verified in this implementation exercise, and no
 real-world recall/precision improvement is claimed. Synthetic replay tests the

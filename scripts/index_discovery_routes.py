@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.authority_history import index_authority
 from src.candidate_registry import observe_candidate
 from src.discovery_store import DiscoveryStore
+from src.route_binding import bound_decode
 from src.route_index import index_routes, resolve_source_routes
 from src.utils import DATA_DIR, atomic_write_json, load_config
 
@@ -53,11 +54,22 @@ def run(config, data_dir=DATA_DIR, *, actions=None, route_input=None, output_dir
         circle_events += store.observations("circle")
         if actions:
             store.ingest_observations("authority_actions", actions, now_ms)
+        pending = read(data_dir / 'agent_links' / 'pending_observations.json', [])
+        if pending:
+            store.ingest_observations('authority_actions', pending, now_ms)
         authority = index_authority(store.observations("authority_actions"), as_of_ms=now_ms)
         transfers = list(records.values())
         source_reads = {"queries": 0, "errors": [], "enabled": resolve_sources}
         if resolve_sources:
             transfers, decodes, source_reads = resolve_source_routes(transfers, decodes, store)
+            # Small immutable transfer-level proofs are also available to the
+            # offline economic reconciler, without opening a writable store.
+            bindings = {row['id']: row['route_decode'] for row in transfers if bound_decode(row)}
+            atomic_write_json(data_dir / 'routes' / 'bindings.json', bindings)
+        else:
+            bindings = read(data_dir / 'routes' / 'bindings.json', {})
+            transfers = [{**row, 'route_decode': row.get('route_decode') or bindings.get(row.get('id'))}
+                         for row in transfers]
         routes = index_routes(transfers, decodes, circle_events, cluster)
         for row in routes["discoveries"]:
             observe_candidate(row["wallet"], {**row, "status": "ok"}, data_dir)

@@ -2,6 +2,7 @@
 
 from src.candidate_registry import valid_wallet
 from src.movements import event_identity
+from src.route_binding import bound_decode, transfer_binding
 
 
 def _matches_source_burn(record, message):
@@ -72,11 +73,14 @@ def resolve_source_routes(records, decodes, store, *, fetch=None, max_queries=20
     for event in store.observations("cctp_sources"):
         cached.setdefault((event["source_domain"], event["source_tx_hash"]), []).append(event)
     enriched, output, errors, spent = [], dict(decodes), [], 0
+    attempts = store.meta('source_route_attempts', {})
     by_transaction = {}
-    for record in records:
-        by_transaction.setdefault((record.get('chain'), (record.get('tx_hash') or '').lower()), []).append(record)
+    ordered = sorted(records, key=lambda row: (attempts.get(f"{row.get('chain')}:{row.get('tx_hash', '').lower()}", 0),
+                                               -(row.get('ts') or 0), event_identity(row)))
+    for record in ordered:
+        by_transaction.setdefault((record.get('chain'), (record.get('tx_hash') or '').lower()), {})[event_identity(record)] = record
     deadline = time.monotonic() + seconds
-    for record in records:
+    for record in ordered:
         tx, chain = (record.get("tx_hash") or "").lower(), record.get("chain")
         decoded = decodes.get(f"{chain}:{tx}", decodes.get(tx)) or {}
         domain = domains.get(chain)
@@ -86,6 +90,7 @@ def resolve_source_routes(records, decodes, store, *, fetch=None, max_queries=20
         key = (domain, tx)
         if key not in cached and spent < max_queries and time.monotonic() < deadline:
             spent += 1
+            attempts[f'{chain}:{tx}'] = int(time.time() * 1000)
             try:
                 if fetch:
                     payload = fetch(domain, tx)
@@ -106,19 +111,25 @@ def resolve_source_routes(records, decodes, store, *, fetch=None, max_queries=20
         # matching token movement supports assigning a message to this record.
         matching = [m for m in messages if _matches_source_burn(record, m)]
         if len(matching) == 1 and sum(_matches_source_burn(r, matching[0])
-                                     for r in by_transaction[(chain, tx)]) != 1:
+                                     for r in by_transaction[(chain, tx)].values()) != 1:
             matching = []
         if len(matching) == 1:
             message = matching[0]
             enriched.append({**record, "protocol_message_id": message["protocol_message_id"],
-                             "protocol_id_verified": True, "route_decode": {**decoded, **message}})
+                             "protocol_id_verified": True,
+                             "route_decode": {**decoded, **message,
+                                              "protocol_id_verified": True,
+                                              "transfer_binding": transfer_binding(record)}})
         elif messages:
             # A transaction-level recipient cannot rescue an unbound movement:
             # batch burns, another token or multiple matching legs stay open.
             enriched.append({**record, 'route_decode': {'protocol': decoded.get('protocol'),
                                                        'error': 'source_message_not_bound'}})
         else:
-            enriched.append(record)
+            enriched.append({**record, 'route_decode': {'protocol': decoded.get('protocol'),
+                                                       'error': 'source_message_unavailable'}})
+    if spent:
+        store.set_meta('source_route_attempts', dict(sorted(attempts.items(), key=lambda item: item[1], reverse=True)[:10000]))
     return enriched, output, {"queries": spent, "errors": errors}
 
 
@@ -155,9 +166,7 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
             continue
         seen.add(event_id)
         chain, tx = rec.get("chain"), (rec.get("tx_hash") or "").lower()
-        decoded = rec.get("route_decode") or bridge_decodes.get(f"{chain}:{tx}", bridge_decodes.get(tx)) or {}
-        if not isinstance(decoded, dict) or decoded.get("heuristic") or decoded.get("error"):
-            decoded = {}
+        decoded = bound_decode(rec)
         if source and source not in cluster and destination in cluster:
             # This is the observed immediate transfer source, never an inferred
             # original customer behind an exchange or shared bridge.
@@ -168,7 +177,7 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
             routes.append(route)
             discover(source, route)
             continue
-        matches = messages.get(rec.get("protocol_message_id"), []) if rec.get("protocol_id_verified") else []
+        matches = messages.get(decoded.get("protocol_message_id"), []) if decoded.get("protocol_id_verified") else []
         matches = [m for m in matches if m.get("direction") == "in"]
         endpoints = {_address(m.get("hl_account")) for m in matches} - {None}
         instructed = _address(decoded.get("hl_account"))

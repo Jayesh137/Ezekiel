@@ -23,10 +23,13 @@ def reconcile(records, ledger=None, decodes=None):
 
 
 def test_self_deposits_and_internal_transfers_are_resolved_but_onward_exit_remains():
+    from src.route_binding import transfer_binding
     rows = [transfer("deposit", dst=ROUTER), transfer("internal", dst=TREASURY),
             transfer("onward", src=TREASURY)]
-    result = reconcile(rows, decodes={"deposit": {"protocol": "cctp_extension",
-                                                "hl_account": TARGET}})
+    rows[0].update(amount=1_000_000, token_address=OTHER)
+    rows[0]['route_decode'] = {'hl_account': TARGET, 'protocol': 'cctp',
+                               'transfer_binding': transfer_binding(rows[0])}
+    result = reconcile(rows)
     assert [r["ref"] for r in result["unresolved_exits"]] == ["onward"]
     assert {r["resolution"] for r in result["resolved"]} == {"cluster_internal", "bridge_to_cluster"}
     assert all(r["event_ids"] for r in result["movements"])
@@ -86,6 +89,7 @@ def test_transfer_identity_includes_chain_and_ledger_duplicates_collapse():
 
 
 def test_collector_reads_known_cluster_and_existing_bridge_decodes(tmp_path, monkeypatch):
+    from src.route_binding import transfer_binding
     monkeypatch.setattr(correlator, "DATA_DIR", tmp_path)
     monkeypatch.setattr(correlator, "load_config", lambda: {"known_self_wallets": [TREASURY]})
     rows = {TARGET: [transfer("self", dst=ROUTER), transfer("internal", dst=TREASURY)],
@@ -94,6 +98,14 @@ def test_collector_reads_known_cluster_and_existing_bridge_decodes(tmp_path, mon
     monkeypatch.setattr(correlator, "load_all_records", lambda path: [])
     (tmp_path / "labels").mkdir()
     (tmp_path / "labels" / "bridge_decodes.json").write_text(json.dumps({"self": {"hl_account": TARGET}}))
+    # An old transaction-only decode leaves the self deposit unresolved until
+    # a validated source message binds its precise transfer leg.
+    assert {r['ref'] for r in correlator.collect_target_exits(TARGET, 100_000)} == {'self', 'onward'}
+    row = rows[TARGET][0]
+    row.update(amount=1_000_000, token_address=OTHER)
+    (tmp_path / 'routes').mkdir()
+    (tmp_path / 'routes' / 'bindings.json').write_text(json.dumps({row['id']: {
+        'protocol': 'cctp', 'hl_account': TARGET, 'transfer_binding': transfer_binding(row)}}))
     assert [r["ref"] for r in correlator.collect_target_exits(TARGET, 100_000)] == ["onward"]
 
 
