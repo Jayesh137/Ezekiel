@@ -1,0 +1,54 @@
+name: Schedule Keeper
+
+# Keeps watch/collect/trace/scan/analyze on their intervals without any machine
+# of ours being awake. See scripts/keep_schedule.py for the rules and why.
+#
+# 2026-09-28: the PC dispatcher was asleep 03:45-20:50 UTC, GitHub's cron left
+# an 8h20m gap in collection, and the heartbeat failed on 475-minute-old data.
+#
+# How it stays alive: every workflow it drives wakes it on completion
+# (workflow_run); it dispatches what is due with GITHUB_TOKEN (workflow_dispatch
+# is the one event a GITHUB_TOKEN may trigger); that run's completion wakes it
+# again. The cron below only restarts the chain if it ever breaks.
+# EVERY workflow in a concurrency group it checks must be listed here, or the
+# keeper can exit waiting on a run whose completion never wakes it (pinned by
+# tests/test_keep_schedule.py).
+
+on:
+  workflow_run:
+    workflows: ['Watch Wallets', 'Collect Trading Data', 'Trace Fund Flows',
+                'Scan for Matching Wallets', 'Daily Analysis & Fingerprint Rebuild',
+                'Historical Backfill', 'Substrate Backfill (multi-chain transfers)']
+    types: [completed]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+# One keeper at a time; a newer wake-up has fresher information than a sleeper.
+concurrency:
+  group: schedule-keeper
+  cancel-in-progress: true
+
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/keep_schedule.py
+            scripts/__init__.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests==2.32.3
+      - name: Dispatch whatever is due
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/keep_schedule.py --ref ${{ github.event.repository.default_branch }}
