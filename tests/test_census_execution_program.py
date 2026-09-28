@@ -22,3 +22,22 @@ def test_population_excludes_the_configured_cluster():
 def test_population_orders_by_week_volume_descending():
     lb = [_row("0xa", 1_000_000, 1_000_000), _row("0xb", 1_000_000, 9_000_000)]
     assert census.population(lb, exclude=set()) == ["0xb", "0xa"]
+
+
+def test_register_hits_makes_each_hit_an_investigation_candidate(tmp_path):
+    from src.candidate_registry import iter_candidates
+    hits = {
+        "0x1111111111111111111111111111111111111111": {
+            "wallet": "0x1111111111111111111111111111111111111111",
+            "clips_matched": 5, "clip_match_ratio": 0.83},
+    }
+    census.register_hits(hits, data_dir=tmp_path)
+    rows = iter_candidates(tmp_path)
+    assert [r["wallet"] for r in rows] == ["0x1111111111111111111111111111111111111111"]
+    assert "execution_program_census" in rows[0]["discovery_sources"]
+
+
+def test_register_hits_ignores_malformed_addresses(tmp_path):
+    from src.candidate_registry import iter_candidates
+    census.register_hits({"not-an-address": {"clips_matched": 5}}, data_dir=tmp_path)
+    assert iter_candidates(tmp_path) == []

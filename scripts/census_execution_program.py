@@ -81,6 +81,32 @@ def target_signature():
     return ep.signature(load_fills(), load_orders())
 
 
+def register_hits(hits, data_dir=None):
+    """Make each account reproducing his clip table an investigation candidate.
+
+    A census hit trades like his script but may have no financial link yet. Adding
+    it to the registry (a behaviour observation, never a financial fact) lets the
+    trace detectors examine it for an independent vector next run — turning
+    "trades like his program" into a full investigation venue-wide, not just for
+    accounts already on the roster. The execution VOTE still comes only from the
+    census-gated detector, so this cannot mint a tier by itself.
+    """
+    from src.candidate_registry import observe_candidate, valid_wallet
+    registered = []
+    for addr, hit in (hits or {}).items():
+        try:
+            wallet = valid_wallet(addr)
+        except ValueError:
+            continue
+        observe_candidate(wallet, {
+            "source": "execution_program_census", "positive": True,
+            "event_id": f"execprog:{wallet}",
+            "detail": {k: hit.get(k) for k in ("clips_matched", "clip_match_ratio")},
+        }, data_dir=data_dir)
+        registered.append(wallet)
+    return registered
+
+
 def write_census(state):
     ratios = [v["ratio"] for v in state["processed"].values() if v.get("ratio") is not None]
     census = ep.summarise_census(ratios)
@@ -126,6 +152,7 @@ def run(*, limit, budget_seconds, fetch=None, leaderboard=None):
             processed_now += 1
     STATE.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(STATE, state)
+    register_hits(state["hits"])
     census = write_census(state)
     print(f"[census] +{processed_now} this run; population measured "
           f"{census['measured']}/{census['attempted']}; ratio_p99={census['ratio_p99']}; "
