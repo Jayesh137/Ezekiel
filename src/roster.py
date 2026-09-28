@@ -32,6 +32,11 @@ VECTOR_LINKAGE = "linkage"          # shared funder or shared deposit address
 VECTOR_CORRELATION = "correlation"  # exit amount re-appeared as a deposit
 VECTOR_BEHAVIOURAL = "behavioural"  # trades like the target
 VECTOR_HL_NATIVE = "hl_native"      # two-way flow entirely inside Hyperliquid
+# Reproduces the target's execution PROGRAM — the exact per-coin clip size his
+# SDK slicer fires. A behaviour vote (a shared bot/frontend is the confounder,
+# rule 9), cast only once the census has measured the match rare (rule 4), so it
+# corroborates a financial/protocol vote and never reaches PROBABLE alone.
+VECTOR_EXECUTION = "execution_program"
 # Explicit shared trading authority; a delegate can serve multiple owners.
 VECTOR_AGENT = "shared_agent"
 # A protocol-declared relationship, whose precise role stays in evidence.
@@ -775,6 +780,30 @@ def build_roster(config: dict | None = None) -> dict:
         e = entry(a)
         e["vectors"].add(VECTOR_AGENT)
         e["evidence"]["shared_agents"] = agents
+
+    # Reproduces his execution program (the SDK slicer's per-coin clip table),
+    # read from the detector's own file. A behaviour vote, and only for matches
+    # the check script already judged discriminating against the census (rule 4);
+    # a shared bot or frontend is the confounder, so this corroborates and never
+    # reaches PROBABLE without an independent financial/protocol vector (rule 9).
+    try:
+        with open(DATA_DIR / "execution_program" / "latest.json") as f:
+            execution = json.load(f)
+    except (OSError, ValueError):
+        execution = {}
+    from src.execution_program import voting_wallets
+    for addr, match in voting_wallets(execution if isinstance(execution, dict) else {}).items():
+        if not addr or addr == target:
+            continue
+        e = entry(addr)
+        e["vectors"].add(VECTOR_EXECUTION)
+        e["evidence"]["execution_program"] = {
+            k: match.get(k) for k in ("clip_match_ratio", "clips_matched",
+                                      "clips_compared", "cadence_agreement", "offset_agreement")}
+        reason = (f"Reproduces {match.get('clips_matched')} of his per-coin clip "
+                  f"sizes (execution program)")
+        if reason not in e["reasons"]:
+            e["reasons"].append(reason)
 
     # Portfolio overlap is recorded but is NOT a vector. A copy-trader holds the
     # same basket in the same direction at the same time by definition, and this

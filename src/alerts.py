@@ -649,6 +649,43 @@ def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bo
     return _send_with_cooldown(f"behavioral_{candidate.lower()}", 24, subject, body)
 
 
+def alert_execution_program_match(wallet: str, match: dict, severity: str) -> bool:
+    """Fire when a wallet reproduces the target's execution program (his slicer).
+
+    The discriminating fact is his CLIP TABLE — the exact base size he runs per
+    coin (ZEC 1, SILVER 20, NEAR 250, BTC 0.1). Reproducing it is a BEHAVIOUR
+    signal: a shared bot or frontend is the confounder (rule 9), so this
+    corroborates and never confirms alone, and only once the census has measured
+    the match rare (rule 4). Two severities, decided by the caller:
+
+      * CRITICAL — the wallet already carries an independent financial or protocol
+        vector, so this is two independent vectors agreeing on the same wallet.
+      * HIGH — a census-rare match on its own: a strong lead, but our inference,
+        not proof about him.
+    """
+    severity = severity if severity in ESCALATING_SEVERITIES else "HIGH"
+    ratio = match.get("clip_match_ratio")
+    matched = match.get("clips_matched")
+    compared = match.get("clips_compared")
+    subject = f"[EZEKIEL] {severity}: Execution Program Match ({matched}/{compared} clip sizes)"
+    combined = ("\nThis wallet ALSO carries an independent fund-flow or protocol "
+                "vector — two vectors agree.\n") if severity == "CRITICAL" else ""
+    body = (
+        f"{address_line(wallet, 'Candidate Wallet')}\n"
+        f"Reproduces {matched} of {compared} of the target's per-coin clip sizes "
+        f"(match ratio {ratio}).\n"
+        f"Cadence agreement: {match.get('cadence_agreement')}; "
+        f"5% IOC offset agreement: {match.get('offset_agreement')}.\n"
+        f"{combined}\n"
+        f"The clip table is the base order size he runs per coin through the SDK "
+        f"slicer; reproducing it\nmeans the same program. A shared bot or frontend "
+        f"is the alternative — corroborate with flow or authority before treating "
+        f"this as his wallet.\n"
+        f"Action: run the fund-flow and agent checks against this address.\n"
+    )
+    return _send_with_cooldown(f"execprog_{wallet.lower()}", 72, subject, body)
+
+
 def alert_combined_match(candidate: str, score: float, flow_amount: str, flow_method: str) -> bool:
     """Fire when the same wallet appears in both fund-flow tracing AND behavioral matching."""
     subject = "[EZEKIEL] CRITICAL: Fund Trace + Behavioral Match on Same Wallet"
