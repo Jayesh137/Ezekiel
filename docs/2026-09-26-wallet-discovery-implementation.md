@@ -170,6 +170,14 @@ at merge `adb57cef492fe3cae16aacba1bfb989a4c5076a9`. CI and Pages deployment pas
   alternate resume slots with fresh work in each selection group. Age limits,
   the global cap and invalidation of any actually pruned prefix still apply.
 
+The final retention/scheduling correction passed **1,873 Python tests in 199.53
+seconds**, Ruff, and the focused resumption regressions. In an isolated smoke,
+the real incomplete history survived synthetic cache pressure and resumed at its
+saved timestamp, growing from 11,970 to 23,906 fills. Snapshot and restore retained
+all 23,906 rows and their continuation while enforcing the 250,000-row global cap.
+The history remained explicitly partial; these counts do not establish ownership.
+Documented limits: [Hyperliquid fills by time](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint).
+
 ## Limits and review status
 
 An independent whole-branch review subsequently completed and found four issues:
