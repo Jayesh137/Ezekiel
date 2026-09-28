@@ -1,0 +1,18 @@
+[Unit]
+Description=Ezekiel scheduled job %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Set by install.sh to the login user and the checkout path.
+User=EZEKIEL_USER
+WorkingDirectory=EZEKIEL_DIR
+EnvironmentFile=EZEKIEL_DIR/.env
+Environment=EZEKIEL_PYTHON=EZEKIEL_DIR/.venv/bin/python
+Environment=EZEKIEL_LOCK=EZEKIEL_DIR/data/.local/ezekiel-run.lock
+ExecStart=EZEKIEL_DIR/.venv/bin/python deploy/vm/run.py %i
+# A generous ceiling: run.py bounds each STEP itself; this only catches a whole
+# job wedged in an external call. Longer than analyze's summed step budgets.
+TimeoutStartSec=3000
+Nice=5
