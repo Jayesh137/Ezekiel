@@ -74,7 +74,7 @@ trading style. Never promote a wallet on one vector alone.
 | Circle deposits | `cctp_feed.py`, `correlator.py --pools cctp` | USDC's forwarder `0x6b9e7731…` sends every CCTP deposit to its recipient, so its ledger is a complete keyless feed of every Circle deposit into every account. Incremental, paced, persisted; Circle depositors also join the scan priority set |
 | New dex | `collector.new_dexes` (collector step) | A book on a HIP-3 dex he has never traded — a migration INSIDE Hyperliquid, with no L1 trace, no transfer and no new address. He uses only `xyz` of the ten the venue lists. CRITICAL, and the set was collected every run from 2026-09-11 with nothing diffing it until 2026-09-12 |
 | Referral | `referral.py` (collector step) | He has no code today. Creating one, referring an account through it, or being referred alerts HIGH with the addresses — a referred account is one he chose to link to himself |
-| Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated — see below** |
+| Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated, so it casts no vote** — the backtest is inconclusive until its fixed held-out cohort accumulates (rule 4); read `thresholds.policy` in `data/scans/latest.json` |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
 | HL account surface | `hl_surface.py`, `scripts/check_hl_surface.py` | `subAccounts`, `referral`, `userVaultEquities` for every detector candidate. A sub-account on either side of a cluster wallet CONFIRMs alone; a master and its sub-accounts are ONE operator in the roster; a quiet referral (≤10 accounts on the code) with the cluster is one vote (`referral`) |
@@ -465,6 +465,18 @@ the next session rebuilding them:
    voting again (one vector each, confidence 0.0). None reaches PROBABLE, so
    none enters the close watch. Read the file, never this table, for the
    current number.
+
+   **Unvalidated again since 2026-09-26, by design rather than by failure.**
+   Scoring schema `2026-09-26.2` stopped drawing strangers from the scan's top
+   scorers (a selected lineup) and scores a **fixed, score-blind held-out
+   cohort** frozen before the trial window, needing at least 20 independent
+   controls (`docs/discovery-operations.md`). Until that cohort has built up
+   the report reads `passed: null` ("only 0 independent strangers; need 20"),
+   the 2026-09-16 pass is **refused as a carry-forward** because it was measured
+   under schema `2026-08-05.1`, and thresholds run as `OBSERVING`, so the
+   behavioural vector casts no vote. 16 controls had built up by 2026-09-28. Do
+   not shortcut this by seeding the cohort from scored wallets: that is the
+   selected lineup the change exists to remove.
 5. **A failed read must never serialise as a clean result.** Distinguish
    "we could not tell" from "there is nothing there", everywhere.
 6. **Never price a missing value as `0.0`** — zero is invisible to every
