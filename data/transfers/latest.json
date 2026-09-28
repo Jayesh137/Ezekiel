@@ -1,21 +1,21 @@
 {
-  "computed_at": "2026-09-23T02:07:34.347983+00:00",
+  "computed_at": "2026-09-28T21:42:24.527625+00:00",
   "wallets": 1,
-  "records": 3,
+  "records": 5,
   "spam_suppressed": 5,
   "unpriced": 2,
   "spam_by_reason": {
     "symbol_forgery": 2,
     "zero_value": 3
   },
-  "calls": 27,
+  "calls": 35,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "base"
+  ],
   "unsupported_sources": [
-    "base",
-    "bsc",
-    "optimism"
+    "bsc"
   ],
   "per_wallet": [
     {
@@ -26,7 +26,7 @@
           "records": 1,
           "spam": 2,
           "calls": 6,
-          "cursor": 507953077,
+          "cursor": 508037872,
           "gaps": [],
           "truncated": false,
           "error": null,
@@ -38,12 +38,13 @@
           },
           "errors_by_kind": {},
           "cursor_by_kind": {
-            "erc20": 507953077,
-            "native": 507948512,
+            "erc20": 508037872,
+            "native": 508029886,
             "internal": 303288471
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {},
+          "reader": "etherscan"
         },
         "ethereum": {
           "records": 1,
@@ -65,43 +66,55 @@
             "internal": 20083520
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {},
+          "reader": "etherscan"
         },
         "base": {
-          "records": 0,
+          "records": 1,
           "spam": 0,
-          "calls": 1,
-          "cursor": 0,
+          "calls": 4,
+          "cursor": 48761019,
           "gaps": [],
-          "truncated": false,
-          "error": "Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis",
+          "truncated": true,
+          "error": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
           "errors_by_kind": {
-            "erc20": "Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis"
+            "native": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/transactions",
+            "internal": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)"
           },
-          "cursor_by_kind": {},
+          "cursor_by_kind": {
+            "erc20": 48761019,
+            "native": 39308638,
+            "internal": 0
+          },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {
+            "erc20": "blockscout:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/token-transfers?type=ERC-20"
+          },
+          "reader": "blockscout"
         },
         "optimism": {
-          "records": 0,
+          "records": 1,
           "spam": 0,
-          "calls": 1,
-          "cursor": 0,
+          "calls": 6,
+          "cursor": 156416887,
           "gaps": [],
           "truncated": false,
-          "error": "Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis",
+          "error": null,
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
-          "errors_by_kind": {
-            "erc20": "Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis"
+          "errors_by_kind": {},
+          "cursor_by_kind": {
+            "erc20": 156416887,
+            "native": 0,
+            "internal": 0
           },
-          "cursor_by_kind": {},
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {},
+          "reader": "blockscout"
         },
         "polygon": {
           "records": 0,
@@ -123,7 +136,8 @@
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {},
+          "reader": "etherscan"
         },
         "bsc": {
           "records": 0,
@@ -141,7 +155,8 @@
           },
           "cursor_by_kind": {},
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {},
+          "reader": "etherscan"
         },
         "monad": {
           "records": 1,
@@ -161,13 +176,14 @@
             "internal": 37671813
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {}
+          "unverified_kinds": {},
+          "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "base"
+      ],
       "unsupported_sources": [
-        "base",
-        "optimism",
         "bsc"
       ]
     },

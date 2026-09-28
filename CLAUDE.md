@@ -834,6 +834,24 @@ that it is.
   against GitHub and the explorer, which found two real bugs: the seen-set held
   orders and evicted a real withdrawal (re-alert), and a 60-entry cap was below
   the treasury's 72 non-trading actions. Setup: `scripts/apps_script/SETUP.md`.
+- **The Schedule Keeper drives the crons from GitHub itself (2026-09-28).**
+  Two heartbeat failures on 2026-09-28 (475-minute-old data) were the alarm
+  working: collect ran at 06:58 and next at 15:17 because NOTHING dispatched a
+  run from 03:45 to 20:50 — the PC dispatcher below was asleep and the Apps
+  Script relay was never installed. `keeper.yml` + `scripts/keep_schedule.py`
+  run the same rules (intervals pinned equal to the PS1 so they never double
+  up) as a job that ticks for an hour and then **dispatches itself** in an
+  `always()` step; an hourly cron restarts a broken chain.
+  **Do not make it event-driven.** The first version woke on `workflow_run`
+  and died after one link: a run STARTED by `GITHUB_TOKEN` raises no
+  `workflow_run` on completion (measured: watch dispatched 21:13, finished,
+  nothing followed). `workflow_dispatch` is the one event `GITHUB_TOKEN` may
+  trigger, which is why the chain is keeper → keeper. The same fact means the
+  heartbeat's `workflow_run` trigger does not fire after keeper-dispatched
+  runs; its own cron and the collector's inline freshness check cover it.
+  `cancel-in-progress` stays **false** or the successor cancels its creator.
+  Verified live: one keeper run dispatched collect 21:34, watch 21:36 and trace
+  21:41 (after collect left `data-commit`) with no PC involved.
 - **A local dispatcher now drives the crons (2026-09-12).**
   `scripts/dispatch_workflows.ps1` runs from Windows Task Scheduler on the
   operator's machine every 5 minutes and dispatches `watch.yml` (10 min),
