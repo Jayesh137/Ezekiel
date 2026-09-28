@@ -1,9 +1,9 @@
 {
   "wallet": "0x6c93641c0a049a171bf80b34d639c51c31b259a4",
   "first_seen": "2026-08-31T04:03:32.909163+00:00",
-  "last_seen": "2026-09-27T18:57:35.500753+00:00",
-  "best_score": 0.3201,
-  "latest_score": 0.3201,
+  "last_seen": "2026-09-28T21:05:38.159026+00:00",
+  "best_score": 0.33,
+  "latest_score": 0.33,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -38,7 +38,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3201,
+      "score_without_bonus": 0.33,
       "explanations": [],
       "frequencies": {}
     },
@@ -46,8 +46,14 @@
       "status": "insufficient_data",
       "promotable": false,
       "similarity": null,
-      "features": {},
-      "independent_sessions": 0,
+      "features": {
+        "relative_size_dispersion": 0.7575,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 1.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 1.0
+      },
+      "independent_sessions": 1,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -189,11 +195,6 @@
         "fill::ETH:1788847181530:999626952403967",
         "fill::ETH:1788847181530:999831142834670"
       ]
-    },
-    "tooling": {
-      "requests": 27.0,
-      "cum_volume_usd": 26852669.03,
-      "requests_per_1k_usd": 0.001
     }
   },
   "score_history": [
@@ -2106,18 +2107,40 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-09-28T21:05:38.159026+00:00",
+      "score": 0.33,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.2,
+        "timing_profile": null,
+        "leverage_profile": 0.3685,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.6449,
+        "trade_sequencing": 0.1758,
+        "position_sizing": 0.079,
+        "order_profile": null,
+        "activity": 0.8075,
+        "direction_bias": 0.0,
+        "position_management": 0.7361,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3111,
-  "last_checked": "2026-09-27T18:57:35.500753+00:00",
+  "recent_avg_score": 0.3139,
+  "last_checked": "2026-09-28T21:05:38.159026+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor",
+    "leaderboard",
     "newborn"
   ],
-  "last_successful_read": "2026-09-27T18:57:35.500753+00:00",
-  "last_positive_evidence": "2026-09-27T18:57:34.958619+00:00",
+  "last_successful_read": "2026-09-28T21:05:38.159026+00:00",
+  "last_positive_evidence": "2026-09-28T21:05:35.235276+00:00",
   "observations": [
     {
       "status": "ok",
@@ -2160,19 +2183,43 @@
       "source": "newborn",
       "positive": true,
       "observed_at": "2026-09-27T18:57:34.958619+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1788815124088,
+      "coverage": {
+        "start_ms": 1788815124088,
+        "end_ms": 1790629524088,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788815124088,
+        "requested_start_ms": 1788815124088,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1790629524088,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-09-28T21:05:35.235276+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788721054835,
-    "end_ms": 1790535454835,
+    "start_ms": 1788815124088,
+    "end_ms": 1790629524088,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "requested_start_ms": 1788721054835,
+    "fetched_start_ms": 1788815124088,
+    "requested_start_ms": 1788815124088,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-09-27T18:57:35.500753+00:00",
+  "last_scored": "2026-09-28T21:05:38.159026+00:00",
   "latest_scoring_schema": "2026-09-26.2"
 }
