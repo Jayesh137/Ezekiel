@@ -8,10 +8,15 @@ GitHub's cron here arrives a median of 198 minutes apart. The schedule depended
 on a machine that sleeps.
 
 This runs the same decisions as that dispatcher, from .github/workflows/
-keeper.yml, woken by the completion of every workflow it drives
-(`workflow_run`). A GITHUB_TOKEN may trigger `workflow_dispatch` -- the one
-event GitHub exempts from its no-recursion rule -- so each completion wakes the
-keeper, which dispatches whatever is due, whose completion wakes it again.
+keeper.yml, as a loop that ticks for about an hour and then dispatches the
+keeper again. A GITHUB_TOKEN may trigger `workflow_dispatch` -- the one event
+GitHub exempts from its no-recursion rule -- so the chain needs no token of
+ours and no machine of ours.
+
+It is a loop and not event-driven because the event-driven version was built
+first and died after one link, measured 2026-09-28: a run STARTED by
+GITHUB_TOKEN raises no `workflow_run` on completion, so the watch run the
+keeper dispatched at 21:13 finished and nothing woke the keeper again.
 
 Rules inherited from the PC dispatcher, each paid for once already:
   * never dispatch a workflow whose newest run is queued or running;
@@ -23,10 +28,11 @@ Rules inherited from the PC dispatcher, each paid for once already:
   * a run list we could not read is never dispatched blind, and an unreadable
     member of a group counts as busy.
 
-Exit policy: if anything is running, exit -- its completion wakes the keeper.
-Otherwise sleep until the next workflow is due (bounded) and decide again, so
-the chain does not die in the gap between one run finishing and the next
-becoming due. The keeper's own cron restarts it if the chain ever breaks.
+Tick policy: when a run is in flight, look again in POLL_SECONDS; when nothing
+is, sleep until the next workflow falls due (never longer than
+MAX_SLEEP_SECONDS). Each tick is ~8 API calls, well inside GITHUB_TOKEN's
+1,000 requests an hour. keeper.yml re-dispatches the keeper in an `always()`
+step, so a crash re-arms it too; its hourly cron restarts a broken chain.
 """
 
 from __future__ import annotations
@@ -61,7 +67,8 @@ GROUP_MEMBERS = {
 }
 
 NEVER = "never"  # a workflow with no runs at all: due immediately
-MAX_SLEEP_SECONDS = 12 * 60
+POLL_SECONDS = 90
+MAX_SLEEP_SECONDS = 5 * 60
 
 
 @dataclass
@@ -186,8 +193,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "Jayesh137/Ezekiel"))
     ap.add_argument("--ref", default="main")
-    ap.add_argument("--budget-seconds", type=int, default=14 * 60,
-                    help="stop sleeping-and-retrying after this long")
+    ap.add_argument("--budget-seconds", type=int, default=60 * 60,
+                    help="tick for this long, then exit so keeper.yml re-dispatches")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -198,21 +205,23 @@ def main() -> int:
     s = _session(token)
     deadline = time.monotonic() + args.budget_seconds
     while True:
-        result = tick(s, args.repo, args.ref, args.dry_run)
-        if result.dispatch or result.in_progress:
-            print("[keeper] a run is in flight; its completion wakes the keeper - exiting")
+        wait = next_sleep(tick(s, args.repo, args.ref, args.dry_run))
+        left = deadline - time.monotonic()
+        if left <= 0:
+            print("[keeper] budget spent - exiting for the next keeper run")
             return 0
-        wait = result.next_due_seconds
-        if wait is None:
-            # Nothing readable is scheduled to fall due: the cron restarts us.
-            print("[keeper] nothing to wait for - exiting")
-            return 0
-        wait = min(wait + 5, MAX_SLEEP_SECONDS)
-        if time.monotonic() + wait > deadline:
-            print(f"[keeper] next due in {wait:.0f}s, past this run's budget - exiting")
-            return 0
-        print(f"[keeper] nothing due; sleeping {wait:.0f}s")
+        wait = min(wait, left)
+        print(f"[keeper] next look in {wait:.0f}s")
         time.sleep(wait)
+
+
+def next_sleep(result: Plan) -> float:
+    """Seconds until the next tick is worth making."""
+    if result.dispatch or result.in_progress or result.next_due_seconds is None:
+        # Something is running (or nothing readable is scheduled): poll, since
+        # nothing will tell us when it finishes.
+        return POLL_SECONDS
+    return max(5.0, min(result.next_due_seconds + 5, MAX_SLEEP_SECONDS))
 
 
 if __name__ == "__main__":
