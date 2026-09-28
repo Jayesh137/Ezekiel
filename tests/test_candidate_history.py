@@ -269,3 +269,18 @@ def test_disjoint_older_query_does_not_claim_the_gap_to_cached_newer_history(tmp
     cached_fill_history(WALLET, 0, 500, db_path=db, fetch=lambda _: [])
     with sqlite3.connect(db) as conn:
         assert conn.execute('SELECT start_ms,end_ms FROM fill_coverage').fetchone() == (0, 500)
+
+
+def test_default_budget_finishes_full_retained_window_with_inclusive_pages(tmp_path):
+    from src import history
+    retained = [fill(i) for i in range(history.RETENTION_LIMIT)]
+    for cached in (False, True):
+        calls = []
+        def fetch(body, calls=calls):
+            calls.append(body['startTime'])
+            return [r for r in retained if r['time'] >= body['startTime']][:history.PAGE_SIZE]
+        result = (history.cached_fill_history(WALLET, 0, 20000, db_path=tmp_path / 'full.sqlite3', fetch=fetch)
+                  if cached else history.fetch_fill_history(WALLET, 0, 20000, fetch=fetch))
+        assert result['status'] == 'ok'
+        assert len(result['fills']) == history.RETENTION_LIMIT
+        assert len(calls) == 6 and calls[1] == retained[1999]['time']

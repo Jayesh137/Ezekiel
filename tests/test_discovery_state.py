@@ -10,6 +10,44 @@ from src.discovery_store import DiscoveryStore
 A, B = ['0x' + char * 40 for char in '12']
 
 
+def test_cache_pressure_preserves_bounded_backfill_prefix_and_resume(tmp_path, monkeypatch):
+    from src import discovery_state as state
+    from src import history
+    db = tmp_path / 'active.sqlite3'
+    monkeypatch.setattr(state, 'MAX_FILL_ROWS', 6, raising=False)
+    monkeypatch.setattr(state, 'PENDING_FILL_ROWS', 4, raising=False)
+    monkeypatch.setattr(history, 'PAGE_SIZE', 3)
+    old = [{'time': 100 + i, 'tid': i, 'coin': 'BTC'} for i in range(3)]
+    history.cached_fill_history(A, 0, 1000, db_path=db, fetch=lambda _: old, max_pages=1)
+    history.cached_fill_history(B, 0, 1000, db_path=db,
+        fetch=lambda body: [{'time': 500 + i, 'tid': i, 'coin': 'BTC'} for i in range(6)] if body['startTime'] == 0 else [])
+    state.compact(db, now_ms=1000)
+    calls = []
+    resumed = history.cached_fill_history(A, 0, 1000, db_path=db,
+        fetch=lambda body: calls.append(body['startTime']) or [old[-1]])
+    assert calls == [102] and resumed['status'] == 'ok'
+    assert len(resumed['fills']) == 3
+    with sqlite3.connect(db) as conn:
+        assert conn.execute('SELECT count(*) FROM fills').fetchone()[0] == 6
+
+
+def test_oversized_pending_history_cannot_exceed_global_cache_budget(tmp_path, monkeypatch):
+    from src import discovery_state as state
+    from src import history
+    db = tmp_path / 'active.sqlite3'
+    monkeypatch.setattr(state, 'MAX_FILL_ROWS', 6, raising=False)
+    monkeypatch.setattr(state, 'PENDING_FILL_ROWS', 2, raising=False)
+    monkeypatch.setattr(history, 'PAGE_SIZE', 3)
+    history.cached_fill_history(A, 0, 1000, db_path=db,
+        fetch=lambda _: [{'time': 100 + i, 'tid': i, 'coin': 'BTC'} for i in range(3)], max_pages=1)
+    history.cached_fill_history(B, 0, 1000, db_path=db,
+        fetch=lambda body: [{'time': 500 + i, 'tid': i, 'coin': 'BTC'} for i in range(6)] if body['startTime'] == 0 else [])
+    state.compact(db, now_ms=1000)
+    with sqlite3.connect(db) as conn:
+        assert conn.execute('SELECT count(*) FROM fills').fetchone()[0] == 6
+        assert not conn.execute('SELECT * FROM fill_progress WHERE wallet=?', (A,)).fetchone()
+
+
 def test_snapshot_captures_committed_wal_and_restores_independent_database(tmp_path):
     original = tmp_path / 'live.sqlite3'
     with DiscoveryStore(original) as store:
