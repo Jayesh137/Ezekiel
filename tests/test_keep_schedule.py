@@ -8,7 +8,7 @@ These pin the rules the keeper inherits from scripts/dispatch_workflows.ps1.
 
 from datetime import UTC, datetime, timedelta
 
-from scripts.keep_schedule import SCHEDULE, plan
+from scripts.keep_schedule import MAX_SLEEP_SECONDS, POLL_SECONDS, SCHEDULE, next_sleep, plan
 
 NOW = datetime(2026, 9, 28, 12, 0, tzinfo=UTC)
 
@@ -94,17 +94,36 @@ def test_intervals_match_the_pc_dispatcher():
     assert ps1 == {job["file"]: job["minutes"] for job in SCHEDULE}
 
 
-def test_keeper_is_triggered_by_every_workflow_it_waits_on():
-    # The keeper exits while something runs and relies on that run's completion to
-    # wake it. A workflow missing from workflow_run would strand the schedule.
+def test_polls_while_a_run_is_in_flight():
+    # Nothing announces a GITHUB_TOKEN-started run finishing, so the keeper polls.
+    busy = plan(fresh(**{"collect.yml": run(2, "in_progress")}), NOW)
+    assert next_sleep(busy) == POLL_SECONDS
+
+
+def test_sleeps_until_next_due_when_idle_but_bounded():
+    idle = plan(fresh(), NOW)  # watch due in 9 minutes
+    assert next_sleep(idle) == MAX_SLEEP_SECONDS
+    almost = plan(fresh(**{"watch.yml": run(9)}), NOW)  # due in 60s
+    assert next_sleep(almost) == 65
+
+
+def _keeper_yml():
+    return open(".github/workflows/keeper.yml", encoding="utf-8").read()
+
+
+def test_keeper_re_dispatches_itself_even_after_a_failure():
+    # The chain is the keeper dispatching its successor. workflow_run cannot carry
+    # it: a GITHUB_TOKEN-started run raises no workflow_run (measured 2026-09-28).
     import re
 
-    text = open(".github/workflows/keeper.yml", encoding="utf-8").read()
-    block = re.search(r"workflows:\s*\[(.*?)\]", text, re.S).group(1)
-    listed = set(re.findall(r"'([^']+)'", block))
-    names = {}
-    for wf in [job["file"] for job in SCHEDULE] + ["backfill.yml", "substrate-backfill.yml"]:
-        body = open(f".github/workflows/{wf}", encoding="utf-8").read()
-        names[wf] = re.search(r"^name:\s*(.+)$", body, re.M).group(1).strip().strip("'\"")
-    missing = {wf: n for wf, n in names.items() if n not in listed}
-    assert not missing, missing
+    text = _keeper_yml()
+    step = text[text.index("- name: Re-dispatch the keeper"):]
+    assert re.search(r"if:\s*always\(\)", step)
+    assert "gh workflow run keeper.yml" in step
+    assert "workflow_run" not in text.split("jobs:")[0].split("on:")[1]
+
+
+def test_keeper_never_cancels_its_own_successor_creator():
+    import re
+
+    assert re.search(r"cancel-in-progress:\s*false", _keeper_yml())
