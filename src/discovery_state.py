@@ -16,6 +16,8 @@ from src.discovery_store import DiscoveryStore
 
 MAX_DATABASE_BYTES = 512 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 48 * 1024 * 1024
+MAX_FILL_ROWS = 250_000
+PENDING_FILL_ROWS = 100_000
 
 
 def _copy_bounded(source, destination, limit):
@@ -123,10 +125,29 @@ def compact(db_path, now_ms=None):
     with DiscoveryStore(db_path) as store:
         store.prune(now_ms - 30 * 86400_000, max_events=100_000)
         tables = {r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        protected, protected_rows = [], 0
         if 'fills' in tables:
             before = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
             store.db.execute('DELETE FROM fills WHERE ts<?', (now_ms - 90 * 86400_000,))
-            store.db.execute('DELETE FROM fills WHERE rowid NOT IN (SELECT rowid FROM fills ORDER BY ts DESC LIMIT 250000)')
+            aged = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
+            if 'fill_progress' in tables:
+                attempts = {}
+                for phase in ('priority', 'leaderboard'):
+                    for wallet, stamp in store.meta('scan_attempts:' + phase, {}).items():
+                        attempts[wallet] = max(attempts.get(wallet, 0), stamp)
+                pending = [r[0] for r in store.db.execute('SELECT wallet FROM fill_progress')]
+                # Retain whole prefixes, oldest waiting attempt first. Keeping
+                # only the newest fill timestamps erased every active backfill
+                # in production, forcing the same pages to be fetched forever.
+                for wallet in sorted(pending, key=lambda w: (attempts.get(w, 0), w)):
+                    size = aged.get(wallet, 0)
+                    if size and size == before[wallet] and protected_rows + size <= min(PENDING_FILL_ROWS, MAX_FILL_ROWS):
+                        protected.append(wallet)
+                        protected_rows += size
+            placeholders = ','.join('?' for _ in protected) or 'NULL'
+            store.db.execute('DELETE FROM fills WHERE rowid NOT IN (SELECT rowid FROM fills '
+                             f'ORDER BY CASE WHEN wallet IN ({placeholders}) THEN 1 ELSE 0 END DESC, '
+                             'ts DESC LIMIT ?)', (*protected, MAX_FILL_ROWS))
             after = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
             if 'fill_coverage' in tables:
                 store.db.executemany('DELETE FROM fill_coverage WHERE wallet=?',
@@ -138,5 +159,7 @@ def compact(db_path, now_ms=None):
                          '(SELECT rowid FROM discovery_observations ORDER BY observed_at_ms DESC LIMIT 100000)')
         store.db.commit()
         store.set_meta('storage_retention', {'at_ms': now_ms, 'market_events': 100000, 'market_days': 30,
-            'fill_rows': 250000, 'fill_days': 90, 'generic_observations': 100000,
+            'fill_rows': MAX_FILL_ROWS, 'fill_days': 90, 'generic_observations': 100000,
+            'pending_fill_row_budget': PENDING_FILL_ROWS, 'protected_fill_wallets': len(protected),
+            'protected_fill_rows': protected_rows,
             'authority_days': 730, 'complete_history': False})

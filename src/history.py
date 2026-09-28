@@ -10,6 +10,9 @@ from src.utils import DATA_DIR, hl_read
 
 PAGE_SIZE = 2000
 RETENTION_LIMIT = 10_000
+# Five full pages contain fewer than 10k distinct rows because boundaries
+# overlap. Allow the final short page without depending on the next scan's cache.
+DEFAULT_MAX_PAGES = 6
 
 
 class FillBatch(list):
@@ -27,7 +30,7 @@ def fill_id(wallet, row):
 
 
 def fetch_fill_history(wallet: str, start_ms: int, end_ms: int, fetch=None,
-                       max_pages: int = 5) -> dict:
+                       max_pages: int = DEFAULT_MAX_PAGES) -> dict:
     wallet = valid_wallet(wallet)
     fetch = fetch or hl_read
     cursor = start_ms
@@ -79,7 +82,7 @@ def fetch_fill_history(wallet: str, start_ms: int, end_ms: int, fetch=None,
 
 
 def cached_fill_history(wallet: str, start_ms: int, end_ms: int, *,
-                        db_path: Path | None = None, fetch=None, max_pages: int = 5) -> dict:
+                        db_path: Path | None = None, fetch=None, max_pages: int = DEFAULT_MAX_PAGES) -> dict:
     wallet = valid_wallet(wallet)
     path = Path(db_path or DATA_DIR / ".local" / "discovery.sqlite3")
     path.parent.mkdir(parents=True, exist_ok=True)

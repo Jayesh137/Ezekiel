@@ -137,6 +137,47 @@ production build/PWA, Ruff and isolated desktop/phone partial-scan rendering pas
 
 Rate accounting source: [Hyperliquid rate limits](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits).
 
+### Production verification, 28 September 2026
+
+[PR #37](https://github.com/Jayesh137/Ezekiel/pull/37) released the runtime fixes
+at merge `adb57cef492fe3cae16aacba1bfb989a4c5076a9`. CI and Pages deployment passed.
+
+- [First fixed scan](https://github.com/Jayesh137/Ezekiel/actions/runs/36346376465):
+  enrichment finished in 781 seconds with 62 wallet attempts, 14 research matches,
+  zero failed public reads and explicit partial coverage. Ranking, quality,
+  checkpoint upload, acknowledgment and data publication all succeeded.
+- Subsequent scans **36352703912** and **36360828048** also succeeded. These are
+  bounded batches, not claims that every requested wallet was enriched each time.
+- [Trace run](https://github.com/Jayesh137/Ezekiel/actions/runs/36358894005) succeeded:
+  dormancy attempted all 40 wallets in about 90 seconds, checked 39 and explicitly
+  left one account's missing portfolio birth unknown. The separate read-only
+  smoke completed 40 attempts in 95.83 seconds and sent no alerts.
+- Restoring the latest owner checkpoint **10945674397** passed integrity checks:
+  500 market events, 264 discovered accounts, 7,264 routing/authority observations,
+  exactly 250,000 retained fills and 13 imported observation batches. Scheduling
+  retained 48 priority and 104 leaderboard attempts. Sixteen prospective control
+  profiles had accumulated; the cohort was not yet frozen or validated.
+- The live checkpoint review exposed a five-page boundary limit: inclusive
+  overlaps leave a full 10,000-fill window incomplete after five pages. Increase
+  the default to six bounded pages so the usual retained window can finish in
+  one attempt, while still respecting time budgets, saturation and read errors.
+  A regression covers both direct reads and the incremental cache.
+- A bounded live probe then returned 11,970 distinct fills and remained partial,
+  exceeding the documented upstream 10,000-fill limit. The implementation does
+  not treat that documented limit as proof of completeness. The production
+  cache had also pruned every pending prefix, defeating resumption. Reserve up
+  to 100,000 of the existing 250,000 fill rows for whole pending prefixes and
+  alternate resume slots with fresh work in each selection group. Age limits,
+  the global cap and invalidation of any actually pruned prefix still apply.
+
+The final retention/scheduling correction passed **1,873 Python tests in 199.53
+seconds**, Ruff, and the focused resumption regressions. In an isolated smoke,
+the real incomplete history survived synthetic cache pressure and resumed at its
+saved timestamp, growing from 11,970 to 23,906 fills. Snapshot and restore retained
+all 23,906 rows and their continuation while enforcing the 250,000-row global cap.
+The history remained explicitly partial; these counts do not establish ownership.
+Documented limits: [Hyperliquid fills by time](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint).
+
 ## Limits and review status
 
 An independent whole-branch review subsequently completed and found four issues:

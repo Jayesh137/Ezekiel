@@ -70,6 +70,15 @@ def test_priority_rotation_reserves_exploration_and_visits_unattempted_wallets_f
     assert set(first).isdisjoint(second)
 
 
+def test_unfinished_histories_get_resume_slots_without_excluding_new_wallets():
+    from src.scan_progress import priority_order
+    rows = {f'w{i}': {'source': 'funding_route'} for i in range(8)}
+    pending = {'w6', 'w7'}
+    attempts = {'w6': 100, 'w7': 101}
+    scheduled = priority_order(rows, attempts, limit=4, pending=pending)
+    assert scheduled == ['w6', 'w0', 'w7', 'w1']
+
+
 def test_priority_failure_is_checkpointed_and_next_run_visits_unattempted_wallet(tmp_path, monkeypatch):
     from src import scanner
     from src.hl_budget import ReadBudget

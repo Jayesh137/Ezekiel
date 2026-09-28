@@ -3,10 +3,21 @@
 from src.discovery_store import DiscoveryStore
 
 
-def priority_order(rows, attempts, limit=80):
+def interleave_resume(ordered, pending, key=lambda row: row):
+    """Alternate unfinished histories and fresh work, preserving age order."""
+    waiting = [row for row in ordered if key(row) in pending]
+    fresh = [row for row in ordered if key(row) not in pending]
+    out = []
+    while waiting or fresh:
+        resume = waiting and (len(out) % 2 == 0 or not fresh)
+        out.append((waiting if resume else fresh).pop(0))
+    return out
+
+
+def priority_order(rows, attempts, limit=80, pending=()):
     ordered = sorted(rows, key=lambda wallet: (attempts.get(wallet, 0), wallet))
-    explore = [w for w in ordered if rows[w].get('discovery')]
-    factual = [w for w in ordered if not rows[w].get('discovery')]
+    explore = interleave_resume([w for w in ordered if rows[w].get('discovery')], pending)
+    factual = interleave_resume([w for w in ordered if not rows[w].get('discovery')], pending)
     out = []
     while (factual or explore) and len(out) < limit:
         # One exploration slot in every five, including the first batch.
@@ -20,6 +31,8 @@ class ScanProgress:
         self.path, self.key = path, 'scan_attempts:' + phase
         with DiscoveryStore(path) as store:
             self.attempts = store.meta(self.key, {})
+            tables = {r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            self.pending = {r[0] for r in store.db.execute('SELECT wallet FROM fill_progress')} if 'fill_progress' in tables else set()
 
     def mark(self, wallet, at_ms):
         self.attempts[wallet] = at_ms

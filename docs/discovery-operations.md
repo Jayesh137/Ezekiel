@@ -274,6 +274,14 @@ partial coverage. The next run orders wallets by oldest attempt; scanner schedul
 lives only in the authoritative checkpoint and cannot be overwritten by a shard.
 
 Partial fill pages commit observations and their inclusive continuation together.
+The default allows six pages: five overlapping 2,000-row responses cannot finish
+a full 10,000-fill retained window. A live probe returned more than that documented
+retention limit, so only the observed terminal page establishes completion. High
+timestamp overlap can also require resumption; saturation is never skipped.
+Up to 100,000 of the existing 250,000 cached rows are reserved for whole pending
+prefixes, ordered by oldest attempted wallet. Resume and fresh slots alternate
+within selection groups, preserving public exploration. Prefixes exceeding the
+reservation, or losing rows to the 90-day limit, can still be evicted explicitly.
 Only a successful available-history read updates complete coverage. Timestamp
 saturation remains unresolved; requesting an older start backfills the missing
 prefix. Local/global retention pruning invalidates affected continuation and

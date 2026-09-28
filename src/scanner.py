@@ -1764,7 +1764,7 @@ def scan_priority_targets(ezekiel_fp: dict, config: dict, eff: dict,
     budget = current_budget()
     progress = ScanProgress(DATA_DIR / '.local' / 'discovery.sqlite3', 'priority') if budget else None
     selected = priority_order(priority, progress.attempts,
-                               config['scanner'].get('max_priority_per_run', 80)) if progress else list(priority)
+                               config['scanner'].get('max_priority_per_run', 80), pending=progress.pending) if progress else list(priority)
     attempted = 0
     for wallet in selected:
         if budget and (not budget.can_continue() or budget.clock() - budget.started >= 420):
@@ -1944,7 +1944,7 @@ def _scan_leaderboard():
     cohort_profiles = []
     from src.evaluation_cohort import cohort_wallets
     from src.hl_budget import current_budget
-    from src.scan_progress import ScanProgress
+    from src.scan_progress import ScanProgress, interleave_resume
     budget = current_budget()
     progress = ScanProgress(DATA_DIR / '.local' / 'discovery.sqlite3', 'leaderboard')
     heldout = set(cohort_wallets(DATA_DIR / '.local' / 'discovery.sqlite3'))
@@ -1957,6 +1957,7 @@ def _scan_leaderboard():
         return entry.get('ethAddress', entry.get('address', '')).lower()
     entries.sort(key=lambda e: (progress.attempts.get(entry_wallet(e), 0),
                                 entry_wallet(e) not in heldout, entry_wallet(e)))
+    entries = interleave_resume(entries, progress.pending, key=entry_wallet)
     for entry in entries:
         if budget and (not budget.can_continue() or budget.clock() - budget.started >= 780):
             break
