@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-28T09:09:05.439662+00:00",
+  "computed_at": "2026-09-28T17:45:14.567786+00:00",
   "wallets": 1,
   "records": 5,
   "spam_suppressed": 6,
@@ -8,10 +8,12 @@
     "symbol_forgery": 2,
     "zero_value": 4
   },
-  "calls": 37,
+  "calls": 36,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "base"
+  ],
   "unsupported_sources": [
     "bsc"
   ],
@@ -70,17 +72,19 @@
         "base": {
           "records": 1,
           "spam": 1,
-          "calls": 6,
+          "calls": 5,
           "cursor": 48761019,
           "gaps": [],
-          "truncated": false,
-          "error": null,
+          "truncated": true,
+          "error": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/internal-transactions",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {
             "zero_value": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/internal-transactions"
+          },
           "cursor_by_kind": {
             "erc20": 48761019,
             "native": 39308638,
@@ -175,7 +179,9 @@
           "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "base"
+      ],
       "unsupported_sources": [
         "bsc"
       ]
