@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src import execution_program as ep
-from src.utils import DATA_DIR, load_config, save_latest
+from src.utils import DATA_DIR, atomic_write_json, load_config, save_latest
 
 OUT_DIR = DATA_DIR / "execution_program"
 MAX_CANDIDATES = 60
@@ -48,9 +48,8 @@ def load_target_signature(*, fills=None, orders=None):
 
 
 def load_census():
-    path = OUT_DIR / "census.json"
     try:
-        with open(path) as handle:
+        with open(OUT_DIR / "census.json") as handle:
             return json.load(handle)
     except (OSError, ValueError):
         return None
@@ -144,7 +143,7 @@ def main():
                                   "ioc_5pct_share": target_sig.get("ioc_5pct_share"),
                                   "program_runs": target_sig.get("program_runs")}
     save_latest(str(OUT_DIR), report)
-    save_latest(str(OUT_DIR / "target"), {"computed_at": report["computed_at"], **target_sig})
+    atomic_write_json(OUT_DIR / "target.json", {"computed_at": report["computed_at"], **target_sig})
     for severity, match in decide_alerts(report):
         alert_execution_program_match(match["wallet"], match, severity)
     print(f"[execution-program] checked {len(rows)} wallets, "

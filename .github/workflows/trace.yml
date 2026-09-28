@@ -335,6 +335,15 @@ jobs:
       - name: Score portfolio overlap
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_portfolio_overlap.py
+      # Does a candidate reproduce his EXECUTION PROGRAM — the exact per-coin clip
+      # size his SDK slicer fires (ZEC 1, SILVER 20, NEAR 250)? One userFills read
+      # per roster candidate. A behaviour vote, cast only for matches the census
+      # has measured rare (rule 4) and only alongside a financial/protocol vector
+      # (rule 9); runs BEFORE the roster so this run's matches vote this run.
+      - name: Match execution program
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 4
+        run: python scripts/check_execution_program.py
       # Measures roster CANDIDATES whole-chain, so `services_from_activity` can
       # disqualify an exchange or a contract on the NEXT build. The graph's own
       # measurement budget goes to the highest-VALUE unmeasured addresses,

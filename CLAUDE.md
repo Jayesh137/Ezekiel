@@ -75,6 +75,7 @@ trading style. Never promote a wallet on one vector alone.
 | New dex | `collector.new_dexes` (collector step) | A book on a HIP-3 dex he has never traded — a migration INSIDE Hyperliquid, with no L1 trace, no transfer and no new address. He uses only `xyz` of the ten the venue lists. CRITICAL, and the set was collected every run from 2026-09-11 with nothing diffing it until 2026-09-12 |
 | Referral | `referral.py` (collector step) | He has no code today. Creating one, referring an account through it, or being referred alerts HIGH with the addresses — a referred account is one he chose to link to himself |
 | Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated, so it casts no vote** — the backtest is inconclusive until its fixed held-out cohort accumulates (rule 4); read `thresholds.policy` in `data/scans/latest.json` |
+| Execution program | `execution_program.py`, `scripts/check_execution_program.py`, `scripts/census_execution_program.py` | His SDK slicer, recognised by his CLIP TABLE — the exact base size he fires per coin (ZEC 1, SILVER 20, NEAR 250, BTC 0.1) through `market_open` (5% IOC, ~1.7s, no client id). A behaviour vote (`execution_program`), so it corroborates and never reaches PROBABLE without a financial/protocol vector (rule 9), and casts NO vote until the census has MEASURED the match rare — `data/execution_program/census.json`, `ratio_p99` (rule 4). Match + independent vector → CRITICAL; census-rare match alone → HIGH. Measured 2026-09-28: 0 of 248 large accounts carry the full signature |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
 | HL account surface | `hl_surface.py`, `scripts/check_hl_surface.py` | `subAccounts`, `referral`, `userVaultEquities` for every detector candidate. A sub-account on either side of a cluster wallet CONFIRMs alone; a master and its sub-accounts are ONE operator in the roster; a quiet referral (≤10 accounts on the code) with the cluster is one vote (`referral`) |
@@ -258,11 +259,18 @@ Each one cost a real finding or a real outage. The story is in the incident log.
 - ~~`data/orders/`~~ — **wired 2026-09-10** as the `order_profile` dimension.
   54,866 records were being collected and never read. It discriminates hard:
   the target is 94.6% `Ioc` limit slices with **0% cancels and 0% client order
-  ids** (manual TWAP), while all three correlation leads are ~100% cancels and
-  **100% client order ids** (bots). Now IN the backtest too, split by the same
-  calendar days as the fills (verified disjoint: 0 shared oids, 0 shared days),
-  with strangers given the same dimension so the target cannot score on one
-  nobody else could earn.
+  ids**, while all three correlation leads are ~100% cancels and **100% client
+  order ids** (bots). Now IN the backtest too, split by the same calendar days as
+  the fills (verified disjoint: 0 shared oids, 0 shared days), with strangers
+  given the same dimension so the target cannot score on one nobody else could
+  earn.
+  **Corrected 2026-09-29: not "manual TWAP".** His limit sits EXACTLY 5.0% through
+  the book on 99.4% of orders — the hyperliquid-python-sdk `market_open` default
+  (`DEFAULT_SLIPPAGE = 0.05`) — fired at one round base size per coin, ~1.7s
+  apart, in runs of tens to thousands, closing with `market_open` too. It is a
+  SCRIPT. That is a stronger fingerprint than `order_profile` captures, and it is
+  now its own vector (`execution_program`, below); the ~8% `FrontendMarket` orders
+  are his web-UI clicks.
 - ~~`data/twitter/`~~ — **removed 2026-09-10**. It was three empty directories
   with no collector and no reference anywhere: scaffolding for an intention
   never built, not data going unused. X's API is paid and scraping is fragile

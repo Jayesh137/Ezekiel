@@ -136,6 +136,14 @@ jobs:
       - name: Watch GCR's Ethereum addresses
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_gcr_wallets.py
+      # Measures how rare his execution program is across the leaderboard, a
+      # bounded slice per run accumulating in a gitignored state file. Produces
+      # the false-positive threshold (rule 4) that lets the execution-program
+      # vector vote, and surfaces any account already reproducing his clip table.
+      - name: Census the execution program
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 20
+        run: python scripts/census_execution_program.py --limit 600 --budget-seconds 900
       - name: Build trader profile
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/profile_builder.py
