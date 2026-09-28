@@ -184,16 +184,16 @@ def test_execution_program_is_a_behaviour_category():
 
 
 def test_execution_plus_a_financial_vector_can_reach_probable():
-    from src.roster import assign_tier
     from src.evidence import aggregate_evidence, vector_observations
+    from src.roster import assign_tier
     vectors = {"execution_program", "transfer"}
     summary = aggregate_evidence(vector_observations(vectors))
     assert assign_tier(vectors, 0.0, False, False, summary) == "PROBABLE"
 
 
 def test_execution_alone_is_only_possible():
-    from src.roster import assign_tier
     from src.evidence import aggregate_evidence, vector_observations
+    from src.roster import assign_tier
     vectors = {"execution_program"}
     summary = aggregate_evidence(vector_observations(vectors))
     assert assign_tier(vectors, 0.0, False, False, summary) == "POSSIBLE"
