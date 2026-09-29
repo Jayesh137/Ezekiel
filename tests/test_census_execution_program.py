@@ -19,9 +19,17 @@ def test_population_excludes_the_configured_cluster():
     assert census.population(lb, exclude={"0xtarget"}) == ["0xother"]
 
 
-def test_population_orders_by_week_volume_descending():
-    lb = [_row("0xa", 1_000_000, 1_000_000), _row("0xb", 1_000_000, 9_000_000)]
-    assert census.population(lb, exclude=set()) == ["0xb", "0xa"]
+def test_population_is_a_deterministic_uniform_sample_not_volume_ranked():
+    # A uniform sample of the eligible band is the right negative population for a
+    # false-positive threshold, and reaches clip-style traders far sooner than a
+    # volume-desc walk that front-loads market makers. Order is stable (same input
+    # -> same order) and independent of volume rank.
+    lb = [_row(f"0x{i:040x}", 1_000_000, 1_000_000 + i) for i in range(50)]
+    first = census.population(lb, exclude=set())
+    assert sorted(first) == sorted(a["ethAddress"] for a in lb)  # covers everyone
+    assert census.population(lb, exclude=set()) == first          # deterministic
+    # Not the volume order (which would be strictly ascending-by-i reversed).
+    assert first != [a["ethAddress"] for a in sorted(lb, key=lambda r: -int(r["windowPerformances"][0][1]["vlm"]))]
 
 
 def test_register_hits_makes_each_hit_an_investigation_candidate(tmp_path):

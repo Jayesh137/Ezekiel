@@ -60,12 +60,23 @@ def window_volume(row, window):
 
 
 def population(leaderboard, exclude):
+    """Eligible accounts in a stable, uniform (hash-ordered) sample.
+
+    The census measures how often a RANDOM venue account reproduces his clip
+    sizes, so a uniform sample of the eligible band is the right negative
+    population. It also reaches clip-style traders far sooner than a volume-desc
+    walk, which front-loads the market makers that carry no clip table at all
+    (verified 2026-09-29: 0 of the top 26 by volume were measurable) — and the
+    threshold, hence the vote, can only build once measured accounts accumulate.
+    Deterministic so a resumed sweep covers everyone exactly once.
+    """
+    import hashlib
     rows = [r for r in leaderboard
             if float(r.get("accountValue") or 0) >= MIN_ACCOUNT_VALUE
             and MIN_WEEK_VOLUME <= window_volume(r, "week") <= MAX_WEEK_VOLUME
             and (r.get("ethAddress") or "").lower() not in exclude]
-    rows.sort(key=lambda r: -window_volume(r, "week"))
-    return [r["ethAddress"].lower() for r in rows if r.get("ethAddress")]
+    return sorted((r["ethAddress"].lower() for r in rows if r.get("ethAddress")),
+                  key=lambda a: hashlib.sha256(a.encode()).hexdigest())
 
 
 def fetch_leaderboard():
