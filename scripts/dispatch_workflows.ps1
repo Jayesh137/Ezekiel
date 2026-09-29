@@ -112,6 +112,7 @@ $Ref = "main"
 # schedulers agree rather than doubling up.
 $Schedule = @(
     @{ File = "watch.yml";   Minutes = 10;   Group = "watch" },
+    @{ File = "tape.yml";    Minutes = 20;   Group = "tape" },
     @{ File = "collect.yml"; Minutes = 15;   Group = "data-commit" },
     @{ File = "trace.yml";   Minutes = 30;   Group = "data-commit" },
     @{ File = "scan.yml";    Minutes = 60;   Group = "data-commit" },

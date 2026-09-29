@@ -1,0 +1,78 @@
+name: Sample the live tape
+
+# The free-setup recovery of the real-time behavioural net. A 24/7 tape stream
+# needs an always-on host (scrapped for lack of one); this samples instead — a
+# bounded ~150s websocket window each run, driven on the usual cadence — and finds
+# any wallet running his EXACT clip program live on his markets, off the leaderboard
+# and off the roster, with no per-wallet API call. Hits become execution-program
+# candidates the census-gated detector examines fully next trace run; this workflow
+# raises no alerts of its own, so it adds coverage without noise. A trade in the gap
+# between windows is still caught later by the other vectors, just not instantly.
+on:
+  schedule:
+    - cron: '*/20 * * * *'   # best-effort; the keeper/relay drives the real cadence
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+# Its own group (like watch): it writes data/tape/ and per-wallet candidate files,
+# and must not queue behind the long jobs in data-commit. Concurrent commits are
+# settled by the -X theirs rebase below; per-wallet candidate files rarely collide,
+# and observe_candidate merges, so a rare lost observation self-heals next run.
+concurrency:
+  group: tape-data
+  cancel-in-progress: false
+
+jobs:
+  tape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8   # a ~150s stream plus commit; generous backstop only
+    env:
+      PYTHONUNBUFFERED: "1"
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - id: deps
+        run: pip install -r requirements.txt -r requirements-stream.txt
+      - name: Sample the tape for his markets
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 5   # step-bounded so a hung socket cannot cancel the commit
+        run: python scripts/collect_tape.py --seconds 150
+      - name: Commit and push
+        if: always()
+        run: |
+          python scripts/check_repo_size.py .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
+          git commit -m "data: sample live tape [automated]"
+          git status --porcelain | head -20
+          for i in 1 2 3 4 5; do
+            if git push origin main; then exit 0; fi
+            git fetch origin main || true
+            if ! git rebase -X theirs --autostash FETCH_HEAD; then
+              git rebase --abort || true
+              echo "attempt $i: rebase could not be settled automatically"
+            fi
+            sleep $(( (RANDOM % 7) + 3 ))
+          done
+          git push origin main
+      - name: Open failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="[pipeline] tape workflow failing"
+          count=$(gh issue list --state open --search "in:title $title" --json number --jq 'length')
+          if [ "$count" = "0" ]; then
+            gh issue create --title "$title" --body "Failing run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi

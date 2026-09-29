@@ -1586,3 +1586,23 @@ too short) are not covered, and covering them needs the live trade tape, i.e. a
 host. **The machinery is merged but deliberately NOT wired** (no cohort to watch;
 phase 2 shift-detector not built). Re-run `scripts/check_copier_cohort.py` if the
 tape ever becomes available; do not wire it on the current data.
+
+---
+
+**Live-tape discovery for the execution vector (2026-09-29).** With the always-on
+host declined (staying on GitHub Actions), the real-time behavioural net is
+recovered as a SAMPLER rather than a 24/7 stream: `tape.yml` runs a bounded ~150s
+websocket window each ~20 min (driven by the keeper/PC dispatcher, added to both in
+sync). `src/tape.py` reconstructs each taker's orders from the trade feed (which
+names both sides) and `program_clip_hits` flags any wallet running a program-shaped
+burst at one of his EXACT per-coin clip sizes — reusing the execution vector's own
+`program_runs`. A hit becomes an `execution_program_tape` candidate the census-gated
+detector examines fully next trace run; the tape raises no alerts of its own (a
+single-coin live burst is a lead, not proof), so it adds coverage without a noisy
+path. It reaches wallets off the leaderboard and off the roster with no per-wallet
+API call — the population a migration lands in. Cadence was separately verified
+already good: the keeper drives watch every ~10 min and trace every ~30 min right
+now (the old 198-min cron figure is obsolete). Live smoke: 41 of his markets, 60s,
+3,992 trades → 2,308 taker orders → 675 takers, 0 false hits in a quiet window.
+Needs `requirements-stream.txt` (websockets); a trade in the gap between windows is
+still caught later by the other vectors, not instantly.

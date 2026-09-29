@@ -51,6 +51,7 @@ import requests
 # finished and older than its interval, whoever started it.
 SCHEDULE = [
     {"file": "watch.yml", "minutes": 10, "group": "watch"},
+    {"file": "tape.yml", "minutes": 20, "group": "tape"},
     {"file": "collect.yml", "minutes": 15, "group": "data-commit"},
     {"file": "trace.yml", "minutes": 30, "group": "data-commit"},
     {"file": "scan.yml", "minutes": 60, "group": "data-commit"},
@@ -60,6 +61,7 @@ SCHEDULE = [
 # Every workflow in each concurrency group, including ones never dispatched here.
 GROUP_MEMBERS = {
     "watch": ["watch.yml"],
+    "tape": ["tape.yml"],
     "data-commit": [
         "collect.yml", "trace.yml", "scan.yml", "analyze.yml",
         "backfill.yml", "substrate-backfill.yml",
