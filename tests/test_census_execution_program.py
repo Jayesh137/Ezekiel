@@ -61,3 +61,14 @@ def test_cap_state_trims_oldest_processed_but_keeps_all_hits():
     kept = capped["processed"]
     assert f"0x{census.MAX_STATE_ROWS + 49:040x}" in kept
     assert "0x" + "0" * 40 not in kept
+
+
+def test_census_summary_reports_a_rho_distribution():
+    census = census_summary_fixture()
+    assert census["rho_p99"] is not None
+    assert census["rho_population"] == 3
+
+
+def census_summary_fixture():
+    from src import execution_program as ep
+    return ep.summarise_census([0.0, 0.2, 1.0], rhos=[0.1, 0.5, 0.95])

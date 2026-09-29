@@ -141,7 +141,8 @@ def register_hits(hits, data_dir=None):
 
 def write_census(state):
     ratios = [v["ratio"] for v in state["processed"].values() if v.get("ratio") is not None]
-    census = ep.summarise_census(ratios)
+    rhos = [v["rho"] for v in state["processed"].values() if v.get("rho") is not None]
+    census = ep.summarise_census(ratios, rhos)
     census.update(computed_at=datetime.now(UTC).isoformat(),
                   measured=len(ratios), attempted=len(state["processed"]),
                   hits=sorted(state["hits"].values(), key=lambda h: -h.get("clips_matched", 0))[:50])
@@ -174,12 +175,20 @@ def run(*, limit, budget_seconds, fetch=None, leaderboard=None):
                 continue
             sig = ep.signature(result["data"])
             match = ep.compare(target_sig, sig)
-            ratio = match["clip_match_ratio"] if match["status"] == "measured" else None
-            state["processed"][addr] = {"ratio": ratio, "clips_compared": match.get("clips_compared"),
+            measured = match["status"] == "measured"
+            ratio = match["clip_match_ratio"] if measured else None
+            rho = match.get("notional_structure_rho") if measured else None
+            state["processed"][addr] = {"ratio": ratio, "rho": rho,
+                                        "clips_compared": match.get("clips_compared"),
                                         "at": int(time.time())}
-            if (match.get("clips_matched") or 0) >= HIT_MIN_CLIPS:
+            # A hit is a strong reproduction of his program by EITHER path: his
+            # exact clip sizes, or (rescale-robust) his per-coin rank structure.
+            strong_structure = (match.get("notional_structure_rho") or 0) >= 0.9 \
+                and (match.get("notional_coins_compared") or 0) >= ep.MIN_STRUCTURE_COINS
+            if (match.get("clips_matched") or 0) >= HIT_MIN_CLIPS or strong_structure:
                 state["hits"][addr] = {"wallet": addr, **{k: match.get(k) for k in
                     ("clip_match_ratio", "clips_matched", "clips_compared",
+                     "notional_structure_rho", "notional_coins_compared",
                      "cadence_agreement", "offset_agreement")}}
             processed_now += 1
     state = cap_state(state)

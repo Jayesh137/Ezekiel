@@ -205,3 +205,52 @@ def test_only_discriminating_matches_vote():
         {"wallet": "0xnope", "discriminating": False, "clip_match_ratio": 0.5}]}
     voting = ep.voting_wallets(report)
     assert set(voting) == {"0xvote"}
+
+
+# --- scale-invariant notional structure (survives clip rescaling) ---------
+
+def _multi(px_by_coin, clips, n=10, oid0=1):
+    fills, oid = [], oid0
+    for coin, clip in clips.items():
+        for i in range(n):
+            fills.append(_fill(oid, i * 1750, coin, "A", clip, px_by_coin[coin]))
+            oid += 1
+    return fills
+
+
+def test_signature_exposes_per_coin_clip_notionals():
+    sig = ep.signature(_program("NEAR", "A", 250, 40, px=4.0))
+    assert abs(sig["clip_notionals"]["NEAR"] - 1000) < 1
+
+
+def test_a_uniform_rescale_breaks_exact_size_but_keeps_rank_structure():
+    px = {"NEAR": 4.0, "ZEC": 300.0, "BTC": 100000.0}
+    ref = ep.signature(_multi(px, {"NEAR": 250, "ZEC": 1, "BTC": 0.1}))
+    mig = ep.signature(_multi(px, {"NEAR": 500, "ZEC": 2, "BTC": 0.2}, oid0=9000))  # all 2x
+    result = ep.compare(ref, mig)
+    assert result["clip_match_ratio"] == 0.0                 # absolute sizes differ
+    assert result["notional_structure_rho"] > 0.99        # structure preserved
+    assert result["notional_coins_compared"] == 3
+
+
+def test_a_different_structure_does_not_match_on_notionals():
+    px = {"NEAR": 4.0, "ZEC": 300.0, "BTC": 100000.0}
+    ref = ep.signature(_multi(px, {"NEAR": 250, "ZEC": 1, "BTC": 0.1}))
+    # candidate trades the same coins but with a totally different size structure
+    other = ep.signature(_multi(px, {"NEAR": 1, "ZEC": 1000, "BTC": 0.001}, oid0=9000))
+    result = ep.compare(ref, other)
+    assert result["notional_structure_rho"] < 0.9
+
+
+def test_a_rescaled_match_is_discriminating_when_the_census_measures_it_rare():
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3, "rho_p99": 0.9}
+    match = {"clip_match_ratio": 0.0, "clips_compared": 3, "clips_matched": 0,
+             "notional_structure_rho": 0.995, "notional_coins_compared": 4}
+    assert ep.is_discriminating(match, census) is True
+
+
+def test_a_common_rho_does_not_vote():
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3, "rho_p99": 0.997}
+    match = {"clip_match_ratio": 0.0, "clips_compared": 3, "clips_matched": 0,
+             "notional_structure_rho": 0.99, "notional_coins_compared": 4}
+    assert ep.is_discriminating(match, census) is False
