@@ -1477,3 +1477,25 @@ execution program needs none: a wallet funded from anywhere and traded by his
 own script is caught by HOW it trades. It is the one net that catches a wallet he
 kept deliberately clean, provided he keeps using the SDK. If he switches tooling
 the vector goes silent — which is itself worth knowing.
+
+---
+
+**Builder/frontend fingerprint — measured and rejected as a discovery channel
+(2026-09-29).** Hyperliquid publishes a keyless per-builder fills dataset at
+`stats-data.hyperliquid.xyz/Mainnet/builder_fills/<builder>/<YYYYMMDD>.csv.lz4`
+(columns: time, user, coin, side, px, sz, crossed, tif, counterparty, closed_pnl,
+twap_id, builder_fee). His `0xf078969e…` approved the builder `0x1924b856…`
+("BasedApp") on 2026-01-02, so the idea was: the set of accounts trading through
+the same app is a small, enriching candidate pool.
+
+Measured over 6 days (2026-09-22 → 27): the BasedApp feed carries ~200-260
+distinct users/day, **623 distinct over the window** — small enough to check all
+against his clip table with zero per-wallet API calls. **But his cluster is absent
+from it** (target, treasury, `0xf078969e…` — none appear in 6 days), and the
+target pays **0 builder fee on every one of his fills**, so he does not trade
+through any builder and cannot appear in any builder feed. The channel therefore
+cannot catch HIM unless he adopts a builder on a new wallet, which is not his
+current behaviour. Not wired in. Worth knowing the feed exists: it is a free
+source of fills-WITH-counterparties (which `userFills` lacks) should a future
+vector need counterparties for the ~600 accounts that do use a builder. Re-check
+only if the target starts paying a builder fee.
