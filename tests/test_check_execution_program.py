@@ -87,3 +87,25 @@ def test_an_invented_severity_is_clamped_to_a_routable_one(monkeypatch):
                         lambda key, hours, subject, body: sent.append(subject) or True)
     alerts.alert_execution_program_match("0xabc", {"clips_matched": 6, "clips_compared": 6}, "ELEVATED")
     assert alerts._severity_of(sent[0]) in alerts.ESCALATING_SEVERITIES
+
+
+def test_select_candidates_reserves_room_for_fresh_wallets_on_his_coins():
+    roster = [f"0x{i:040x}" for i in range(10)]
+    discovery = {"candidates": [
+        {"wallet": "0xfresh1", "markets": {"NEAR": 3}, "trade_count": 3},
+        {"wallet": "0xfresh2", "markets": {"ZEC": 1}, "trade_count": 1},
+        {"wallet": "0xoffcoin", "markets": {"WIF": 9}, "trade_count": 9},  # not a clip coin
+    ]}
+    clip_coins = {"NEAR", "ZEC", "BTC"}
+    picked = chk.select_candidates(roster, discovery, clip_coins, cap=6)
+    assert "0xfresh1" in picked and "0xfresh2" in picked   # fresh wallets on his coins kept
+    assert "0xoffcoin" not in picked                        # off-coin discovery ignored
+    assert len(picked) == 6                                 # capped
+    assert picked[0] in roster                              # roster leads still lead
+
+
+def test_select_candidates_dedupes_and_survives_missing_discovery():
+    roster = ["0xaaa", "0xbbb"]
+    assert chk.select_candidates(roster, None, {"NEAR"}, cap=10) == ["0xaaa", "0xbbb"]
+    dup = {"candidates": [{"wallet": "0xaaa", "markets": {"NEAR": 1}}]}
+    assert chk.select_candidates(roster, dup, {"NEAR"}, cap=10) == ["0xaaa", "0xbbb"]

@@ -55,9 +55,60 @@ def load_census():
         return None
 
 
-def candidate_wallets(config, roster):
+def select_candidates(roster_candidates, discovery, clip_coins, cap=MAX_CANDIDATES):
+    """Roster leads plus fresh wallets seen trading his clipped coins.
+
+    A migration wallet is small and new — outside the leaderboard and off the
+    roster for a long time — so checking only roster candidates would find it late
+    or never. The discovery tape sees whoever trades his markets; a wallet trading
+    a coin he runs a fixed clip on is exactly where his script would surface first.
+    A slice of the budget is reserved for these so roster leads cannot crowd them
+    out (the "reserve exploration capacity" lesson). Deterministic and deduped.
+    """
+    clip_coins = {c for c in (clip_coins or set())}
+    ordered_roster = [str(w).lower() for w in (roster_candidates or [])]
+    fresh = []
+    for row in (discovery or {}).get("candidates", []):
+        wallet = (row.get("wallet") or "").lower()
+        markets = set((row.get("markets") or {}).keys())
+        if wallet and markets & clip_coins:
+            fresh.append((wallet, row.get("trade_count") or 0))
+    fresh.sort(key=lambda wc: (-wc[1], wc[0]))
+    fresh_wallets = [w for w, _ in fresh]
+    reserved = max(0, cap // 2)
+    picked, seen = [], set()
+
+    def add(wallet):
+        if wallet and wallet not in seen:
+            seen.add(wallet)
+            picked.append(wallet)
+
+    # Roster leads first (they carry evidence), leaving the reserved tail for fresh.
+    for wallet in ordered_roster[:cap - min(reserved, len(fresh_wallets))]:
+        add(wallet)
+    for wallet in fresh_wallets:
+        if len(picked) >= cap:
+            break
+        add(wallet)
+    for wallet in ordered_roster:  # backfill any reserved room fresh did not use
+        if len(picked) >= cap:
+            break
+        add(wallet)
+    return picked[:cap]
+
+
+def load_discovery():
+    try:
+        with open(DATA_DIR / "discovery" / "latest.json") as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return None
+
+
+def candidate_wallets(config, roster, clip_coins):
     from src.roster import detector_candidates
-    return detector_candidates(config, roster, MAX_CANDIDATES)
+    roster_candidates = detector_candidates(config, roster, MAX_CANDIDATES)
+    return select_candidates(roster_candidates, load_discovery(), clip_coins, MAX_CANDIDATES)
 
 
 def roster_vector_map(roster):
@@ -124,7 +175,8 @@ def main():
             roster = json.load(handle)
     except (OSError, ValueError):
         roster = {}
-    wallets = candidate_wallets(config, roster)
+    clip_coins = set((target_sig.get("clip_table") or {}).keys())
+    wallets = candidate_wallets(config, roster, clip_coins)
     rows, errors = [], []
     with ReadBudget(seconds=600, weight_per_minute=600) as budget:
         for wallet in wallets:
