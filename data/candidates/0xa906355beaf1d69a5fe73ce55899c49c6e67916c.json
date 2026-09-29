@@ -1,13 +1,14 @@
 {
   "wallet": "0xa906355beaf1d69a5fe73ce55899c49c6e67916c",
   "first_seen": "2026-08-13T03:23:51.123492+00:00",
-  "last_seen": "2026-09-27T19:05:06.745474+00:00",
+  "last_seen": "2026-09-29T00:53:44.850467+00:00",
   "best_score": 0.3182,
-  "latest_score": 0.2866,
+  "latest_score": 0.2673,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
+      "Matching trade frequency and cadence",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
@@ -41,16 +42,22 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2866,
+      "score_without_bonus": 0.2673,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
-      "status": "insufficient_data",
+      "status": "research",
       "promotable": false,
-      "similarity": null,
-      "features": {},
-      "independent_sessions": 0,
+      "similarity": 0.7465,
+      "features": {
+        "relative_size_dispersion": 0.7325,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 1.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 5,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -2200,17 +2207,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-09-29T00:53:44.850467+00:00",
+      "score": 0.2673,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1111,
+        "timing_profile": null,
+        "leverage_profile": 0.2714,
+        "entry_exit_style": 0.1352,
+        "hold_duration": 0.4898,
+        "account_size": 0.5584,
+        "trade_sequencing": 0.6944,
+        "position_sizing": 0.0984,
+        "order_profile": null,
+        "activity": 0.7763,
+        "direction_bias": 0.0,
+        "position_management": 0.8842,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.261,
-  "last_checked": "2026-09-27T19:05:06.745474+00:00",
+  "recent_avg_score": 0.2634,
+  "last_checked": "2026-09-29T00:53:44.850467+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-09-27T19:05:06.745474+00:00",
-  "last_positive_evidence": "2026-09-27T19:05:06.390442+00:00",
+  "last_successful_read": "2026-09-29T00:53:44.850467+00:00",
+  "last_positive_evidence": "2026-09-29T00:53:38.188372+00:00",
   "observations": [
     {
       "status": "ok",
@@ -2253,19 +2281,43 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-09-27T19:05:06.390442+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1790455510215,
+      "coverage": {
+        "start_ms": 1788828803984,
+        "end_ms": 1790643203984,
+        "pages": 2,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788828803984,
+        "requested_start_ms": 1788828803984,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1790643203984,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-09-29T00:53:38.188372+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788721506070,
-    "end_ms": 1790535906070,
+    "start_ms": 1788828803984,
+    "end_ms": 1790643203984,
     "pages": 2,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "requested_start_ms": 1788721506070,
+    "fetched_start_ms": 1788828803984,
+    "requested_start_ms": 1788828803984,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-09-27T19:05:06.745474+00:00",
+  "last_scored": "2026-09-29T00:53:44.850467+00:00",
   "latest_scoring_schema": "2026-09-26.2"
 }

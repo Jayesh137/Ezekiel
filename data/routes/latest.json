@@ -572,7 +572,7 @@
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "source_chain": "ethereum",
       "source_tx": "0xbf44cda94f0d55d7babafd3c03b590dab772a093fe35820acb0f4db1c9138e10",
-      "amount_usd": 0.18,
+      "amount_usd": null,
       "ts_ms": 1788676499000,
       "assertion": "observed_transfer",
       "parent_event_ids": [
@@ -45401,14 +45401,14 @@
   ],
   "coverage": {
     "transfer_records": 5711,
-    "circle_events": 12137
+    "circle_events": 12283
   },
   "counts": {
     "routes": 3211,
     "unresolved": 2506,
     "discoveries": 2957
   },
-  "computed_at_ms": 1790640193875,
+  "computed_at_ms": 1790642529914,
   "authority": {
     "intervals": [
       {
@@ -46342,9 +46342,10 @@
         "relationship": "approve_agent",
         "boundaries_observed_only": true,
         "valid_from_ms": 1790507801004,
-        "valid_to_ms": 1791535639419,
+        "valid_to_ms": 1790641771100,
         "parent_event_ids": [
-          "agents:0x60a8c761f39696b3b419f31dcda20b405cb685f6:1790507801004:0x4fbf8d78ec9e9a904ee904601a71a92861c0cd02"
+          "agents:0x60a8c761f39696b3b419f31dcda20b405cb685f6:1790507801004:0x4fbf8d78ec9e9a904ee904601a71a92861c0cd02",
+          "agents:0x60a8c761f39696b3b419f31dcda20b405cb685f6:1790641771100:0x4fbf8d78ec9e9a904ee904601a71a92861c0cd02"
         ],
         "confirms_owner": false
       },
@@ -51618,9 +51619,10 @@
         "relationship": "approve_agent",
         "boundaries_observed_only": true,
         "valid_from_ms": 1790618029048,
-        "valid_to_ms": 1791827025955,
+        "valid_to_ms": 1790641771100,
         "parent_event_ids": [
-          "agents:0x84abc08c0ea62e687c370154de1f38ea462f4d37:1790618029048:0xcb1951d7ef6b6c94d4c0883d16dc28e6e9abe3f5"
+          "agents:0x84abc08c0ea62e687c370154de1f38ea462f4d37:1790618029048:0xcb1951d7ef6b6c94d4c0883d16dc28e6e9abe3f5",
+          "agents:0x84abc08c0ea62e687c370154de1f38ea462f4d37:1790641771100:0xcb1951d7ef6b6c94d4c0883d16dc28e6e9abe3f5"
         ],
         "confirms_owner": false
       },
@@ -51672,6 +51674,30 @@
           "agents:0x065fb6cfdb32ccaa5747122fd979b88b3844b68c:1790632186359:0xf92de1ecab02f5234e4a860549752330e5e88b05"
         ],
         "confirms_owner": false
+      },
+      {
+        "account": "0x60a8c761f39696b3b419f31dcda20b405cb685f6",
+        "authority": "0xa8c1f611fc2f653439903598f9a2ae5a23d76a5d",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1790641771100,
+        "valid_to_ms": 1791850629159,
+        "parent_event_ids": [
+          "agents:0x60a8c761f39696b3b419f31dcda20b405cb685f6:1790641771100:0xa8c1f611fc2f653439903598f9a2ae5a23d76a5d"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0x84abc08c0ea62e687c370154de1f38ea462f4d37",
+        "authority": "0x4a4eb3ba07f6c72f702fb157e7de5acf98da0512",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1790641771100,
+        "valid_to_ms": 1791851002069,
+        "parent_event_ids": [
+          "agents:0x84abc08c0ea62e687c370154de1f38ea462f4d37:1790641771100:0x4a4eb3ba07f6c72f702fb157e7de5acf98da0512"
+        ],
+        "confirms_owner": false
       }
     ],
     "shared_authority": [],
@@ -51682,6 +51708,10 @@
   "source_message_reads": {
     "queries": 20,
     "errors": [
+      {
+        "tx": "0xcf95ed986af9cc9baf4500627206fd5c751bb41b58706556e95ada3623aebad9",
+        "reason": "no validated complete V2 message"
+      },
       {
         "tx": "0x1b9e849f15d9265b687b4eace5b900dd4575e6f3d6a8e06dbe0889e5c41d147d",
         "reason": "no validated complete V2 message"
@@ -51757,15 +51787,11 @@
       {
         "tx": "0xf0767047d9f2a817a7256679326a1ce94e3b9c0c7188d23c9aecb7d61c2bcb3b",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0xa66961f98c5b4bccd753630122dde13cefd44a86ecd5792e7b9a59fd2614a07a",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 12137,
+    "circle_rows_read": 12283,
     "store_read_limit": 100000
   }
 }
