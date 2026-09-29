@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-09-29T04:32:24.252804+00:00",
+  "computed_at": "2026-09-29T05:01:58.603172+00:00",
   "wallets": 1,
   "records": 5,
   "spam_suppressed": 6,
@@ -76,14 +76,14 @@
           "cursor": 48761019,
           "gaps": [],
           "truncated": true,
-          "error": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)",
+          "error": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/internal-transactions",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {
             "zero_value": 1
           },
           "errors_by_kind": {
-            "internal": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)"
+            "internal": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/internal-transactions"
           },
           "cursor_by_kind": {
             "erc20": 48761019,
@@ -91,7 +91,10 @@
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "blockscout:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/token-transfers?type=ERC-20",
+            "native": "blockscout:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/transactions"
+          },
           "reader": "blockscout"
         },
         "optimism": {
