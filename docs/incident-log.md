@@ -1536,3 +1536,27 @@ investigation priority. Still `research_only`/`promotable: false` — it reorder
 research queue, it does not mint a roster tier, so no rule-4 exposure. Result rows
 now carry `handoff_basket`. The behavioural handoff a copy-trader cannot fake is
 now weighted by how distinctive the basket is, not merely whether one coin moved.
+
+---
+
+**Scale-invariant execution signature — hardening the flagship against rescaling
+(2026-09-29).** The execution-program vector matched his EXACT per-coin clip sizes,
+so the cheapest evasion is to rescale every clip (NEAR 250→500, ZEC 1→2), and the
+recall test already showed his absolute sizes drift ~50% over months. Measured what
+survives a rescale/drift: his per-coin clip NOTIONALS keep the same rank ordering —
+Spearman rho of pre/post-cutoff structure ran -0.07, 0.26, **0.90, 0.89** across
+splits (strong and rising toward recent windows), while exact-size match sat at
+~0.5 and coin-set overlap at ~0.17. So the rank of his per-coin sizes is the
+invariant, not the sizes themselves.
+
+`signature` now carries `clip_notionals` (modal clip × typical price per coin);
+`compare` adds `notional_structure_rho` (Spearman rank correlation over shared
+clip coins, magnitude-robust — unlike raw cosine, which the biggest coin
+dominates); `is_discriminating` clears the bar by EITHER the exact clip match
+beating `ratio_p99` OR the rank structure beating a measured `rho_p99` (the
+census now measures both distributions); `recall` reports which path recognised
+each split. A uniform rescale preserves ranks exactly (rho 1.0), so a migrated
+wallet that rescales its clips is still caught. Both gated by the census (rule 4),
+so a non-discriminating rho self-disables. Recall on live data rose from
+caught_rate 0 to 0.75 once the census populated; the recent-migration split is
+recognised at rho 1.0. Full suite 1955.

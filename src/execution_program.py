@@ -51,6 +51,12 @@ SLIPPAGE_TOLERANCE = 0.004
 
 # A comparison needs at least this many coins where BOTH sides carry a clip.
 MIN_SHARED_CLIP_COINS = 2
+# Rank correlation of the per-coin clip NOTIONALS needs at least this many shared
+# coins to mean anything. This is the scale-invariant signal: it survives him
+# rescaling every clip (ranks are unchanged) and it is more stable across his drift
+# than the exact sizes (measured 2026-09-29: recent-window Spearman rho ~0.9 while
+# exact-size match was ~0.5). Nobody's per-coin size RANKING is his by chance.
+MIN_STRUCTURE_COINS = 3
 
 # A vote needs the match measured over at least this many shared clips, on top of
 # whatever the census says is rare. Two exact size matches can be luck; six of his
@@ -94,6 +100,37 @@ def reconstruct_orders(fills: list[dict]) -> list[dict]:
                        "taker": bool(crossed) and all(crossed), "first_px": first["px"]})
     orders.sort(key=lambda o: o["t"])
     return orders
+
+
+def clip_notionals(orders: list[dict], table: dict) -> dict:
+    """Per-coin clip NOTIONAL (modal clip size x that coin's typical price).
+
+    The scale-invariant fingerprint is built on this: his relative ordering of
+    per-coin clip notionals is idiosyncratic and persists even when he rescales
+    the absolute sizes.
+    """
+    prices = defaultdict(list)
+    for order in orders:
+        if order.get("taker") and order.get("coin") in table and order.get("first_px"):
+            prices[order["coin"]].append(order["first_px"])
+    return {coin: table[coin]["size"] * median(prices[coin])
+            for coin in table if prices.get(coin)}
+
+
+def _spearman(a: dict, b: dict):
+    """Rank correlation of two coin->value maps over their shared coins.
+
+    Scale-invariant (ranks are unchanged by a uniform rescale) and not dominated
+    by the largest coin (unlike raw cosine). Returns (rho, shared_count).
+    """
+    shared = sorted(set(a) & set(b))
+    n = len(shared)
+    if n < MIN_STRUCTURE_COINS:
+        return None, n
+    rank_a = {c: i for i, c in enumerate(sorted(shared, key=lambda c: a[c]))}
+    rank_b = {c: i for i, c in enumerate(sorted(shared, key=lambda c: b[c]))}
+    d_sq = sum((rank_a[c] - rank_b[c]) ** 2 for c in shared)
+    return 1 - 6 * d_sq / (n * (n * n - 1)), n
 
 
 def clip_table(orders: list[dict]) -> dict:
@@ -162,10 +199,12 @@ def signature(fills: list[dict], orders: list[dict] | None = None) -> dict:
     """
     reconstructed = reconstruct_orders(fills)
     taker = [o["taker"] for o in reconstructed]
+    table = clip_table(reconstructed)
     sig = {
         "orders_observed": len(reconstructed),
         "taker_share": round(sum(taker) / len(taker), 4) if taker else None,
-        "clip_table": clip_table(reconstructed),
+        "clip_table": table,
+        "clip_notionals": clip_notionals(reconstructed, table),
         "program_runs": len(program_runs(reconstructed)),
         "ioc_5pct_share": None,
         "cloid_share": None,
@@ -211,11 +250,24 @@ def compare(target: dict, candidate: dict) -> dict:
     """
     result = {"status": "insufficient_data", "clip_match_ratio": None, "clips_matched": 0,
               "clips_compared": 0, "cadence_agreement": None, "offset_agreement": None,
+              "notional_structure_rho": None, "notional_coins_compared": 0,
               "strength": None, "promotable": False}
     t_table = target.get("clip_table") or {}
     c_table = candidate.get("clip_table") or {}
+    # Scale-invariant structure: the rank correlation of per-coin clip notionals
+    # survives him rescaling every clip, and is computed even when the exact clip
+    # tables share too few coins to compare on absolute size.
+    rho, structure_coins = _spearman(target.get("clip_notionals") or {},
+                                     candidate.get("clip_notionals") or {})
+    result["notional_structure_rho"] = round(rho, 4) if rho is not None else None
+    result["notional_coins_compared"] = structure_coins
     shared = set(t_table) & set(c_table)
     if len(shared) < MIN_SHARED_CLIP_COINS:
+        # Still a measured comparison if the scale-invariant structure could be read.
+        if rho is not None:
+            result["status"] = "measured"
+            result["clip_match_ratio"] = 0.0
+            result["strength"] = round(max(0.0, rho), 4)
         return result
     matched = sum(1 for coin in shared
                   if math.isclose(t_table[coin]["size"], c_table[coin]["size"], rel_tol=1e-9))
@@ -227,9 +279,10 @@ def compare(target: dict, candidate: dict) -> dict:
     if target.get("ioc_5pct_share") is not None and candidate.get("ioc_5pct_share") is not None:
         result["offset_agreement"] = bool(target["ioc_5pct_share"] >= 0.8
                                           and candidate["ioc_5pct_share"] >= 0.8)
-    # Strength is the clip-table match, nudged by the corroborating habits. It is
-    # an ordering aid, not a probability, and never promotes on its own.
-    strength = ratio
+    # Strength is the stronger of the exact clip-table match and the scale-invariant
+    # rank structure (so a rescaled program still ranks highly), nudged by the
+    # corroborating habits. An ordering aid, not a probability; never promotes alone.
+    strength = max(ratio, rho if rho is not None else 0.0)
     if result["cadence_agreement"]:
         strength = min(1.0, strength + 0.05)
     if result["offset_agreement"]:
@@ -258,29 +311,45 @@ def rank_matches(target: dict, candidates: list[dict]) -> list[dict]:
 
 
 def is_discriminating(match: dict, census: dict | None) -> bool:
-    """Whether a clip-table match is rare enough in the population to be evidence.
+    """Whether a match is rare enough in the population to be evidence.
 
     Rule 4: a behavioural signal casts no vote until its false-positive rate has
-    been MEASURED. Without a census this returns False however perfect the match,
-    exactly as the fuzzy behavioural score waits on its backtest. With a census, a
-    match must beat the population's 99th-percentile ratio AND rest on enough
-    shared clips that a coincidence of common sizes cannot reach it.
+    been MEASURED. Without a census this returns False however perfect the match.
+    Two independent ways to clear the bar, each on its own measured distribution:
+
+      * the EXACT clip match beats the population's 99th-percentile ratio over
+        enough shared clips (he kept his sizes), or
+      * the scale-invariant rank structure beats the population's 99th-percentile
+        rho over enough coins (he rescaled his clips but kept his per-coin
+        structure) — the evasion-robust path.
     """
     if not census:
         return False
     ratio = match.get("clip_match_ratio")
     compared = match.get("clips_compared") or 0
     matched = match.get("clips_matched") or 0
-    if ratio is None:
-        return False
-    threshold = census.get("ratio_p99")
+    ratio_threshold = census.get("ratio_p99")
     min_clips = max(MIN_VOTE_CLIPS, int(census.get("min_clips") or 0))
-    if threshold is None:
-        return False
-    return ratio > threshold and compared >= min_clips and matched >= MIN_VOTE_CLIPS
+    exact = (ratio is not None and ratio_threshold is not None
+             and ratio > ratio_threshold and compared >= min_clips and matched >= MIN_VOTE_CLIPS)
+
+    rho = match.get("notional_structure_rho")
+    rho_threshold = census.get("rho_p99")
+    structure_coins = match.get("notional_coins_compared") or 0
+    structural = (rho is not None and rho_threshold is not None
+                  and rho > rho_threshold and structure_coins >= MIN_STRUCTURE_COINS)
+    return bool(exact or structural)
 
 
-def summarise_census(ratios: list[float]) -> dict:
+def _p99(values):
+    clean = sorted(v for v in values if isinstance(v, (int, float)))
+    if not clean:
+        return None, None, None, 0
+    idx = min(len(clean) - 1, math.ceil(0.99 * len(clean)) - 1)
+    return round(clean[idx], 4), round(clean[-1], 4), round(sum(clean) / len(clean), 4), len(clean)
+
+
+def summarise_census(ratios: list[float], rhos: list[float] | None = None) -> dict:
     """Distribution of stranger clip-match ratios, and the rarity threshold.
 
     `ratios` are the clip_match_ratio of every population wallet that had a
@@ -288,14 +357,12 @@ def summarise_census(ratios: list[float]) -> dict:
     candidate must beat to count as rare. An empty sample yields no threshold, so
     `is_discriminating` refuses every match until a real population exists.
     """
-    clean = sorted(r for r in ratios if isinstance(r, (int, float)))
-    if not clean:
-        return {"population": 0, "ratio_p99": None, "ratio_max": None,
-                "ratio_mean": None, "min_clips": MIN_VOTE_CLIPS}
-    idx = min(len(clean) - 1, math.ceil(0.99 * len(clean)) - 1)
-    return {"population": len(clean), "ratio_p99": round(clean[idx], 4),
-            "ratio_max": round(clean[-1], 4), "ratio_mean": round(sum(clean) / len(clean), 4),
-            "min_clips": MIN_VOTE_CLIPS}
+    ratio_p99, ratio_max, ratio_mean, population = _p99(ratios)
+    rho_p99, rho_max, rho_mean, rho_population = _p99(rhos or [])
+    return {"population": population, "ratio_p99": ratio_p99, "ratio_max": ratio_max,
+            "ratio_mean": ratio_mean, "min_clips": MIN_VOTE_CLIPS,
+            "rho_p99": rho_p99, "rho_max": rho_max, "rho_mean": rho_mean,
+            "rho_population": rho_population}
 
 
 def voting_wallets(report: dict | None) -> dict:

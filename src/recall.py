@@ -51,12 +51,18 @@ def self_migration_recall(fills: list[dict], cutoff_ms: int, census: dict | None
         "clip_match_ratio": match.get("clip_match_ratio"),
         "clips_matched": match.get("clips_matched"),
         "clips_compared": match.get("clips_compared"),
-        "recognised": False, "would_vote": False, "caught": False,
+        "notional_structure_rho": match.get("notional_structure_rho"),
+        "notional_coins_compared": match.get("notional_coins_compared"),
+        "recognised": False, "recognised_by": None, "would_vote": False, "caught": False,
     }
     if match["status"] != "measured":
         return result
-    # Recognised: the migrated half reproduces most of his reference clip table.
-    result["recognised"] = (match.get("clip_match_ratio") or 0) >= 0.5 and (match.get("clips_matched") or 0) >= 2
+    # Recognised by EITHER path: his exact clip sizes, or (rescale-robust) his
+    # per-coin rank structure surviving even when the exact sizes drifted.
+    exact = (match.get("clip_match_ratio") or 0) >= 0.5 and (match.get("clips_matched") or 0) >= 2
+    structural = (match.get("notional_structure_rho") or 0) >= 0.8 and (match.get("notional_coins_compared") or 0) >= 3
+    result["recognised"] = bool(exact or structural)
+    result["recognised_by"] = "exact_clips" if exact else "rank_structure" if structural else None
     result["would_vote"] = ep.is_discriminating(match, census)
     result["caught"] = result["recognised"] and result["would_vote"]
     return result
