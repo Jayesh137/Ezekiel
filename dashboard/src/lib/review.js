@@ -30,7 +30,8 @@ export const VECTOR_LABEL = {
 	shared_agent: 'Shares an agent',
 	explicit_link: 'Explicit link (sub-account / role)',
 	dormancy_handoff: 'Activity near an observed pause',
-	referral: 'Referral link'
+	referral: 'Referral link',
+	execution_program: 'Runs his trading program'
 };
 
 /** An unknown vector renders raw rather than disappearing. */
