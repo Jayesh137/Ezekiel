@@ -1,18 +1,20 @@
 {
-  "computed_at": "2026-09-29T02:06:33.658983+00:00",
+  "computed_at": "2026-09-29T02:25:38.351332+00:00",
   "wallets": 1,
   "records": 4,
-  "spam_suppressed": 5,
+  "spam_suppressed": 4,
   "unpriced": 2,
   "spam_by_reason": {
-    "symbol_forgery": 2,
-    "zero_value": 3
+    "zero_value": 3,
+    "symbol_forgery": 1
   },
-  "calls": 34,
+  "calls": 31,
   "possible_gaps": 0,
   "incomplete": {},
   "degraded_sources": [
-    "base"
+    "arbitrum",
+    "base",
+    "polygon"
   ],
   "unsupported_sources": [
     "bsc"
@@ -24,19 +26,20 @@
       "chains": {
         "arbitrum": {
           "records": 1,
-          "spam": 2,
-          "calls": 6,
+          "spam": 1,
+          "calls": 5,
           "cursor": 508037872,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 1,
           "spam_by_reason": {
-            "symbol_forgery": 1,
             "zero_value": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 508037872,
             "native": 508029886,
@@ -76,14 +79,14 @@
           "cursor": 48761019,
           "gaps": [],
           "truncated": true,
-          "error": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)",
+          "error": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/internal-transactions",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
           "errors_by_kind": {
             "erc20": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/token-transfers?type=ERC-20",
             "native": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/transactions",
-            "internal": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)"
+            "internal": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/internal-transactions"
           },
           "cursor_by_kind": {
             "erc20": 48761019,
@@ -118,17 +121,20 @@
         "polygon": {
           "records": 0,
           "spam": 1,
-          "calls": 6,
+          "calls": 4,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {
             "symbol_forgery": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 79283383,
             "native": 0,
@@ -180,7 +186,9 @@
         }
       },
       "degraded_sources": [
-        "base"
+        "arbitrum",
+        "base",
+        "polygon"
       ],
       "unsupported_sources": [
         "bsc"
