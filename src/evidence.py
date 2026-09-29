@@ -3,7 +3,8 @@
 CATEGORIES = ('protocol', 'financial', 'behaviour', 'successor')
 VECTOR_CATEGORY = {'transfer': 'financial', 'hl_native': 'financial', 'linkage': 'financial',
                    'correlation': 'financial', 'shared_agent': 'protocol', 'explicit_link': 'protocol',
-                   'behavioural': 'behaviour', 'dormancy_handoff': 'successor', 'referral': 'protocol'}
+                   'behavioural': 'behaviour', 'execution_program': 'behaviour',
+                   'dormancy_handoff': 'successor', 'referral': 'protocol'}
 
 
 def aggregate_evidence(observations: list[dict]) -> dict:

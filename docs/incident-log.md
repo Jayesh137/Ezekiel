@@ -1423,3 +1423,57 @@ since 2026-09-12 for exactly this, and the collector never used it. The stored
 history shows it: his agent record reads `none` between two real agents.
 **When one call in a pair is guarded, ask what guards the other** — third time
 this file has recorded that sentence.
+
+---
+
+**The execution-program vector — his slicer is a script, not manual TWAP
+(2026-09-29).** CLAUDE.md had called his execution "manual TWAP" since
+2026-09-10. Measured over his 168,170 stored fills / 92,402 reconstructed
+orders: **53,630 of 57,580 historical orders are taker `Limit`/`Ioc`, no client
+id, `reduceOnly` false, with the limit priced EXACTLY 5.0% through the book**
+(99.4% within ±0.3%). That is the hyperliquid-python-sdk `market_open` default,
+`DEFAULT_SLIPPAGE = 0.05` (verified in the SDK's `exchange.py`, which sends
+`{"limit": {"tif": "Ioc"}}` at `ref * (1 ± slippage)` and no cloid). He closes
+with `market_open` too (`reduceOnly` false, not `market_close`). The program
+fires **one round base size per coin** — his CLIP TABLE — at a ~1.7s median
+cadence (p10 ~1.55s) in runs of tens to 3,000+ orders. The treasury
+`0x1419e75…` shows the manual precursor of the same habit: 37 × 500 HYPE
+`FrontendMarket` orders ~2.5s apart. His ~8% `FrontendMarket` orders are web-UI
+clicks. No `twapId` and no `builderFee` on any of his fills.
+
+What travels to a new wallet is the clip table — the exact size per coin (ZEC 1,
+SILVER 20, NEAR 250, BTC 0.1, HYPE 40, XRP 1000, LINK 100, PUMP 200000,
+FARTCOIN 3000, DOGE 10000). Anyone can fire a 5% IOC; almost nobody reproduces
+his whole size table. **Rarity measured 2026-09-28: 0 of 248 large active
+accounts (≥$250k, top week volume) carried the full signature**; 5 ran a
+constant-clip cadence only and 3 of those were manual clickers. A 10-minute
+full-venue tape sample (658 markets, one websocket, ~52 trades/s, 3,133 wallets)
+held 131 taker sequences ≥15 orders, 3 with constant clip and cadence, 0 with
+the full signature. Constant clip alone is not specific; the clip table plus the
+5% offset is.
+
+Built as a first-class vector: `src/execution_program.py` (signature extraction
+and clip-table comparison, self-compare 1.0 on his real data, recovering his
+38-coin table), `scripts/check_execution_program.py` (live detector in
+`trace.yml`, before the roster so its matches vote the same run) and
+`scripts/census_execution_program.py` (measures the population distribution in
+`analyze.yml`, writing `data/execution_program/census.json`). Bound by the same
+discipline as the fuzzy behavioural score: it is a BEHAVIOUR vote
+(`execution_program`, category `behaviour`), so it corroborates a
+financial/protocol vote and never reaches PROBABLE alone (rule 9 — a shared bot
+or frontend is the confounder), and it casts NO vote until the census has
+MEASURED the match rare (rule 4 — `is_discriminating` returns False without a
+census, however perfect the match, and requires the ratio to beat the
+population's 99th percentile over ≥3 shared clips). A missing/flat/unread wallet
+is `insufficient_data`, never a 0.0 score (rules 5, 6). Alerts:
+`alert_execution_program_match` routes CRITICAL when the wallet already carries
+an independent financial/protocol vector (two vectors agree), HIGH for a
+census-rare match alone; both are clamped to the routing vocabulary. 47 new
+tests; full suite 1917 passing.
+
+**Why this matters for the mission:** the linkage vectors all need him to leave a
+connection — a transfer, a shared deposit address, an authorised agent. The
+execution program needs none: a wallet funded from anywhere and traded by his
+own script is caught by HOW it trades. It is the one net that catches a wallet he
+kept deliberately clean, provided he keeps using the SDK. If he switches tooling
+the vector goes silent — which is itself worth knowing.
