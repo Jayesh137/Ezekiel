@@ -1499,3 +1499,23 @@ current behaviour. Not wired in. Worth knowing the feed exists: it is a free
 source of fills-WITH-counterparties (which `userFills` lacks) should a future
 vector need counterparties for the ~600 accounts that do use a builder. Re-check
 only if the target starts paying a builder fee.
+
+---
+
+**Correlator self-loop cleanup via observed-return reconciliation (2026-09-29).**
+The correlator surfaced his outbounds to Monad as unresolved "exits" that then
+matched same-size deposits at other wallets, on the assumption they were his
+Aave/Monad yield loop. `movements.reconcile_movements` now resolves a cluster
+outbound as `self_roundtrip` when an equal-size deposit (within 2%) returns to his
+own HL account within 45 days — an OBSERVED return, never an inference. Measured on
+live data: **176 round-trips totalling $383M** now resolve as internal instead of
+feeding the exit pool, with zero over-filter risk, because a genuine exit does not
+come back (rule 7) — the "an outbound with no return stays an exit" test pins this.
+
+A correction to the earlier framing: not every Monad outbound is a round-trip. The
+specific $6M Monad outbound `0x7867fd62…` does NOT return size-matched, so it
+remains a genuinely unresolved exit — and its $6M match at `0xeaad1c35…` is
+therefore a real (if low-confidence, single-vector POSSIBLE) lead the mission wants
+surfaced, not noise to suppress. Aggregated or split round-trips that do not
+size-match are left as leads on purpose; catching those needs source-chain-attributed
+deposits (a larger change with over-filter risk), deliberately not done.
