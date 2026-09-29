@@ -102,6 +102,7 @@ def _handoffs(target, candidate, context, cutoff):
                              for event in context.get('market_events', []))
                 possibilities.append((abs(1 - ratio), delay, i, j, {
                     'coin': entry['coin'], 'direction': entry['direction'],
+                    'entry_ts_ms': entry['ts_ms'],
                     'quantity_ratio': round(ratio, 4), 'delay_hours': round(delay / 3600_000, 4),
                     'common_market_event': common, 'timing_is_interval_censored': True,
                     'market_control_available': bool(context.get('market_events')),
@@ -114,6 +115,33 @@ def _handoffs(target, candidate, context, cutoff):
             used_entries.add(j)
             output.append(row)
     return output
+
+
+def basket_handoff(handoffs, freq, window_ms=DAY):
+    """Score a BASKET handoff: several of his coins moving to one account together.
+
+    A single-coin "handoff" (he sells BTC, someone buys BTC) is market noise; a
+    distinctive multi-coin basket reducing on his side while the SAME basket builds
+    on one account in the same window is what a copy-trader cannot fake. Strength is
+    the calibrated rarity of the coin set (`market_rarity_bonus`), which compounds
+    several coins with diminishing returns and gives common coins no weight — so a
+    BTC/ETH basket earns nothing and his memory-chip pair book earns a real bonus.
+    """
+    empty = {"coins": [], "basket_size": 0, "rarity_bonus": 0.0, "reasons": []}
+    if not handoffs:
+        return empty
+    from src.calibration import market_rarity_bonus
+    rows = sorted(handoffs, key=lambda h: h.get("entry_ts_ms") or 0)
+    best = empty
+    for i, anchor in enumerate(rows):
+        start = anchor.get("entry_ts_ms") or 0
+        coins = [h["coin"] for h in rows[i:] if (h.get("entry_ts_ms") or 0) - start <= window_ms]
+        bonus, reasons = market_rarity_bonus(coins, freq or {})
+        size = len(set(coins))
+        if (bonus, size) > (best["rarity_bonus"], best["basket_size"]):
+            best = {"coins": sorted(set(coins)), "basket_size": size,
+                    "rarity_bonus": bonus, "reasons": reasons}
+    return best
 
 
 def _group_accounts(candidates, groups, cutoff):
@@ -174,6 +202,13 @@ def find_successor_hypotheses(target: dict, candidates: list[dict], context: dic
     target_episodes = build_episodes([{**f, 'wallet': target['wallet']} for f in target_fills])
     target_profile = episode_profile(target_episodes)
     regimes = regime_profiles(target_episodes)
+    market_freq = context.get('market_frequency')
+    if market_freq is None:
+        from src.calibration import load_market_frequencies
+        try:
+            market_freq = load_market_frequencies()
+        except (OSError, ValueError):
+            market_freq = {}
     results = []
     accounts = candidates + _group_accounts(candidates, context.get('linked_groups', []), cutoff)
     for candidate in accounts:
@@ -194,6 +229,7 @@ def find_successor_hypotheses(target: dict, candidates: list[dict], context: dic
                        if set(a.get('accounts', [])) & members and set(a.get('accounts', [])) & cluster
                        and a.get('parent_event_ids') and (number(a.get('observed_at_ms')) or 0) <= cutoff]
         handoffs = _handoffs(target, candidate, context, cutoff)
+        basket = basket_handoff(handoffs, market_freq)
         disclosures = [d for d in context.get('disclosures', []) if d.get('wallet') in members
                        and number(d.get('observed_at_ms')) is not None and number(d['observed_at_ms']) <= cutoff
                        and str(d.get('url', '')).startswith(('https://', 'http://'))]
@@ -229,12 +265,15 @@ def find_successor_hypotheses(target: dict, candidates: list[dict], context: dic
                             'collect candidate fills and dated position snapshots across independent sessions')
         # Evidence families, not repeated observations, drive the research queue.
         priority = 4 * bool(returns) + 3 * bool(funding) + 2 * bool(authorities) + bool(handoffs)
+        # A distinctive multi-coin basket handoff outranks a bare single-coin one.
+        priority += basket['rarity_bonus']
         priority += min(profile['session_count'], 10) / 10
         results.append({'wallet': wallet, 'group_members': candidate.get('group_members', []),
                         'identity_confirmed': False, 'promotable': False, 'research_only': True,
                         'priority': priority, 'score_kind': 'investigation_utility_not_probability',
                         'episode_similarity': comparison, 'early_observed_regimes': regime_scores,
-                        'position_handoffs': handoffs, 'return_routes': returns, 'funding_routes': funding,
+                        'position_handoffs': handoffs, 'handoff_basket': basket,
+                        'return_routes': returns, 'funding_routes': funding,
                         'authority_links': authorities, 'operational_sequences': sequences,
                         'reactivations': gaps, 'style_changes': shifts, 'disclosures': disclosures,
                         'copier_cohort': _cohort(target, candidate, context, cutoff),

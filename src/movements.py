@@ -11,6 +11,13 @@ import re
 
 from src.route_binding import bound_decode
 
+# A cluster outbound whose money returns as a similar-size deposit to his own HL
+# account is a round-trip (his Aave/Monad-style DeFi yield loops), not an exit.
+# Only an OBSERVED return resolves it, so a genuine exit — which by definition does
+# not come back — is never hidden (rule 7: reach beats tidiness).
+ROUNDTRIP_WINDOW_S = 45 * 86400
+ROUNDTRIP_TOLERANCE = 0.02
+
 
 def positive_number(value) -> float | None:
     try:
@@ -110,6 +117,32 @@ def reconcile_movements(records: list[dict], ledger: list[dict], cluster: set[st
                           "resolution": resolution, "route_resolved": resolution != "unresolved",
                           "known_self": resolution in {"cluster_internal", "bridge_to_cluster"},
                           "decoded_route": decoded or None})
+
+    # Return-leg reconciliation. His HL deposits, oldest first, each consumable
+    # once. An unresolved outbound followed within the window by a deposit of the
+    # same size back into his account is a round-trip, not money that left him.
+    deposits = []
+    for entry in ledger or []:
+        if not isinstance(entry, dict):
+            continue
+        delta = entry.get("delta") or {}
+        if not isinstance(delta, dict) or delta.get("type") != "deposit":
+            continue
+        usdc, ts = positive_number(delta.get("usdc")), positive_number(entry.get("time"))
+        if usdc is not None and ts is not None:
+            deposits.append([int(ts) // 1000, usdc, False])
+    deposits.sort()
+    for mv in movements:
+        if mv["route_resolved"] or mv["source"] != "l1_outbound":
+            continue
+        for dep in deposits:
+            if dep[2] or dep[0] <= mv["ts"] or dep[0] > mv["ts"] + ROUNDTRIP_WINDOW_S:
+                continue
+            if abs(dep[1] - mv["amount"]) <= ROUNDTRIP_TOLERANCE * mv["amount"]:
+                dep[2] = True
+                mv.update(resolution="self_roundtrip", route_resolved=True,
+                          known_self=True, return_deposit_ts=dep[0])
+                break
 
     movements.sort(key=lambda item: (item["ts"], item["id"]))
     resolved = [row for row in movements if row["route_resolved"]]

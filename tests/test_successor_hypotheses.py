@@ -130,3 +130,67 @@ def test_busy_funding_queue_cannot_starve_unfunded_public_discoveries(tmp_path):
     missed = set(factual) - wallets
     second = run({'target_wallet': A}, data_dir=tmp_path, as_of_ms=2000, limit=5)
     assert missed <= {r['wallet'] for r in second['investigations']}
+
+
+def _mstate(ts, positions):
+    return {"ts_ms": ts, "positions": positions}
+
+
+def _freq(counts, eligible=500):
+    return {"sufficient": True, "eligible_wallets": eligible, "market_counts": counts}
+
+
+def test_basket_handoff_of_several_coins_scores_above_a_single_coin():
+    from src.successor_hypotheses import _handoffs, basket_handoff
+    DAY = 86_400_000
+    # target drops a 3-coin basket; candidate builds the same 3 in the same window
+    target = {"wallet": A, "fills": [], "positions_history": [
+        _mstate(1000, {"MU": 100, "SKHX": 100, "SP500": 100}),
+        _mstate(1000 + DAY, {"MU": 0, "SKHX": 0, "SP500": 0})]}
+    cand = {"wallet": B, "fills": [], "positions_history": [
+        _mstate(1000, {}), _mstate(1000 + DAY + 3600_000, {"MU": 100, "SKHX": 100, "SP500": 100})]}
+    handoffs = _handoffs(target, cand, {}, float("inf"))
+    freq = _freq({"MU": 5, "SKHX": 5, "SP500": 2})  # all rare
+    basket = basket_handoff(handoffs, freq)
+    assert basket["basket_size"] == 3
+    assert set(basket["coins"]) == {"MU", "SKHX", "SP500"}
+    assert basket["rarity_bonus"] > 0
+
+    single = {"wallet": C, "fills": [], "positions_history": [
+        _mstate(1000, {}), _mstate(1000 + DAY + 3600_000, {"MU": 100})]}
+    single_hand = _handoffs(target, single, {}, float("inf"))
+    assert basket_handoff(single_hand, freq)["rarity_bonus"] < basket["rarity_bonus"]
+
+
+def test_a_common_coin_basket_earns_no_rarity_bonus():
+    from src.successor_hypotheses import _handoffs, basket_handoff
+    DAY = 86_400_000
+    target = {"wallet": A, "fills": [], "positions_history": [
+        _mstate(1000, {"BTC": 10, "ETH": 10}), _mstate(1000 + DAY, {"BTC": 0, "ETH": 0})]}
+    cand = {"wallet": B, "fills": [], "positions_history": [
+        _mstate(1000, {}), _mstate(1000 + DAY + 3600_000, {"BTC": 10, "ETH": 10})]}
+    handoffs = _handoffs(target, cand, {}, float("inf"))
+    basket = basket_handoff(handoffs, _freq({"BTC": 450, "ETH": 440}))  # common
+    assert basket["basket_size"] == 2
+    assert basket["rarity_bonus"] == 0.0
+
+
+def test_empty_handoffs_make_an_empty_basket():
+    from src.successor_hypotheses import basket_handoff
+    b = basket_handoff([], _freq({}))
+    assert b["basket_size"] == 0 and b["rarity_bonus"] == 0.0
+
+
+def test_a_rare_basket_handoff_lifts_priority_above_a_bare_handoff():
+    DAY = 86_400_000
+    target = {"wallet": A, "fills": [], "positions_history": [
+        _mstate(1000, {"MU": 100, "SKHX": 100, "SP500": 100}),
+        _mstate(1000 + DAY, {"MU": 0, "SKHX": 0, "SP500": 0})]}
+    basket_cand = {"wallet": B, "fills": [], "positions_history": [
+        _mstate(1000, {}), _mstate(1000 + DAY + 3600_000, {"MU": 100, "SKHX": 100, "SP500": 100})]}
+    ctx = {"market_frequency": _freq({"MU": 5, "SKHX": 5, "SP500": 2})}
+    res = find_successor_hypotheses(target, [basket_cand], ctx)[0]
+    assert res["handoff_basket"]["basket_size"] == 3
+    assert res["handoff_basket"]["rarity_bonus"] > 0
+    # priority carries the basket rarity on top of the bare-handoff flag
+    assert res["priority"] > 1

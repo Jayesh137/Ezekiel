@@ -140,3 +140,50 @@ def test_accounting_separates_classified_infrastructure_from_identified_recipien
     assert result["destination_classified_share"] == 1
     assert result["controlled_recipient_share"] == 0
     assert result["unresolved_infrastructure_usd"] == 1_000_000
+
+
+def _deposit(usdc, time_ms):
+    return {"time": time_ms, "delta": {"type": "deposit", "usdc": str(usdc)}}
+
+
+def test_an_outbound_that_returns_as_a_deposit_is_a_roundtrip_not_an_exit():
+    # His Aave/Monad yield loop: money leaves and an equal amount returns to his
+    # own HL account days later. That is not an exit to be matched against a
+    # stranger's deposit.
+    out = transfer("monad_out", dst=ROUTER, amount=6_000_000, ts=1000)
+    dep = _deposit(6_000_000, (1000 + 3 * 86400) * 1000)
+    result = reconcile([out], ledger=[dep])
+    assert result["unresolved_exits"] == []
+    assert any(r["resolution"] == "self_roundtrip" for r in result["movements"])
+
+
+def test_an_outbound_with_no_return_stays_an_exit():
+    # rule 7: a genuine exit never returns, so it must remain matchable. This is
+    # the guard against over-filtering a real migration.
+    out = transfer("real_exit", dst=OTHER, amount=6_000_000, ts=1000)
+    assert [r["ref"] for r in reconcile([out], ledger=[])["unresolved_exits"]] == ["real_exit"]
+
+
+def test_a_deposit_before_the_outbound_is_not_a_return():
+    out = transfer("out", dst=ROUTER, amount=6_000_000, ts=1_000_000)
+    dep = _deposit(6_000_000, (1_000_000 - 3 * 86400) * 1000)
+    assert [r["ref"] for r in reconcile([out], ledger=[dep])["unresolved_exits"]] == ["out"]
+
+
+def test_one_deposit_resolves_at_most_one_outbound():
+    outs = [transfer("out1", dst=ROUTER, amount=6_000_000, ts=1000),
+            transfer("out2", dst=ROUTER, amount=6_000_000, ts=2000)]
+    dep = _deposit(6_000_000, (2000 + 3 * 86400) * 1000)
+    assert len(reconcile(outs, ledger=[dep])["unresolved_exits"]) == 1
+
+
+def test_amount_outside_tolerance_stays_an_exit():
+    out = transfer("out", dst=ROUTER, amount=6_000_000, ts=1000)
+    dep = _deposit(6_500_000, (1000 + 3 * 86400) * 1000)  # ~8% off
+    assert [r["ref"] for r in reconcile([out], ledger=[dep])["unresolved_exits"]] == ["out"]
+
+
+def test_a_return_far_outside_the_window_stays_an_exit():
+    out = transfer("out", dst=ROUTER, amount=6_000_000, ts=1000)
+    dep = _deposit(6_000_000, (1000 + 400 * 86400) * 1000)  # 400 days later
+    assert [r["ref"] for r in reconcile([out], ledger=[dep])["unresolved_exits"]] == ["out"]
