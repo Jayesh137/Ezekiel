@@ -1,13 +1,13 @@
 {
   "wallet": "0xad59ed47c226987cf458a63428ca10887773ba81",
-  "last_checked": "2026-09-27T18:54:22.608934+00:00",
+  "last_checked": "2026-09-29T05:32:46.588958+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-27T15:04:04.066767+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-09-27T18:54:22.608934+00:00",
-  "last_positive_evidence": "2026-09-27T18:54:21.916714+00:00",
+  "last_successful_read": "2026-09-29T05:32:46.588958+00:00",
+  "last_positive_evidence": "2026-09-29T05:32:35.172941+00:00",
   "observations": [
     {
       "status": "ok",
@@ -50,23 +50,47 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-09-27T18:54:21.916714+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1788845554120,
+      "coverage": {
+        "start_ms": 1788845554120,
+        "end_ms": 1790659954120,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788845554120,
+        "requested_start_ms": 1788845554120,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1790659954120,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-09-29T05:32:35.172941+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788720861614,
-    "end_ms": 1790535261614,
+    "start_ms": 1788845554120,
+    "end_ms": 1790659954120,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "requested_start_ms": 1788720861614,
+    "fetched_start_ms": 1788845554120,
+    "requested_start_ms": 1788845554120,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-09-27T18:54:22.608934+00:00",
-  "last_scored": "2026-09-27T18:54:22.608934+00:00",
-  "best_score": 0.4186,
-  "latest_score": 0.4178,
+  "last_seen": "2026-09-29T05:32:46.588958+00:00",
+  "last_scored": "2026-09-29T05:32:46.588958+00:00",
+  "best_score": 0.4396,
+  "latest_score": 0.4396,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -90,13 +114,14 @@
       ],
       "candidate_only": [
         "ASTER",
+        "POL",
         "XMR",
         "XRP",
         "xyz:BRENTOIL"
       ],
       "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.2222
+      "jaccard": 0.2
     },
     "market_rarity": {
       "shared_markets": [],
@@ -105,16 +130,22 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4178,
+      "score_without_bonus": 0.4396,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
-      "status": "insufficient_data",
+      "status": "research",
       "promotable": false,
-      "similarity": null,
-      "features": {},
-      "independent_sessions": 0,
+      "similarity": 0.5336,
+      "features": {
+        "relative_size_dispersion": 0.6679,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 0.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 5,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -157,6 +188,7 @@
         "fill::ETH:1789983179296:638910201187493",
         "fill::ETH:1789983179296:662702334989535",
         "fill::ETH:1789983179296:935291276566194",
+        "fill::POL:1790537110832:313187168815790",
         "fill::XMR:1789972158655:105400376461196",
         "fill::XMR:1789972158655:295667687488264",
         "fill::XMR:1789972158655:495117767581365",
@@ -237,8 +269,8 @@
       ]
     },
     "tooling": {
-      "requests": 3855.0,
-      "cum_volume_usd": 32458858.26,
+      "requests": 3856.0,
+      "cum_volume_usd": 32471153.26,
       "requests_per_1k_usd": 0.1188
     }
   },
@@ -281,6 +313,27 @@
         "activity": 0.6773,
         "direction_bias": 1.0,
         "position_management": 0.7167,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-09-29T05:32:46.588958+00:00",
+      "score": 0.4396,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.4746,
+        "timing_profile": null,
+        "leverage_profile": 0.6662,
+        "entry_exit_style": 0.1941,
+        "hold_duration": 0.7583,
+        "account_size": 0.2908,
+        "trade_sequencing": 0.4791,
+        "position_sizing": 0.1191,
+        "order_profile": 0.7698,
+        "activity": 0.6823,
+        "direction_bias": 1.0,
+        "position_management": 0.7147,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
