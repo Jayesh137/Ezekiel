@@ -72,11 +72,17 @@ def _week_vlm(row):
 
 
 def main():
+    import argparse
+
     from src.calibration import load_market_frequencies
     from src.fingerprint import load_fills
     from src.hl_budget import ReadBudget
     from src.utils import hl_read
 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--limit", type=int, default=MAX_CANDIDATES)
+    parser.add_argument("--budget-seconds", type=int, default=1500)
+    args = parser.parse_args()
     config = load_config()
     exclude = {config.get("target_wallet", "").lower(),
                *[w.lower() for w in config.get("known_self_wallets", [])]}
@@ -95,8 +101,8 @@ def main():
     # opening history — measuring them is measuring nothing (verified 2026-09-29).
     rows.sort(key=lambda r: hashlib.sha256(r["ethAddress"].encode()).hexdigest())
     candidates, errors = [], []
-    with ReadBudget(seconds=1500, weight_per_minute=600) as budget:
-        for row in rows[:MAX_CANDIDATES]:
+    with ReadBudget(seconds=args.budget_seconds, weight_per_minute=600) as budget:
+        for row in rows[:args.limit]:
             if not budget.can_continue():
                 break
             wallet = row["ethAddress"].lower()

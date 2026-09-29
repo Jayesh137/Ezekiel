@@ -1560,3 +1560,29 @@ wallet that rescales its clips is still caught. Both gated by the census (rule 4
 so a non-discriminating rho self-disables. Recall on live data rose from
 caught_rate 0 to 0.75 once the census populated; the recent-migration split is
 recognised at rho 1.0. Full suite 1955.
+
+---
+
+**Copier-cohort sensor — built, measured, and found NO cohort (2026-09-29).** Idea:
+his copiers are a sensor he cannot control; if a cohort shifts from his wallet to a
+new account, that account is his successor. `src/copier_cohort.py` measures who
+opens his positions shortly after him, guarded by a time-shuffled placebo, coin
+rarity, lead-lag, and (rule 5) opportunities counted only within each candidate's
+observed fill window.
+
+First run said "cohort 0" but with follow=0 AND placebo=0 for all 116 — a coverage
+artifact: top-volume accounts churn their newest ~2,000 fills in under a day and
+never overlap his 60-day opening history. Fixed to hash-sample the leaderboard and
+treat no-overlap as insufficient, then re-measured **validly**: 106 read, **65
+measured** (≥8 overlapping opportunities), **cohort 0**. The strongest follower
+matched **2 of his 61 openings** (follow 0.033 vs placebo 0.003) — noise. Nobody in
+the measurable large-account population copies him, which fits his documented
+anti-copy OPSEC (blurred positions, "do not copytrade me", visibility is -ev).
+
+A real measured-no, correcting the earlier premature "untestable (21-day window)".
+Bounds: 65 large accounts whose recent fills overlap his openings — not the whole
+venue; sub-leaderboard retail copiers and busy accounts (whose 2,000-fill window is
+too short) are not covered, and covering them needs the live trade tape, i.e. a
+host. **The machinery is merged but deliberately NOT wired** (no cohort to watch;
+phase 2 shift-detector not built). Re-run `scripts/check_copier_cohort.py` if the
+tape ever becomes available; do not wire it on the current data.

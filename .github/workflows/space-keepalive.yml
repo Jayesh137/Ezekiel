@@ -1,0 +1,36 @@
+name: Keep the Space awake
+# A free Hugging Face Space sleeps after ~48h without traffic. This pings it so the
+# always-on loop keeps running. It is a no-op until the repo Actions variable
+# EZEKIEL_SPACE_URL is set (see deploy/space/README.md), so it costs nothing until
+# the card-free host is actually in use.
+on:
+  schedule:
+    - cron: '19 * * * *'   # hourly (best-effort, which is plenty to prevent sleep)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: space-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping the Space health endpoint
+        env:
+          SPACE_URL: ${{ vars.EZEKIEL_SPACE_URL }}
+        run: |
+          if [ -z "$SPACE_URL" ]; then
+            echo "EZEKIEL_SPACE_URL not set — card-free host not in use yet; nothing to ping."
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/space.json -w '%{http_code}' --max-time 30 "$SPACE_URL" || echo "000")
+          echo "HTTP $code"
+          head -c 500 /tmp/space.json || true
+          # A sleeping/broken Space is worth knowing about, but a transient blip is not
+          # worth failing the run — HF cold-starts can be slow.
+          if [ "$code" = "200" ]; then echo "Space is awake."; else echo "::warning::Space ping returned $code"; fi
