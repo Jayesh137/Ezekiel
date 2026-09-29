@@ -18,6 +18,7 @@ SendGrid's convention — Brevo does not accept it and answered every send with
 
 import json
 import os
+import re
 import smtplib
 from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
@@ -337,6 +338,22 @@ def discovery_withheld(classification: str) -> bool:
     return not _health_bearing(f"[EZEKIEL] {discovery_severity(classification)}: x")
 
 
+_ADDR_RE = re.compile(r"0x[0-9a-fA-F]{40}")
+
+
+def _redact_addresses(text: str) -> str:
+    """Shorten full 20-byte addresses to `0x123456…7890` for PUBLIC surfaces.
+
+    The repo is public and GitHub issue titles are indexed by search engines, so a
+    fallback issue that names a full wallet address is a durable breadcrumb about
+    the target that outlives the alert. The short form stays recognisable to the
+    operator, who cross-references it against the private channel and dashboard,
+    without publishing the searchable full address. Instant channels (ntfy /
+    Telegram) are private, so they still carry the full address.
+    """
+    return _ADDR_RE.sub(lambda m: m.group(0)[:8] + "…" + m.group(0)[-4:], text or "")
+
+
 def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
     """Open a GitHub issue so a failed email still reaches the operator.
 
@@ -362,7 +379,9 @@ def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
 
     import requests
 
-    title = f"{subject} [{key}]"
+    # This issue is public and search-indexed; never publish a full address here.
+    title = _redact_addresses(f"{subject} [{key}]")
+    body = _redact_addresses(body)
     headers = {"Authorization": f"Bearer {token}",
                "Accept": "application/vnd.github+json"}
     api = f"https://api.github.com/repos/{repo}/issues"
@@ -381,8 +400,10 @@ def _github_issue_fallback(key: str, subject: str, body: str) -> bool:
         created = requests.post(
             api, headers=headers, timeout=20,
             json={"title": title,
-                  "body": (f"{body}\n\n---\nRaised by Ezekiel because email "
-                           f"delivery failed. Close this once actioned.")})
+                  "body": (f"{body}\n\n---\nRaised by Ezekiel because the instant "
+                           f"channels failed. Addresses are shortened here (this "
+                           f"issue is public); the full detail is on the private "
+                           f"channel and dashboard. Close this once actioned.")})
         if created.status_code in (200, 201):
             _issues_opened_this_run += 1
             print(f"[alerts] Email failed — raised GitHub issue instead: {subject}")

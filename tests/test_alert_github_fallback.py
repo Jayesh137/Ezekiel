@@ -206,3 +206,26 @@ def test_an_undated_fund_movement_says_so_rather_than_implying_recency(monkeypat
     alerts.alert_fund_movement("0xw", "$1.00", "0xd", "0xtx")
     assert "When: unknown" in captured["body"]
     assert "historical transfer" in captured["body"]
+
+
+def test_full_addresses_are_redacted_from_public_issues(monkeypatch):
+    """The repo is public and issue titles rank in search. A fallback issue must
+    not publish a full wallet address — keep a short, recognisable form only."""
+    calls = _api(monkeypatch)
+    addr = "0x45d26f28196d226497130c4bac709d808fed4029"
+    ok = alerts._github_issue_fallback(
+        f"execprog_{addr}", "[EZEKIEL] CRITICAL: Execution Program Match",
+        f"Candidate Wallet: {addr}\nsee the private channel")
+    assert ok is True
+    posted = calls["post"][0]
+    blob = posted["title"] + "\n" + posted["body"]
+    assert addr not in blob            # the full address is never published
+    assert "0x45d26f" in blob          # a short form is kept so the operator can cross-reference
+
+
+def test_redaction_leaves_non_address_text_intact():
+    text = "wallet 0x45d26f28196d226497130c4bac709d808fed4029 moved 1,000,000 USDC"
+    out = alerts._redact_addresses(text)
+    assert "0x45d26f28196d226497130c4bac709d808fed4029" not in out
+    assert "moved 1,000,000 USDC" in out
+    assert out.count("…") == 1

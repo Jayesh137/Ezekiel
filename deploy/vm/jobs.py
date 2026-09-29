@@ -84,6 +84,7 @@ JOBS: dict[str, dict] = {
             (["python", "scripts/check_gcr_hypothesis.py"], 180),
             (["python", "scripts/check_gcr_wallets.py"], 180),
             (["python", "scripts/census_execution_program.py", "--limit", "600", "--budget-seconds", "900"], 1200),
+            (["python", "scripts/check_recall.py"], 180),
             (["python", "src/profile_builder.py"], 180),
             (["python", "-c", "from src.utils import update_index; update_index()"], 120),
         ],
