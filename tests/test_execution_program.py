@@ -243,7 +243,7 @@ def test_a_different_structure_does_not_match_on_notionals():
 
 
 def test_a_rescaled_match_is_discriminating_when_the_census_measures_it_rare():
-    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3, "rho_p99": 0.9}
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3, "rho_p99": 0.9, "rho_population": 300}
     match = {"clip_match_ratio": 0.0, "clips_compared": 3, "clips_matched": 0,
              "notional_structure_rho": 0.995, "notional_coins_compared": 4}
     assert ep.is_discriminating(match, census) is True
@@ -254,3 +254,25 @@ def test_a_common_rho_does_not_vote():
     match = {"clip_match_ratio": 0.0, "clips_compared": 3, "clips_matched": 0,
              "notional_structure_rho": 0.99, "notional_coins_compared": 4}
     assert ep.is_discriminating(match, census) is False
+
+
+# --- the census must be large enough to trust (rule 4) ---------------------
+
+def test_a_threshold_from_a_tiny_population_does_not_vote():
+    # population 1 gives a meaningless p99; a perfect match must still not vote.
+    census = {"population": 1, "ratio_p99": 0.0, "min_clips": 3}
+    match = {"clip_match_ratio": 1.0, "clips_compared": 6, "clips_matched": 6}
+    assert ep.is_discriminating(match, census) is False
+
+
+def test_the_structure_path_also_needs_a_large_enough_rho_population():
+    census = {"population": 300, "ratio_p99": 0.34, "rho_p99": 0.9, "rho_population": 2, "min_clips": 3}
+    match = {"clip_match_ratio": 0.0, "clips_compared": 3, "clips_matched": 0,
+             "notional_structure_rho": 0.99, "notional_coins_compared": 4}
+    assert ep.is_discriminating(match, census) is False
+
+
+def test_a_large_population_lets_a_rare_match_vote():
+    census = {"population": 50, "ratio_p99": 0.34, "min_clips": 3}
+    match = {"clip_match_ratio": 1.0, "clips_compared": 6, "clips_matched": 6}
+    assert ep.is_discriminating(match, census) is True

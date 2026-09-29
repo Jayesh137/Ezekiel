@@ -62,6 +62,11 @@ MIN_STRUCTURE_COINS = 3
 # whatever the census says is rare. Two exact size matches can be luck; six of his
 # idiosyncratic sizes (ZEC 1, SILVER 20, NEAR 250) reproduced together cannot.
 MIN_VOTE_CLIPS = 3
+# A p99 computed from a handful of accounts is not a distribution. The vote waits
+# until the census has this many MEASURED controls, the same discipline the
+# behavioural backtest applies to its held-out cohort (rule 4). Until then the
+# vector records matches but casts no vote, however perfect.
+MIN_CENSUS_POPULATION = 20
 
 
 def _num(value):
@@ -330,13 +335,16 @@ def is_discriminating(match: dict, census: dict | None) -> bool:
     matched = match.get("clips_matched") or 0
     ratio_threshold = census.get("ratio_p99")
     min_clips = max(MIN_VOTE_CLIPS, int(census.get("min_clips") or 0))
-    exact = (ratio is not None and ratio_threshold is not None
+    # A threshold is only trustworthy once enough controls have been measured.
+    exact_ready = (census.get("population") or 0) >= MIN_CENSUS_POPULATION
+    exact = (exact_ready and ratio is not None and ratio_threshold is not None
              and ratio > ratio_threshold and compared >= min_clips and matched >= MIN_VOTE_CLIPS)
 
     rho = match.get("notional_structure_rho")
     rho_threshold = census.get("rho_p99")
     structure_coins = match.get("notional_coins_compared") or 0
-    structural = (rho is not None and rho_threshold is not None
+    rho_ready = (census.get("rho_population") or 0) >= MIN_CENSUS_POPULATION
+    structural = (rho_ready and rho is not None and rho_threshold is not None
                   and rho > rho_threshold and structure_coins >= MIN_STRUCTURE_COINS)
     return bool(exact or structural)
 
