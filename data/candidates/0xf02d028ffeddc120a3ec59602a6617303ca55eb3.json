@@ -1,9 +1,9 @@
 {
   "wallet": "0xf02d028ffeddc120a3ec59602a6617303ca55eb3",
   "first_seen": "2026-09-21T15:36:19.240807+00:00",
-  "last_seen": "2026-09-27T19:08:03.562041+00:00",
+  "last_seen": "2026-09-29T07:34:23.597841+00:00",
   "best_score": 0.45,
-  "latest_score": 0.3856,
+  "latest_score": 0.387,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -16,7 +16,7 @@
       "Weak asset overlap"
     ],
     "vetoes": [
-      "Decision frequency 7x apart (0.83 vs 6.00 position episodes/day)"
+      "Decision frequency 6x apart (1.00 vs 6.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
@@ -42,7 +42,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3856,
+      "score_without_bonus": 0.387,
       "explanations": [],
       "frequencies": {}
     },
@@ -50,8 +50,14 @@
       "status": "insufficient_data",
       "promotable": false,
       "similarity": null,
-      "features": {},
-      "independent_sessions": 0,
+      "features": {
+        "relative_size_dispersion": 0.6858,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 1.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -396,17 +402,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-09-29T07:34:23.597841+00:00",
+      "score": 0.387,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.2736,
+        "timing_profile": null,
+        "leverage_profile": 0.5529,
+        "entry_exit_style": 0.8799,
+        "hold_duration": 0.426,
+        "account_size": 0.622,
+        "trade_sequencing": 0.6675,
+        "position_sizing": 0.059,
+        "order_profile": null,
+        "activity": 0.539,
+        "direction_bias": 0.9905,
+        "position_management": 0.6919,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "ACTIVE",
   "recent_avg_score": null,
-  "last_checked": "2026-09-27T19:08:03.562041+00:00",
+  "last_checked": "2026-09-29T07:34:23.597841+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-09-27T19:08:03.562041+00:00",
-  "last_positive_evidence": "2026-09-27T19:08:03.263014+00:00",
+  "last_successful_read": "2026-09-29T07:34:23.597841+00:00",
+  "last_positive_evidence": "2026-09-29T07:34:20.269776+00:00",
   "observations": [
     {
       "status": "ok",
@@ -428,18 +455,42 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-09-27T19:08:03.263014+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1788852859968,
+      "coverage": {
+        "start_ms": 1788852859968,
+        "end_ms": 1790667259968,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788852859968,
+        "requested_start_ms": 1788852859968,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1790667259968,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-09-29T07:34:20.269776+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788721682919,
-    "end_ms": 1790536082919,
+    "start_ms": 1788852859968,
+    "end_ms": 1790667259968,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "requested_start_ms": 1788721682919,
+    "fetched_start_ms": 1788852859968,
+    "requested_start_ms": 1788852859968,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-09-27T19:08:03.562041+00:00"
+  "last_scored": "2026-09-29T07:34:23.597841+00:00"
 }
