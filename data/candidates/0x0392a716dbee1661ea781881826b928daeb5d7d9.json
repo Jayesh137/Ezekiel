@@ -1,9 +1,9 @@
 {
   "wallet": "0x0392a716dbee1661ea781881826b928daeb5d7d9",
   "first_seen": "2026-09-13T06:58:19.951246+00:00",
-  "last_seen": "2026-09-27T21:52:43.363004+00:00",
-  "best_score": 0.3493,
-  "latest_score": 0.3392,
+  "last_seen": "2026-09-29T11:03:43.790521+00:00",
+  "best_score": 0.3527,
+  "latest_score": 0.3527,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -38,7 +38,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3392,
+      "score_without_bonus": 0.3527,
       "explanations": [],
       "frequencies": {}
     },
@@ -46,8 +46,14 @@
       "status": "insufficient_data",
       "promotable": false,
       "similarity": null,
-      "features": {},
-      "independent_sessions": 0,
+      "features": {
+        "relative_size_dispersion": 0.6928,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 1.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 1,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -756,18 +762,39 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-09-29T11:03:43.790521+00:00",
+      "score": 0.3527,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.2,
+        "timing_profile": null,
+        "leverage_profile": 0.9213,
+        "entry_exit_style": 0.2342,
+        "hold_duration": null,
+        "account_size": 0.5256,
+        "trade_sequencing": 0.2026,
+        "position_sizing": 0.164,
+        "order_profile": null,
+        "activity": 0.8807,
+        "direction_bias": 0.0,
+        "position_management": 0.8745,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3366,
-  "last_checked": "2026-09-27T21:52:43.363004+00:00",
+  "recent_avg_score": 0.3395,
+  "last_checked": "2026-09-29T11:03:43.790521+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor",
     "leaderboard"
   ],
-  "last_successful_read": "2026-09-27T21:52:43.363004+00:00",
-  "last_positive_evidence": "2026-09-27T21:52:38.393796+00:00",
+  "last_successful_read": "2026-09-29T11:03:43.790521+00:00",
+  "last_positive_evidence": "2026-09-29T11:03:38.650224+00:00",
   "observations": [
     {
       "status": "ok",
@@ -856,21 +883,44 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-09-27T21:52:38.393796+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1789997256292,
+      "coverage": {
+        "start_ms": 1788865395301,
+        "end_ms": 1790679795301,
+        "pages": 2,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788865395301,
+        "requested_start_ms": 1788865395301,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1790679795301,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-09-29T11:03:38.650224+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788731535197,
-    "end_ms": 1790545935197,
+    "start_ms": 1788865395301,
+    "end_ms": 1790679795301,
     "pages": 2,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1788731535197,
-    "requested_start_ms": 1788731535197,
+    "fetched_start_ms": 1788865395301,
+    "requested_start_ms": 1788865395301,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-09-27T21:52:43.363004+00:00",
+  "last_scored": "2026-09-29T11:03:43.790521+00:00",
   "latest_scoring_schema": "2026-09-26.2",
   "last_investigated_ms": 1790522154926
 }
