@@ -1,9 +1,9 @@
 {
   "wallet": "0x0d6ad2d27b76c05bf87cb6d2e7b343416ff3ca57",
   "first_seen": "2026-09-20T19:14:02.289244+00:00",
-  "last_seen": "2026-09-27T21:46:26.529944+00:00",
+  "last_seen": "2026-09-29T13:47:12.893302+00:00",
   "best_score": 0.3349,
-  "latest_score": 0.3009,
+  "latest_score": 0.3259,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -15,7 +15,7 @@
       "Weak asset overlap"
     ],
     "vetoes": [
-      "Decision frequency 25x apart (0.83 vs 21.00 position episodes/day)"
+      "Decision frequency 21x apart (1.00 vs 21.00 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
@@ -52,7 +52,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3009,
+      "score_without_bonus": 0.3259,
       "explanations": [],
       "frequencies": {}
     },
@@ -60,8 +60,14 @@
       "status": "insufficient_data",
       "promotable": false,
       "similarity": null,
-      "features": {},
-      "independent_sessions": 0,
+      "features": {
+        "relative_size_dispersion": 0.995,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 1.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 1,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -814,17 +820,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-09-29T13:47:12.893302+00:00",
+      "score": 0.3259,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0588,
+        "timing_profile": null,
+        "leverage_profile": 0.4233,
+        "entry_exit_style": 0.9999,
+        "hold_duration": 0.3886,
+        "account_size": 0.4745,
+        "trade_sequencing": 0.6794,
+        "position_sizing": 0.2677,
+        "order_profile": 0.6739,
+        "activity": 0.5628,
+        "direction_bias": 0.0,
+        "position_management": 0.7291,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3202,
-  "last_checked": "2026-09-27T21:46:26.529944+00:00",
+  "recent_avg_score": 0.319,
+  "last_checked": "2026-09-29T13:47:12.893302+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-09-27T21:46:26.529944+00:00",
-  "last_positive_evidence": "2026-09-27T21:46:17.072331+00:00",
+  "last_successful_read": "2026-09-29T13:47:12.893302+00:00",
+  "last_positive_evidence": "2026-09-29T13:47:03.414252+00:00",
   "observations": [
     {
       "status": "ok",
@@ -890,20 +917,43 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-09-27T21:46:17.072331+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1788875221350,
+      "coverage": {
+        "start_ms": 1788875221350,
+        "end_ms": 1790689621350,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788875221350,
+        "requested_start_ms": 1788875221350,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1790689621350,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-09-29T13:47:03.414252+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788731174993,
-    "end_ms": 1790545574993,
+    "start_ms": 1788875221350,
+    "end_ms": 1790689621350,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1788731174993,
-    "requested_start_ms": 1788731174993,
+    "fetched_start_ms": 1788875221350,
+    "requested_start_ms": 1788875221350,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-09-27T21:46:26.529944+00:00",
+  "last_scored": "2026-09-29T13:47:12.893302+00:00",
   "last_investigated_ms": 1790546223812
 }
