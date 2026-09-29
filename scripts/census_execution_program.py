@@ -33,6 +33,13 @@ from src.utils import DATA_DIR, atomic_write_json, load_config
 
 OUT_DIR = DATA_DIR / "execution_program"
 CENSUS_FILE = OUT_DIR / "census.json"
+# Committed (not data/.local), so the measured population ACCUMULATES across runs
+# even on ephemeral GitHub Actions runners — otherwise each daily run would
+# re-measure the same top-volume accounts and the threshold could never build, and
+# the vector could never vote until the VM existed. Capped so it cannot grow the
+# repo without bound.
+STATE = OUT_DIR / "census_state.json"
+MAX_STATE_ROWS = 20_000
 STATE = DATA_DIR / ".local" / "execution_census.json"
 # A wallet reproducing this many of his exact per-coin clip sizes is a lead worth
 # recording in the output whatever the population distribution turns out to be.
@@ -79,6 +86,20 @@ def load_state():
 def target_signature():
     from src.fingerprint import load_fills, load_orders
     return ep.signature(load_fills(), load_orders())
+
+
+def cap_state(state):
+    """Keep the state bounded: the newest MAX_STATE_ROWS processed rows, all hits.
+
+    Hits are few and precious (accounts reproducing his table), so they are never
+    evicted; ordinary measured/insufficient rows are trimmed oldest-first by their
+    observation time so the committed file cannot grow the repo without bound.
+    """
+    processed = state.get("processed", {})
+    if len(processed) > MAX_STATE_ROWS:
+        keep = sorted(processed.items(), key=lambda kv: kv[1].get("at", 0))[-MAX_STATE_ROWS:]
+        processed = dict(keep)
+    return {"processed": processed, "hits": state.get("hits", {})}
 
 
 def register_hits(hits, data_dir=None):
@@ -150,6 +171,7 @@ def run(*, limit, budget_seconds, fetch=None, leaderboard=None):
                     ("clip_match_ratio", "clips_matched", "clips_compared",
                      "cadence_agreement", "offset_agreement")}}
             processed_now += 1
+    state = cap_state(state)
     STATE.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(STATE, state)
     register_hits(state["hits"])

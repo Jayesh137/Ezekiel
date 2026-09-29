@@ -41,3 +41,15 @@ def test_register_hits_ignores_malformed_addresses(tmp_path):
     from src.candidate_registry import iter_candidates
     census.register_hits({"not-an-address": {"clips_matched": 5}}, data_dir=tmp_path)
     assert iter_candidates(tmp_path) == []
+
+
+def test_cap_state_trims_oldest_processed_but_keeps_all_hits():
+    processed = {f"0x{i:040x}": {"ratio": None, "at": i} for i in range(census.MAX_STATE_ROWS + 50)}
+    hits = {"0xhit": {"clips_matched": 6}}
+    capped = census.cap_state({"processed": processed, "hits": hits})
+    assert len(capped["processed"]) == census.MAX_STATE_ROWS
+    assert capped["hits"] == hits
+    # The oldest (smallest 'at') were dropped; the newest kept.
+    kept = capped["processed"]
+    assert f"0x{census.MAX_STATE_ROWS + 49:040x}" in kept
+    assert "0x" + "0" * 40 not in kept
