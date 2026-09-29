@@ -2097,8 +2097,8 @@
   ],
   "status": "COOLING",
   "recent_avg_score": 0.2887,
-  "last_checked": "2026-09-27T18:52:18.718385+00:00",
-  "last_read_status": "ok",
+  "last_checked": "2026-09-29T04:21:30.917720+00:00",
+  "last_read_status": "error",
   "discovery_sources": [
     "bridge_depositor"
   ],
@@ -2146,19 +2146,49 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-09-27T18:52:17.457650+00:00"
+    },
+    {
+      "status": "error",
+      "next_cursor_ms": 1788841289050,
+      "coverage": {
+        "start_ms": 1788841289050,
+        "end_ms": 1790655689050,
+        "pages": 1,
+        "complete_available_window": false,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1788841289050,
+        "requested_start_ms": 1788841289050,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [
+        {
+          "start_ms": 1788841289050,
+          "reason": "read_error"
+        }
+      ],
+      "error": "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))",
+      "last_successful_end_ms": null,
+      "source": "bridge_depositor",
+      "positive": false,
+      "observed_at": "2026-09-29T04:21:30.917720+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1788720736521,
-    "end_ms": 1790535136521,
-    "pages": 4,
-    "complete_available_window": true,
+    "start_ms": 1788841289050,
+    "end_ms": 1790655689050,
+    "pages": 1,
+    "complete_available_window": false,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "requested_start_ms": 1788720736521,
+    "fetched_start_ms": 1788841289050,
+    "requested_start_ms": 1788841289050,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_scored": "2026-09-27T18:52:18.718385+00:00",
-  "latest_scoring_schema": "2026-09-26.2"
+  "latest_scoring_schema": "2026-09-26.2",
+  "last_read_error": "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))"
 }
