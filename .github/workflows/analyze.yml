@@ -144,6 +144,13 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 20
         run: python scripts/census_execution_program.py --limit 600 --budget-seconds 900
+      # Would we CATCH him if he migrated and kept his script? A pseudo-migration
+      # on his own history: recognise the later half from the earlier half. No
+      # network, no alerts — the honest, continuous answer to "does this work".
+      - name: Measure migration recall
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 3
+        run: python scripts/check_recall.py
       - name: Build trader profile
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/profile_builder.py
