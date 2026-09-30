@@ -55,6 +55,7 @@ jobs:
     # before its first line when the whole file phase measures 18s.
     env:
       PYTHONUNBUFFERED: "1"
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -142,13 +143,21 @@ jobs:
             sleep $(( (RANDOM % 7) + 3 ))
           done
           git push origin main
+      # Opens the issue AND pushes HIGH to ntfy, again every 6h while it stays
+      # red (scripts/pipeline_status.py): trace failed 34 runs in a row on
+      # 2026-09-29/30 behind an issue opened once and never looked at.
       - name: Open failure issue
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          title="[pipeline] substrate backfill failing"
-          count=$(gh issue list --state open --search "in:title $title" --json number --jq 'length')
-          if [ "$count" = "0" ]; then
-            gh issue create --title "$title" --body "Failing run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          fi
+        run: >-
+          python3 scripts/pipeline_status.py --outcome failure
+          --title "[pipeline] substrate backfill failing"
+      # Closes that issue on recovery, so the next failure alerts afresh.
+      - name: Close failure issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/pipeline_status.py --outcome success
+          --title "[pipeline] substrate backfill failing"

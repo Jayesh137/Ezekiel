@@ -71,6 +71,8 @@ def _timeout_seconds(workflow: str) -> int:
     """`timeout-minutes:` from a workflow, without needing a YAML parser
     (PyYAML is not in requirements.txt, so the suite must not depend on it)."""
     text = (ROOT / ".github" / "workflows" / workflow).read_text()
+    # The cron `gate` job's own 3-minute ceiling is not the work job's.
+    text = re.sub(r"^  gate:\n(?:(?:    .*|)\n)*", "", text, flags=re.MULTILINE)
     match = re.search(r"^\s*timeout-minutes:\s*(\d+)\s*$", text, re.MULTILINE)
     assert match, f"{workflow} has no timeout-minutes"
     return int(match.group(1)) * 60
