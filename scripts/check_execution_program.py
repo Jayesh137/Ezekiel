@@ -32,6 +32,12 @@ from src.utils import DATA_DIR, atomic_write_json, load_config, save_latest
 
 OUT_DIR = DATA_DIR / "execution_program"
 MAX_CANDIDATES = 60
+# Timeouts nest: this read budget + the ~12s signature load + the save must stay
+# under the step's `timeout-minutes: 7` in trace.yml. It was 600s inside a 4-minute
+# step, so the step was killed on every run from 2026-09-29 and never once wrote a
+# report. userFills paces at ~12s a wallet (2,000 rows weigh ~100), so a run reads
+# ~25 of the 60; `order_by_staleness` rotates the rest in on the following runs.
+READ_BUDGET_SECONDS = 300
 # Financial/protocol vectors — an execution match beside one of these is the
 # two-independent-vectors case. A behavioural sibling does not make it CRITICAL.
 INDEPENDENT_VECTORS = {"transfer", "linkage", "hl_native", "correlation",
@@ -97,6 +103,14 @@ def select_candidates(roster_candidates, discovery, clip_coins, cap=MAX_CANDIDAT
     return picked[:cap]
 
 
+def load_previous():
+    try:
+        with open(OUT_DIR / "latest.json") as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return None
+
+
 def load_discovery():
     try:
         with open(DATA_DIR / "discovery" / "latest.json") as handle:
@@ -109,6 +123,35 @@ def candidate_wallets(config, roster, clip_coins):
     from src.roster import detector_candidates
     roster_candidates = detector_candidates(config, roster, MAX_CANDIDATES)
     return select_candidates(roster_candidates, load_discovery(), clip_coins, MAX_CANDIDATES)
+
+
+def order_by_staleness(wallets, last_checked):
+    """Never-read wallets first, then the longest unread; ties keep selection order.
+
+    The read budget covers only part of the list, so a fixed order would read the
+    same head every run and never reach the reserved fresh-wallet tail — the cap
+    starving exactly the wallets with no evidence yet.
+    """
+    last_checked = last_checked or {}
+    return sorted(wallets, key=lambda w: last_checked.get(w) or "")
+
+
+def carry_forward(previous, wallets, read_wallets, census):
+    """Matches from earlier runs for candidates this run did not reach.
+
+    A wallet left unread for lack of budget is unknown this run, not unmatched:
+    dropping its row would lapse its roster vote between reads. Discrimination is
+    recomputed against the current census; `carried_forward` marks the row so it
+    is never routed as an alert a second time.
+    """
+    keep = set(wallets) - set(read_wallets)
+    out = []
+    for match in (previous or {}).get("matches", []):
+        wallet = (match.get("wallet") or "").lower()
+        if wallet in keep:
+            out.append({**match, "carried_forward": True,
+                        "discriminating": ep.is_discriminating(match, census)})
+    return out
 
 
 def roster_vector_map(roster):
@@ -147,7 +190,7 @@ def decide_alerts(report):
     """Route only measured-rare matches. Two vectors → CRITICAL, one → HIGH."""
     out = []
     for match in report.get("matches", []):
-        if not match.get("discriminating"):
+        if not match.get("discriminating") or match.get("carried_forward"):
             continue
         out.append((("CRITICAL" if match.get("has_independent_vector") else "HIGH"), match))
     return out
@@ -177,20 +220,33 @@ def main():
         roster = {}
     clip_coins = set((target_sig.get("clip_table") or {}).keys())
     wallets = candidate_wallets(config, roster, clip_coins)
+    previous = load_previous()
+    last_checked = {w: t for w, t in ((previous or {}).get("last_checked") or {}).items()
+                    if w in set(wallets)}
     rows, errors = [], []
-    with ReadBudget(seconds=600, weight_per_minute=600) as budget:
-        for wallet in wallets:
+    with ReadBudget(seconds=READ_BUDGET_SECONDS, weight_per_minute=600) as budget:
+        for wallet in order_by_staleness(wallets, last_checked):
             if not budget.can_continue():
                 break
             result = hl_read({"type": "userFills", "user": wallet})
             if not result.get("ok"):
+                if budget.stopped_reason == "time_budget":
+                    break  # refused by the budget, not a failed read
                 errors.append({"wallet": wallet, "error": result.get("error")})
                 continue
             rows.append({"wallet": wallet, "signature": ep.signature(result["data"])})
+            last_checked[wallet] = datetime.now(UTC).isoformat()
+        budget_report = budget.report()
     report = build_report(target_sig, rows, census, roster_vector_map(roster),
                           target_wallet=target_wallet)
+    read_wallets = {r["wallet"] for r in rows}
+    report["matches"].extend(carry_forward(previous, wallets, read_wallets, census))
     report["errors"] = errors
     report["wallets_checked"] = len(rows)
+    report["candidates"] = len(wallets)
+    report["never_checked"] = sum(1 for w in wallets if w not in last_checked)
+    report["last_checked"] = last_checked
+    report["budget"] = budget_report
     report["target_signature"] = {"clip_table": target_sig.get("clip_table"),
                                   "ioc_5pct_share": target_sig.get("ioc_5pct_share"),
                                   "program_runs": target_sig.get("program_runs")}
@@ -198,7 +254,8 @@ def main():
     atomic_write_json(OUT_DIR / "target.json", {"computed_at": report["computed_at"], **target_sig})
     for severity, match in decide_alerts(report):
         alert_execution_program_match(match["wallet"], match, severity)
-    print(f"[execution-program] checked {len(rows)} wallets, "
+    print(f"[execution-program] checked {len(rows)} of {len(wallets)} wallets "
+          f"({report['never_checked']} never read, stopped: {budget_report['stopped_reason']}), "
           f"{len(report['matches'])} measured, {len(decide_alerts(report))} routed, "
           f"census={'yes' if census else 'no'}")
     return report
