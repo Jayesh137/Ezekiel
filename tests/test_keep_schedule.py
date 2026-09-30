@@ -127,3 +127,105 @@ def test_keeper_never_cancels_its_own_successor_creator():
     import re
 
     assert re.search(r"cancel-in-progress:\s*false", _keeper_yml())
+
+
+# --- The cron gate: a cron run steps aside instead of evicting ---------------
+from scripts.keep_schedule import gate  # noqa: E402
+
+
+def test_cron_run_steps_aside_when_its_group_is_busy():
+    # trace's 03:04 cron evicted the day's only analyze run, which was waiting.
+    runs = fresh(**{"trace.yml": run(40), "analyze.yml": run(0, "queued")})
+    proceed, reason = gate("trace.yml", runs, NOW)
+    assert not proceed and "analyze.yml" in reason
+
+
+def test_cron_run_steps_aside_when_the_keeper_already_ran_it():
+    proceed, _ = gate("trace.yml", fresh(**{"trace.yml": run(10)}), NOW)
+    assert not proceed
+
+
+def test_cron_run_goes_ahead_when_idle_and_due():
+    # The keeper is dead: the cron is the fallback and must still run.
+    proceed, _ = gate("trace.yml", fresh(**{"trace.yml": run(45)}), NOW)
+    assert proceed
+
+
+def test_cron_gate_fails_open_on_an_unreadable_run_list():
+    runs = fresh(**{"trace.yml": None, "collect.yml": None})
+    assert gate("trace.yml", runs, NOW)[0]
+
+
+def test_keeper_cron_steps_aside_while_a_keeper_runs():
+    assert not gate("keeper.yml", {"keeper.yml": run(30, "in_progress")}, NOW)[0]
+    assert gate("keeper.yml", {"keeper.yml": run(30)}, NOW)[0]
+
+
+def test_watch_gate_ignores_the_busy_data_commit_group():
+    runs = fresh(**{"watch.yml": run(15), "trace.yml": run(0, "in_progress")})
+    assert gate("watch.yml", runs, NOW)[0]
+
+
+# --- A run that did no work is not the workflow having run -------------------
+from scripts import keep_schedule as ks  # noqa: E402
+
+
+class _Resp:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self.payload
+
+
+class _Session:
+    """Answers the runs list and each run's jobs from fixed data."""
+
+    def __init__(self, rows, jobs=None):
+        self.rows, self.jobs, self.job_reads = rows, jobs or {}, 0
+
+    def get(self, url, **_):
+        if url.endswith("/jobs"):
+            self.job_reads += 1
+            return _Resp({"jobs": self.jobs[int(url.split("/")[-2])]})
+        return _Resp({"workflow_runs": self.rows})
+
+
+def _row(run_id, minutes_ago, conclusion="success", event="workflow_dispatch", status="completed"):
+    stamp = (NOW - timedelta(minutes=minutes_ago)).isoformat().replace("+00:00", "Z")
+    return {"id": run_id, "status": status, "conclusion": conclusion, "event": event,
+            "created_at": stamp}
+
+
+def test_an_evicted_run_does_not_restart_the_interval():
+    # 2026-09-30: analyze's only run that day was evicted at 03:04.
+    s = _Session([_row(2, 60, "cancelled"), _row(1, 1500)])
+    newest = ks.newest_run(s, "o/r", "analyze.yml")
+    assert newest["created_at"] == NOW - timedelta(minutes=1500)
+
+
+def test_a_gated_off_cron_run_does_not_restart_the_interval():
+    ks._no_work_cache.clear()
+    s = _Session([_row(12, 5, event="schedule"), _row(11, 40)],
+                 jobs={12: [{"name": "gate", "conclusion": "success"},
+                            {"name": "trace", "conclusion": "skipped"}]})
+    assert ks.newest_run(s, "o/r", "trace.yml")["created_at"] == NOW - timedelta(minutes=40)
+    ks.newest_run(s, "o/r", "trace.yml")
+    assert s.job_reads == 1  # each run's jobs are read once
+
+
+def test_a_cron_run_that_worked_counts():
+    ks._no_work_cache.clear()
+    s = _Session([_row(22, 5, event="schedule")],
+                 jobs={22: [{"name": "gate", "conclusion": "success"},
+                            {"name": "trace", "conclusion": "success"}]})
+    assert ks.newest_run(s, "o/r", "trace.yml")["created_at"] == NOW - timedelta(minutes=5)
+
+
+def test_a_running_run_counts_and_the_gate_excludes_its_own():
+    s = _Session([_row(32, 0, status="in_progress", conclusion=None), _row(31, 50)])
+    assert ks.newest_run(s, "o/r", "trace.yml")["status"] == "in_progress"
+    assert ks.newest_run(s, "o/r", "trace.yml", exclude_run_id=32)["status"] == "completed"

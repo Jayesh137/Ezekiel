@@ -100,6 +100,9 @@ DROPPED_ON_VM = {
     "pip",
     # backfill runs only on manual dispatch with an investigate wallet.
     "scripts/backfill_transfers.py",
+    # The cron gate stops GitHub's scheduled runs evicting queued work in a
+    # concurrency group; the VM runs its jobs itself and has no such queue.
+    "scripts/keep_schedule.py",
 }
 
 

@@ -68,6 +68,9 @@ GROUP_MEMBERS = {
     ],
 }
 
+# The keeper's own group, for the cron gate only: tick() never dispatches it.
+GATE_GROUPS = {**GROUP_MEMBERS, "schedule-keeper": ["keeper.yml"]}
+
 NEVER = "never"  # a workflow with no runs at all: due immediately
 POLL_SECONDS = 90
 MAX_SLEEP_SECONDS = 5 * 60
@@ -133,6 +136,33 @@ def plan(runs: dict, now: datetime) -> Plan:
     return result
 
 
+def gate(wf: str, runs: dict, now: datetime) -> tuple[bool, str]:
+    """Should a CRON-started run of `wf` go ahead? `runs` excludes that run.
+
+    A concurrency group holds one pending run, so a cron run arriving while the
+    group is busy evicts whatever was already waiting: measured 2026-09-30,
+    trace's 03:04 cron evicted that day's only analyze run, and the keeper's
+    hourly cron and its self-dispatch evicted each other four times in a day.
+    The keeper never dispatches into a busy group; the crons had no such rule.
+    So a cron run steps aside when its group is busy or the keeper has already
+    run it within its interval, and still runs when the keeper is dead, which
+    is what the crons are kept for. Unreadable counts as idle: failing OPEN
+    keeps the fallback alive, and at worst reproduces the old behaviour.
+    """
+    group = next((g for g, members in GATE_GROUPS.items() if wf in members), None)
+    for member in GATE_GROUPS.get(group, [wf]):
+        newest = runs.get(member)
+        if newest not in (None, NEVER) and newest["status"] != "completed":
+            return False, f"{member} is {newest['status']} in group {group}"
+    job = next((j for j in SCHEDULE if j["file"] == wf), None)
+    own = runs.get(wf)
+    if job and own not in (None, NEVER):
+        age = (now - own["created_at"]).total_seconds()
+        if age < job["minutes"] * 60:
+            return False, f"last run {age / 60:.0f} min ago, interval {job['minutes']} min"
+    return True, "group idle and due"
+
+
 # --- GitHub I/O -----------------------------------------------------------------
 
 
@@ -146,11 +176,51 @@ def _session(token: str) -> requests.Session:
     return s
 
 
-def newest_run(s: requests.Session, repo: str, wf: str):
-    """The newest run of `wf`, NEVER if it has none, None if unreadable."""
+# A run that did no work must not count as the workflow having run: the
+# interval would restart from it and the real run slip a whole interval.
+# Measured 2026-09-30: the day's only analyze run was evicted from the group
+# (cancelled) at 03:04, and as the newest run it told the keeper analyze had
+# run - so nothing would have re-dispatched it for 24 hours.
+NO_WORK_CONCLUSIONS = {"cancelled", "skipped"}
+LOOKBACK = 10
+_no_work_cache: dict[int, bool] = {}
+
+
+def did_no_work(s: requests.Session, repo: str, row: dict) -> bool:
+    """A completed run that was evicted, or a cron run its gate stepped aside.
+
+    A gated-off cron run concludes `success` with its work job skipped, so the
+    run's own conclusion cannot tell; its jobs can. Only completed `schedule`
+    runs are asked, once each. Unreadable counts as work done - the cautious
+    side, since it can only delay a dispatch by one interval, never double one.
+    """
+    if row.get("status") != "completed":
+        return False
+    if row.get("conclusion") in NO_WORK_CONCLUSIONS:
+        return True
+    if row.get("event") != "schedule":
+        return False
+    run_id = row.get("id")
+    if run_id not in _no_work_cache:
+        try:
+            r = s.get(f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs",
+                      timeout=(10, 30))
+            r.raise_for_status()
+            work = [j for j in r.json().get("jobs", []) if j.get("name") != "gate"]
+            _no_work_cache[run_id] = bool(work) and all(
+                j.get("conclusion") == "skipped" for j in work)
+        except (requests.RequestException, ValueError) as exc:
+            print(f"[keeper] run {run_id}: could not read jobs ({exc})")
+            return False
+    return _no_work_cache[run_id]
+
+
+def newest_run(s: requests.Session, repo: str, wf: str, exclude_run_id: int | None = None):
+    """The newest run of `wf` that did work (or is still going), NEVER if it
+    has none in the last LOOKBACK, None if unreadable."""
     try:
         r = s.get(f"https://api.github.com/repos/{repo}/actions/workflows/{wf}/runs",
-                  params={"per_page": 1}, timeout=(10, 30))
+                  params={"per_page": LOOKBACK}, timeout=(10, 30))
         r.raise_for_status()
         rows = r.json().get("workflow_runs")
     except (requests.RequestException, ValueError) as exc:
@@ -158,10 +228,12 @@ def newest_run(s: requests.Session, repo: str, wf: str):
         return None
     if rows is None:
         return None
-    if not rows:
-        return NEVER
-    created = datetime.fromisoformat(rows[0]["created_at"].replace("Z", "+00:00"))
-    return {"status": rows[0]["status"], "created_at": created}
+    for row in rows:
+        if row.get("id") == exclude_run_id or did_no_work(s, repo, row):
+            continue
+        created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+        return {"status": row["status"], "created_at": created}
+    return NEVER
 
 
 def dispatch(s: requests.Session, repo: str, wf: str, ref: str) -> bool:
@@ -198,7 +270,13 @@ def main() -> int:
     ap.add_argument("--budget-seconds", type=int, default=60 * 60,
                     help="tick for this long, then exit so keeper.yml re-dispatches")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--gate", metavar="WORKFLOW",
+                    help="decide whether a cron-started run of WORKFLOW should proceed; "
+                         "writes run=true|false to $GITHUB_OUTPUT and always exits 0")
     args = ap.parse_args()
+
+    if args.gate:
+        return run_gate(args.gate, args.repo)
 
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -215,6 +293,26 @@ def main() -> int:
         wait = min(wait, left)
         print(f"[keeper] next look in {wait:.0f}s")
         time.sleep(wait)
+
+
+def run_gate(wf: str, repo: str) -> int:
+    proceed, reason = True, "gate could not decide - failing open"
+    try:
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        own_id = int(os.environ.get("GITHUB_RUN_ID") or 0) or None
+        s = _session(token or "")
+        group = next((g for g, members in GATE_GROUPS.items() if wf in members), None)
+        members = GATE_GROUPS.get(group, [wf])
+        runs = {m: newest_run(s, repo, m, exclude_run_id=own_id) for m in members}
+        proceed, reason = gate(wf, runs, datetime.now(UTC))
+    except Exception as exc:  # noqa: BLE001 - the gate must never be what fails a run
+        print(f"[gate] {type(exc).__name__}: {exc}")
+    print(f"[gate] {wf}: {'RUN' if proceed else 'SKIP'} - {reason}")
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a", encoding="utf-8") as handle:
+            handle.write("run=true\n" if proceed else "run=false\n")
+    return 0
 
 
 def next_sleep(result: Plan) -> float:

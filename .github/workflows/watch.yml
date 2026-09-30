@@ -38,13 +38,45 @@ permissions:
 # this job writes (data/watchlist/, data/hyperevm/) have exactly one writer.
 # Concurrent COMMITS remain safe without a shared group — the push step below
 # rebases with -X theirs and every run rewrites its own files whole.
-concurrency:
-  group: watch-data
-  cancel-in-progress: false
+# (The group is set on the `watch` job, behind the cron gate.)
 
 jobs:
+  # Cron runs only: step aside rather than evict a run already waiting in the
+  # concurrency group, or repeat one the keeper ran moments ago
+  # (scripts/keep_schedule.py `gate`). Concurrency sits on the job below, not
+  # the workflow, so a run that steps aside never enters the group at all.
+  gate:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/keep_schedule.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests==2.32.3
+      - name: Gate the cron run
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/keep_schedule.py --gate watch.yml
+
   watch:
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ !cancelled() && (needs.gate.result == 'skipped' || needs.gate.outputs.run != 'false') }}
+    concurrency:
+      group: watch-data
+      cancel-in-progress: false
     # A minute of work. The ceiling is generous only so a slow Hyperliquid
     # response cannot cancel the job before it commits what it read.
     # A backstop only; the step below carries its own. Raised from 8 when the
@@ -209,20 +241,21 @@ jobs:
             sleep $(( (RANDOM % 7) + 3 ))
           done
           git push origin main
+      # Opens the issue AND pushes HIGH to ntfy, again every 6h while it stays
+      # red (scripts/pipeline_status.py): trace failed 34 runs in a row on
+      # 2026-09-29/30 behind an issue opened once and never looked at.
       - name: Open failure issue
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          title="[pipeline] watch workflow failing"
-          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
-          body="The wallet watch failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-
-          This is the fastest tripwire in the project. While it is failing, a
-          watched wallet can empty, authorise an agent or withdraw to a new
-          address with nothing reporting it."
-          if [ -z "$existing" ]; then
-            gh issue create --title "$title" --body "$body"
-          else
-            gh issue comment "$existing" --body "$body"
-          fi
+        run: >-
+          python3 scripts/pipeline_status.py --outcome failure
+          --title "[pipeline] watch workflow failing" --note "This is the fastest tripwire in the project. While it is failing, a watched wallet can empty, authorise an agent or withdraw to a new address with nothing reporting it."
+      # Closes that issue on recovery, so the next failure alerts afresh.
+      - name: Close failure issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/pipeline_status.py --outcome success
+          --title "[pipeline] watch workflow failing"

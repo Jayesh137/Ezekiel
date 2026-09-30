@@ -161,6 +161,25 @@ function Test-GroupBusy([string]$Group) {
     return $false
 }
 
+function Limit-Log {
+    try {
+        $lines = Get-Content $Log -ErrorAction Stop
+        if ($lines.Count -gt 2000) { $lines[-2000..-1] | Set-Content -Path $Log -Encoding utf8 }
+    } catch {}
+}
+
+# Stand down while the Schedule Keeper (keeper.yml) is alive: it runs these same
+# rules on GitHub itself. Two schedulers deciding independently race: measured
+# 2026-09-30 03:55:56/03:55:58, both dispatched scan.yml two seconds apart and
+# the second run sat pending in data-commit, where the next cron run could evict
+# it. This machine is now only the backup for a broken keeper chain.
+$keeper = Get-NewestRun "keeper.yml"
+if ($null -ne $keeper -and $keeper.status -ne "completed") {
+    Write-Log "keeper.yml is $($keeper.status) - standing down"
+    Limit-Log
+    exit 0
+}
+
 $now = (Get-Date).ToUniversalTime()
 $due = @()
 $index = 0
@@ -219,7 +238,4 @@ foreach ($group in @($due | ForEach-Object { $_.Group } | Select-Object -Unique)
 }
 
 # Keep the log bounded.
-try {
-    $lines = Get-Content $Log -ErrorAction Stop
-    if ($lines.Count -gt 2000) { $lines[-2000..-1] | Set-Content -Path $Log -Encoding utf8 }
-} catch {}
+Limit-Log

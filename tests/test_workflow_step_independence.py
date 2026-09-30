@@ -32,12 +32,16 @@ ROOT = Path(__file__).parent.parent
 WORKFLOWS = ("trace.yml", "scan.yml", "analyze.yml", "watch.yml")
 
 # Steps whose whole job is to run after a failure, or to report one.
-TERMINAL = {"Commit and push": "always()", "Open failure issue": "failure()"}
+TERMINAL = {"Commit and push": "always()", "Open failure issue": "failure()",
+            "Close failure issue": "success()"}
 
 
 def _steps(workflow: str):
     """(name, body) per step, split on the step-list indent."""
     text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    # The cron `gate` job has its own environment; these rules are about the
+    # steps of the job that does the work.
+    text = re.sub(r"^  gate:\n(?:(?:    .*|)\n)*", "", text, flags=re.MULTILINE)
     # Steps start at exactly six spaces + "- "; anything deeper belongs to one.
     parts = re.split(r"^      - ", text, flags=re.MULTILINE)[1:]
     out = []
