@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "id": "optimism:0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84:native:0",
+      "original_funder": "0xf0783ac2188da6164dd7a0cf6782f954b300f19e",
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "source_chain": "optimism",
+      "source_tx": "0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84",
+      "amount_usd": null,
+      "ts_ms": 1790739801000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "optimism:0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84:native:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "ethereum:0x03479bcbf30fa292547da4547d1f89cc2a99a874b5a9354c23e6f51f99ce4ef5:erc20:0",
       "original_funder": "0x3d51807664cecbcf79b78261478830e29358f665",
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
@@ -14377,20 +14391,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "ethereum:0xb84fb3f3f582b8cd17ce3939904307020bfc85c3dffd282e72f66337da136cf2:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "ethereum:0xf37e524c45ca704701a078d8df1703bde5a844133cfa1c4538a4a00d23fc8600:erc20:0",
-      "original_funder": "0x0000000000000000000000000000000000000000",
-      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
-      "source_chain": "ethereum",
-      "source_tx": "0xf37e524c45ca704701a078d8df1703bde5a844133cfa1c4538a4a00d23fc8600",
-      "amount_usd": 999998.0,
-      "ts_ms": 1753415315000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "ethereum:0xf37e524c45ca704701a078d8df1703bde5a844133cfa1c4538a4a00d23fc8600:erc20:0"
       ],
       "confirms_owner": false
     }
@@ -34399,6 +34399,17 @@
   ],
   "discoveries": [
     {
+      "wallet": "0xf0783ac2188da6164dd7a0cf6782f954b300f19e",
+      "source": "funding_route",
+      "positive": true,
+      "event_id": "optimism:0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84:native:0",
+      "parent_event_ids": [
+        "optimism:0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84:native:0"
+      ],
+      "assertion": "observed_transfer",
+      "confirms_owner": false
+    },
+    {
       "wallet": "0x3d51807664cecbcf79b78261478830e29358f665",
       "source": "funding_route",
       "positive": true,
@@ -45386,29 +45397,18 @@
       ],
       "assertion": "observed_transfer",
       "confirms_owner": false
-    },
-    {
-      "wallet": "0x28a83a28b710f4710489944254d9995523b16c36",
-      "source": "funding_route",
-      "positive": true,
-      "event_id": "base:0xa727179f5925f24460c0c6b1a88802d99231d5e68fea11f8e8435735a6fbd1a9:erc20:1018",
-      "parent_event_ids": [
-        "base:0xa727179f5925f24460c0c6b1a88802d99231d5e68fea11f8e8435735a6fbd1a9:erc20:1018"
-      ],
-      "assertion": "observed_transfer",
-      "confirms_owner": false
     }
   ],
   "coverage": {
-    "transfer_records": 5711,
-    "circle_events": 21780
+    "transfer_records": 5712,
+    "circle_events": 22010
   },
   "counts": {
-    "routes": 3211,
+    "routes": 3212,
     "unresolved": 2506,
-    "discoveries": 2957
+    "discoveries": 2958
   },
-  "computed_at_ms": 1790736997648,
+  "computed_at_ms": 1790740616703,
   "authority": {
     "intervals": [
       {
@@ -53399,9 +53399,10 @@
         "relationship": "approve_agent",
         "boundaries_observed_only": true,
         "valid_from_ms": 1790717381100,
-        "valid_to_ms": 1791926291209,
+        "valid_to_ms": 1790738327182,
         "parent_event_ids": [
-          "agents:0x0252f92ee3f4430ac419fc3e9ae31df718990842:1790717381100:0x93379ec38fbce669eba588ed3a8a0b3e4ec00d3d"
+          "agents:0x0252f92ee3f4430ac419fc3e9ae31df718990842:1790717381100:0x93379ec38fbce669eba588ed3a8a0b3e4ec00d3d",
+          "agents:0x0252f92ee3f4430ac419fc3e9ae31df718990842:1790738327182:0x93379ec38fbce669eba588ed3a8a0b3e4ec00d3d"
         ],
         "confirms_owner": false
       },
@@ -53488,6 +53489,18 @@
           "agents:0x000b2944639b001a70c7776a39b4600ac4ebb13e:1790736290922:0x9f835b55957d7b6d0ef24c734136fbf165ff2e10"
         ],
         "confirms_owner": false
+      },
+      {
+        "account": "0x0252f92ee3f4430ac419fc3e9ae31df718990842",
+        "authority": "0xb1c5aed32ccd5a19b259ef7f0771223348a73139",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1790738327182,
+        "valid_to_ms": 1791946928004,
+        "parent_event_ids": [
+          "agents:0x0252f92ee3f4430ac419fc3e9ae31df718990842:1790738327182:0xb1c5aed32ccd5a19b259ef7f0771223348a73139"
+        ],
+        "confirms_owner": false
       }
     ],
     "shared_authority": [],
@@ -53498,6 +53511,10 @@
   "source_message_reads": {
     "queries": 20,
     "errors": [
+      {
+        "tx": "0x81a455df5de2916f5a84a61d79868010d0712def995b3f26f78191c5662feec5",
+        "reason": "no validated complete V2 message"
+      },
       {
         "tx": "0x048a25e0eeb8c06d624bde76079c2eea5997b068944bdef4bc1fc126459d9826",
         "reason": "no validated complete V2 message"
@@ -53573,15 +53590,11 @@
       {
         "tx": "0x3b539971680d0243fdc4f226b0d82e63e7c1d67756ebc1b84e8c0a7cb32eb0e2",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0xd85c1caef6bcedd1665907607d6fd3b6c84bea4c5b7b374089a17cbcd1e74831",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 21780,
+    "circle_rows_read": 22010,
     "store_read_limit": 100000
   }
 }
