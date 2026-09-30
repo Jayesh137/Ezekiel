@@ -1,17 +1,19 @@
 {
-  "computed_at": "2026-09-30T07:31:55.549302+00:00",
+  "computed_at": "2026-09-30T08:09:42.027526+00:00",
   "wallets": 1,
-  "records": 5,
+  "records": 4,
   "spam_suppressed": 6,
-  "unpriced": 2,
+  "unpriced": 1,
   "spam_by_reason": {
     "symbol_forgery": 2,
     "zero_value": 4
   },
-  "calls": 37,
+  "calls": 36,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "ethereum"
+  ],
   "unsupported_sources": [
     "bsc"
   ],
@@ -45,19 +47,21 @@
           "reader": "etherscan"
         },
         "ethereum": {
-          "records": 1,
+          "records": 0,
           "spam": 2,
-          "calls": 6,
+          "calls": 5,
           "cursor": 25809339,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
             "zero_value": 2
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 25809339,
             "native": 25807766,
@@ -175,7 +179,9 @@
           "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "ethereum"
+      ],
       "unsupported_sources": [
         "bsc"
       ]
