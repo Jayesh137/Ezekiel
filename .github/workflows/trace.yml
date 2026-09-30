@@ -342,7 +342,8 @@ jobs:
       # (rule 9); runs BEFORE the roster so this run's matches vote this run.
       - name: Match execution program
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
-        timeout-minutes: 4
+        # 300s read budget + ~12s signature load < 7 min (nesting order).
+        timeout-minutes: 7
         run: python scripts/check_execution_program.py
       # Measures roster CANDIDATES whole-chain, so `services_from_activity` can
       # disqualify an exchange or a contract on the NEXT build. The graph's own

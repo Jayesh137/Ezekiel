@@ -109,3 +109,50 @@ def test_select_candidates_dedupes_and_survives_missing_discovery():
     assert chk.select_candidates(roster, None, {"NEAR"}, cap=10) == ["0xaaa", "0xbbb"]
     dup = {"candidates": [{"wallet": "0xaaa", "markets": {"NEAR": 1}}]}
     assert chk.select_candidates(roster, dup, {"NEAR"}, cap=10) == ["0xaaa", "0xbbb"]
+
+
+def test_unread_and_oldest_wallets_are_read_first():
+    wallets = ["0xa", "0xb", "0xc", "0xd"]
+    last = {"0xa": "2026-09-30T02:00:00+00:00", "0xb": "2026-09-30T01:00:00+00:00"}
+    # Never-read in selection order, then the longest unread.
+    assert chk.order_by_staleness(wallets, last) == ["0xc", "0xd", "0xb", "0xa"]
+
+
+def test_the_budget_rotates_through_the_whole_list():
+    wallets = [f"0x{i}" for i in range(10)]
+    last, seen = {}, set()
+    for run in range(4):  # a budget of 3 reads a run reaches all 10 in 4 runs
+        for wallet in chk.order_by_staleness(wallets, last)[:3]:
+            last[wallet] = f"2026-09-30T0{run}:00:0{len(seen) % 10}"
+            seen.add(wallet)
+    assert seen == set(wallets)
+
+
+def test_an_unread_wallet_keeps_its_match_but_is_not_re_alerted():
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3}
+    target = _target(6)
+    old = chk.build_report(target, [{"wallet": "0xhit", "signature": target}], census, {})
+    carried = chk.carry_forward(old, ["0xhit", "0xother"], read_wallets={"0xother"}, census=census)
+    assert [m["wallet"] for m in carried] == ["0xhit"]
+    assert carried[0]["discriminating"] is True and carried[0]["carried_forward"] is True
+    assert chk.decide_alerts({"matches": carried}) == []
+    assert "0xhit" in chk.roster_execution_matches({"matches": carried})
+
+
+def test_a_reread_or_dropped_wallet_is_not_carried():
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3}
+    target = _target(6)
+    old = chk.build_report(target, [{"wallet": "0xhit", "signature": target}], census, {})
+    assert chk.carry_forward(old, ["0xhit"], read_wallets={"0xhit"}, census=census) == []
+    assert chk.carry_forward(old, ["0xnew"], read_wallets=set(), census=census) == []
+    assert chk.carry_forward(None, ["0xhit"], read_wallets=set(), census=census) == []
+
+
+def test_the_read_budget_fits_inside_the_step_timeout():
+    # The budget ran 600s inside a 4-minute step, so every trace run was killed.
+    import re
+    from pathlib import Path
+    workflow = (Path(__file__).parent.parent / ".github/workflows/trace.yml").read_text()
+    step = workflow.split("name: Match execution program", 1)[1].split("- name:", 1)[0]
+    minutes = int(re.search(r"timeout-minutes:\s*(\d+)", step).group(1))
+    assert chk.READ_BUDGET_SECONDS + 60 < minutes * 60
