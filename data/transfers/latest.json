@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-10-01T20:55:09.686839+00:00",
+  "computed_at": "2026-10-01T21:26:32.346131+00:00",
   "wallets": 1,
   "records": 5,
   "spam_suppressed": 6,
@@ -8,10 +8,12 @@
     "symbol_forgery": 2,
     "zero_value": 4
   },
-  "calls": 37,
+  "calls": 36,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "monad"
+  ],
   "unsupported_sources": [
     "bsc"
   ],
@@ -64,9 +66,7 @@
             "internal": 20083520
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {
-            "erc20": "Max calls per sec rate limit reached (3/sec)"
-          },
+          "unverified_kinds": {},
           "reader": "etherscan"
         },
         "base": {
@@ -133,11 +133,7 @@
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {
-            "erc20": "Max calls per sec rate limit reached (3/sec)",
-            "native": "Max calls per sec rate limit reached (3/sec)",
-            "internal": "Max calls per sec rate limit reached (3/sec)"
-          },
+          "unverified_kinds": {},
           "reader": "etherscan"
         },
         "bsc": {
@@ -162,15 +158,17 @@
         "monad": {
           "records": 1,
           "spam": 0,
-          "calls": 6,
+          "calls": 5,
           "cursor": 37671813,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 0,
             "native": 0,
@@ -178,13 +176,14 @@
           },
           "incomplete_kinds": {},
           "unverified_kinds": {
-            "erc20": "Max calls per sec rate limit reached (3/sec)",
-            "native": "Max calls per sec rate limit reached (3/sec)"
+            "internal": "Max calls per sec rate limit reached (3/sec)"
           },
           "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "monad"
+      ],
       "unsupported_sources": [
         "bsc"
       ]
