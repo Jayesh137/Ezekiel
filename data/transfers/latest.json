@@ -1,17 +1,19 @@
 {
-  "computed_at": "2026-10-02T21:12:17.656556+00:00",
+  "computed_at": "2026-10-02T21:43:18.542928+00:00",
   "wallets": 1,
   "records": 5,
-  "spam_suppressed": 6,
+  "spam_suppressed": 5,
   "unpriced": 2,
   "spam_by_reason": {
-    "symbol_forgery": 2,
+    "symbol_forgery": 1,
     "zero_value": 4
   },
-  "calls": 37,
+  "calls": 35,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "polygon"
+  ],
   "unsupported_sources": [
     "bsc"
   ],
@@ -113,25 +115,28 @@
         },
         "polygon": {
           "records": 0,
-          "spam": 1,
-          "calls": 6,
+          "spam": 0,
+          "calls": 4,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
-          "spam_by_reason": {
-            "symbol_forgery": 1
+          "spam_by_reason": {},
+          "errors_by_kind": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
           },
-          "errors_by_kind": {},
           "cursor_by_kind": {
             "erc20": 79283383,
             "native": 0,
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "native": "Max calls per sec rate limit reached (3/sec)"
+          },
           "reader": "etherscan"
         },
         "bsc": {
@@ -171,11 +176,15 @@
             "internal": 37671813
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)"
+          },
           "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "polygon"
+      ],
       "unsupported_sources": [
         "bsc"
       ]
