@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-10-03T05:16:25.484380+00:00",
+  "computed_at": "2026-10-03T05:39:49.834357+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "params": {
     "min_amount_usd": 100000,
@@ -8,51 +8,13 @@
     "min_confidence": 0.55
   },
   "pools_read": [
+    "bridge",
     "cctp"
   ],
-  "match_count": 12,
-  "candidate_pool_error": "bridge: Max calls per sec rate limit reached (3/sec)",
-  "candidates_considered": 2207,
+  "match_count": 14,
+  "candidate_pool_error": "bridge: read 34892 rows and hit the page ceiling before the window ended \u2014 the candidate pool is incomplete",
+  "candidates_considered": 2843,
   "matches": [
-    {
-      "id": "corr:0xeaad1c358354a51ef09265f1b64d6c562d943c26:monad:0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674:erc20:0",
-      "wallet": "0xeaad1c358354a51ef09265f1b64d6c562d943c26",
-      "deposit_amount_usd": 6000000.0,
-      "exit_amount_usd": 6000000.0,
-      "amount_diff_pct": 0.0,
-      "gap_hours": 30.9,
-      "exit_source": "l1_outbound",
-      "exit_ref": "0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674",
-      "exit_id": "monad:0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674:erc20:0",
-      "event_ids": [
-        "monad:0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674:erc20:0"
-      ],
-      "deposit_ref": null,
-      "uniqueness": 1.0,
-      "competing_deposits": 0,
-      "confidence": 0.9816,
-      "score_kind": "heuristic",
-      "deposit_ts": 1789766568,
-      "assignment_mode": "exact",
-      "alternative_count": 2,
-      "alternatives": [
-        {
-          "wallet": "0xeaad1c358354a51ef09265f1b64d6c562d943c26",
-          "confidence": 0.958,
-          "exit_ref": "0x9d763c6b58736f74b7a17ef27eed803a60f5f9387a253f405252997c866caf4d",
-          "deposit_ts": 1789766568
-        },
-        {
-          "wallet": "0xeaad1c358354a51ef09265f1b64d6c562d943c26",
-          "confidence": 0.9424,
-          "exit_ref": "0xe504f3b11ac19791a81c5c5dc8b59f1a2576517f4f1d5d438c0acb635ebb803b",
-          "deposit_ts": 1789766568
-        }
-      ],
-      "ambiguous": true,
-      "detected_at": "2026-10-02T05:20:15.320438+00:00",
-      "via": "bridge"
-    },
     {
       "id": "corr:0xb798aef79972ce8f73d47b9ebbcda6bbb7ec4fbf:monad:0x24085cabc34c139e7b99166eb6b82f4950b563cbdcd08e5b84b624ed14e494bd:erc20:0",
       "wallet": "0xb798aef79972ce8f73d47b9ebbcda6bbb7ec4fbf",
@@ -95,7 +57,7 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484205+00:00",
+      "detected_at": "2026-10-03T05:39:49.833716+00:00",
       "via": "cctp"
     },
     {
@@ -140,7 +102,7 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484193+00:00",
+      "detected_at": "2026-10-03T05:39:49.833687+00:00",
       "via": "cctp"
     },
     {
@@ -185,8 +147,98 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484187+00:00",
+      "detected_at": "2026-10-03T05:39:49.833678+00:00",
       "via": "cctp"
+    },
+    {
+      "id": "corr:0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f:arbitrum:0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8:erc20:0",
+      "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+      "deposit_amount_usd": 3000000.0,
+      "exit_amount_usd": 3000000.0,
+      "amount_diff_pct": 0.0,
+      "gap_hours": 47.5,
+      "exit_source": "l1_outbound",
+      "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+      "exit_id": "arbitrum:0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8:erc20:0",
+      "event_ids": [
+        "arbitrum:0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8:erc20:0"
+      ],
+      "deposit_ref": null,
+      "uniqueness": 0.1667,
+      "competing_deposits": 5,
+      "confidence": 0.7218,
+      "score_kind": "heuristic",
+      "deposit_ts": 1790293337,
+      "assignment_mode": "exact",
+      "alternative_count": 3,
+      "alternatives": [
+        {
+          "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+          "confidence": 0.7252,
+          "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+          "deposit_ts": 1790293337
+        },
+        {
+          "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+          "confidence": 0.7138,
+          "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+          "deposit_ts": 1790341254
+        },
+        {
+          "wallet": "0xf48f5097bf6d416e18762faf88d85cc4b20610fe",
+          "confidence": 0.6654,
+          "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+          "deposit_ts": 1790280659
+        }
+      ],
+      "ambiguous": true,
+      "detected_at": "2026-10-03T05:39:48.720710+00:00",
+      "via": "bridge"
+    },
+    {
+      "id": "corr:0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f:arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0",
+      "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+      "deposit_amount_usd": 3000000.0,
+      "exit_amount_usd": 3000000.0,
+      "amount_diff_pct": 0.0,
+      "gap_hours": 55.0,
+      "exit_source": "l1_outbound",
+      "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+      "exit_id": "arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0",
+      "event_ids": [
+        "arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0"
+      ],
+      "deposit_ref": null,
+      "uniqueness": 0.1667,
+      "competing_deposits": 5,
+      "confidence": 0.7173,
+      "score_kind": "heuristic",
+      "deposit_ts": 1790341254,
+      "assignment_mode": "exact",
+      "alternative_count": 3,
+      "alternatives": [
+        {
+          "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+          "confidence": 0.7252,
+          "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+          "deposit_ts": 1790293337
+        },
+        {
+          "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+          "confidence": 0.7138,
+          "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+          "deposit_ts": 1790341254
+        },
+        {
+          "wallet": "0xf48f5097bf6d416e18762faf88d85cc4b20610fe",
+          "confidence": 0.6688,
+          "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+          "deposit_ts": 1790280659
+        }
+      ],
+      "ambiguous": true,
+      "detected_at": "2026-10-03T05:39:48.720717+00:00",
+      "via": "bridge"
     },
     {
       "id": "corr:0xd47587702a91731dc1089b5db0932cf820151a91:arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0",
@@ -272,7 +324,7 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484229+00:00",
+      "detected_at": "2026-10-03T05:39:49.833760+00:00",
       "via": "cctp"
     },
     {
@@ -359,7 +411,7 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484221+00:00",
+      "detected_at": "2026-10-03T05:39:49.833746+00:00",
       "via": "cctp"
     },
     {
@@ -422,7 +474,7 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484198+00:00",
+      "detected_at": "2026-10-03T05:39:49.833704+00:00",
       "via": "cctp"
     },
     {
@@ -461,41 +513,8 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484213+00:00",
+      "detected_at": "2026-10-03T05:39:49.833732+00:00",
       "via": "cctp"
-    },
-    {
-      "id": "corr:0xfc667adba8d4837586078f4fdcdc29804337ca06:ethereum:0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4:erc20:0",
-      "wallet": "0xfc667adba8d4837586078f4fdcdc29804337ca06",
-      "deposit_amount_usd": 5000000.0,
-      "exit_amount_usd": 5000000.0,
-      "amount_diff_pct": 0.0,
-      "gap_hours": 328.6,
-      "exit_source": "l1_outbound",
-      "exit_ref": "0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4",
-      "exit_id": "ethereum:0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4:erc20:0",
-      "event_ids": [
-        "ethereum:0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4:erc20:0"
-      ],
-      "deposit_ref": null,
-      "uniqueness": 0.5,
-      "competing_deposits": 1,
-      "confidence": 0.6544,
-      "score_kind": "heuristic",
-      "deposit_ts": 1789727770,
-      "assignment_mode": "exact",
-      "alternative_count": 1,
-      "alternatives": [
-        {
-          "wallet": "0x57dd78cd36e76e2011e8f6dc25cabbaba994494b",
-          "confidence": 0.6509,
-          "exit_ref": "0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4",
-          "deposit_ts": 1789749048
-        }
-      ],
-      "ambiguous": true,
-      "detected_at": "2026-10-02T05:20:15.320408+00:00",
-      "via": "bridge"
     },
     {
       "id": "corr:0x2b1e0bcefada121c5bc484a546e3ca0e2a8bee5b:ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0",
@@ -557,8 +576,134 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484210+00:00",
+      "detected_at": "2026-10-03T05:39:49.833726+00:00",
       "via": "cctp"
+    },
+    {
+      "id": "corr:0xf150e75c0ab5deff96174214366bfd83c97b3253:ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0",
+      "wallet": "0xf150e75c0ab5deff96174214366bfd83c97b3253",
+      "deposit_amount_usd": 133223.2,
+      "exit_amount_usd": 133442.32,
+      "amount_diff_pct": 0.164,
+      "gap_hours": 98.3,
+      "exit_source": "l1_outbound",
+      "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+      "exit_id": "ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0",
+      "event_ids": [
+        "ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0"
+      ],
+      "deposit_ref": null,
+      "uniqueness": 0.0154,
+      "competing_deposits": 64,
+      "confidence": 0.6187,
+      "score_kind": "heuristic",
+      "deposit_ts": 1790352074,
+      "assignment_mode": "exact",
+      "alternative_count": 11,
+      "alternatives": [
+        {
+          "wallet": "0x023a3d058020fb76cca98f01b3c48c8938a22355",
+          "confidence": 0.6179,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790338478
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.6158,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790524336
+        },
+        {
+          "wallet": "0xac299dfeb2e633f80084005a82e460b90f259f44",
+          "confidence": 0.6048,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790337799
+        },
+        {
+          "wallet": "0x023a3d058020fb76cca98f01b3c48c8938a22355",
+          "confidence": 0.5932,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790098895
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.5925,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790594849
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.591,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790528248
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.5865,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790621523
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.5847,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790615739
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.5731,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790535592
+        },
+        {
+          "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+          "confidence": 0.5636,
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "deposit_ts": 1790639319
+        }
+      ],
+      "ambiguous": true,
+      "detected_at": "2026-10-03T05:39:48.720675+00:00",
+      "via": "bridge"
+    },
+    {
+      "id": "corr:0x7fdafde5cfb5465924316eced2d3715494c517d1:arbitrum:0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567:erc20:0",
+      "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+      "deposit_amount_usd": 1799999.4,
+      "exit_amount_usd": 1783628.31,
+      "amount_diff_pct": 0.918,
+      "gap_hours": 137.7,
+      "exit_source": "l1_outbound",
+      "exit_ref": "0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567",
+      "exit_id": "arbitrum:0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567:erc20:0",
+      "event_ids": [
+        "arbitrum:0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567:erc20:0"
+      ],
+      "deposit_ref": null,
+      "uniqueness": 0.5,
+      "competing_deposits": 1,
+      "confidence": 0.6151,
+      "score_kind": "heuristic",
+      "deposit_ts": 1790616567,
+      "assignment_mode": "exact",
+      "alternative_count": 2,
+      "alternatives": [
+        {
+          "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+          "confidence": 0.615,
+          "exit_ref": "0xc4300d6d2fd63a861bf2583d8c18e4589342e41e7a4a1fdb11faa4bcc3e8531b",
+          "deposit_ts": 1790616567
+        },
+        {
+          "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+          "confidence": 0.5917,
+          "exit_ref": "0x4e3bfc0821ab1049d4ab20e7cd3a57764da276754fcf8b4af55f85d65a84229f",
+          "deposit_ts": 1790616567
+        }
+      ],
+      "ambiguous": true,
+      "detected_at": "2026-10-03T05:39:48.720700+00:00",
+      "via": "bridge"
     },
     {
       "id": "corr:0x5b5d51203a0f9079f8aeb098a6523a13f298c060:monad:0x9bc79df5c258a39885d3bf0bba55f22d965d6eb0813f03a99f53b7fbd6a6e29b:erc20:0",
@@ -583,7 +728,7 @@
       "alternative_count": 0,
       "alternatives": [],
       "ambiguous": false,
-      "detected_at": "2026-10-03T05:16:25.484173+00:00",
+      "detected_at": "2026-10-03T05:39:49.833653+00:00",
       "via": "cctp"
     },
     {
@@ -628,94 +773,238 @@
         }
       ],
       "ambiguous": true,
-      "detected_at": "2026-10-03T05:16:25.484202+00:00",
+      "detected_at": "2026-10-03T05:39:49.833710+00:00",
       "via": "cctp"
     }
   ],
   "pools": {
     "bridge": {
-      "computed_at": "2026-10-02T05:20:15.320801+00:00",
-      "candidate_pool_error": "Max calls per sec rate limit reached (3/sec)",
-      "candidates_considered": 450,
+      "computed_at": "2026-10-03T05:39:48.721209+00:00",
+      "candidate_pool_error": "read 34892 rows and hit the page ceiling before the window ended \u2014 the candidate pool is incomplete",
+      "candidates_considered": 1088,
       "matches": [
         {
-          "id": "corr:0xeaad1c358354a51ef09265f1b64d6c562d943c26:monad:0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674:erc20:0",
-          "wallet": "0xeaad1c358354a51ef09265f1b64d6c562d943c26",
-          "deposit_amount_usd": 6000000.0,
-          "exit_amount_usd": 6000000.0,
+          "id": "corr:0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f:arbitrum:0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8:erc20:0",
+          "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+          "deposit_amount_usd": 3000000.0,
+          "exit_amount_usd": 3000000.0,
           "amount_diff_pct": 0.0,
-          "gap_hours": 30.9,
+          "gap_hours": 47.5,
           "exit_source": "l1_outbound",
-          "exit_ref": "0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674",
-          "exit_id": "monad:0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674:erc20:0",
+          "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+          "exit_id": "arbitrum:0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8:erc20:0",
           "event_ids": [
-            "monad:0x7867fd62fe8bbc165fedf8b7f7163a0a525782dc92db0d0ae36fa8df3eb7c674:erc20:0"
+            "arbitrum:0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8:erc20:0"
           ],
           "deposit_ref": null,
-          "uniqueness": 1.0,
-          "competing_deposits": 0,
-          "confidence": 0.9816,
+          "uniqueness": 0.1667,
+          "competing_deposits": 5,
+          "confidence": 0.7218,
           "score_kind": "heuristic",
-          "deposit_ts": 1789766568,
+          "deposit_ts": 1790293337,
           "assignment_mode": "exact",
-          "alternative_count": 2,
+          "alternative_count": 3,
           "alternatives": [
             {
-              "wallet": "0xeaad1c358354a51ef09265f1b64d6c562d943c26",
-              "confidence": 0.958,
-              "exit_ref": "0x9d763c6b58736f74b7a17ef27eed803a60f5f9387a253f405252997c866caf4d",
-              "deposit_ts": 1789766568
+              "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+              "confidence": 0.7252,
+              "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+              "deposit_ts": 1790293337
             },
             {
-              "wallet": "0xeaad1c358354a51ef09265f1b64d6c562d943c26",
-              "confidence": 0.9424,
-              "exit_ref": "0xe504f3b11ac19791a81c5c5dc8b59f1a2576517f4f1d5d438c0acb635ebb803b",
-              "deposit_ts": 1789766568
+              "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+              "confidence": 0.7138,
+              "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+              "deposit_ts": 1790341254
+            },
+            {
+              "wallet": "0xf48f5097bf6d416e18762faf88d85cc4b20610fe",
+              "confidence": 0.6654,
+              "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+              "deposit_ts": 1790280659
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-02T05:20:15.320438+00:00",
+          "detected_at": "2026-10-03T05:39:48.720710+00:00",
           "via": "bridge"
         },
         {
-          "id": "corr:0xfc667adba8d4837586078f4fdcdc29804337ca06:ethereum:0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4:erc20:0",
-          "wallet": "0xfc667adba8d4837586078f4fdcdc29804337ca06",
-          "deposit_amount_usd": 5000000.0,
-          "exit_amount_usd": 5000000.0,
+          "id": "corr:0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f:arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0",
+          "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+          "deposit_amount_usd": 3000000.0,
+          "exit_amount_usd": 3000000.0,
           "amount_diff_pct": 0.0,
-          "gap_hours": 328.6,
+          "gap_hours": 55.0,
           "exit_source": "l1_outbound",
-          "exit_ref": "0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4",
-          "exit_id": "ethereum:0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4:erc20:0",
+          "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+          "exit_id": "arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0",
           "event_ids": [
-            "ethereum:0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4:erc20:0"
+            "arbitrum:0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1:erc20:0"
+          ],
+          "deposit_ref": null,
+          "uniqueness": 0.1667,
+          "competing_deposits": 5,
+          "confidence": 0.7173,
+          "score_kind": "heuristic",
+          "deposit_ts": 1790341254,
+          "assignment_mode": "exact",
+          "alternative_count": 3,
+          "alternatives": [
+            {
+              "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+              "confidence": 0.7252,
+              "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+              "deposit_ts": 1790293337
+            },
+            {
+              "wallet": "0x936cf4fb95c30ce83f658b5bbb247e4bb381bb0f",
+              "confidence": 0.7138,
+              "exit_ref": "0x518bcff37afe05c1b640b2760dd5e1d45e39d512bea8feaafc8ef5039d6248d8",
+              "deposit_ts": 1790341254
+            },
+            {
+              "wallet": "0xf48f5097bf6d416e18762faf88d85cc4b20610fe",
+              "confidence": 0.6688,
+              "exit_ref": "0x489997d075ad254b13920430a2ea3e6584a38f6fb9fd28a94b5d8c5e7d0a20f1",
+              "deposit_ts": 1790280659
+            }
+          ],
+          "ambiguous": true,
+          "detected_at": "2026-10-03T05:39:48.720717+00:00",
+          "via": "bridge"
+        },
+        {
+          "id": "corr:0xf150e75c0ab5deff96174214366bfd83c97b3253:ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0",
+          "wallet": "0xf150e75c0ab5deff96174214366bfd83c97b3253",
+          "deposit_amount_usd": 133223.2,
+          "exit_amount_usd": 133442.32,
+          "amount_diff_pct": 0.164,
+          "gap_hours": 98.3,
+          "exit_source": "l1_outbound",
+          "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+          "exit_id": "ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0",
+          "event_ids": [
+            "ethereum:0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d:erc20:0"
+          ],
+          "deposit_ref": null,
+          "uniqueness": 0.0154,
+          "competing_deposits": 64,
+          "confidence": 0.6187,
+          "score_kind": "heuristic",
+          "deposit_ts": 1790352074,
+          "assignment_mode": "exact",
+          "alternative_count": 11,
+          "alternatives": [
+            {
+              "wallet": "0x023a3d058020fb76cca98f01b3c48c8938a22355",
+              "confidence": 0.6179,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790338478
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.6158,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790524336
+            },
+            {
+              "wallet": "0xac299dfeb2e633f80084005a82e460b90f259f44",
+              "confidence": 0.6048,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790337799
+            },
+            {
+              "wallet": "0x023a3d058020fb76cca98f01b3c48c8938a22355",
+              "confidence": 0.5932,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790098895
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.5925,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790594849
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.591,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790528248
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.5865,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790621523
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.5847,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790615739
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.5731,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790535592
+            },
+            {
+              "wallet": "0x1a44a6bc450d233049d629c27792c5309d9ca12d",
+              "confidence": 0.5636,
+              "exit_ref": "0xe1b8661f0681a0ec7a31f9849d273d4c9435552e73beb72da5117c08d7be303d",
+              "deposit_ts": 1790639319
+            }
+          ],
+          "ambiguous": true,
+          "detected_at": "2026-10-03T05:39:48.720675+00:00",
+          "via": "bridge"
+        },
+        {
+          "id": "corr:0x7fdafde5cfb5465924316eced2d3715494c517d1:arbitrum:0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567:erc20:0",
+          "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+          "deposit_amount_usd": 1799999.4,
+          "exit_amount_usd": 1783628.31,
+          "amount_diff_pct": 0.918,
+          "gap_hours": 137.7,
+          "exit_source": "l1_outbound",
+          "exit_ref": "0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567",
+          "exit_id": "arbitrum:0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567:erc20:0",
+          "event_ids": [
+            "arbitrum:0xf1fe10060f4ef98fc97c141550d6bd874c8ab0e882ea09b21b900c940fc94567:erc20:0"
           ],
           "deposit_ref": null,
           "uniqueness": 0.5,
           "competing_deposits": 1,
-          "confidence": 0.6544,
+          "confidence": 0.6151,
           "score_kind": "heuristic",
-          "deposit_ts": 1789727770,
+          "deposit_ts": 1790616567,
           "assignment_mode": "exact",
-          "alternative_count": 1,
+          "alternative_count": 2,
           "alternatives": [
             {
-              "wallet": "0x57dd78cd36e76e2011e8f6dc25cabbaba994494b",
-              "confidence": 0.6509,
-              "exit_ref": "0xf5a3059cd6f52dc29bfa80096ce8c34d5a15d2cd0605c8e3888b8c578ed8bec4",
-              "deposit_ts": 1789749048
+              "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+              "confidence": 0.615,
+              "exit_ref": "0xc4300d6d2fd63a861bf2583d8c18e4589342e41e7a4a1fdb11faa4bcc3e8531b",
+              "deposit_ts": 1790616567
+            },
+            {
+              "wallet": "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+              "confidence": 0.5917,
+              "exit_ref": "0x4e3bfc0821ab1049d4ab20e7cd3a57764da276754fcf8b4af55f85d65a84229f",
+              "deposit_ts": 1790616567
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-02T05:20:15.320408+00:00",
+          "detected_at": "2026-10-03T05:39:48.720700+00:00",
           "via": "bridge"
         }
       ]
     },
     "cctp": {
-      "computed_at": "2026-10-03T05:16:25.484371+00:00",
+      "computed_at": "2026-10-03T05:39:49.834339+00:00",
       "candidate_pool_error": null,
-      "candidates_considered": 1757,
+      "candidates_considered": 1755,
       "matches": [
         {
           "id": "corr:0xb798aef79972ce8f73d47b9ebbcda6bbb7ec4fbf:monad:0x24085cabc34c139e7b99166eb6b82f4950b563cbdcd08e5b84b624ed14e494bd:erc20:0",
@@ -759,7 +1048,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484205+00:00",
+          "detected_at": "2026-10-03T05:39:49.833716+00:00",
           "via": "cctp"
         },
         {
@@ -804,7 +1093,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484193+00:00",
+          "detected_at": "2026-10-03T05:39:49.833687+00:00",
           "via": "cctp"
         },
         {
@@ -849,7 +1138,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484187+00:00",
+          "detected_at": "2026-10-03T05:39:49.833678+00:00",
           "via": "cctp"
         },
         {
@@ -936,7 +1225,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484229+00:00",
+          "detected_at": "2026-10-03T05:39:49.833760+00:00",
           "via": "cctp"
         },
         {
@@ -1023,7 +1312,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484221+00:00",
+          "detected_at": "2026-10-03T05:39:49.833746+00:00",
           "via": "cctp"
         },
         {
@@ -1086,7 +1375,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484198+00:00",
+          "detected_at": "2026-10-03T05:39:49.833704+00:00",
           "via": "cctp"
         },
         {
@@ -1125,7 +1414,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484213+00:00",
+          "detected_at": "2026-10-03T05:39:49.833732+00:00",
           "via": "cctp"
         },
         {
@@ -1188,7 +1477,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484210+00:00",
+          "detected_at": "2026-10-03T05:39:49.833726+00:00",
           "via": "cctp"
         },
         {
@@ -1214,7 +1503,7 @@
           "alternative_count": 0,
           "alternatives": [],
           "ambiguous": false,
-          "detected_at": "2026-10-03T05:16:25.484173+00:00",
+          "detected_at": "2026-10-03T05:39:49.833653+00:00",
           "via": "cctp"
         },
         {
@@ -1259,7 +1548,7 @@
             }
           ],
           "ambiguous": true,
-          "detected_at": "2026-10-03T05:16:25.484202+00:00",
+          "detected_at": "2026-10-03T05:39:49.833710+00:00",
           "via": "cctp"
         }
       ]
