@@ -1,34 +1,38 @@
 {
   "wallet": "0x16bf84af3f85f8c8a97597bf2be549dfe0dee637",
   "first_seen": "2026-09-13T07:07:09.166428+00:00",
-  "last_seen": "2026-10-01T21:52:05.422290+00:00",
+  "last_seen": "2026-10-03T07:37:27.246156+00:00",
   "best_score": 0.2826,
-  "latest_score": 0.1432,
+  "latest_score": 0.2421,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Matching long/short bias"
+    ],
     "warnings": [
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
-      "overlap": [],
+      "overlap": [
+        "BTC"
+      ],
       "target_only": [
         "ADA",
-        "BTC",
         "ETH",
         "FARTCOIN",
         "LIT",
+        "MON",
         "NEAR"
       ],
       "candidate_only": [
         "@142"
       ],
-      "overlap_count": 0,
+      "overlap_count": 1,
       "rare_overlap": [],
-      "jaccard": 0.0
+      "jaccard": 0.125
     },
     "market_rarity": {
       "shared_markets": [],
@@ -37,22 +41,22 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.1432,
+      "score_without_bonus": 0.2421,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
       "status": "research",
       "promotable": false,
-      "similarity": 0.589,
+      "similarity": 0.596,
       "features": {
-        "relative_size_dispersion": 0.9452,
+        "relative_size_dispersion": 0.9798,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 0.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 7,
+      "independent_sessions": 9,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -740,18 +744,39 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-03T07:37:27.246156+00:00",
+      "score": 0.2421,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.125,
+        "timing_profile": null,
+        "leverage_profile": 0.4071,
+        "entry_exit_style": 0.0619,
+        "hold_duration": null,
+        "account_size": 0.3658,
+        "trade_sequencing": 0.6556,
+        "position_sizing": 0.0455,
+        "order_profile": null,
+        "activity": 0.6701,
+        "direction_bias": 1.0,
+        "position_management": 0.5108,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2111,
+  "recent_avg_score": 0.2083,
   "last_investigated_ms": 1790850811424,
-  "last_checked": "2026-10-01T21:52:05.422290+00:00",
+  "last_checked": "2026-10-03T07:37:27.246156+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-10-01T21:52:05.422290+00:00",
-  "last_positive_evidence": "2026-10-01T21:51:59.889346+00:00",
+  "last_successful_read": "2026-10-03T07:37:27.246156+00:00",
+  "last_positive_evidence": "2026-10-03T07:37:21.413670+00:00",
   "observations": [
     {
       "status": "ok",
@@ -821,20 +846,43 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-10-01T21:51:59.889346+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1789198640947,
+      "coverage": {
+        "start_ms": 1789198640947,
+        "end_ms": 1791013040947,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1789198640947,
+        "requested_start_ms": 1789198640947,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1791013040947,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-10-03T07:37:21.413670+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1789077117754,
-    "end_ms": 1790891517754,
+    "start_ms": 1789198640947,
+    "end_ms": 1791013040947,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1789077117754,
-    "requested_start_ms": 1789077117754,
+    "fetched_start_ms": 1789198640947,
+    "requested_start_ms": 1789198640947,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-10-01T21:52:05.422290+00:00",
+  "last_scored": "2026-10-03T07:37:27.246156+00:00",
   "latest_scoring_schema": "2026-09-26.2"
 }
