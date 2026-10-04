@@ -1606,3 +1606,48 @@ now (the old 198-min cron figure is obsolete). Live smoke: 41 of his markets, 60
 3,992 trades → 2,308 taker orders → 675 takers, 0 false hits in a quiet window.
 Needs `requirements-stream.txt` (websockets); a trade in the gap between windows is
 still caught later by the other vectors, not instantly.
+
+---
+
+**The frontier was dead for 15 of 17 days, behind an alarm that fired daily
+(2026-10-04).** No wallet was expanded from 2026-09-16 to 09-27 or from 09-29
+08:12 to this fix. `alert_discovery_stalled` reported it HIGH fifteen times, up
+to 248.9h; every run's `health.expansion` read `failed`, 5 lookups, 0 wallets,
+`could not read bsc, monad`.
+
+Cause: the per-lookup call budget was `len(chains) * 3` — three record kinds per
+chain — while a frontier sweep also spends a probe per Etherscan chain and, on a
+Blockscout chain, a newest-block completeness check per kind. When Base and
+Optimism moved to keyless Blockscout readers (09-26/27) a wallet active on the
+usual chains spent all 21 calls (arbitrum 4, ethereum 4, base 6, optimism 6,
+polygon 1) before BSC was probed. BSC and Monad were then budget-exhausted on
+EVERY wallet; exhaustion is not a plan refusal, so they were DEGRADED, and a
+degraded chain deferred the whole wallet — throwing away the chains just read,
+re-queueing it, and failing identically next run. The same class as the
+2026-09-10 unsupported/degraded merge, reached by a different route: a
+deterministic per-chain failure plus all-or-nothing wallet accounting.
+
+Fix (`transfer_graph.lookup_call_budget`, `tests/test_frontier_lookup_budget.py`):
+the budget is the chain plan itself (probe + kinds for Etherscan, kinds +
+completeness for Blockscout) plus one further page per kind — 53 calls for the
+7 production chains, bounded so endless history still stops; and a lookup that
+read SOME chains is kept and walked, its unread chains revisited within the hour
+through the refresh schedule and still reported degraded. A lookup that read
+nothing stays deferred.
+
+Found during a tracing review the same day, which also measured what the dead
+walk had left unexamined: of 992 direct counterparties (>= $1K) of the three
+cluster wallets, 936 had never been swept — 109 contracts carrying $1.9B and 10
+quiet EOAs carrying $48.6M. Hand-tracing four of them with keyless APIs found a
+second private Binance deposit address (`0x841b9e4f…`, 2023, $39.4M, 12 txs
+ever), a Hyperliquid-internal exchange deposit address (`0x4aecac3b…`, UENA
+forwarded in 11s to hub `0x1f6093d3…`), a Binance -> fresh wallet -> cluster hop
+(`0x68797748…`, $6M), and a wallet co-funded by `0xf078969e…` and `0x793a3e8a…`
+within two hours (`0x734c9213…`, $5.5M into ApolloX/Aster) — none an HL trading
+account, all reachable, none surfaced. The redesign this motivated is specified
+separately.
+
+**Rule:** a per-unit budget is derived from the unit's actual plan, never a fixed
+multiple of something that later changes; and partial success is progress — a
+unit that read part of its sources must keep what it read and retry the rest,
+or one deterministic failure anywhere becomes a total outage.

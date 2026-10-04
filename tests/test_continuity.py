@@ -442,6 +442,11 @@ def test_relay_classification_matrix(received, forwarded, hours, dests, expected
 # the except branch that keeps a wallet retryable unreachable for the failure
 # that actually happens, and `explored` persists as expanded_ledger — so the
 # marking was permanent across runs.
+#
+# These fakes report NO per-chain result (`chains: {}`), i.e. a sweep that read
+# nothing we can vouch for, and such a wallet stays deferred. A sweep that READ
+# some chains and failed others is kept and its unread chains revisited within
+# the hour (2026-10-04) — tests/test_frontier_lookup_budget.py pins that half.
 
 def _sweeps(monkeypatch, by_wallet, rows_by_wallet=None):
     monkeypatch.setenv("ETHERSCAN_API_KEY", "test-key-not-a-secret")
@@ -467,7 +472,7 @@ def test_a_degraded_sweep_leaves_the_wallet_out_of_explored(monkeypatch):
     _, diag = tg.expand_frontier(seed, T, tg.DEFAULTS, now_ts=NOW)
 
     assert A not in diag["expanded_ledger"], \
-        "a wallet whose sweep could not read every chain is not fully explored"
+        "a wallet whose sweep read no chain at all is not explored"
     assert B in diag["expanded_ledger"], "a clean sweep still finishes the wallet"
 
     failed = {f["wallet"]: f for f in diag["partial_failures"]}
