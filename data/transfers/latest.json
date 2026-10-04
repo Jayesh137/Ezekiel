@@ -1,17 +1,19 @@
 {
-  "computed_at": "2026-10-04T10:15:15.878747+00:00",
+  "computed_at": "2026-10-04T10:55:57.367835+00:00",
   "wallets": 1,
-  "records": 5,
+  "records": 4,
   "spam_suppressed": 6,
   "unpriced": 2,
   "spam_by_reason": {
     "symbol_forgery": 2,
     "zero_value": 4
   },
-  "calls": 37,
+  "calls": 36,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "base"
+  ],
   "unsupported_sources": [
     "bsc"
   ],
@@ -68,19 +70,21 @@
           "reader": "etherscan"
         },
         "base": {
-          "records": 1,
+          "records": 0,
           "spam": 1,
-          "calls": 6,
+          "calls": 5,
           "cursor": 48761019,
           "gaps": [],
-          "truncated": false,
-          "error": null,
+          "truncated": true,
+          "error": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {
             "zero_value": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "erc20": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)"
+          },
           "cursor_by_kind": {
             "erc20": 48761019,
             "native": 39308638,
@@ -175,7 +179,9 @@
           "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "base"
+      ],
       "unsupported_sources": [
         "bsc"
       ]
