@@ -270,6 +270,25 @@ jobs:
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: python scripts/probe_hyperevm_index.py
+      # The trace engine (src/trace/, spec docs/superpowers/specs/2026-10-04-
+      # trace-engine-design.md): follows HIS money — ranked by how much of his
+      # dollars reached an address — through HL ledgers (including the treasury's
+      # and 0xf078969e's, never walked before), whole-chain classification and
+      # L1 sweeps of quiet wallets, to HL accounts, deposit addresses inside and
+      # outside Hyperliquid, co-funders of single-purpose wallets and quiet
+      # funders. Before the graph so its sweeps land in this run's graph, and
+      # before the roster so its links vote this run.
+      # Nesting order: engine budget 240s + ~40s substrate load < 8 minutes.
+      - name: Run the trace engine
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 8
+        run: python scripts/run_trace_engine.py
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
       - name: Rebuild transfer graph

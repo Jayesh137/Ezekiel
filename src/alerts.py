@@ -1234,6 +1234,31 @@ def alert_deposit_address_shared(row: dict, hl_state: dict | None = None) -> boo
     return _send_with_cooldown(key, 168, subject, body)
 
 
+def alert_trace_reached(row: dict) -> bool:
+    """His money reached a Hyperliquid account through quiet wallets only.
+
+    From the trace engine (src/trace/engine.py): the share of HIS dollars that
+    arrived, through no exchange, protocol or hub on the way. HIGH, not
+    CRITICAL: reaching an account is an inference about flow, not something he
+    did to it — a transfer is not ownership (rule 8).
+    """
+    address = row.get("address") or ""
+    subject = (f"[EZEKIEL] HIGH: His Money Reached A Hyperliquid Account "
+               f"(${float(row.get('in_usd') or 0):,.0f})")
+    parents = ", ".join(row.get("parents") or []) or "unknown"
+    body = (
+        f"{address_line(address, 'Account')}\n"
+        f"His money arriving: ${float(row.get('in_usd') or 0):,.2f} "
+        f"(share of its inflow: {float(row.get('share') or 0):.0%})\n"
+        f"Hops from his wallets: {row.get('depth')}, via {parents}\n"
+        f"Its HL ledger: {row.get('hl_rows')} row(s)\n\n"
+        f"Every hop on the way is a quiet wallet, not an exchange or protocol.\n"
+        f"Check whether it trades, then who else funds it. A transfer is still\n"
+        f"not ownership: he may simply have paid someone.\n"
+    )
+    return _send_with_cooldown(f"trace_reached_{address.lower()}", 168, subject, body)
+
+
 def alert_feed_stale(feed: str, problem: str, path: str) -> bool:
     """A detector has stopped producing readings — a capability of OURS, so HIGH.
 

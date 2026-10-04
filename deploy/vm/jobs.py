@@ -46,6 +46,7 @@ JOBS: dict[str, dict] = {
             (["python", "scripts/check_comovement.py"], 180),
             (["python", "scripts/check_vaults.py"], 180),
             (["python", "scripts/probe_hyperevm_index.py"], 180),
+            (["python", "scripts/run_trace_engine.py"], 480),
             (["python", "src/transfer_graph.py"], 600),
             (["python", "scripts/check_identity.py"], 180),
             (["python", "scripts/check_agents.py"], 240),
