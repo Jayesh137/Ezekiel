@@ -152,6 +152,39 @@ def lookup_seconds(remaining: float) -> float:
     deadline.
     """
     return max(0.0, min(LOOKUP_SECONDS, float(remaining)))
+
+
+def lookup_call_budget(chains: list[dict]) -> int:
+    """The calls one frontier lookup may spend: every chain's whole plan.
+
+    A frontier sweep costs more than one call per record kind. Each Etherscan
+    chain is probed first (one call) and then read kind by kind; each Blockscout
+    chain reads every kind and then checks the newest block of each, because a
+    short page there does not prove the history ended. On top of that plan, one
+    further page per kind, so a wallet with more than a page of history is not
+    budget-starved on the first chain it meets.
+
+    This replaced `len(chains) * 3`, which priced only the pages. With Base and
+    Optimism on Blockscout (2026-09-26/27) five chains spent all 21 calls before
+    BSC was probed, so BSC and Monad were budget-exhausted on EVERY wallet.
+    Exhaustion is not a plan refusal, so they read as degraded, every wallet was
+    deferred, and the frontier expanded nothing from 2026-09-29 until this fix.
+    The ceiling still binds: a wallet with endless history (an unlabelled
+    exchange, as the frontier sees one) stops at this many calls.
+    """
+    from src.chain.collect import KINDS
+
+    kinds = len(KINDS)
+    total = 0
+    for chain in chains:
+        if chain.get("reader") == "blockscout":
+            total += kinds * 2            # one page + one completeness check each
+        else:
+            total += 1 + kinds            # activity probe + one page each
+        total += kinds                    # one further page per kind
+    return max(1, total)
+
+
 # `decisions` is unbounded in practice — 1,409 entries / 225 KB on the live
 # graph, already larger than a full frontier queue — and grows with the frontier.
 MAX_DECISIONS = 3000
@@ -2126,12 +2159,13 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
 
     # The frontier's own ceiling, expressed in the units the substrate spends.
     # max_expansions counted wallet lookups when one wallet cost one call; a
-    # wallet now costs up to three calls per chain, so the budget has to be
-    # denominated in calls or the ceiling silently means something else.
+    # wallet now costs a probe and several calls per chain, so the budget has
+    # to be denominated in calls or the ceiling silently means something else —
+    # see lookup_call_budget for the four days that cost.
     # Per-LOOKUP, not per-walk: see LOOKUP_SECONDS. A single budget shared
     # across every lookup lets the first slow wallet hold every second the walk
     # has left, which is exactly what killed the graph step.
-    sweep_calls = max(1, len(sweep_chains) * 3)
+    sweep_calls = lookup_call_budget(sweep_chains)
 
     started = time.monotonic()
     deadline = started + budget["time_budget_seconds"]
@@ -2289,6 +2323,7 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 # genuinely has nothing.
                 degraded = list((sweep or {}).get("degraded_sources") or [])
                 status = (sweep or {}).get("status", "ok")
+                unsupported = list((sweep or {}).get("unsupported_sources") or [])
                 # A chain our API plan does not serve is a permanent, KNOWN gap,
                 # not a failed read. Deferring the wallet over it waits for a
                 # retry that can never succeed: measured on production
@@ -2296,20 +2331,36 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 # explored and 0 new edges, while arbitrum, ethereum and polygon
                 # had been read successfully each time and were thrown away.
                 # Recorded, never forgiven silently.
-                uncovered((sweep or {}).get("unsupported_sources") or [])
+                uncovered(unsupported)
+                # The chains this lookup actually READ. A sweep that reports no
+                # per-chain result read nothing we can vouch for.
+                read = [name for name in ((sweep or {}).get("chains") or {})
+                        if name not in degraded and name not in unsupported]
+                partial = None
                 if degraded or status != "ok":
-                    record_refresh(refreshes, wallet, now_ts, d, error=f"sweep {status}")
                     named = ", ".join(degraded) or "unknown chain(s)"
                     diag["partial_failures"].append(
                         {"wallet": wallet, "depth": d,
                          "error": f"sweep {status}: could not read {named}",
                          "chains": degraded})
                     degrade(degraded)
-                    decide(wallet, d, "deferred",
-                           f"sweep {status}; could not read {named}", pr)
-                    continue
+                    if status != "ok" or not read:
+                        record_refresh(refreshes, wallet, now_ts, d,
+                                       error=f"sweep {status}")
+                        decide(wallet, d, "deferred",
+                               f"sweep {status}; could not read {named}", pr)
+                        continue
+                    # The same failure arriving the second way. Deferring a
+                    # wallet because ONE chain failed threw away the chains that
+                    # were read, kept its recipients out of the walk, and — when
+                    # the failure was deterministic (2026-09-29: BSC and Monad
+                    # budget-exhausted on every wallet) — deferred every wallet
+                    # forever. What was read is kept and walked; the unread
+                    # chains come back within the hour through the refresh
+                    # schedule, and the run still reports them degraded.
+                    partial = f"partial: could not read {named}"
                 explored[wallet] = None
-                record_refresh(refreshes, wallet, now_ts, d)
+                record_refresh(refreshes, wallet, now_ts, d, error=partial)
                 if wallet in due_order:
                     diag["refreshed_wallets"].append(wallet)
                 expanded_now.add(wallet)
@@ -2333,7 +2384,8 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                         queue.append((d + 1, e["dst"]))
                 decide(wallet, d, "expanded",
                        f"{found} new edge(s); relay={prof['relay']['is_relay']} "
-                       f"({prof['relay']['reason']})", pr)
+                       f"({prof['relay']['reason']})"
+                       + (f"; {partial}" if partial else ""), pr)
 
             for pr, wallet, d, _p in ranked[branching:]:
                 decide(wallet, d, "deferred",
@@ -2429,8 +2481,11 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 diag["stopped_reason"] = stopped_reason
             elif failures:
                 diag["status"] = "partial"
+                # Not "re-queued" any more: a lookup that read some chains is
+                # kept and its unread chains come back through the refresh
+                # schedule; only a lookup that read nothing is re-queued.
                 diag["stopped_reason"] = (
-                    f"{failures} lookup(s) failed and were re-queued")
+                    f"{failures} lookup(s) left chains unread; those are retried")
             else:
                 diag["status"] = "partial"
                 diag["stopped_reason"] = "frontier not fully drained"

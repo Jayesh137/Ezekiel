@@ -206,6 +206,12 @@ Each one cost a real finding or a real outage. The story is in the incident log.
 - **A plan refusal is not a rate limit.** `unsupported_sources` (short-circuit
   per run via `plan_refused`, never persisted, always reported) vs
   `degraded_sources` (retried). Merging them once killed discovery for two days.
+- **Derive a unit's budget from its plan, and count partial success as
+  progress.** A per-lookup budget of `chains × 3` ignored each chain's probe and
+  completeness calls; adding two Blockscout chains starved BSC and Monad on
+  every wallet, one degraded chain deferred the whole wallet, and discovery was
+  dark 15 of 17 days behind a daily alarm (2026-10-04). Keep what was read;
+  retry only the rest.
 - **Read the substrate once for many wallets** (`collect.records_by_wallet`);
   raising a cache ceiling only buys one step against a growing store.
 - **The repo has a size budget — GitHub refuses any blob over 100 MiB** after
