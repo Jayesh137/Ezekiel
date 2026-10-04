@@ -318,3 +318,40 @@ def test_new_findings_route_high_and_known_ones_stay_silent(monkeypatch):
     assert runner.alert_new(report) == 2
     assert [alerts._severity_of(s) for s in sent] == ["HIGH", "HIGH"]
     assert all(alerts._severity_of(s) in alerts.ESCALATING_SEVERITIES for s in sent)
+
+
+# --- a wallet holding his money is looked at again -------------------------------
+
+def test_a_quiet_wallet_holding_his_money_is_re_swept_when_stale():
+    world = World()
+    _first, registry, hl_store = run(world)
+    assert PAYEE_734 in world.swept
+    world.swept.discard(PAYEE_734)
+    # Three days on: stale, so it is swept again (its cursor makes it cheap).
+    report = engine.run(cluster={F07}, registry=registry, hl_store=hl_store, previous=None,
+                        l1_records_for=world.l1_records_for, hl_post=world.hl_post,
+                        activity=world, sweep=world.sweep, services={BINANCE14, BINANCE16},
+                        inferred=set(), cex_hot={BINANCE14, BINANCE16},
+                        now_ts=NOW + 3 * 86400 + 1)
+    assert PAYEE_734 in world.swept
+    assert report["units"]["l1"] >= 1
+
+
+def test_a_fresh_sweep_is_not_repeated():
+    world = World()
+    _first, registry, hl_store = run(world)
+    world.swept.clear()
+    report, _, _ = run(world, registry=registry, hl_store=hl_store)
+    assert report["units"]["l1"] == 0
+
+
+def test_a_zero_reading_for_an_address_seen_sending_is_not_quiet():
+    # 2026-10-04: Blockscout counted 0 transactions for 0x153e996e, a Circle
+    # relayer calling receiveMessage every few minutes. A zero for an address
+    # we watched send value is a broken reading, not a quiet wallet.
+    zero = {"is_contract": False, "txs": 0, "token_transfers": 0}
+    assert engine.classify("0x" + "1" * 40, {}, cluster=set(), services=set(), inferred=set(),
+                           activity=[zero], l1_seen=True, l1_sender=True) == engine.UNKNOWN
+    # Never seen sending: zero is an honest answer (Blockscout's 404 is zero too).
+    assert engine.classify("0x" + "1" * 40, {}, cluster=set(), services=set(), inferred=set(),
+                           activity=[zero], l1_seen=True, l1_sender=False) == engine.QUIET

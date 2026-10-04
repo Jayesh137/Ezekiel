@@ -279,3 +279,12 @@ def test_the_reading_budget_starts_at_the_first_live_reading():
     assert "checked_at" in got[0], "a live reading records when it was taken"
     now[0] = 200.0                     # and the bound still holds once it has started
     assert r.for_address("0x" + "ab" * 20, {"arbitrum"}) == []
+
+
+def test_a_zero_reading_for_a_sender_is_unmeasured_not_quiet():
+    # A sender PAID the sentinel, so zero activity is a counter Blockscout never
+    # computed (0x153e996e, a Circle relayer, read 0 txs on 2026-10-04). Called
+    # quiet it would page CRITICAL.
+    zero = {"is_contract": False, "txs": 0, "token_transfers": 0}
+    assert ds.classify([zero], sender=True) == ds.CLASS_UNMEASURED
+    assert ds.classify([zero]) == ds.CLASS_QUIET

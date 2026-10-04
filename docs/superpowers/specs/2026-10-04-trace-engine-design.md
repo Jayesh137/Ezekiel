@@ -134,7 +134,13 @@ an empty ledger, CLAUDE.md "utils.hl_post never raises").
    walk, patterns, his-money priority, report, roster + sentinel wiring. Runs
    *beside* the repaired frontier: L1 units call the same `sweep_wallet`, seeded
    from the engine's priority, under their own small budget.
-2. **See inside transactions; retire `expand_frontier`.** `tx_legs` (all transfers,
+2. **~~See inside transactions~~ — measured and not built (2026-10-04):** 117 of
+   his contract-facing transactions read in full surfaced only solvers, market
+   makers and relayers (CLAUDE.md, measured-and-rejected). Built instead: L1
+   refresh of quiet wallets holding his money (re-swept every 3 days). The old
+   frontier stays — after the hotfix its queue is empty and it costs ~0, while
+   its refresh schedule still covers 2,226 explored wallets. Original item:
+   **See inside transactions; retire `expand_frontier`.** `tx_legs` (all transfers,
    internal transfers and signer of each cluster / high-share transaction),
    initiator links, receipt-token following; frontier tests ported as scheduler
    properties (retention by priority, revisits, services never walked).

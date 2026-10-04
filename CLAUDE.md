@@ -388,6 +388,17 @@ the next session rebuilding them:
   - *Copier classification from co-movement.* All 12 candidates are
     `untestable`: he made 2 decisions inside the 21-day window. There is
     nothing to classify until he trades more.
+  - *Transaction legs (every transfer inside his transactions, and their
+    signers) — measured 2026-10-04.* 117 contract-facing transactions read in
+    full (80 of `0xf078969e…`'s 1,468 on Ethereum, 37 of the target's 572 on
+    Arbitrum): every third-party recipient and every foreign signer was a solver,
+    market maker or relayer (`0x37305b1c…` 1.47M transfers, 21 legs;
+    `0x7ddb0773…` 218K txs). Three "quiet" recipients each appeared once with
+    1K–5K transfers. Not built; the engine's spec moves it out of phase 2.
+    **Trap found doing it: Blockscout counters can read 0 for a busy address**
+    (`0x153e996e…`, a Circle relayer). A zero for an address seen SENDING is now
+    unmeasured, in the engine and in `deposit_sentinels.classify(sender=True)`
+    — where it would otherwise have paged a false CRITICAL.
   - *Relay/Across/deBridge/LI.FI decoding.* 4 of the cluster's 4,978 records
     touch one (a $500K LI.FI swap in 2024 and three inbound Across fills, all
     on `0xf078969e…`). He bridges through Circle and Socket, both decoded.

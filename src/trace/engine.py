@@ -50,6 +50,7 @@ DEFAULTS = {
     "seconds": 240,            # whole run; step timeout is larger (rule: order)
     "min_reach_usd": 10_000,   # an HL account reached by at least this much of his money
     "hl_refresh_s": 6 * 3600,  # cluster/linked ledgers re-read this often
+    "l1_refresh_s": 3 * 86400, # a quiet wallet holding his money is re-swept this often
 }
 
 
@@ -66,7 +67,7 @@ def is_system(address: str) -> bool:
 
 
 def classify(address: str, record: dict, *, cluster, services, inferred, activity,
-             l1_seen: bool = False, has_code: bool = False) -> str:
+             l1_seen: bool = False, has_code: bool = False, l1_sender: bool = False) -> str:
     """The class of one address from everything already known about it. Pure.
 
     `activity` is the list of whole-chain readings for the address (rule 9:
@@ -90,6 +91,11 @@ def classify(address: str, record: dict, *, cluster, services, inferred, activit
     if has_code:
         return CONTRACT
     readings = [r for r in activity or [] if isinstance(r, dict)]
+    if l1_sender:
+        # An address seen SENDING cannot have zero activity: such a reading is
+        # a counter Blockscout never computed (0x153e996e, a Circle relayer).
+        readings = [r for r in readings
+                    if int(r.get("txs") or 0) + int(r.get("token_transfers") or 0) > 0]
     if any(r.get("is_contract") for r in readings):
         return CONTRACT
     from src.chain.activity import is_busy
@@ -177,6 +183,7 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
         return unique
 
     chain_index: dict[str, set] = {}
+    senders: set = set()
     inferred = {_low(a) for a in inferred}
 
     def infer(edges) -> None:
@@ -196,11 +203,13 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
 
     def index(edges) -> None:
         chain_index.clear()
+        senders.clear()
         for e in edges:
             c = e.get("chain")
             if not c or c == hl_ledger.CHAIN:
                 continue
             chain_index.setdefault(e["src"], set()).add(c)
+            senders.add(e["src"])
             chain_index.setdefault(e["dst"], set()).add(c)
 
     def chains_of(addr: str, _edges=None) -> list[str]:
@@ -211,7 +220,8 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
         readings = [activity.cached(addr, c) for c in chains]
         return classify(addr, registry.get(addr) or {}, cluster=cluster, services=services,
                         inferred=inferred, activity=readings, l1_seen=bool(chains),
-                        has_code=any(code.get(f"{c}:{addr}") is True for c in chains))
+                        has_code=any(code.get(f"{c}:{addr}") is True for c in chains),
+                        l1_sender=addr in senders)
 
     def read_hl(addr: str) -> None:
         r = rec(addr)
@@ -247,6 +257,26 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
         fresh = hl_ledger.normalise(rows, addr)
         ids = {e["id"] for e in stored}
         hl_store[addr] = stored + [e for e in fresh if e["id"] not in ids]
+
+    def sweep_due(addr: str, r: dict) -> bool:
+        """Never swept, or stale while it still holds a real share of his money.
+
+        A relay that sits on his money and moves it weeks later is the delayed
+        route the 2026-09-25 review flagged; the sweep is incremental from its
+        cursors, so looking again costs a few calls.
+        """
+        swept_at = (r.get("l1") or {}).get("swept_at")
+        if not swept_at:
+            return True
+        try:
+            age = now_ts - datetime.fromisoformat(swept_at).timestamp()
+        except (TypeError, ValueError):
+            return True
+        held = max(float((side.get(addr) or {}).get("in_usd") or 0) for side in (money, funding))
+        return age >= b["l1_refresh_s"] and held >= b["min_reach_usd"]
+
+    money: dict = {}
+    funding: dict = {}
 
     def due_hl(addr: str) -> bool:
         hl = (registry.get(addr) or {}).get("hl") or {}
@@ -303,7 +333,7 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
                                        "error": f"unmeasured: {why}"})
             r = registry.get(addr) or {}
             if (spent["l1"] < b["l1_sweeps"] and class_of(addr, edges) == QUIET
-                    and not (r.get("l1") or {}).get("swept_at") and chains_of(addr, edges)):
+                    and sweep_due(addr, r) and chains_of(addr, edges)):
                 spent["l1"] += 1
                 result = sweep(addr) or {}
                 l1 = rec(addr).setdefault("l1", {})
