@@ -162,7 +162,8 @@ def main() -> int:
         found[addr], unvalued[addr] = ds.senders(rows.get(addr) or [], addr, members)
     for senders in found.values():
         for sender, e in senders.items():
-            classes[sender] = ds.classify(readings.for_address(sender, e["chains"]))
+            classes[sender] = ds.classify(readings.for_address(sender, e["chains"]),
+                                          sender=True)
     sharers = ds.sharers(found, classes)
 
     live_keys = {ds.sharer_key(r) for r in sharers}

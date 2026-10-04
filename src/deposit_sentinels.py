@@ -62,16 +62,23 @@ def _low(a) -> str:
     return (a or "").strip().lower()
 
 
-def classify(readings) -> str:
+def classify(readings, *, sender: bool = False) -> str:
     """One address's class from its per-chain activity readings.
 
     Busy on ANY chain is busy — an exchange sweeper is infrastructure wherever
     it was counted. Quiet needs at least one reading and no busy one. A contract
     is never a person. No reading at all is unmeasured, which is never quiet.
+
+    `sender`: the address was seen paying, so a reading of zero activity is a
+    counter Blockscout never computed, not a quiet wallet (2026-10-04: a Circle
+    relayer read 0 transactions). Dropped, which leaves it unmeasured.
     """
     from src.chain.activity import is_busy
 
     readings = [r for r in (readings or []) if isinstance(r, dict)]
+    if sender:
+        readings = [r for r in readings
+                    if int(r.get("txs") or 0) + int(r.get("token_transfers") or 0) > 0]
     if not readings:
         return CLASS_UNMEASURED
     if any(r.get("is_contract") for r in readings):

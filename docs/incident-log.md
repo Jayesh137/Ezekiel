@@ -1683,3 +1683,23 @@ readings, 321 addresses, 14,203 edges; found the HyperCore deposit address
 Hyperliquid, none of `0xffd62ae3…`, `0x5c2c1aa8…`, `0x7eb59373…` is an account
 (all endpoints answered empty): L1 trails for the engine's sweep units, not
 results.
+
+---
+
+**Transaction legs measured, not built; a zero-counter trap fixed (2026-10-04).**
+Phase 2 of the trace engine was to read every transfer inside his transactions
+and their signers. Measured first: 117 contract-facing transactions read in
+full via Blockscout (80 of `0xf078969e…`'s on Ethereum, 37 of the target's on
+Arbitrum). Third-party recipients: `0x37305b1c…` (21 legs, 1.47M token
+transfers), `0xe8736af1…` (6, 897K), `0x6efa3205…` (7) and three that appeared
+once with 983–5,341 transfers — solvers and market makers filling his swaps.
+Foreign signers: relayers (`0x7ddb0773…`, 218K txs; `0x99f5a2e5…`). No
+single-purpose third party in the sample, so the vector is recorded as measured
+and not built; built instead is an L1 refresh of quiet wallets still holding
+his money (every 3 days, incremental from cursors).
+
+One reading said a signer was quiet: `0x153e996e…`, 0 transactions on Arbitrum.
+It is a Circle relayer calling `receiveMessage` every few minutes — Blockscout's
+counter simply had not been computed. A zero for an address seen SENDING is now
+treated as unmeasured in the engine and in `deposit_sentinels.classify`, where a
+"quiet" sender pages CRITICAL.

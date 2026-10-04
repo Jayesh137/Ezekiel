@@ -179,8 +179,9 @@ def main(argv=None) -> int:
     if args.dry_run:
         (out_dir / "latest.json").write_text(json.dumps(report, indent=2))
     else:
-        save_latest(str(TRACE_DIR), report)
+        # Alerts first, so the file records what was actually sent.
         report["alerts_sent"] = alert_new(report)
+        save_latest(str(TRACE_DIR), report)
 
     u = report["units"]
     print(f"[trace] {time.monotonic() - started:.0f}s: hl {u['hl']}, classify {u['classify']}, "
