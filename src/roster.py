@@ -691,6 +691,36 @@ def build_roster(config: dict | None = None) -> dict:
         if reason not in e["reasons"]:
             e["reasons"].append(reason)
 
+    # The trace engine's links, from its own file (src/trace/engine.py). Both
+    # are shared destinations, so both vote `linkage`: a quiet wallet his wallet
+    # also paid within days (the general form of a shared deposit address), and
+    # a deposit address INSIDE Hyperliquid that he paid. An HL account his money
+    # reached is a route to check, recorded as evidence and never a vote.
+    trace_path = DATA_DIR / "trace" / "latest.json"
+    for link in _read(trace_path, "links"):
+        a = (link.get("wallet") or "").lower() if isinstance(link, dict) else ""
+        if not a or a == target or a in known_self:
+            continue
+        kind = link.get("kind")
+        if kind not in ("shared_payee", "shared_hl_deposit"):
+            continue
+        e = entry(a)
+        e["vectors"].add(VECTOR_LINKAGE)
+        key = "shared_quiet_payee" if kind == "shared_payee" else "shared_hl_deposit_address"
+        e["evidence"][key] = {k: link.get(k) for k in ("via", "hub", "outsider_usd",
+                                                       "cluster_usd", "gap_hours", "ts")}
+        reason = (f"Paid quiet wallet {str(link.get('via'))[:10]}... which his wallet also paid"
+                  if kind == "shared_payee"
+                  else f"Paid his Hyperliquid deposit address {str(link.get('via'))[:10]}...")
+        if reason not in e["reasons"]:
+            e["reasons"].append(reason)
+    for row in _read(trace_path, "reached_hl_accounts"):
+        a = (row.get("address") or "").lower() if isinstance(row, dict) else ""
+        if not a or a == target or a in known_self:
+            continue
+        entry(a)["evidence"]["trace_reach"] = {k: row.get(k) for k in
+                                               ("in_usd", "share", "depth", "parents")}
+
     # A Circle transfer, read from Circle's own events on HyperEVM, between one
     # of his wallets and an account outside the cluster: his wallet funded it,
     # or it paid one of his addresses. An observed transfer — the protocol names

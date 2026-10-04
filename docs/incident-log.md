@@ -1651,3 +1651,35 @@ separately.
 multiple of something that later changes; and partial success is progress — a
 unit that read part of its sources must keep what it read and retry the rest,
 or one deterministic failure anywhere becomes a total outage.
+
+---
+
+**The trace engine, phase 1 (2026-10-04).** Built to the spec in
+`docs/superpowers/specs/2026-10-04-trace-engine-design.md` after the frontier
+review above. Three production dry runs (read-only, no sweeps, no alerts) shaped
+it, and each found a real defect before anything was wired:
+
+1. HL rows alone made token contracts look like people: `0x5d3a1ff2…` ($68M from
+   `0xf078969e…`) and `0x6e4141d3…` were "HL accounts reached". An address seen
+   on L1 now needs an L1 measurement (or the bytecode cache) to be quiet.
+2. It ignored what the project already knew: `0x8570c2ae…` read as a quiet
+   wallet because the deposit sentinels, graph conduits, roster INFRASTRUCTURE
+   and the 320 wallets the frontier had swept were not passed in.
+3. The shared-payee link fired 14 times through `0x160f6ef9…`, a busy personal
+   wallet paid by mints, Binance hot wallets and WETH. A payee must now be
+   measured single-purpose (≤ 100 txs, ≤ 4 distinct senders) and a boundary
+   never counts as a sender.
+
+Also: `chain.labels.infer_deposit_addresses` anchors its 24h window from the
+FIRST inflow to the LARGEST forward, so a deposit address used for weeks (his
+`0x841b9e4f…`, 2023) reads as a wallet; the engine judges deposit by deposit
+(`patterns.l1_deposit_hot`).
+
+Third dry run, 199s inside a 240s budget: 60 HL ledger reads, 25 whole-chain
+readings, 321 addresses, 14,203 edges; found the HyperCore deposit address
+`0x4aecac3b…` (hub `0x1f6093d3…`) from config alone, 7 quiet funders including
+`0x68797748…`, and two co-funders of `0xffd62ae3…` (which paid him $18M) —
+`0x5c2c1aa8…` paid it $4M two minutes after the cluster did. Asked of
+Hyperliquid, none of `0xffd62ae3…`, `0x5c2c1aa8…`, `0x7eb59373…` is an account
+(all endpoints answered empty): L1 trails for the engine's sweep units, not
+results.
