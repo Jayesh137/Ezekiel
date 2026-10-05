@@ -1,17 +1,21 @@
 {
-  "computed_at": "2026-10-05T03:31:09.527619+00:00",
+  "computed_at": "2026-10-05T04:16:16.860521+00:00",
   "wallets": 1,
-  "records": 5,
+  "records": 2,
   "spam_suppressed": 5,
-  "unpriced": 2,
+  "unpriced": 0,
   "spam_by_reason": {
-    "symbol_forgery": 1,
-    "zero_value": 4
+    "symbol_forgery": 2,
+    "zero_value": 3
   },
-  "calls": 36,
+  "calls": 31,
   "possible_gaps": 0,
   "incomplete": {},
   "degraded_sources": [
+    "arbitrum",
+    "base",
+    "ethereum",
+    "monad",
     "polygon"
   ],
   "unsupported_sources": [
@@ -23,66 +27,76 @@
       "status": "ok",
       "chains": {
         "arbitrum": {
-          "records": 1,
+          "records": 0,
           "spam": 2,
-          "calls": 6,
+          "calls": 5,
           "cursor": 508037872,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
             "symbol_forgery": 1,
             "zero_value": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 508037872,
             "native": 508029886,
             "internal": 303288471
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)"
+          },
           "reader": "etherscan"
         },
         "ethereum": {
-          "records": 1,
+          "records": 0,
           "spam": 2,
-          "calls": 6,
+          "calls": 5,
           "cursor": 25809339,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
             "zero_value": 2
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 25809339,
             "native": 25807766,
             "internal": 20083520
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)",
+            "native": "Max calls per sec rate limit reached (3/sec)"
+          },
           "reader": "etherscan"
         },
         "base": {
-          "records": 1,
-          "spam": 1,
-          "calls": 6,
+          "records": 0,
+          "spam": 0,
+          "calls": 4,
           "cursor": 48761019,
           "gaps": [],
-          "truncated": false,
-          "error": null,
+          "truncated": true,
+          "error": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/transactions",
           "probed_inactive": false,
           "unpriced": 0,
-          "spam_by_reason": {
-            "zero_value": 1
+          "spam_by_reason": {},
+          "errors_by_kind": {
+            "erc20": "blockscout:ReadTimeout:HTTPSConnectionPool(host='base.blockscout.com', port=443): Read timed out. (read timeout=20)",
+            "native": "blockscout:HTTPError:500 Server Error: Internal Server Error for url: https://base.blockscout.com/api/v2/addresses/0x45d26f28196d226497130c4bac709d808fed4029/transactions"
           },
-          "errors_by_kind": {},
           "cursor_by_kind": {
             "erc20": 48761019,
             "native": 39308638,
@@ -115,7 +129,7 @@
         },
         "polygon": {
           "records": 0,
-          "spam": 0,
+          "spam": 1,
           "calls": 5,
           "cursor": 79283383,
           "gaps": [],
@@ -123,9 +137,11 @@
           "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
-          "spam_by_reason": {},
+          "spam_by_reason": {
+            "symbol_forgery": 1
+          },
           "errors_by_kind": {
-            "erc20": "Max calls per sec rate limit reached (3/sec)"
+            "native": "Max calls per sec rate limit reached (3/sec)"
           },
           "cursor_by_kind": {
             "erc20": 79283383,
@@ -134,7 +150,6 @@
           },
           "incomplete_kinds": {},
           "unverified_kinds": {
-            "native": "Max calls per sec rate limit reached (3/sec)",
             "internal": "Max calls per sec rate limit reached (3/sec)"
           },
           "reader": "etherscan"
@@ -161,27 +176,36 @@
         "monad": {
           "records": 1,
           "spam": 0,
-          "calls": 6,
+          "calls": 5,
           "cursor": 37671813,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
           "unpriced": 0,
           "spam_by_reason": {},
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 0,
             "native": 0,
             "internal": 37671813
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "reader": "etherscan"
         }
       },
       "degraded_sources": [
-        "polygon"
+        "arbitrum",
+        "ethereum",
+        "base",
+        "polygon",
+        "monad"
       ],
       "unsupported_sources": [
         "bsc"
