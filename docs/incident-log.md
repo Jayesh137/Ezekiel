@@ -1703,3 +1703,33 @@ It is a Circle relayer calling `receiveMessage` every few minutes — Blockscout
 counter simply had not been computed. A zero for an address seen SENDING is now
 treated as unmeasured in the engine and in `deposit_sentinels.classify`, where a
 "quiet" sender pages CRITICAL.
+
+---
+
+**The trace engine pushed the trace job past its ceiling (2026-10-05).** Within a
+day of going live the engine's registry held 63,660 addresses and a run read
+1.2M edges in 345s against a 240s budget; the job then hit its 25-minute limit,
+so `Match execution program` was cancelled and **the roster and accounting were
+skipped on every cancelled run** (trace runs 16:45–18:59 UTC, all cancelled).
+Causes, each fixed test-first:
+
+1. Every address his money touched was remembered, down to cents. The registry
+   now keeps only his wallets, anything read or swept, and addresses holding
+   >= $1K of his money — pruned on entry and on exit (63,660 -> 1,603).
+2. Units were spent on crumbs; now only on >= $1K or unvalued direct transfers.
+3. A wallet read quiet on one chain and unread on another counted as quiet, so
+   the engine swept busy wallets (one held 131K records). Quiet now needs a
+   reading on EVERY chain the address was seen on (rule 9).
+4. Every swept wallet's full history was loaded every pass, and each load was a
+   full pass over the 1.7M-record substrate. Histories now load only for
+   wallets holding his money (one depth deeper per pass), a wallet past 5,000
+   stored records is a busy boundary, and the runner indexes the substrate once
+   per run (`SubstrateIndex`).
+5. "Reached" listed a busy trader holding $344K of his money that was 0.07% of
+   its $490M inflow (`0x8d4d699a…`). Reach now also needs his money to be >= 5%
+   of the account's inflow.
+
+Production dry run from the bloated live state after the fixes: 124s inside a
+180s budget (lowered from 240), 25,064 edges, one substrate pass, all unit
+budgets spent. The job ceiling is raised 25 -> 35 minutes as a backstop, since
+the job's healthy runtime grew by the engine's step.

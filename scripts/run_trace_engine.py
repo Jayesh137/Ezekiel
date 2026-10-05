@@ -81,6 +81,55 @@ def make_sweep(config: dict):
     return sweep
 
 
+class Rows(list):
+    """Records kept for a wallet, carrying how many it really has (`total`)."""
+    total: int = 0
+
+
+class SubstrateIndex:
+    """The substrate read ONCE per run, then served from memory.
+
+    `records_by_wallet` costs a pass over every stored record (1.7M on
+    2026-10-05, ~60s) however few wallets are asked for, and the engine asks
+    several times a run — which, with 309 wallets to load, left no time for a
+    single unit. Wallets swept during the run are re-read on next ask
+    (`forget`). A wallet past `cap` records keeps only the rows touching the
+    cluster: the engine treats it as busy and never walks the rest.
+    """
+
+    def __init__(self, cluster, cap: int):
+        from src.chain.collect import records_by_wallet
+        self._read = records_by_wallet
+        self.cluster = set(cluster)
+        self.cap = cap
+        self.rows: dict = {}
+        self.scans = 0
+
+    def _keep(self, addr, rows):
+        if addr in self.cluster or len(rows) <= self.cap:
+            return rows
+        kept = Rows(r for r in rows if (r.get("src") or "").lower() in self.cluster
+                    or (r.get("dst") or "").lower() in self.cluster)
+        kept.total = len(rows)   # the engine judges busyness on the true size
+        return kept
+
+    def load(self, addresses) -> None:
+        missing = sorted({a for a in addresses if a not in self.rows})
+        if not missing:
+            return
+        self.scans += 1
+        got = self._read(missing)
+        for a in missing:
+            self.rows[a] = self._keep(a, got.get(a) or [])
+
+    def __call__(self, addresses):
+        self.load(addresses)
+        return {a: self.rows.get(a, []) for a in addresses}
+
+    def forget(self, address) -> None:
+        self.rows.pop(address, None)
+
+
 def alert_new(report: dict) -> int:
     """HIGH for an HL account newly reached by his money; the sentinel alert
     (CRITICAL when measured quiet) for a new sender into a HyperCore deposit
@@ -111,7 +160,6 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     from src.chain.activity import ActivityCache
-    from src.chain.collect import records_by_wallet
     from src.hl_budget import ReadBudget
     from src.trace import engine, store
 
@@ -160,18 +208,28 @@ def main(argv=None) -> int:
     # is the slow one (files are then cached in-process by collect._load_cached),
     # and the engine's budget is for units, not for warming a cache.
     t0 = time.monotonic()
-    records_by_wallet(sorted(cluster))
-    print(f"[trace] substrate loaded in {time.monotonic() - t0:.0f}s")
+    index = SubstrateIndex(cluster, engine.DEFAULTS["max_wallet_records"])
+    index.load(cluster | {a for a, r in registry.items()
+                          if (r.get("l1") or {}).get("swept_at")} | set(already_swept))
+    print(f"[trace] substrate indexed in {time.monotonic() - t0:.0f}s "
+          f"({len(index.rows)} wallets)")
+    sweeper = (lambda a: {}) if args.dry_run else make_sweep(config)
+
+    def sweep_and_forget(address):
+        result = sweeper(address)
+        index.forget(address)
+        return result
     started = time.monotonic()
     with ReadBudget(seconds=budgets["seconds"], weight_per_minute=600) as hl_budget:
         report = engine.run(
             cluster=cluster, registry=registry, hl_store=hl_store, previous=previous,
-            l1_records_for=lambda addrs: records_by_wallet(addrs),
+            l1_records_for=index,
             hl_post=paced_post(hl_budget), activity=activity,
-            sweep=(lambda a: {}) if args.dry_run else make_sweep(config),
+            sweep=sweep_and_forget,
             services=services, inferred=inferred, cex_hot=hot, code=code,
             already_swept=already_swept, budgets=budgets)
         report["hl_budget"] = hl_budget.report()
+    report["substrate_scans"] = index.scans
 
     written = store.save(out_dir / "registry", registry)
     written += store.save(out_dir / "hl_edges", hl_store)

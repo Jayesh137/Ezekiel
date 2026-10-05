@@ -355,3 +355,129 @@ def test_a_zero_reading_for_an_address_seen_sending_is_not_quiet():
     # Never seen sending: zero is an honest answer (Blockscout's 404 is zero too).
     assert engine.classify("0x" + "1" * 40, {}, cluster=set(), services=set(), inferred=set(),
                            activity=[zero], l1_seen=True, l1_sender=False) == engine.QUIET
+
+
+# --- bounded state (2026-10-05: 63,660 addresses, 1.2M edges, job timeout) -------
+
+def test_dust_of_his_money_does_not_enter_the_registry():
+    world = World()
+    crumbs = ["0x" + f"{i:040x}" for i in range(1, 40)]
+    for i, c in enumerate(crumbs):
+        RECORDS.append(rec(F07, c, 5.0, T25 + i))
+    try:
+        _report, registry, _ = run(world)
+    finally:
+        del RECORDS[-len(crumbs):]
+    assert not set(crumbs) & set(registry)
+
+
+def test_a_stale_registry_is_pruned_to_what_matters():
+    world = World()
+    registry = {"0x" + "a" * 40: {"first_seen": "2026-10-01", "class": "unknown",
+                                   "his_money": {"in_usd": 3.0}}}
+    _report, registry, _ = run(world, registry=registry)
+    assert "0x" + "a" * 40 not in registry
+    assert DEPOSIT_841 in registry and F07 in registry
+
+
+def test_reached_accounts_carry_real_money():
+    world = World()
+    RECORDS.append(rec(F07, "0x" + "c" * 40, None, T25))
+    try:
+        report, _, _ = run(world)
+    finally:
+        RECORDS.pop()
+    assert all(float(r["in_usd"]) >= engine.DEFAULTS["min_reach_usd"]
+               for r in report["reached_hl_accounts"])
+
+
+def test_a_busy_wallet_swept_elsewhere_is_not_loaded():
+    # 0x160f6ef9's thousands of counterparties flooded the run once it joined
+    # the substrate. Only wallets holding a real share of his money are loaded.
+    world = World()
+    asked = []
+    orig = world.l1_records_for
+
+    def spy(addresses):
+        asked.extend(addresses)
+        return orig(addresses)
+    world.l1_records_for = spy
+    crumb = "0x" + "d" * 40
+    RECORDS.append(rec(F07, crumb, 5.0, T25))
+    try:
+        engine.run(cluster={F07}, registry={}, hl_store={}, previous=None,
+                   l1_records_for=world.l1_records_for, hl_post=world.hl_post, activity=world,
+                   sweep=world.sweep, services={BINANCE14, BINANCE16}, inferred=set(),
+                   cex_hot={BINANCE14, BINANCE16}, already_swept={crumb}, now_ts=NOW)
+    finally:
+        RECORDS.pop()
+    assert crumb not in asked
+
+
+def test_a_wallet_with_a_huge_stored_history_is_busy_and_not_walked():
+    # 2026-10-05: wallets swept long ago by the old frontier (WETH, Paraswap,
+    # CoW settlement, one with 132K records) put 705K edges into one run and
+    # left no time for a single unit. A person's wallet does not hold that.
+    hub = "0x" + "e" * 40
+    world = World()
+    world.swept.add(hub)
+    RECORDS.append(rec(F07, hub, 50_000, T25))
+    RECORDS.extend(rec(hub, "0x" + f"{i:040x}", 10.0, T25 + i) for i in range(1, 60))
+    try:
+        report = engine.run(cluster={F07}, registry={}, hl_store={}, previous=None,
+                            l1_records_for=world.l1_records_for, hl_post=world.hl_post,
+                            activity=world, sweep=world.sweep, services=set(), inferred=set(),
+                            cex_hot={BINANCE14}, already_swept={hub},
+                            budgets={"max_wallet_records": 50}, now_ts=NOW)
+    finally:
+        del RECORDS[-60:]
+    assert report["edges"] < 30
+    assert hub in {b["address"] for b in report["boundaries"]}
+
+
+def test_quiet_needs_a_reading_on_every_chain_it_was_seen_on():
+    # 2026-10-05: a wallet read quiet on one chain and unread on another was
+    # swept; it held 131K records. Rule 9: unmeasured is never quiet.
+    quiet = {"is_contract": False, "txs": 12, "token_transfers": 3}
+    cls = engine.classify("0x" + "1" * 40, {}, cluster=set(), services=set(), inferred=set(),
+                          activity=[quiet, None], l1_seen=True)
+    assert cls == engine.UNKNOWN
+    assert engine.classify("0x" + "1" * 40, {}, cluster=set(), services=set(), inferred=set(),
+                           activity=[quiet, quiet], l1_seen=True) == engine.QUIET
+
+
+def test_the_runner_reads_the_substrate_once_and_trims_busy_wallets(monkeypatch):
+    import scripts.run_trace_engine as runner
+    scans = []
+    busy = "0x" + "e" * 40
+    stored = {F07: [rec(F07, busy, 1.0, 1)],
+              busy: [rec(F07, busy, 1.0, 1)] + [rec(busy, "0x" + f"{i:040x}", 1.0, i)
+                                                for i in range(2, 30)]}
+
+    index = runner.SubstrateIndex({F07}, cap=10)
+    index._read = lambda addrs: scans.append(list(addrs)) or {a: stored.get(a, []) for a in addrs}
+    first = index([F07, busy])
+    again = index([F07, busy])
+    assert len(scans) == 1 and first == again
+    assert len(first[busy]) == 1 and first[busy].total == 29   # trimmed, size kept
+    index.forget(busy)
+    index([busy])
+    assert len(scans) == 2
+
+
+def test_an_account_where_his_money_is_a_sliver_is_not_reached():
+    # 2026-10-05: 0x8d4d699a got $344K of his money two hops out — 0.07% of the
+    # $490M it received. A busy trader, not a destination of his.
+    trader = "0x" + "9" * 40
+    world = World()
+    world.readings[trader] = {"is_contract": False, "txs": 50, "token_transfers": 60}
+    world.swept.add(trader)
+    RECORDS.extend([rec(F07, trader, 300_000, T25, chain="arbitrum"),
+                    rec("0x" + "8" * 40, trader, 400_000_000, T25 + 5, chain="arbitrum")])
+    LEDGERS[trader] = [{"time": T25 * 1000, "hash": "0xd", "delta": {"type": "deposit", "usdc": "1"}}]
+    try:
+        report, _, _ = run(world)
+    finally:
+        del RECORDS[-2:]
+        LEDGERS.pop(trader)
+    assert trader not in {r["address"] for r in report["reached_hl_accounts"]}

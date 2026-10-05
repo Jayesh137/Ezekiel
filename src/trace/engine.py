@@ -47,8 +47,11 @@ DEFAULTS = {
     "hl_reads": 60,            # ledger units per run (HL weight is paced too)
     "classify_reads": 25,      # Blockscout activity readings per run
     "l1_sweeps": 6,            # substrate sweeps per run
-    "seconds": 240,            # whole run; step timeout is larger (rule: order)
+    "seconds": 180,            # whole run; step timeout is larger (rule: order)
     "min_reach_usd": 10_000,   # an HL account reached by at least this much of his money
+    "min_keep_usd": 1_000,     # below this, an address is not worth remembering
+    "min_reach_share": 0.05,   # his money must be at least this share of its inflow
+    "max_wallet_records": 5_000,  # stored history beyond this is not one person's wallet
     "hl_refresh_s": 6 * 3600,  # cluster/linked ledgers re-read this often
     "l1_refresh_s": 3 * 86400, # a quiet wallet holding his money is re-swept this often
 }
@@ -84,12 +87,15 @@ def classify(address: str, record: dict, *, cluster, services, inferred, activit
     hl = record.get("hl") or {}
     if hl.get("hub"):
         return HUB
+    if (record.get("l1") or {}).get("busy_history"):
+        return BUSY
     if hl.get("deposit_hub"):
         return HL_DEPOSIT
     if a in inferred:
         return CEX_DEPOSIT
     if has_code:
         return CONTRACT
+    seen_on = len(activity or [])
     readings = [r for r in activity or [] if isinstance(r, dict)]
     if l1_sender:
         # An address seen SENDING cannot have zero activity: such a reading is
@@ -101,7 +107,12 @@ def classify(address: str, record: dict, *, cluster, services, inferred, activit
     from src.chain.activity import is_busy
     if any(is_busy(r) for r in readings):
         return BUSY
-    if readings or (not l1_seen and hl.get("read_ok") and hl.get("rows")):
+    # Quiet only when measured on EVERY chain it was seen on (rule 9): a wallet
+    # read quiet on one chain and unread on another was swept on 2026-10-05
+    # and held 131K records.
+    if readings and len(readings) == seen_on:
+        return QUIET
+    if not l1_seen and hl.get("read_ok") and hl.get("rows"):
         return QUIET
     return UNKNOWN
 
@@ -164,13 +175,33 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
     already_swept = {_low(a) for a in already_swept}
     known: set = set()
 
+    # Prune on entry as well as on exit: a registry bloated by an earlier run
+    # (63,660 entries on 2026-10-05) must not be paid for before it is fixed.
+    for a in [a for a, r in registry.items()
+              if a not in cluster and not (r.get("hl") or {}).get("read_at")
+              and not (r.get("l1") or {}).get("swept_at")
+              and float((r.get("his_money") or {}).get("in_usd") or 0) < b["min_keep_usd"]]:
+        registry.pop(a)
+
     def swept_addresses() -> set:
         mine = {a for a, r in registry.items() if (r.get("l1") or {}).get("swept_at")}
-        return cluster | mine | (already_swept & (known | set(registry)))
+        # Histories are loaded only for wallets holding a real share of his
+        # money (`known`): value-directed, one depth deeper per pass. Loading
+        # every wallet ever swept put 292K edges into one run (2026-10-05).
+        return cluster | ((mine | already_swept) & known)
 
     def all_edges() -> list[dict]:
         edges = []
-        for rows in l1_records_for(sorted(swept_addresses())).values():
+        for addr, rows in l1_records_for(sorted(swept_addresses())).items():
+            # A stored history this large is infrastructure, not a person: it
+            # becomes a boundary and its history is not walked (2026-10-05:
+            # 705K edges from WETH, Paraswap and CoW left no time for a unit).
+            total = getattr(rows, "total", len(rows))   # a caller may pre-trim
+            if addr not in cluster and total > b["max_wallet_records"]:
+                rec(addr).setdefault("l1", {})["busy_history"] = total
+                edges.extend(l1_edges([r for r in rows if _low(r.get("src")) in cluster
+                                       or _low(r.get("dst")) in cluster]))
+                continue
             edges.extend(l1_edges(rows))
         for rows in hl_store.values():
             edges.extend(rows)
@@ -308,11 +339,20 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
                       if class_of(a, edges) in BOUNDARY_CLASSES}
         money = value.his_money(edges, seeds=cluster, boundaries=boundaries)
         funding = value.his_money(reverse(edges), seeds=cluster, boundaries=boundaries)
-        known.update(a for a in (*money, *funding) if a not in boundaries)
+        # Only wallets holding a real amount of his money are worth loading
+        # from the substrate: a busy wallet swept elsewhere (0x160f6ef9) floods
+        # the run with thousands of counterparties (2026-10-05: 1.2M edges).
+        known.update(a for side in (money, funding) for a, info in side.items()
+                     if a not in boundaries and float(info["in_usd"]) >= b["min_keep_usd"])
         best: dict[str, float] = {}
         for side in (money, funding):
             for a, info in side.items():
-                if a not in boundaries:
+                # Units are spent only where a real amount of his money is, or
+                # on a direct counterparty whose transfers could not be valued
+                # (old ETH): never on crumbs.
+                worth_a_unit = (float(info["in_usd"]) >= b["min_keep_usd"]
+                                or (info.get("unvalued") and info["depth"] == 1))
+                if a not in boundaries and worth_a_unit:
                     p = priority(info, class_of(a), registry.get(a) or {}, now_ts)
                     best[a] = max(best.get(a, 0.0), p)
         ranked = sorted(((p, a) for a, p in best.items()), reverse=True)
@@ -356,11 +396,24 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
     boundaries = {a for a, c in classes.items() if c in BOUNDARY_CLASSES}
     money = value.his_money(edges, seeds=cluster, boundaries=boundaries)
     funding = value.his_money(reverse(edges), seeds=cluster, boundaries=boundaries)
-    for a, cls in classes.items():
-        if a in registry or a in money:
-            rec(a)["class"] = cls
+    # Remember what matters, and only that: his wallets, anything read or swept,
+    # and addresses holding a real amount of his money either way. Everything
+    # else is recomputed from the substrate when needed. (2026-10-05: storing
+    # every address his money touched grew the registry to 63,660 entries and
+    # the run past its budget and the job past its ceiling.)
+    def worth(a: str) -> bool:
+        r = registry.get(a) or {}
+        held = max(float((side.get(a) or {}).get("in_usd") or 0) for side in (money, funding))
+        return (a in cluster or bool((r.get("hl") or {}).get("read_at"))
+                or bool((r.get("l1") or {}).get("swept_at")) or held >= b["min_keep_usd"])
+    for a in [a for a in registry if not worth(a)]:
+        registry.pop(a)
+    for a in set(money) | set(funding) | set(cluster):
+        if worth(a):
+            rec(a)["class"] = classes.get(a, rec(a).get("class"))
     for a, info in money.items():
-        rec(a)["his_money"] = {k: info[k] for k in ("in_usd", "share", "depth", "unvalued", "parents")}
+        if a in registry:
+            rec(a)["his_money"] = {k: info[k] for k in ("in_usd", "share", "depth", "unvalued", "parents")}
 
     # Payees must be MEASURED single-purpose: quiet, with a small whole-chain
     # history (0x734c9213: 5 transactions in its life).
@@ -405,7 +458,9 @@ def run(*, cluster, registry: dict, hl_store: dict, previous: dict | None,
         hl = (registry.get(a) or {}).get("hl") or {}
         if a in cluster or a in boundaries or not hl.get("rows"):
             continue
-        if float(info["in_usd"]) < b["min_reach_usd"] and not info.get("unvalued"):
+        # A real amount AND a real share: $344K that is 0.07% of a busy
+        # trader's $490M inflow (0x8d4d699a, 2026-10-05) is not his destination.
+        if float(info["in_usd"]) < b["min_reach_usd"] or float(info["share"]) < b["min_reach_share"]:
             continue
         reached.append({"address": a, "in_usd": info["in_usd"], "share": info["share"],
                         "depth": info["depth"], "parents": info["parents"],
