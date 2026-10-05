@@ -1,7 +1,10 @@
 # Trace engine — follow his money to Hyperliquid
 
-**Date:** 2026-10-04 · **Status:** approved direction (operator chose approach B and
-delegated the detailed design) · **Scope:** fund tracing only. Behavioural
+**Date:** 2026-10-04 · **Status (2026-10-05):** phase 1 LIVE (PR #59, bounded in #61 —
+see the incident log); phase 2's transaction legs measured and not built, L1
+refresh built (#60); phase 3's netted accounting built (`routed_to_self`), the
+HyperCore exchange-hub correlator pool deferred (his only HyperCore exchange
+deposit is $24K). Operator chose approach B and delegated the detailed design · **Scope:** fund tracing only. Behavioural
 vectors, the scanner and the dashboard restyle are out of scope.
 
 ## 1. Why
@@ -144,8 +147,11 @@ an empty ledger, CLAUDE.md "utils.hl_post never raises").
    internal transfers and signer of each cluster / high-share transaction),
    initiator links, receipt-token following; frontier tests ported as scheduler
    properties (retention by priority, revisits, services never walked).
-3. **Cross the exchange gap.** HyperCore exchange hubs become a correlator pool;
-   netted accounting with a machine-readable boundary queue; dashboard view.
+3. **Cross the exchange gap.** HyperCore exchange hubs become a correlator pool
+   (deferred: one $24K deposit to match against); netted accounting (built:
+   outflows movements.py proves landed on him count as `routed_to_self`, not
+   infrastructure); the engine's report already lists boundaries — where his
+   money stopped and why.
 
 ## 6. Acceptance (phase 1)
 
@@ -169,3 +175,8 @@ production state reports units run, budgets used and what it found.
   `ReadBudget` window and stops cleanly on 429.
 - **Repo growth:** sharded state, hubs summarised, edges only for walked
   non-hub accounts.
+- **Unbounded state (happened, 2026-10-05):** the registry reached 63,660
+  addresses and pushed the job past its ceiling. Bounds now in code: keep only
+  >= $1K of his money, quiet only when measured on every chain, histories only
+  for value holders, > 5,000 stored records is busy, one substrate pass per run.
+  Dry-run any engine change on production state before merging.
