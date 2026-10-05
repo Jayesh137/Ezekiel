@@ -1,12 +1,12 @@
 {
-  "computed_at": "2026-10-05T16:14:59.658847+00:00",
+  "computed_at": "2026-10-05T17:09:34.546963+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
-  "wallet_count": 2587,
+  "wallet_count": 2589,
   "behavioural_counts_as_a_vector": false,
   "tier_counts": {
     "CONFIRMED": 2,
     "POSSIBLE": 37,
-    "WATCH": 2324,
+    "WATCH": 2326,
     "INFRASTRUCTURE": 224
   },
   "tier_semantics": "CONFIRMED=configured trusted seed; other tiers=investigation priority",
@@ -518,9 +518,9 @@
         "behavioural_threshold": 0.8,
         "portfolio_overlap": 0.1731,
         "shared_rare_markets": [
+          "LINK",
           "ASTER",
           "MON",
-          "LINK",
           "AVAX",
           "DOGE"
         ],
@@ -721,9 +721,9 @@
         "shared_rare_markets": [
           "ASTER",
           "MON",
-          "TAO",
+          "VVV",
           "GRASS",
-          "VVV"
+          "TAO"
         ],
         "hl_role": "user",
         "hl_account_value": 20011745.357869,
@@ -777,16 +777,116 @@
       "rank_strength": 0.7218
     },
     {
+      "wallet": "0xd47587702a91731dc1089b5db0932cf820151a91",
+      "vectors": [
+        "correlation"
+      ],
+      "confidence": 0.4861,
+      "classification": "POSSIBLE_LINKED_WALLET",
+      "reasons": [
+        "Repeated transfers (1525 separate movements)",
+        "Began depositing/trading 7.7h after a target exit",
+        "Exit amount re-appears as a deposit (single amount, 71% match confidence)",
+        "Behavioural similarity only 32% \u2014 weak on its own",
+        "Actively trading on Hyperliquid after receiving funds"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1526,
+          "unvalued_edge_count": 0
+        },
+        "depth": 1,
+        "chains": [
+          "arbitrum",
+          "ethereum",
+          "inferred",
+          "monad",
+          "polygon"
+        ],
+        "graph_reach_only": true,
+        "correlation_confidence": 0.7074,
+        "correlation_gap_hours": 7.7,
+        "competing_deposits": 24,
+        "behavioural_score": 0.3239,
+        "behavioural_tier": "BACKGROUND",
+        "behavioural_scored_at": "2026-10-03T10:52:16.582907+00:00",
+        "behavioural_scorer_current": true,
+        "style_vetoes": [],
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 1541289.927507,
+        "hl_birth_ms": 1737582600102,
+        "frontend_agent": "0x925829a1fa4cf63e2c1fd3ad4983ea6b74b402a0",
+        "operator_group": {
+          "master": "0xd47587702a91731dc1089b5db0932cf820151a91",
+          "subaccounts": [
+            "0x4196dc4a1dc7d3bfd5434adf04c829f4ccaf480d",
+            "0xb2f7374b222a930d20e8d556f33228211d1baf9f"
+          ]
+        },
+        "vectors_via_group": [],
+        "group_confidence": 0.4861
+      },
+      "is_service": false,
+      "known_self": false,
+      "detector_count": 1,
+      "observations": [
+        {
+          "source": "correlation",
+          "category": "financial"
+        }
+      ],
+      "evidence_summary": {
+        "families": [
+          {
+            "sources": [
+              "correlation"
+            ],
+            "categories": [
+              "financial"
+            ],
+            "parent_event_ids": [],
+            "provenance_complete": false,
+            "research_only": false
+          }
+        ],
+        "independent_groups": 1,
+        "promotable_groups": 1,
+        "categories": {
+          "protocol": [],
+          "financial": [
+            0
+          ],
+          "behaviour": [],
+          "successor": []
+        },
+        "legacy_observations": 1,
+        "identity_confirmed": false,
+        "count_kind": "observation_groups_not_owners",
+        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
+      },
+      "vector_count": 1,
+      "identity_confirmed": false,
+      "tier_basis": "investigation_priority_not_ownership",
+      "tier": "POSSIBLE",
+      "peak_tier": "PROBABLE",
+      "tier_dropped_from": "PROBABLE",
+      "rank_strength": 0.7074
+    },
+    {
       "wallet": "0x2ae2519036ba86b7d08a70cb30a3a34a6c3a78ae",
       "vectors": [
         "correlation"
       ],
-      "confidence": 0.336,
+      "confidence": 0.3355,
       "classification": "CORRELATION_LEAD",
       "reasons": [
         "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
-        "Began depositing/trading 8.7h after a target exit",
-        "Exit amount re-appears as a deposit (single amount, 71% match confidence)",
+        "Began depositing/trading 14.5h after a target exit",
+        "Exit amount re-appears as a deposit (single amount, 70% match confidence)",
         "Actively trading on Hyperliquid after receiving funds"
       ],
       "evidence": {
@@ -801,9 +901,9 @@
         "chains": [
           "inferred"
         ],
-        "correlation_confidence": 0.7064,
-        "correlation_gap_hours": 8.7,
-        "competing_deposits": 25,
+        "correlation_confidence": 0.7034,
+        "correlation_gap_hours": 14.5,
+        "competing_deposits": 24,
         "behavioural_score": 0.0,
         "behavioural_tier": null,
         "behavioural_scored_at": null,
@@ -859,107 +959,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.7064
-    },
-    {
-      "wallet": "0xd47587702a91731dc1089b5db0932cf820151a91",
-      "vectors": [
-        "correlation"
-      ],
-      "confidence": 0.4855,
-      "classification": "POSSIBLE_LINKED_WALLET",
-      "reasons": [
-        "Repeated transfers (1525 separate movements)",
-        "Began depositing/trading 13.6h after a target exit",
-        "Exit amount re-appears as a deposit (single amount, 70% match confidence)",
-        "Behavioural similarity only 32% \u2014 weak on its own",
-        "Actively trading on Hyperliquid after receiving funds"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1526,
-          "unvalued_edge_count": 0
-        },
-        "depth": 1,
-        "chains": [
-          "arbitrum",
-          "ethereum",
-          "inferred",
-          "monad",
-          "polygon"
-        ],
-        "graph_reach_only": true,
-        "correlation_confidence": 0.7035,
-        "correlation_gap_hours": 13.6,
-        "competing_deposits": 25,
-        "behavioural_score": 0.3239,
-        "behavioural_tier": "BACKGROUND",
-        "behavioural_scored_at": "2026-10-03T10:52:16.582907+00:00",
-        "behavioural_scorer_current": true,
-        "style_vetoes": [],
-        "behavioural_threshold": 0.8,
-        "hl_role": "user",
-        "hl_account_value": 1541289.927507,
-        "hl_birth_ms": 1737582600102,
-        "frontend_agent": "0x925829a1fa4cf63e2c1fd3ad4983ea6b74b402a0",
-        "operator_group": {
-          "master": "0xd47587702a91731dc1089b5db0932cf820151a91",
-          "subaccounts": [
-            "0x4196dc4a1dc7d3bfd5434adf04c829f4ccaf480d",
-            "0xb2f7374b222a930d20e8d556f33228211d1baf9f"
-          ]
-        },
-        "vectors_via_group": [],
-        "group_confidence": 0.4855
-      },
-      "is_service": false,
-      "known_self": false,
-      "detector_count": 1,
-      "observations": [
-        {
-          "source": "correlation",
-          "category": "financial"
-        }
-      ],
-      "evidence_summary": {
-        "families": [
-          {
-            "sources": [
-              "correlation"
-            ],
-            "categories": [
-              "financial"
-            ],
-            "parent_event_ids": [],
-            "provenance_complete": false,
-            "research_only": false
-          }
-        ],
-        "independent_groups": 1,
-        "promotable_groups": 1,
-        "categories": {
-          "protocol": [],
-          "financial": [
-            0
-          ],
-          "behaviour": [],
-          "successor": []
-        },
-        "legacy_observations": 1,
-        "identity_confirmed": false,
-        "count_kind": "observation_groups_not_owners",
-        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
-      },
-      "vector_count": 1,
-      "identity_confirmed": false,
-      "tier_basis": "investigation_priority_not_ownership",
-      "tier": "POSSIBLE",
-      "peak_tier": "PROBABLE",
-      "tier_dropped_from": "PROBABLE",
-      "rank_strength": 0.7035
+      "rank_strength": 0.7034
     },
     {
       "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
@@ -1939,7 +1939,7 @@
         "vectors_via_group": [
           "correlation"
         ],
-        "group_confidence": 0.4855
+        "group_confidence": 0.4861
       },
       "is_service": false,
       "known_self": false,
@@ -2288,7 +2288,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.2074,
+      "confidence": 0.2073,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Sent funds to the target wallet",
@@ -2378,7 +2378,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.2074
+      "rank_strength": 0.2073
     },
     {
       "wallet": "0x36715f6408819492c27c1a1538156af9a2bfe963",
@@ -2391,7 +2391,7 @@
         "Sent funds to the target wallet",
         "Transfer happened entirely inside Hyperliquid (no L1 trace)",
         "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 427 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 428 days ago \u2014 transfer evidence aged to 40%",
         "Single transfer with no corroborating evidence \u2014 relationship unproven, NOT treated as same owner"
       ],
       "evidence": {
@@ -2788,7 +2788,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (938 separate movements)",
+        "Repeated transfers (940 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -2796,7 +2796,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 938,
+          "edge_count": 940,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -4037,7 +4037,7 @@
         "vectors_via_group": [
           "correlation"
         ],
-        "group_confidence": 0.4855
+        "group_confidence": 0.4861
       },
       "is_service": false,
       "known_self": false,
@@ -77794,7 +77794,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (120 separate movements)",
+        "Repeated transfers (122 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -77802,12 +77802,13 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 120,
+          "edge_count": 122,
           "unvalued_edge_count": 0
         },
         "depth": 2,
         "chains": [
-          "arbitrum"
+          "arbitrum",
+          "ethereum"
         ],
         "graph_reach_only": true,
         "hl_role": "missing",
@@ -78229,7 +78230,7 @@
     {
       "wallet": "0x2bb7d1c7f4127ed31b18efbe6339592a469d5f90",
       "vectors": [],
-      "confidence": 0.0909,
+      "confidence": 0.0908,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (128 separate movements)",
@@ -78277,7 +78278,7 @@
       "tier": "WATCH",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": "POSSIBLE",
-      "rank_strength": 0.0909
+      "rank_strength": 0.0908
     },
     {
       "wallet": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
@@ -78297,10 +78298,10 @@
         "portfolio_overlap": 0.0864,
         "shared_rare_markets": [
           "LINK",
-          "GRASS",
           "VVV",
-          "FARTCOIN",
-          "GRAM"
+          "GRASS",
+          "GRAM",
+          "FARTCOIN"
         ],
         "hl_role": "user",
         "hl_account_value": 52506957.923444,
@@ -79146,7 +79147,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (76 separate movements)",
-        "Last movement 389 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 390 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -118409,7 +118410,10 @@
           "share": 0.0,
           "depth": 2,
           "parents": []
-        }
+        },
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1781739600054
       },
       "is_service": false,
       "known_self": false,
@@ -120265,7 +120269,7 @@
       "reasons": [],
       "evidence": {
         "trace_reach": {
-          "in_usd": 4523.55,
+          "in_usd": 4465.26,
           "share": 0.0001,
           "depth": 2,
           "parents": [
@@ -125999,7 +126003,7 @@
       "reasons": [],
       "evidence": {
         "trace_reach": {
-          "in_usd": 349060.51,
+          "in_usd": 344562.01,
           "share": 0.0007,
           "depth": 2,
           "parents": [
@@ -131263,6 +131267,46 @@
       "rank_strength": 0.0
     },
     {
+      "wallet": "0x9eef7e8fb0f18916d2af435ddf43575d397f0b35",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "trace_reach": {
+          "in_usd": 0.0,
+          "share": 0.0,
+          "depth": 4,
+          "parents": []
+        }
+      },
+      "is_service": false,
+      "known_self": false,
+      "detector_count": 0,
+      "evidence_summary": {
+        "families": [],
+        "independent_groups": 0,
+        "promotable_groups": 0,
+        "categories": {
+          "protocol": [],
+          "financial": [],
+          "behaviour": [],
+          "successor": []
+        },
+        "legacy_observations": 0,
+        "identity_confirmed": false,
+        "count_kind": "observation_groups_not_owners",
+        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
+      },
+      "vector_count": 0,
+      "identity_confirmed": false,
+      "tier_basis": "investigation_priority_not_ownership",
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
       "wallet": "0x9f53476f4aef57fe061441d88cdd13684b018ab3",
       "vectors": [],
       "confidence": 0.0,
@@ -133211,6 +133255,46 @@
         "hl_account_value": 25181.376252,
         "hl_birth_ms": 1754520240014,
         "frontend_agent": "0xa0dad6d42d3896907584f63ea7125ed5c6cbd6fa"
+      },
+      "is_service": false,
+      "known_self": false,
+      "detector_count": 0,
+      "evidence_summary": {
+        "families": [],
+        "independent_groups": 0,
+        "promotable_groups": 0,
+        "categories": {
+          "protocol": [],
+          "financial": [],
+          "behaviour": [],
+          "successor": []
+        },
+        "legacy_observations": 0,
+        "identity_confirmed": false,
+        "count_kind": "observation_groups_not_owners",
+        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
+      },
+      "vector_count": 0,
+      "identity_confirmed": false,
+      "tier_basis": "investigation_priority_not_ownership",
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
+      "rank_strength": 0.0
+    },
+    {
+      "wallet": "0xaac627ba8969b913f2492e04829cfb956d122508",
+      "vectors": [],
+      "confidence": 0.0,
+      "classification": null,
+      "reasons": [],
+      "evidence": {
+        "trace_reach": {
+          "in_usd": 0.0,
+          "share": 0.0,
+          "depth": 4,
+          "parents": []
+        }
       },
       "is_service": false,
       "known_self": false,
@@ -137674,7 +137758,7 @@
       "reasons": [],
       "evidence": {
         "trace_reach": {
-          "in_usd": 150.82,
+          "in_usd": 148.88,
           "share": 0.0003,
           "depth": 4,
           "parents": [
@@ -153056,7 +153140,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (3 separate movements)",
-        "Last movement 537 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 538 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -153265,7 +153349,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 215,
+          "edge_count": 225,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -153410,7 +153494,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 639,
+          "edge_count": 645,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -153658,7 +153742,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 13,
+          "edge_count": 16,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -154378,7 +154462,7 @@
       "confidence": 0.1125,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (330 separate movements)",
+        "Repeated transfers (331 separate movements)",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -154386,7 +154470,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 330,
+          "edge_count": 331,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -154544,7 +154628,7 @@
       "confidence": 0.0995,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (202 separate movements)",
+        "Repeated transfers (203 separate movements)",
         "Last movement 132 days ago \u2014 transfer evidence aged to 88%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
@@ -154553,7 +154637,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 202,
+          "edge_count": 203,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -155520,7 +155604,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (5 separate movements)",
-        "Last movement 537 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 538 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -155857,7 +155941,7 @@
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (5 separate movements)",
-        "Last movement 963 days ago \u2014 transfer evidence aged to 40%",
+        "Last movement 964 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -155995,8 +156079,8 @@
       "confidence": 0.045,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
-        "Repeated transfers (7 separate movements)",
-        "Last movement 434 days ago \u2014 transfer evidence aged to 40%",
+        "Repeated transfers (8 separate movements)",
+        "Last movement 411 days ago \u2014 transfer evidence aged to 40%",
         "Reached at 2 hops from target \u2014 confidence discounted"
       ],
       "evidence": {
@@ -156004,7 +156088,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 7,
+          "edge_count": 8,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -156327,7 +156411,7 @@
         "totals": {
           "received_from_target_usd": 136642577.09,
           "sent_to_target_usd": 416668544.01,
-          "edge_count": 54964,
+          "edge_count": 55070,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -159481,7 +159565,7 @@
         "totals": {
           "received_from_target_usd": 752691.45,
           "sent_to_target_usd": 0,
-          "edge_count": 721,
+          "edge_count": 738,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -159553,7 +159637,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 3167,
+          "edge_count": 3170,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -159694,7 +159778,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 999994.72,
-          "edge_count": 744,
+          "edge_count": 754,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -159823,7 +159907,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 883,
+          "edge_count": 886,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -160313,7 +160397,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 3879,
+          "edge_count": 3883,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -160655,7 +160739,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 6924,
+          "edge_count": 6945,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -161655,7 +161739,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9282918.5,
-          "edge_count": 1587,
+          "edge_count": 1743,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -162373,7 +162457,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 91,
+          "edge_count": 100,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -162807,7 +162891,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 1500097.32,
-          "edge_count": 3139,
+          "edge_count": 3305,
           "unvalued_edge_count": 1
         },
         "depth": 1,
@@ -163409,7 +163493,7 @@
         "totals": {
           "received_from_target_usd": 383447848.82,
           "sent_to_target_usd": 440899852.0,
-          "edge_count": 4408,
+          "edge_count": 4424,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -165872,7 +165956,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 9,
+          "edge_count": 10,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -166196,7 +166280,7 @@
         "totals": {
           "received_from_target_usd": 4999999.0,
           "sent_to_target_usd": 0,
-          "edge_count": 1448,
+          "edge_count": 1449,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -166774,7 +166858,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 463,
+          "edge_count": 464,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -166843,7 +166927,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 580,
+          "edge_count": 582,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -168944,7 +169028,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 5597,
+          "edge_count": 5602,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -169247,7 +169331,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 384,
+          "edge_count": 386,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -169316,7 +169400,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 136,
+          "edge_count": 138,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -169411,7 +169495,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 969,
+          "edge_count": 1009,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -169813,7 +169897,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1062,
+          "edge_count": 1067,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -170102,7 +170186,7 @@
         "totals": {
           "received_from_target_usd": 5000000.0,
           "sent_to_target_usd": 0,
-          "edge_count": 1186,
+          "edge_count": 1196,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -170463,7 +170547,7 @@
         "totals": {
           "received_from_target_usd": 1700000.0,
           "sent_to_target_usd": 0,
-          "edge_count": 1066,
+          "edge_count": 1087,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -170683,7 +170767,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1547,
+          "edge_count": 1573,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -170955,7 +171039,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 729,
+          "edge_count": 731,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -171387,7 +171471,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 337,
+          "edge_count": 338,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -172234,7 +172318,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 3415,
+          "edge_count": 3442,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -172571,7 +172655,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 117,
+          "edge_count": 121,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -172713,7 +172797,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1538,
+          "edge_count": 1540,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -172838,7 +172922,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 23077,
+          "edge_count": 23194,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -173215,7 +173299,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 973,
+          "edge_count": 1003,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -173912,7 +173996,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 279,
+          "edge_count": 281,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -176883,7 +176967,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 5800081.45,
-          "edge_count": 12969,
+          "edge_count": 12975,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -177995,7 +178079,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 107,
+          "edge_count": 108,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -178281,7 +178365,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1512,
+          "edge_count": 1656,
           "unvalued_edge_count": 1
         },
         "depth": 1,
@@ -178968,7 +179052,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9308697.38,
-          "edge_count": 8057,
+          "edge_count": 8227,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -179876,7 +179960,7 @@
         "totals": {
           "received_from_target_usd": 57760728.95,
           "sent_to_target_usd": 0,
-          "edge_count": 45713,
+          "edge_count": 45714,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -180106,7 +180190,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 40,
+          "edge_count": 42,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -181414,7 +181498,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 2049,
+          "edge_count": 2073,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -181702,7 +181786,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 678,
+          "edge_count": 689,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -181945,7 +182029,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 618,
+          "edge_count": 621,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -182089,7 +182173,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 2578,
+          "edge_count": 2597,
           "unvalued_edge_count": 0
         },
         "depth": 2,
