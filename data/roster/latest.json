@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-10-05T12:46:35.988457+00:00",
+  "computed_at": "2026-10-05T13:40:37.145890+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 2584,
   "behavioural_counts_as_a_vector": false,
@@ -304,6 +304,90 @@
       "rank_strength": 0.7
     },
     {
+      "wallet": "0x346fc40b3ccf8aeab5096cc0df9b7b5a35cd241d",
+      "vectors": [
+        "correlation"
+      ],
+      "confidence": 0.2735,
+      "classification": "CORRELATION_LEAD",
+      "reasons": [
+        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
+        "Began depositing/trading 63.1h after a target exit",
+        "Exit amount re-appears as a deposit (single amount, 82% match confidence)"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1,
+          "unvalued_edge_count": 0
+        },
+        "depth": 1,
+        "chains": [
+          "inferred"
+        ],
+        "correlation_confidence": 0.8233,
+        "correlation_gap_hours": 63.1,
+        "competing_deposits": 0,
+        "behavioural_score": 0.0,
+        "behavioural_tier": null,
+        "behavioural_scored_at": null,
+        "behavioural_scorer_current": false,
+        "style_vetoes": [],
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1790347812506,
+        "frontend_agent": "0xc250ec4d0e6e2a89ebba142e32965cb98abf49d5"
+      },
+      "is_service": false,
+      "known_self": false,
+      "detector_count": 1,
+      "observations": [
+        {
+          "source": "correlation",
+          "category": "financial"
+        }
+      ],
+      "evidence_summary": {
+        "families": [
+          {
+            "sources": [
+              "correlation"
+            ],
+            "categories": [
+              "financial"
+            ],
+            "parent_event_ids": [],
+            "provenance_complete": false,
+            "research_only": false
+          }
+        ],
+        "independent_groups": 1,
+        "promotable_groups": 1,
+        "categories": {
+          "protocol": [],
+          "financial": [
+            0
+          ],
+          "behaviour": [],
+          "successor": []
+        },
+        "legacy_observations": 1,
+        "identity_confirmed": false,
+        "count_kind": "observation_groups_not_owners",
+        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
+      },
+      "vector_count": 1,
+      "identity_confirmed": false,
+      "tier_basis": "investigation_priority_not_ownership",
+      "tier": "POSSIBLE",
+      "peak_tier": "POSSIBLE",
+      "tier_dropped_from": null,
+      "rank_strength": 0.8233
+    },
+    {
       "wallet": "0xb798aef79972ce8f73d47b9ebbcda6bbb7ec4fbf",
       "vectors": [
         "correlation"
@@ -432,11 +516,11 @@
           "Decision frequency 7x apart (1.00 vs 7.00 position episodes/day)"
         ],
         "behavioural_threshold": 0.8,
-        "portfolio_overlap": 0.119,
+        "portfolio_overlap": 0.1724,
         "shared_rare_markets": [
+          "ASTER",
           "MON",
           "LINK",
-          "ASTER",
           "AVAX",
           "DOGE"
         ],
@@ -635,11 +719,11 @@
         "behavioural_threshold": 0.8,
         "portfolio_overlap": 0.1117,
         "shared_rare_markets": [
-          "MON",
           "ASTER",
-          "TAO",
+          "MON",
           "VVV",
-          "GRASS"
+          "GRASS",
+          "TAO"
         ],
         "hl_role": "user",
         "hl_account_value": 20011745.357869,
@@ -693,116 +777,16 @@
       "rank_strength": 0.7218
     },
     {
-      "wallet": "0xd47587702a91731dc1089b5db0932cf820151a91",
-      "vectors": [
-        "correlation"
-      ],
-      "confidence": 0.486,
-      "classification": "POSSIBLE_LINKED_WALLET",
-      "reasons": [
-        "Repeated transfers (1525 separate movements)",
-        "Began depositing/trading 7.7h after a target exit",
-        "Exit amount re-appears as a deposit (single amount, 71% match confidence)",
-        "Behavioural similarity only 32% \u2014 weak on its own",
-        "Actively trading on Hyperliquid after receiving funds"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1526,
-          "unvalued_edge_count": 0
-        },
-        "depth": 1,
-        "chains": [
-          "arbitrum",
-          "ethereum",
-          "inferred",
-          "monad",
-          "polygon"
-        ],
-        "graph_reach_only": true,
-        "correlation_confidence": 0.7065,
-        "correlation_gap_hours": 7.7,
-        "competing_deposits": 26,
-        "behavioural_score": 0.3239,
-        "behavioural_tier": "BACKGROUND",
-        "behavioural_scored_at": "2026-10-03T10:52:16.582907+00:00",
-        "behavioural_scorer_current": true,
-        "style_vetoes": [],
-        "behavioural_threshold": 0.8,
-        "hl_role": "user",
-        "hl_account_value": 1541289.927507,
-        "hl_birth_ms": 1737582600102,
-        "frontend_agent": "0x925829a1fa4cf63e2c1fd3ad4983ea6b74b402a0",
-        "operator_group": {
-          "master": "0xd47587702a91731dc1089b5db0932cf820151a91",
-          "subaccounts": [
-            "0x4196dc4a1dc7d3bfd5434adf04c829f4ccaf480d",
-            "0xb2f7374b222a930d20e8d556f33228211d1baf9f"
-          ]
-        },
-        "vectors_via_group": [],
-        "group_confidence": 0.486
-      },
-      "is_service": false,
-      "known_self": false,
-      "detector_count": 1,
-      "observations": [
-        {
-          "source": "correlation",
-          "category": "financial"
-        }
-      ],
-      "evidence_summary": {
-        "families": [
-          {
-            "sources": [
-              "correlation"
-            ],
-            "categories": [
-              "financial"
-            ],
-            "parent_event_ids": [],
-            "provenance_complete": false,
-            "research_only": false
-          }
-        ],
-        "independent_groups": 1,
-        "promotable_groups": 1,
-        "categories": {
-          "protocol": [],
-          "financial": [
-            0
-          ],
-          "behaviour": [],
-          "successor": []
-        },
-        "legacy_observations": 1,
-        "identity_confirmed": false,
-        "count_kind": "observation_groups_not_owners",
-        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
-      },
-      "vector_count": 1,
-      "identity_confirmed": false,
-      "tier_basis": "investigation_priority_not_ownership",
-      "tier": "POSSIBLE",
-      "peak_tier": "PROBABLE",
-      "tier_dropped_from": "PROBABLE",
-      "rank_strength": 0.7065
-    },
-    {
       "wallet": "0x2ae2519036ba86b7d08a70cb30a3a34a6c3a78ae",
       "vectors": [
         "correlation"
       ],
-      "confidence": 0.3354,
+      "confidence": 0.336,
       "classification": "CORRELATION_LEAD",
       "reasons": [
         "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
-        "Began depositing/trading 14.5h after a target exit",
-        "Exit amount re-appears as a deposit (single amount, 70% match confidence)",
+        "Began depositing/trading 8.7h after a target exit",
+        "Exit amount re-appears as a deposit (single amount, 71% match confidence)",
         "Actively trading on Hyperliquid after receiving funds"
       ],
       "evidence": {
@@ -817,9 +801,9 @@
         "chains": [
           "inferred"
         ],
-        "correlation_confidence": 0.7025,
-        "correlation_gap_hours": 14.5,
-        "competing_deposits": 26,
+        "correlation_confidence": 0.7064,
+        "correlation_gap_hours": 8.7,
+        "competing_deposits": 25,
         "behavioural_score": 0.0,
         "behavioural_tier": null,
         "behavioural_scored_at": null,
@@ -875,7 +859,107 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.7025
+      "rank_strength": 0.7064
+    },
+    {
+      "wallet": "0xd47587702a91731dc1089b5db0932cf820151a91",
+      "vectors": [
+        "correlation"
+      ],
+      "confidence": 0.4855,
+      "classification": "POSSIBLE_LINKED_WALLET",
+      "reasons": [
+        "Repeated transfers (1525 separate movements)",
+        "Began depositing/trading 13.6h after a target exit",
+        "Exit amount re-appears as a deposit (single amount, 70% match confidence)",
+        "Behavioural similarity only 32% \u2014 weak on its own",
+        "Actively trading on Hyperliquid after receiving funds"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 1526,
+          "unvalued_edge_count": 0
+        },
+        "depth": 1,
+        "chains": [
+          "arbitrum",
+          "ethereum",
+          "inferred",
+          "monad",
+          "polygon"
+        ],
+        "graph_reach_only": true,
+        "correlation_confidence": 0.7035,
+        "correlation_gap_hours": 13.6,
+        "competing_deposits": 25,
+        "behavioural_score": 0.3239,
+        "behavioural_tier": "BACKGROUND",
+        "behavioural_scored_at": "2026-10-03T10:52:16.582907+00:00",
+        "behavioural_scorer_current": true,
+        "style_vetoes": [],
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 1541289.927507,
+        "hl_birth_ms": 1737582600102,
+        "frontend_agent": "0x925829a1fa4cf63e2c1fd3ad4983ea6b74b402a0",
+        "operator_group": {
+          "master": "0xd47587702a91731dc1089b5db0932cf820151a91",
+          "subaccounts": [
+            "0x4196dc4a1dc7d3bfd5434adf04c829f4ccaf480d",
+            "0xb2f7374b222a930d20e8d556f33228211d1baf9f"
+          ]
+        },
+        "vectors_via_group": [],
+        "group_confidence": 0.4855
+      },
+      "is_service": false,
+      "known_self": false,
+      "detector_count": 1,
+      "observations": [
+        {
+          "source": "correlation",
+          "category": "financial"
+        }
+      ],
+      "evidence_summary": {
+        "families": [
+          {
+            "sources": [
+              "correlation"
+            ],
+            "categories": [
+              "financial"
+            ],
+            "parent_event_ids": [],
+            "provenance_complete": false,
+            "research_only": false
+          }
+        ],
+        "independent_groups": 1,
+        "promotable_groups": 1,
+        "categories": {
+          "protocol": [],
+          "financial": [
+            0
+          ],
+          "behaviour": [],
+          "successor": []
+        },
+        "legacy_observations": 1,
+        "identity_confirmed": false,
+        "count_kind": "observation_groups_not_owners",
+        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
+      },
+      "vector_count": 1,
+      "identity_confirmed": false,
+      "tier_basis": "investigation_priority_not_ownership",
+      "tier": "POSSIBLE",
+      "peak_tier": "PROBABLE",
+      "tier_dropped_from": "PROBABLE",
+      "rank_strength": 0.7035
     },
     {
       "wallet": "0x5b5d51203a0f9079f8aeb098a6523a13f298c060",
@@ -917,8 +1001,8 @@
         "behavioural_threshold": 0.8,
         "portfolio_overlap": 0.0797,
         "shared_rare_markets": [
-          "BNB",
           "LINK",
+          "BNB",
           "DOGE",
           "FARTCOIN"
         ],
@@ -981,95 +1065,11 @@
       "rank_strength": 0.6822
     },
     {
-      "wallet": "0x346fc40b3ccf8aeab5096cc0df9b7b5a35cd241d",
-      "vectors": [
-        "correlation"
-      ],
-      "confidence": 0.251,
-      "classification": "CORRELATION_LEAD",
-      "reasons": [
-        "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
-        "Began depositing/trading 63.1h after a target exit",
-        "Exit amount re-appears as a deposit (single amount, 67% match confidence)"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 1,
-          "unvalued_edge_count": 0
-        },
-        "depth": 1,
-        "chains": [
-          "inferred"
-        ],
-        "correlation_confidence": 0.6733,
-        "correlation_gap_hours": 63.1,
-        "competing_deposits": 1,
-        "behavioural_score": 0.0,
-        "behavioural_tier": null,
-        "behavioural_scored_at": null,
-        "behavioural_scorer_current": false,
-        "style_vetoes": [],
-        "behavioural_threshold": 0.8,
-        "hl_role": "user",
-        "hl_account_value": 0.0,
-        "hl_birth_ms": 1790347812506,
-        "frontend_agent": "0xc250ec4d0e6e2a89ebba142e32965cb98abf49d5"
-      },
-      "is_service": false,
-      "known_self": false,
-      "detector_count": 1,
-      "observations": [
-        {
-          "source": "correlation",
-          "category": "financial"
-        }
-      ],
-      "evidence_summary": {
-        "families": [
-          {
-            "sources": [
-              "correlation"
-            ],
-            "categories": [
-              "financial"
-            ],
-            "parent_event_ids": [],
-            "provenance_complete": false,
-            "research_only": false
-          }
-        ],
-        "independent_groups": 1,
-        "promotable_groups": 1,
-        "categories": {
-          "protocol": [],
-          "financial": [
-            0
-          ],
-          "behaviour": [],
-          "successor": []
-        },
-        "legacy_observations": 1,
-        "identity_confirmed": false,
-        "count_kind": "observation_groups_not_owners",
-        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
-      },
-      "vector_count": 1,
-      "identity_confirmed": false,
-      "tier_basis": "investigation_priority_not_ownership",
-      "tier": "POSSIBLE",
-      "peak_tier": "POSSIBLE",
-      "tier_dropped_from": null,
-      "rank_strength": 0.6733
-    },
-    {
       "wallet": "0x2b1e0bcefada121c5bc484a546e3ca0e2a8bee5b",
       "vectors": [
         "correlation"
       ],
-      "confidence": 0.2432,
+      "confidence": 0.2433,
       "classification": "CORRELATION_LEAD",
       "reasons": [
         "No transfer to or from the target was ever observed (re-linked across a gap by amount and timing alone)",
@@ -1088,9 +1088,9 @@
         "chains": [
           "inferred"
         ],
-        "correlation_confidence": 0.6216,
+        "correlation_confidence": 0.6218,
         "correlation_gap_hours": 36.2,
-        "competing_deposits": 34,
+        "competing_deposits": 33,
         "behavioural_score": 0.4078,
         "behavioural_tier": "WEAK_LEAD",
         "behavioural_scored_at": "2026-08-11T16:48:15.179456+00:00",
@@ -1147,7 +1147,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.6216
+      "rank_strength": 0.6218
     },
     {
       "wallet": "0xf150e75c0ab5deff96174214366bfd83c97b3253",
@@ -1938,7 +1938,7 @@
         "vectors_via_group": [
           "correlation"
         ],
-        "group_confidence": 0.486
+        "group_confidence": 0.4855
       },
       "is_service": false,
       "known_self": false,
@@ -2082,7 +2082,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.2848,
+      "confidence": 0.2846,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Received funds directly from the target wallet",
@@ -2280,7 +2280,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.2848
+      "rank_strength": 0.2846
     },
     {
       "wallet": "0x1606060bf337da4cdb778a4f120507e26cbdab5b",
@@ -4036,7 +4036,7 @@
         "vectors_via_group": [
           "correlation"
         ],
-        "group_confidence": 0.486
+        "group_confidence": 0.4855
       },
       "is_service": false,
       "known_self": false,
@@ -81313,13 +81313,7 @@
         "hl_role": "user",
         "hl_account_value": 13106.098615,
         "hl_birth_ms": 1785363000023,
-        "frontend_agent": "0xc4ba7cfb99137ac30bcd305c85731842e5301446",
-        "vault_deposits": [
-          "0x07fd993f0fa3a185f7207adccd29f7a87404689d",
-          "0x1e37a337ed460039d1b15bd3bc489de789768d5e",
-          "0x654016a8c9fcf0c4cb7ed6078aba21f7f399f7b7",
-          "0xc179e03922afe8fa9533d3f896338b9fb87ce0c8"
-        ]
+        "frontend_agent": "0xc4ba7cfb99137ac30bcd305c85731842e5301446"
       },
       "is_service": false,
       "known_self": false,
@@ -96842,7 +96836,10 @@
         "behavioural_scored_at": null,
         "behavioural_scorer_current": false,
         "style_vetoes": [],
-        "behavioural_threshold": 0.8
+        "behavioural_threshold": 0.8,
+        "hl_role": "subAccount",
+        "hl_account_value": 90139.311313,
+        "hl_birth_ms": 1765410000098
       },
       "is_service": false,
       "known_self": false,
@@ -105383,7 +105380,10 @@
         "behavioural_scored_at": "2026-10-05T12:10:57.973283+00:00",
         "behavioural_scorer_current": true,
         "style_vetoes": [],
-        "behavioural_threshold": 0.8
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 0.0,
+        "hl_birth_ms": 1779317280061
       },
       "is_service": false,
       "known_self": false,
@@ -120130,7 +120130,7 @@
       "reasons": [],
       "evidence": {
         "trace_reach": {
-          "in_usd": 4512.12,
+          "in_usd": 4523.55,
           "share": 0.0001,
           "depth": 2,
           "parents": [
@@ -125864,7 +125864,7 @@
       "reasons": [],
       "evidence": {
         "trace_reach": {
-          "in_usd": 348177.94,
+          "in_usd": 349060.51,
           "share": 0.0007,
           "depth": 2,
           "parents": [
@@ -137539,7 +137539,7 @@
       "reasons": [],
       "evidence": {
         "trace_reach": {
-          "in_usd": 150.44,
+          "in_usd": 150.82,
           "share": 0.0003,
           "depth": 4,
           "parents": [
@@ -153130,7 +153130,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 201,
+          "edge_count": 205,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -161520,7 +161520,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9282918.5,
-          "edge_count": 1491,
+          "edge_count": 1494,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -162672,7 +162672,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 1500097.32,
-          "edge_count": 3035,
+          "edge_count": 3037,
           "unvalued_edge_count": 1
         },
         "depth": 1,
@@ -169276,7 +169276,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 906,
+          "edge_count": 907,
           "unvalued_edge_count": 0
         },
         "depth": 2,
@@ -178146,7 +178146,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 1415,
+          "edge_count": 1420,
           "unvalued_edge_count": 1
         },
         "depth": 1,
@@ -178833,7 +178833,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 9308697.38,
-          "edge_count": 7987,
+          "edge_count": 7989,
           "unvalued_edge_count": 0
         },
         "depth": 1,
@@ -179809,7 +179809,7 @@
     {
       "wallet": "0x87283edb0f12e7cd0ed3e18baeab20aaf43b5f6e",
       "vectors": [],
-      "confidence": 0.0983,
+      "confidence": 0.0982,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (5 separate movements)",
@@ -179857,7 +179857,7 @@
       "tier": "INFRASTRUCTURE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.0983
+      "rank_strength": 0.0982
     },
     {
       "wallet": "0x01087f4e1dbc0c52690a9397677dd90983711c37",
@@ -181567,7 +181567,7 @@
         "totals": {
           "received_from_target_usd": 0,
           "sent_to_target_usd": 0,
-          "edge_count": 549,
+          "edge_count": 665,
           "unvalued_edge_count": 0
         },
         "depth": 2,

@@ -1,17 +1,19 @@
 {
-  "computed_at": "2026-10-05T12:50:55.491207+00:00",
+  "computed_at": "2026-10-05T13:16:53.070847+00:00",
   "wallets": 1,
-  "records": 5,
-  "spam_suppressed": 6,
-  "unpriced": 2,
+  "records": 4,
+  "spam_suppressed": 5,
+  "unpriced": 1,
   "spam_by_reason": {
     "symbol_forgery": 2,
-    "zero_value": 4
+    "zero_value": 3
   },
-  "calls": 37,
+  "calls": 35,
   "possible_gaps": 0,
   "incomplete": {},
-  "degraded_sources": [],
+  "degraded_sources": [
+    "arbitrum"
+  ],
   "unsupported_sources": [
     "bsc"
   ],
@@ -21,20 +23,22 @@
       "status": "ok",
       "chains": {
         "arbitrum": {
-          "records": 1,
-          "spam": 2,
-          "calls": 6,
+          "records": 0,
+          "spam": 1,
+          "calls": 4,
           "cursor": 508037872,
           "gaps": [],
           "truncated": false,
-          "error": null,
+          "error": "Max calls per sec rate limit reached (3/sec)",
           "probed_inactive": false,
-          "unpriced": 1,
+          "unpriced": 0,
           "spam_by_reason": {
-            "symbol_forgery": 1,
-            "zero_value": 1
+            "symbol_forgery": 1
           },
-          "errors_by_kind": {},
+          "errors_by_kind": {
+            "native": "Max calls per sec rate limit reached (3/sec)",
+            "internal": "Max calls per sec rate limit reached (3/sec)"
+          },
           "cursor_by_kind": {
             "erc20": 508037872,
             "native": 508029886,
@@ -175,7 +179,9 @@
           "reader": "etherscan"
         }
       },
-      "degraded_sources": [],
+      "degraded_sources": [
+        "arbitrum"
+      ],
       "unsupported_sources": [
         "bsc"
       ]
