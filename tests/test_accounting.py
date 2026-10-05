@@ -116,3 +116,29 @@ def test_a_transfer_with_no_destination_is_dropped():
     out = acc.reconcile([{"src": TARGET, "dst": "", "amount_usd": 99.0}],
                         TARGET, ROSTER, set())
     assert out["total_out_usd"] == 0.0
+
+
+# --- money the movement ledger proves came back to him -----------------------------
+#
+# 2026-10-05: the headline filed $1.24B as "infrastructure" while movements.py had
+# already resolved 408 of those outflows to him — Bridge2 deposits crediting his
+# own HL account, decoded bridges landing on his wallets. Proven routes count as
+# his; an unproven infrastructure outflow stays exactly where it was.
+
+def test_an_outflow_proven_to_land_on_him_is_routed_to_self():
+    proven = {**_rec(SERVICE, 300.0), "id": "arbitrum:0xa:erc20:0"}
+    unproven = {**_rec(SERVICE, 50.0), "id": "arbitrum:0xb:erc20:0"}
+    out = acc.reconcile([proven, unproven], TARGET, ROSTER, {SELF},
+                        routed_to_self={"arbitrum:0xa:erc20:0"})
+    b = out["buckets"]
+    assert b[acc.DEST_ROUTED_SELF]["usd"] == 300.0
+    assert b[acc.DEST_INFRASTRUCTURE]["usd"] == 50.0
+    assert out["controlled_recipient_usd"] == 300.0
+    assert out["unresolved_infrastructure_usd"] == 50.0
+    assert out["traced_usd"] == 350.0
+
+
+def test_without_proof_nothing_moves():
+    out = acc.reconcile([{**_rec(SERVICE, 300.0), "id": "x"}], TARGET, ROSTER, {SELF})
+    assert out["buckets"][acc.DEST_ROUTED_SELF]["usd"] == 0.0
+    assert out["buckets"][acc.DEST_INFRASTRUCTURE]["usd"] == 300.0

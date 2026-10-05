@@ -35,12 +35,16 @@ ACCOUNTING_DIR = DATA_DIR / "accounting"
 
 # Where a dollar went, in decreasing order of "we know what this is".
 DEST_SELF = "known_self"            # operator ground truth
+# Not sent to a wallet of his directly, but PROVEN to land on him: movements.py
+# resolved the route (a Bridge2 deposit crediting his own HL account, a decoded
+# bridge minting at his wallet, a round trip back to him).
+DEST_ROUTED_SELF = "routed_to_self"
 DEST_IDENTIFIED = "identified"      # roster CONFIRMED or PROBABLE
 DEST_INFRASTRUCTURE = "infrastructure"   # exchange / bridge / contract
 DEST_LEAD = "lead"                  # roster POSSIBLE or WATCH
 DEST_UNKNOWN = "unknown"            # in no roster tier at all
 
-DEST_ORDER = [DEST_SELF, DEST_IDENTIFIED, DEST_INFRASTRUCTURE, DEST_LEAD,
+DEST_ORDER = [DEST_SELF, DEST_ROUTED_SELF, DEST_IDENTIFIED, DEST_INFRASTRUCTURE, DEST_LEAD,
               DEST_UNKNOWN]
 
 
@@ -71,12 +75,15 @@ def classify_destination(addr: str, roster: dict, known_self: set) -> str:
     return DEST_UNKNOWN
 
 
-def reconcile(records, target: str, roster: dict, known_self: set) -> dict:
+def reconcile(records, target: str, roster: dict, known_self: set,
+              routed_to_self: set | None = None) -> dict:
     """Split the target's outflow by what we know about each destination.
 
     Pure: takes records, returns the accounting. `records` is whatever
-    `records_for(target)` yields.
+    `records_for(target)` yields. `routed_to_self` holds the record ids whose
+    route movements.py resolved back to him; only those leave their bucket.
     """
+    routed_to_self = routed_to_self or set()
     target = (target or "").lower()
     buckets = {k: {"usd": 0.0, "transfers": 0, "wallets": set()} for k in DEST_ORDER}
     unpriced = {"transfers": 0, "assets": {}, "wallets": set()}
@@ -103,7 +110,10 @@ def reconcile(records, target: str, roster: dict, known_self: set) -> dict:
             continue
         if not math.isfinite(usd) or usd <= 0:
             continue
-        bucket = buckets[classify_destination(dst, roster, known_self)]
+        where = classify_destination(dst, roster, known_self)
+        if where != DEST_SELF and rec.get("id") in routed_to_self:
+            where = DEST_ROUTED_SELF
+        bucket = buckets[where]
         bucket["usd"] += usd
         bucket["transfers"] += 1
         bucket["wallets"].add(dst)
@@ -122,6 +132,7 @@ def reconcile(records, target: str, roster: dict, known_self: set) -> dict:
     # "Traced" deliberately excludes leads. A POSSIBLE wallet is a question, and
     # counting questions as answers is how a reconciliation flatters itself.
     traced = (out["buckets"][DEST_SELF]["usd"]
+              + out["buckets"][DEST_ROUTED_SELF]["usd"]
               + out["buckets"][DEST_IDENTIFIED]["usd"]
               + out["buckets"][DEST_INFRASTRUCTURE]["usd"])
     out["traced_usd"] = round(traced, 2)
@@ -129,7 +140,8 @@ def reconcile(records, target: str, roster: dict, known_self: set) -> dict:
     # Preserve legacy consumers, but name what the measure actually establishes.
     out["destination_classified_usd"] = out["traced_usd"]
     out["destination_classified_share"] = out["traced_share"]
-    controlled = out["buckets"][DEST_SELF]["usd"]
+    controlled = round(out["buckets"][DEST_SELF]["usd"]
+                       + out["buckets"][DEST_ROUTED_SELF]["usd"], 2)
     out["controlled_recipient_usd"] = controlled
     out["controlled_recipient_share"] = round(controlled / total_usd, 4) if total_usd else 0.0
     out["associated_recipient_usd"] = out["buckets"][DEST_IDENTIFIED]["usd"]
@@ -152,9 +164,12 @@ def build_accounting(config: dict | None = None) -> dict:
     known_self = {(w or "").lower() for w in config.get("known_self_wallets", [])}
 
     from src.chain.collect import records_for
-    result = reconcile(records_for(target), target, _roster_index(), known_self)
     from src.correlator import collect_target_movements
     movements = collect_target_movements(target, config=config, data_dir=DATA_DIR)
+    routed = {i for row in movements["resolved"]
+              for i in (row.get("event_ids") or [row.get("id")]) if i}
+    result = reconcile(records_for(target), target, _roster_index(), known_self,
+                       routed_to_self=routed)
     result["economic_routes"] = {
         **movements["totals"], "coverage": movements["coverage"],
         "resolved_count": len(movements["resolved"]),
