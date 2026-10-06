@@ -13,7 +13,7 @@ def test_scan_is_checkpoint_owner_and_discovery_precedes_enrichment():
     assert text.index('index_discovery_routes.py') < text.index('python src/scanner.py')
     assert text.index('python src/scanner.py') < text.index('check_successor_hypotheses.py')
     assert "steps.discovery_state.conclusion == 'success'" in text
-    assert text.index('actions/upload-artifact@v4') < text.index('discovery_artifacts.py cleanup')
+    assert text.index('actions/upload-artifact@v5') < text.index('discovery_artifacts.py cleanup')
     assert 'data/discovery/' in text and 'data/movements/' in text
 
 
