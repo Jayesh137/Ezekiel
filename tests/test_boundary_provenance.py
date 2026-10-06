@@ -242,3 +242,24 @@ def test_mints_system_and_protocol_addresses_are_never_funders():
         {"from": provenance.FORWARDER, "usd": 5e5, "ts": 1, "chain": "hyperevm"},
         {"from": QUIET, "usd": 2e5, "ts": 1, "chain": "hyperevm"}])
     assert [r["address"] for r in rows] == [QUIET]
+
+
+def test_an_account_paying_in_from_its_own_address_on_any_chain_is_traced_to_its_funders():
+    # Live: three Circle-route accounts had deposited from their own Arbitrum
+    # address through Hyperliquid's extension, and read as their own hop-1
+    # 'source' - their real funders landed at hop 2, where his wallet is HIGH.
+    ledger = [{"time": 1_790_000_000_000, "hash": "0xc", "delta": {
+        "type": "send", "user": provenance.FORWARDER, "destination": NEW, "token": "USDC",
+        "amount": "2000000.0", "usdcValue": "2000000.0"}}]
+    asked = []
+
+    def inbound(chain, address, *, since_ts, until_ts):
+        asked.append((chain, address))
+        return [{"from": T, "usd": 2e6, "ts": until_ts - 60, "chain": chain}]
+    rec = provenance.resolve(NEW, ledger=ledger, unit_events=[], index=INDEX, label_of=label_of,
+                             read_inbound=inbound, read_first_gas=no_gas, read_ledger=boom,
+                             circle_source=lambda e, a: {"address": NEW, "chain": "arbitrum"},
+                             now_ts=1_791_000_000)
+    assert asked == [("arbitrum", NEW)]
+    [f] = provenance.findings(rec)
+    assert (f["severity"], f["hop"]) == ("CRITICAL", 1)

@@ -126,3 +126,12 @@ def test_a_mint_is_no_exchange_that_paid_him():
     fam = perimeter.exchange_families([rec(zero, T, 5e6), rec(SVC, T, 5e6)], set(), {T},
                                       is_hot=lambda a: True)
     assert fam == {"paid_him": [SVC]}
+
+
+def test_a_contract_that_paid_him_is_no_exchange():
+    # Live: the Bridge2 contract 'paid him' every HL withdrawal; as a contract it
+    # passed the hot test and made any account it paid read same_exchange.
+    bridge = "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7"
+    fam = perimeter.exchange_families([rec(bridge, T, 9e6), rec(SVC, T, 5e6)], set(), {T},
+                                      is_hot=lambda a: True, is_contract=lambda a: a == bridge)
+    assert fam == {"paid_him": [SVC]}

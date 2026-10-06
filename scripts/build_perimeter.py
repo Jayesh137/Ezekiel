@@ -27,7 +27,7 @@ SUBSTRATE_EVERY_S = 24 * 3600
 # Bumped when the rules that build associates or families change, so a fix
 # lands on the next run instead of waiting for the daily pass. 2 (2026-10-06):
 # mints and system addresses kept out of his exchange families.
-RULES_VERSION = 2
+RULES_VERSION = 3          # 3: a contract (the Bridge2 contract) is no exchange that paid him
 ACTIVE_VALUE_USD = 10_000.0
 ACTIVE_VOLUME_USD = 100_000.0
 
@@ -141,7 +141,8 @@ def main(argv=None, *, post=None, substrate=None, now=None, is_hot=None,
         records = [r for a in sorted(rows) for r in rows[a]]
         found = pm.associates([r for a in sorted(core) for r in rows.get(a, [])], core,
                               is_contract=contract, is_busy=busy, services=services)
-        families = pm.exchange_families(records, deposits, core, is_hot=hot_test)
+        families = pm.exchange_families(records, deposits, core, is_hot=hot_test,
+                                        is_contract=contract)
         substrate_at, rules_version = now_iso, RULES_VERSION
     else:
         found = previous.get("associates") or {}

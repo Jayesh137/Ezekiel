@@ -38,7 +38,7 @@ CACHE_TTL_S = 7 * 86400
 # resolved again now instead of keeping its verdict for the TTL. 2 (2026-10-06):
 # mints, system addresses and Circle's wallet are no funders; an empty hop is
 # unresolved; vault withdrawals are not funding.
-RESOLVER_VERSION = 2
+RESOLVER_VERSION = 3       # 3: an account paying in from its own address, on any chain
 KEEP_ACCOUNTS, KEEP_FINDINGS = 2000, 500
 # Hyperliquid's CCTP extension on Arbitrum: a Circle deposit through it is a
 # USDC transfer from the depositor's own address into this contract.
