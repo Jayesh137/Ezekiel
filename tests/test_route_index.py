@@ -1,7 +1,7 @@
 from src.route_index import index_routes
 
 A = "0x" + "1" * 40
-B = "0x" + "2" * 40
+B = "0x" + "5" * 40   # not 0x2222…2222: that is HyperCore's HYPE system address
 ROUTER = "0x" + "3" * 40
 TOKEN = "0x" + "4" * 40
 
@@ -249,3 +249,15 @@ def test_protocol_join_cannot_reuse_a_binding_from_another_transfer():
     received = {'protocol_message_id': '6:n', 'protocol_id_verified': True, 'direction': 'in', 'hl_account': B}
     report = index_routes([record], {}, [received], {A})
     assert not report['routes'] and len(report['unresolved']) == 1
+
+
+def test_mints_and_system_contracts_never_become_funding_route_candidates():
+    from src.route_index import index_routes
+    T = "0x45d26f28196d226497130c4bac709d808fed4029"
+    recs = [{"id": f"r{i}", "src": src, "dst": T, "amount_usd": 1e6, "ts": 1, "chain": "polygon",
+             "tx_hash": f"0x{i}"} for i, src in enumerate((
+                 "0x0000000000000000000000000000000000000000",
+                 "0x0000000000000000000000000000000000001010",
+                 "0x2000000000000000000000000000000000000000"))]
+    out = index_routes(recs, {}, [], {T})
+    assert out["discoveries"] == []

@@ -149,7 +149,12 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
     routes, unresolved, discoveries, seen = [], [], {}, set()
 
     def discover(wallet, route):
-        if not wallet or wallet in cluster:
+        # A mint (the zero address), a chain's native-token system contract or a
+        # HyperCore system address is not a funder: data/candidates/0x000…0000.json
+        # held hundreds of these before 2026-10-06.
+        if (not wallet or wallet in cluster or wallet == "0x" + "0" * 40
+                or wallet == "0x0000000000000000000000000000000000001010"
+                or wallet.startswith(("0x20000000000000000000000000000000000000", "0x2222222222"))):
             return
         key = (wallet, route["id"])
         discoveries[key] = {"wallet": wallet, "source": "funding_route", "positive": True,
