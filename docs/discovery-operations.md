@@ -167,7 +167,16 @@ artifact quotas can still be exhausted if imports stop; an upload failure is a
 visible workflow failure, never permission to buy storage or discard unseen facts.
 
 Scheduled compaction retains at most 100,000 market events within 30 days,
-250,000 fills within 90 days globally, and 100,000 generic observations. Explicit
+250,000 fills within 90 days globally, and 100,000 generic observations.
+Those caps count rows; the checkpoint budget counts bytes, and with every
+table at its cap the compressed store reached ~48 MiB, so from 2026-10-03
+every snapshot was refused and discovery froze on a three-day-old checkpoint.
+The scanner's own checkpoint is therefore taken with `snapshot_within_budget`:
+over budget, the oldest 15% of replayable bulk (fills outside active backfills,
+generic observations other than authority) is removed and the snapshot taken
+again, at most 8 rounds, recorded as `storage_retention.byte_trimmed` and in
+`data/discovery/state.json`. Observation shards are never trimmed - their facts
+are unseen - so an oversized shard still fails visibly. Explicit
 authority can survive up to 730 days subject to that generic row cap. Evaluation
 profiles have their own 90-day/10,000-row cap, keeping the first and last profile
 per member per UTC day. Frozen membership excludes new nonmembers from retention.

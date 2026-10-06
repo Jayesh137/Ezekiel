@@ -176,3 +176,73 @@ def test_bad_observer_shard_does_not_disable_valid_checkpoint(tmp_path, corrupt_
     assert report['ready'] is True
     assert report['pending_shards'] == 1
     assert report['errors'][0]['artifact_id'] == 2
+
+
+def _bulky_store(db, *, fills=400, circle=300, authority=5, pending=None):
+    """Old-to-new fills and observations whose text does not compress away."""
+    import hashlib
+    import json as _json
+
+    def noise(i):
+        return hashlib.sha256(str(i).encode()).hexdigest() * 4
+    with DiscoveryStore(db) as store:
+        store.db.execute('CREATE TABLE IF NOT EXISTS fills (wallet TEXT, event_id TEXT PRIMARY KEY, ts INTEGER, raw TEXT)')
+        store.db.execute('CREATE TABLE IF NOT EXISTS fill_progress (wallet TEXT PRIMARY KEY, start_ms INTEGER, cursor_ms INTEGER)')
+        store.db.execute('CREATE TABLE IF NOT EXISTS fill_coverage (wallet TEXT, start_ms INTEGER, end_ms INTEGER)')
+        for i in range(fills):
+            wallet = (pending if pending and i < 20 else A if i % 2 else B)
+            store.db.execute('INSERT INTO fills VALUES (?,?,?,?)',
+                             (wallet, f'f{i}', 1_000 + i, _json.dumps({'tid': i, 'pad': noise(i)})))
+        if pending:
+            store.db.execute('INSERT INTO fill_progress VALUES (?,?,?)', (pending, 0, 500))
+        store.db.commit()
+        store.ingest_observations('authority_actions',
+                                  [{'event_id': f'auth{i}', 'pad': noise(-i)} for i in range(authority)], 1)
+        for i in range(circle):
+            store.ingest_observations('circle', [{'event_id': f'c{i}', 'pad': noise(10_000 + i)}], 2 + i)
+
+
+def test_a_checkpoint_over_its_byte_budget_is_trimmed_oldest_first_until_it_fits(tmp_path, monkeypatch):
+    # 2026-10-03 onward: retention caps rows, the artifact budget is bytes, and
+    # once the tables reached their caps every snapshot was refused - discovery
+    # froze on a three-day-old checkpoint while 465 shards piled up unimported.
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    _bulky_store(db)
+    plain = state.snapshot(db, tmp_path / 'probe').stat().st_size
+    monkeypatch.setattr(state, 'MAX_ARCHIVE_BYTES', int(plain * 0.6))
+    with pytest.raises(state.OverBudget):
+        state.snapshot(db, tmp_path / 'refused')
+    path = state.snapshot_within_budget(db, tmp_path / 'out')
+    assert path.stat().st_size <= state.MAX_ARCHIVE_BYTES
+    with sqlite3.connect(db) as conn:
+        newest = conn.execute('SELECT max(ts) FROM fills').fetchone()[0]
+        oldest = conn.execute('SELECT min(ts) FROM fills').fetchone()[0]
+        assert newest == 1_399 and oldest > 1_000
+    with DiscoveryStore(db) as store:
+        trimmed = store.meta('storage_retention', {}).get('byte_trimmed') or {}
+        assert trimmed.get('fills', 0) > 0 and trimmed.get('rounds', 0) >= 1
+
+
+def test_active_backfills_and_authority_are_never_trimmed_for_bytes(tmp_path, monkeypatch):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    pend = '0x' + '9' * 40
+    _bulky_store(db, pending=pend)
+    plain = state.snapshot(db, tmp_path / 'probe').stat().st_size
+    monkeypatch.setattr(state, 'MAX_ARCHIVE_BYTES', int(plain * 0.6))
+    state.snapshot_within_budget(db, tmp_path / 'out')
+    with sqlite3.connect(db) as conn:
+        assert conn.execute('SELECT count(*) FROM fills WHERE wallet=?', (pend,)).fetchone()[0] == 20
+        assert conn.execute('SELECT * FROM fill_progress WHERE wallet=?', (pend,)).fetchone()
+    with DiscoveryStore(db) as store:
+        assert len(store.observations('authority_actions')) == 5
+
+
+def test_a_budget_that_cannot_be_met_still_fails_loudly(tmp_path, monkeypatch):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    _bulky_store(db, fills=50, circle=20, authority=200)
+    monkeypatch.setattr(state, 'MAX_ARCHIVE_BYTES', 512)
+    with pytest.raises(state.OverBudget):
+        state.snapshot_within_budget(db, tmp_path / 'out')
