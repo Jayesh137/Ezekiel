@@ -1,5 +1,7 @@
 """Daily records: additive, never counting a fill twice, never claiming what was not read."""
 
+import copy
+
 from src.study import records as rec
 
 W = "0x" + "a" * 40
@@ -21,6 +23,13 @@ def order(t, tif="Ioc", side="B", px="105.0", cloid=None, status="filled",
     return {"order": {"coin": "BTC", "side": side, "limitPx": px, "oid": t, "timestamp": t,
                       "tif": tif, "cloid": cloid, "isTrigger": trigger, "orderType": otype,
                       "reduceOnly": False}, "status": status}
+
+
+def ledger_row(i, usd=None, kind="send"):
+    """A ledger row `i` ms into the test day, with a unique hash. `usd=None` is a delta that
+    carries no value field at all (a spotGenesis, say), which is ordinary in a real ledger."""
+    delta = {"type": kind} if usd is None else {"type": kind, "usd": str(usd)}
+    return {"time": DAY0 + i, "hash": f"0x{i:040x}", "delta": delta}
 
 
 def test_minutes_round_trip():
@@ -296,3 +305,67 @@ def test_day_with_exactly_twenty_coins_keeps_all_and_no_other():
     coins = days["2026-10-02"]["coins"]
     assert len(coins) == 20
     assert rec.OTHER not in coins
+
+
+def test_a_value_less_ledger_row_is_the_first_dropped_over_the_cap():
+    """Over the cap an unknown value ranks below every known one: it goes first, then the
+    smallest known row. (Pins `value-less rows ranked first`.)"""
+    known = [ledger_row(i, usd=float(i)) for i in range(1, rec.MAX_LEDGER + 2)]  # $1 .. $51
+    unknown = ledger_row(100)
+    days = {}
+    rec.fold_ledger(days, known + [unknown], wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    day = days["2026-10-02"]
+    assert len(day["ledger"]) == rec.MAX_LEDGER
+    assert day["ledger_overflow"] == 2
+    assert all(r["usd"] is not None for r in day["ledger"])
+    # The other row dropped is the smallest known one ($1), so $2 .. $51 remain.
+    remaining = sorted(r["usd"] for r in day["ledger"])
+    assert remaining == [float(v) for v in range(2, rec.MAX_LEDGER + 2)]
+
+
+def test_ledger_rows_of_equal_value_keep_the_earliest_over_the_cap():
+    """Rows of one value tie on rank and a tie goes to the earlier row. Fed newest-first, so
+    neither the input order nor a stable sort can stand in for the tie-break.
+    (Pins `ties broken by the latest time`.)"""
+    total = rec.MAX_LEDGER + 10
+    rows = [ledger_row(i, usd=100.0) for i in range(total, 0, -1)]  # 60 rows, all $100
+    days = {}
+    rec.fold_ledger(days, rows, wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    day = days["2026-10-02"]
+    assert [r["ts_ms"] for r in day["ledger"]] == [DAY0 + i for i in range(1, rec.MAX_LEDGER + 1)]
+    assert day["ledger_overflow"] == 10
+
+
+def test_a_covered_refold_returns_the_last_fill_and_changes_nothing():
+    """A crash-retry re-folds a window whose rows are all covered. The cursor handed back must
+    still be the last in-window fill, not the caller's stale value, and the record must not
+    move. The read runs past the boundary, as a real one does, and those rows are not this
+    fold's. (Pins the pre-fix return: the last UNCOVERED order, else `last_fill_ms`.)"""
+    fills = program(DAY0 + HOUR, 20)
+    delivered = fills + [fill(DAY0 + 3 * HOUR)]
+    days = {}
+    first = rec.fold_fills(days, delivered, wallet=W, role="studied", start_ms=DAY0,
+                           end_ms=DAY0 + 2 * HOUR, last_fill_ms=None)
+    assert first == fills[-1]["time"]
+    folded = copy.deepcopy(days)
+    for stale in (None, DAY0 + 30 * 60_000):
+        again = rec.fold_fills(days, delivered, wallet=W, role="studied", start_ms=DAY0,
+                               end_ms=DAY0 + 2 * HOUR, last_fill_ms=stale)
+        assert again == fills[-1]["time"]
+        assert days == folded
+
+
+def test_folding_a_covered_ledger_span_again_changes_nothing():
+    """Rows a fold dropped over the cap must not re-enter on a repeat fold and be dropped, and
+    counted, a second time: `ledger_overflow` stays exact. (Pins `no ledger coverage filter`.)"""
+    rows = [ledger_row(i, usd=float(i)) for i in range(1, rec.MAX_LEDGER + 11)]  # 60 rows
+    days = {}
+    rec.fold_ledger(days, rows, wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    assert days["2026-10-02"]["ledger_overflow"] == 10
+    once = copy.deepcopy(days)
+    rec.fold_ledger(days, rows, wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    assert days == once
