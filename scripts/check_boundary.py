@@ -285,6 +285,8 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
                     tx = (p.get("transactionHash") or "").lower()
                     for r in (bridge2.decode_withdrawal(x) for x in readers["tx_logs"](tx)):
                         if r and r["destination"] == m["address"]:
+                            # A transaction's logs carry no time; its payout row does.
+                            r = {**r, "ts": r.get("ts") or logs.to_int(p.get("timeStamp") or 0)}
                             events.append(at.from_bridge2_withdrawal(r, retro=True))
                     read.append(tx)
                 if len(todo) <= RETRO_TX_PER_MEMBER:
