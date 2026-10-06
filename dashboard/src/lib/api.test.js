@@ -107,3 +107,40 @@ test('every detector the watch or trace job checks for blindness has a dashboard
 		assert.ok(names.has(n), n);
 	}
 });
+
+import { traceFindings, perimeterRows, provenanceRows, DETECTOR_FEEDS as FEEDS2 } from './api.js';
+
+test('trace findings merge both files newest first and keep severity', () => {
+	const boundary = { findings: [
+		{ kind: 'outside_account_paid_his_world', severity: 'CRITICAL', hl_account: '0xa', counterparty: '0xb', role: 'deposit', amount_usd: 5, ts: 10, source: 'bridge2' },
+		{ kind: 'perimeter_member_active_on_hl', severity: null, hl_account: '0xc', counterparty: '0xc', role: 'associate', ts: 30 }] };
+	const provenance = { findings: [
+		{ kind: 'provenance_touches_his_world', severity: 'HIGH', account: '0xd', member: '0xe', role: 'sink', usd: 7, ts: 20, hop: 2, route: 'bridge2' }] };
+	const rows = traceFindings(boundary, provenance);
+	assert.deepEqual(rows.map((r) => r.account), ['0xc', '0xd', '0xa']);
+	assert.equal(rows[1].other, '0xe');
+	assert.equal(rows[2].severity, 'CRITICAL');
+	assert.ok(rows.every((r) => typeof r.label === 'string' && r.label.length));
+	assert.deepEqual(traceFindings(null, undefined), []);
+});
+
+test('perimeter rows are ordered by role strength', () => {
+	const rows = perimeterRows({ members: {
+		'0x3': { address: '0x3', role: 'associate', weight: 0.3, why: 'two-way' },
+		'0x1': { address: '0x1', role: 'core', weight: 1, why: 'config', hl: { active: true, checked_at: 'x' } },
+		'0x2': { address: '0x2', role: 'deposit', weight: 1, why: 'binance' } } });
+	assert.deepEqual(rows.map((r) => r.role), ['core', 'deposit', 'associate']);
+	assert.equal(rows[0].active, true);
+	assert.deepEqual(perimeterRows(null), []);
+});
+
+test('provenance rows carry a readable verdict', () => {
+	const rows = provenanceRows({ recent: [{ account: '0x9', verdict: 'same_exchange', routes: ['bridge2'], usd: 1, hop1: [], resolved_at: 1 }] });
+	assert.equal(rows[0].verdictLabel, 'Funded by his exchange');
+	assert.deepEqual(provenanceRows({}), []);
+});
+
+test('the trace feeds are on the detector list', () => {
+	const names = new Set(FEEDS2.map((f) => f.name.toLowerCase()));
+	for (const n of ['boundary attribution', 'his perimeter', 'funding provenance']) assert.ok(names.has(n), n);
+});

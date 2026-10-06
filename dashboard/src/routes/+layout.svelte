@@ -13,6 +13,7 @@
 	const navGroups = [
 		{ label: 'Hunt', items: [
 			{ href: `${base}/recovery`, label: 'Recovery', icon: 'crosshair' },
+			{ href: `${base}/trace`, label: 'Trace', icon: 'trace' },
 			{ href: `${base}/transfers`, label: 'Transfers', icon: 'transfers' },
 			{ href: `${base}/roster`, label: 'Roster', icon: 'users' },
 			{ href: `${base}/tripwires`, label: 'Tripwires', icon: 'tripwire' },
