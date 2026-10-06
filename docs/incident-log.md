@@ -1733,3 +1733,91 @@ Production dry run from the bloated live state after the fixes: 124s inside a
 180s budget (lowered from 240), 25,064 edges, one substrate pass, all unit
 budgets spent. The job ceiling is raised 25 -> 35 minutes as a backstop, since
 the job's healthy runtime grew by the engine's step.
+
+---
+
+**Tracing measured, then rebuilt around Hyperliquid's edge (2026-10-06).** Asked
+to make fund tracing drastically better, the first job was to measure why it
+found nothing:
+
+| Measurement | Result |
+|---|---|
+| All 412 L1 counterparties (>= $50K) of the three config wallets, put to HL | 16 exist there and **none trades** — `0x160f6ef9…` ($180M two-way) included |
+| How the 72 newborn >= $1M HL accounts were funded | Circle 35 · account-to-account send 16 · Unit 9 · HyperEVM 6 · Bridge2 6 |
+| Correlator exits | $3.39B "unresolved" — mostly DeFi he still holds, bridges to himself, and his own withdrawals whose ledger row has no destination |
+| Trace engine's last run | 0 HL accounts reached; the whole 180s budget spent |
+
+Walking his money forward is exhausted: another account of his sits behind a
+custody gap or has no flow link at all. So tracing now watches the edge, from
+both sides (spec `docs/superpowers/specs/2026-10-06-boundary-trace-design.md`):
+his world as one table (`src/boundary/perimeter.py`); every Bridge2 withdrawal
+attributed to the account that made it (`scripts/check_boundary.py`, watch.yml);
+every large new account's money traced back to its first boundary
+(`scripts/run_provenance.py`, trace.yml); the correlator restricted to
+custody-gap exits and route physics; and a dashboard Trace page.
+
+**Found while building: a latent false CRITICAL in `circle_flows`.** A Circle
+withdrawal burned by USDC's forwarder names the forwarder as `messageSender`,
+so a withdrawal into his world read as an outsider paying him. The withdrawer
+now comes from the USDC system address's ledger, matched on the exact amount.
+
+**The production dry run caught what the tests could not, each fixed test-first:**
+
+1. **The perimeter held none of his four private deposit addresses.** The
+   roster tiers them INFRASTRUCTURE ("conduit: forwards 100% … to
+   infrastructure") and `load_services` read that tier as "service"; the same
+   leak made the correlator call every exit to `0x8570c2ae…` a contract.
+   Services now come from labels and config only, as the engine's own list
+   does. A roster tier is never ground truth, in either direction.
+2. **All 30 boundary findings were false.** 27 were USDC's forwarder delivering
+   his own Circle deposits — every later one would have paged CRITICAL — 2 were
+   spam airdrops (MAX, LATINA) whose senders would have received `transfer`
+   votes, and 1 was his payment to his own HyperCore deposit address. The
+   forwarder and vaults are not accounts; an unpriced token sent into his world
+   is not a payment; the roster's `transfer` vote now needs its $1K bar here too.
+3. **Every retro Circle read failed:** a three-topic getLogs needs
+   `topic0_2_opr`, not only the consecutive pairs.
+4. **The watch step ran 441s against its 240s limit**, and provenance spent
+   216s on one account: a throttled call slept 10+20+30+40s, the last after its
+   final try, and nothing bounded the run. Each step now runs on one clock (140s
+   and 200s), backoff is 2/5/10s, and a record cut short by a 429 keeps its
+   findings and is re-resolved next run instead of hiding the account for the
+   7-day TTL. Rerun under a fully throttled Blockscout: 131s and 192s, cursors
+   kept, the failures reported.
+5. **Blockscout's Arbitrum index has a hole:** blocks 507,912,970 to about
+   508,546,9xx, 2026-09-22 21:41 to 09-24 20:07 UTC. It answers "Not found" for
+   those blocks, "No logs found" for getLogs over them — the words of an empty
+   range — and its block-by-time answers the last block before the hole, 22
+   hours off. With a key, logs, the head and block-by-time come from Etherscan
+   first; a Blockscout block-by-time answer is checked against the block's own
+   timestamp; a whole-history read that fills a page is refused; an empty hop is
+   unresolved, never "unrelated". **Any keyless Blockscout read of Arbitrum
+   across that window, anywhere in this project, is suspect.**
+6. **A credit "from the forwarder" is Circle's deposit wallet, not only a Circle
+   message.** The dry run's "unresolved" $15.3M account had paid in its own
+   HyperEVM USDC. The payer is read on HyperEVM in the credit's own block (the
+   credit lands 0.36s after it): from Circle's CctpForwarder it is a message
+   whose `MessageReceived`, in the same transaction, names the source chain and
+   sender; otherwise it is a HyperEVM holder, whose funders are read through
+   Etherscan on chain 999.
+7. **The VM job map had drifted from the workflows** (`test_vm_jobs`).
+
+Measured and left alone: all six engine funders are `unknown`, because rule 9
+counts a wallet quiet only once it is measured on every chain it was seen on, so
+the perimeter's `funder` role is empty in production; four of the six are
+associates anyway.
+
+Dry-run numbers: perimeter 13 members (core 3, deposit 5, identity 1,
+associate 4), 9 put to HL, none active outside the core. Boundary, first run
+before the fixes: 2,132 withdrawals in 345,601 blocks, 30 findings, all false;
+after them, rerun under a fully throttled Blockscout: 0 findings in 131s, the
+cursor kept and the failures reported. Provenance under the same throttle: 2
+accounts in 192s — `0x1cb5b5c2…` ($15.3M) final `unresolved` (paid in from its
+own HyperEVM address, whose funders need the Etherscan key), `0x96de0254…` six
+Circle messages from the Arbitrum extension, marked for retry. Live numbers
+come from the first CI runs.
+
+**The rule: index the edge, not the graph.** A table of his addresses joined
+against a global feed of every crossing costs one lookup per event and scales
+with the table; a forward walk costs a sweep per wallet, and its yield had
+fallen to zero.

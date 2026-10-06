@@ -1,7 +1,9 @@
 # Boundary tracing — watch Hyperliquid's edges, search from both sides
 
-**Date:** 2026-10-06 · **Status:** approved design (operator chose approach A and
-asked for it to be carried through to the end) · **Scope:** fund tracing — the
+**Date:** 2026-10-06 · **Status:** implemented on `feat/boundary-trace` (plan
+`docs/superpowers/plans/2026-10-06-boundary-trace.md`); the production dry run
+and every fix it forced are in `docs/incident-log.md` (2026-10-06). Approved
+design: the operator chose approach A and asked for it to be carried through to the end. · **Scope:** fund tracing — the
 outbound attribution, inbound provenance and custody-gap correlation of value
 crossing into and out of Hyperliquid accounts, plus a dashboard page that shows
 it. The behavioural scanner, the execution-program detector and the scheduling
