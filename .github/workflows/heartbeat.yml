@@ -47,7 +47,7 @@ jobs:
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Only data/index.json and src/ are needed — avoid pulling the whole
           # data tree just to read one timestamp. requirements.txt MUST be here:
@@ -61,7 +61,7 @@ jobs:
             config.json
             requirements.txt
           sparse-checkout-cone-mode: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'

@@ -25,12 +25,12 @@ jobs:
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           sparse-checkout: |
             scripts/keep_schedule.py
           sparse-checkout-cone-mode: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: pip install requests==2.32.3
@@ -56,8 +56,8 @@ jobs:
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     timeout-minutes: 45          # steps sum past 40; the checkpoint may now take up to 4
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -126,7 +126,7 @@ jobs:
         # and freezing discovery, as it did from 2026-10-03.
         timeout-minutes: 4
         run: python scripts/discovery_artifacts.py snapshot --kind state
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         id: checkpoint_upload
         if: ${{ !cancelled() && steps.discovery_snapshot.conclusion == 'success' && steps.discovery_snapshot.outputs.artifact_path != '' }}
         with:
