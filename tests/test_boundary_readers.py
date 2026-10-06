@@ -72,3 +72,14 @@ def test_a_spent_budget_or_failed_read_raises_never_empty():
                                   budget=readers.Budget(3), get=down)
     with pytest.raises(readers.ReadError):
         readers.inbound_transfers("monad", DD53, since_ts=0, until_ts=1, budget=readers.Budget(3))
+
+
+def test_tx_logs_come_back_with_hex_block_numbers_so_every_decoder_applies():
+    from src import circle_flows as cf
+    doc = _fx("bs_txlogs_cctp_mint.json")
+    rows = readers.tx_logs("arbitrum", doc["_tx"], budget=readers.Budget(2),
+                           get=lambda url, params: doc)
+    received = [cf.decode_received(r) for r in rows
+                if r["address"] == cf.MESSAGE_TRANSMITTER_V2]
+    assert received and received[0]["domain"] == 19
+    assert all(str(r["blockNumber"]).startswith("0x") for r in rows)

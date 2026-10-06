@@ -54,7 +54,8 @@ def readers(live=(), user=None, payouts=None, tx_logs=None, unit=None, head=1_00
             "user_withdrawals": lambda u: (user or {}).get(u, []),
             "payouts": lambda m: (payouts or {}).get(m, []),
             "tx_logs": lambda tx: (tx_logs or {}).get(tx, []),
-            "unit": lambda a: (unit or {}).get(a, {"addresses": [], "operations": []})}
+            "unit": lambda a: (unit or {}).get(a, {"addresses": [], "operations": []}),
+            "mints": lambda m: [], "system_sends": lambda start_ms: []}
 
 
 def _state(tmp):
@@ -157,3 +158,36 @@ def test_dry_run_writes_only_its_directory_and_sends_nothing(sandbox, tmp_path_f
     cb.main(["--dry-run", str(out)], readers=readers(head=500, live=[fw(OUT, S, 5e5, 400, "0xd")]))
     assert (out / "latest.json").exists() and not (tmp / "boundary").exists()
     assert not sent["boundary"] and not sent["foreign"]
+
+
+def test_retro_circle_mints_name_an_outside_withdrawer(sandbox):
+    tmp, sent = sandbox
+    from pathlib import Path
+
+    from src.boundary import readers as rd
+    fx = json.loads((Path(__file__).parent / "fixtures" / "boundary" / "bs_txlogs_cctp_mint.json").read_text())
+    logs = rd.tx_logs("arbitrum", fx["_tx"], budget=rd.Budget(2), get=lambda url, params: fx)
+    mint = {"transactionHash": fx["_tx"], "timeStamp": hex(1_790_000_000), "logIndex": "0x0"}
+    r = readers(head=500, tx_logs={fx["_tx"]: logs})
+    r["mints"] = lambda m: [mint] if m == T else []
+    r["system_sends"] = lambda start: [{"user": OUT, "amount": 6_000_000.0, "ts_ms": 1, "hash": "x"}]
+    cb.main([], readers=r)
+    st = _state(tmp)
+    f = [f for f in st["findings"] if f["source"] == "circle"]
+    assert f and f[0]["hl_account"] == OUT and f[0]["counterparty"] == T and f[0]["retro"]
+    assert st["retro"][T]["circle"]
+
+
+def test_his_own_retro_circle_withdrawal_is_not_a_finding(sandbox):
+    tmp, sent = sandbox
+    from pathlib import Path
+
+    from src.boundary import readers as rd
+    fx = json.loads((Path(__file__).parent / "fixtures" / "boundary" / "bs_txlogs_cctp_mint.json").read_text())
+    logs = rd.tx_logs("arbitrum", fx["_tx"], budget=rd.Budget(2), get=lambda url, params: fx)
+    mint = {"transactionHash": fx["_tx"], "timeStamp": hex(1_790_000_000), "logIndex": "0x0"}
+    r = readers(head=500, tx_logs={fx["_tx"]: logs})
+    r["mints"] = lambda m: [mint] if m == T else []
+    r["system_sends"] = lambda start: [{"user": T, "amount": 6_000_000.0, "ts_ms": 1, "hash": "x"}]
+    cb.main([], readers=r)
+    assert not [f for f in _state(tmp)["findings"] if f["source"] == "circle"]

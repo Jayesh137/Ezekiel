@@ -1365,8 +1365,12 @@ def alert_circle_flow(kind: str, row: dict, hl_state: dict | None) -> bool:
         cf.KIND_FUNDED_OUTSIDE: "A Wallet Of His Funded A Hyperliquid Account Outside The Cluster",
         cf.KIND_OUTSIDE_PAID_HIM: "A Hyperliquid Account Outside The Cluster Paid One Of His Addresses",
         cf.KIND_HIS_ACCOUNT_WITHDREW_OUTSIDE: "His Hyperliquid Account Withdrew Through Circle To An Outside Address",
+        cf.KIND_UNATTRIBUTED_PAID_HIM: "A Hyperliquid Withdrawal Nobody Can Attribute Paid One Of His Addresses",
     }.get(kind, "Circle Flow Touching The Cluster")
-    subject = f"[EZEKIEL] CRITICAL: {headline}"
+    # Unattributed means the withdrawer could not be named even from the USDC
+    # system ledger: it may still be his own, so it is HIGH, never CRITICAL.
+    level = "HIGH" if kind == cf.KIND_UNATTRIBUTED_PAID_HIM else "CRITICAL"
+    subject = f"[EZEKIEL] {level}: {headline}"
     hl = hl_state or {}
     if hl.get("read_ok"):
         hl_line = (f"The account on Hyperliquid: role {hl.get('role')}, value "

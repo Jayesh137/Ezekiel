@@ -143,11 +143,14 @@ def tx_logs(chain: str, tx_hash: str, *, budget: Budget, get=None) -> list[dict]
     items = doc.get("items")
     if not isinstance(items, list):
         raise ReadError("invalid Blockscout logs page")
+    # Etherscan's shape is hex strings: Blockscout v2 answers integers, and a
+    # decoder that parses with int(x, 16) (circle_flows) crashes on an int.
     return [{"address": ((i.get("address") or {}).get("hash") or "").lower(),
              "topics": [t for t in (i.get("topics") or []) if t],
-             "data": i.get("data") or "0x", "logIndex": i.get("index"),
+             "data": i.get("data") or "0x", "logIndex": hex(to_int(i.get("index"))),
              "transactionHash": (i.get("transaction_hash") or tx_hash).lower(),
-             "blockNumber": i.get("block_number"), "timeStamp": None} for i in items]
+             "blockNumber": hex(to_int(i.get("block_number"))), "timeStamp": None}
+            for i in items]
 
 
 def block_of(row: dict) -> int:

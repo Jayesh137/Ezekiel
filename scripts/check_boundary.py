@@ -57,7 +57,62 @@ def default_readers() -> dict:
         "payouts": payouts,
         "tx_logs": lambda tx: readers.tx_logs("arbitrum", tx, budget=budget),
         "unit": lambda a: unit.read_operations(a),
+        "mints": mints,
+        "system_sends": system_sends_from,
     }
+
+
+def mints(member: str) -> list:
+    """Native-USDC mints (from the zero address) into a member on Arbitrum."""
+    from src.boundary import bridge2, logs
+    topics = {0: bridge2.TOPIC_TRANSFER, 1: bridge2.topic_address("0x" + "0" * 40),
+              2: bridge2.topic_address(member)}
+    return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest")
+
+
+def system_sends_from(start_ms: int) -> list:
+    """Sends into the USDC system address since `start_ms`; raises when unreadable."""
+    import time
+
+    from scripts.check_circle_flows import system_sends_since
+    hours = max(1.0, (time.time() * 1000 - start_ms) / 3.6e6 + 1)
+    rows, readable = system_sends_since(hours=hours)
+    if not readable:
+        raise RuntimeError("USDC system ledger unreadable")
+    return rows
+
+
+def retro_circle(member: str, readers: dict, own: set, core: set) -> list:
+    """Circle withdrawals out of Hyperliquid that minted at a member, by whom.
+
+    A mint already paired with one of his own withdrawals (withdrawals.py) is
+    skipped. A forwarder-burned message names the forwarder, so its withdrawer
+    comes from the USDC system ledger (src/circle_flows.resolve_withdrawer).
+    """
+    from src import circle_flows as cf
+    from src.boundary import attribution as at
+    from src.boundary.logs import to_int
+    out = []
+    fresh = [x for x in readers["mints"](member)
+             if (x.get("transactionHash") or "").lower() not in own]
+    for mint in fresh[:RETRO_TX_PER_MEMBER]:
+        ts = to_int(mint.get("timeStamp")) if mint.get("timeStamp") else None
+        for log in readers["tx_logs"](mint["transactionHash"]):
+            if (log.get("address") or "").lower() != cf.MESSAGE_TRANSMITTER_V2:
+                continue
+            msg = cf.decode_received(log)
+            if not msg or msg["domain"] != cf.HYPEREVM_DOMAIN:
+                continue
+            msg = {**msg, "direction": "out", "hl_account": msg["message_sender"]}
+            sends = (readers["system_sends"](((ts or 0) - 7200) * 1000)
+                     if msg["message_sender"] == cf.FORWARDER else [])
+            account, _basis = cf.resolve_withdrawer(msg, sends)
+            if account and account not in core:
+                out.append(at.event(source="circle", direction="out", hl_account=account,
+                                    counterparty=member, chain="arbitrum",
+                                    amount_usd=msg["amount_usd"], ts=ts,
+                                    ref=(mint.get("transactionHash") or "").lower(), retro=True))
+    return out
 
 
 def hubs(data: Path) -> set:
@@ -152,22 +207,41 @@ def main(argv=None, *, readers=None, now=None) -> int:
         events.append({**e, "retro": not edge_cursor or int(e.get("ts") or 0) <= edge_cursor})
     new_edge_cursor = max([edge_cursor] + [int(e.get("ts") or 0) for e in edges])
 
-    # 5. Retro: who ever withdrew to a member (bounded, resumable).
+    # 5. Retro: who ever withdrew to a member (bounded, resumable). Bridge2
+    # payouts for every member but the core (whose own withdrawals are read
+    # exactly above); Circle mints for the core and his deposit addresses.
     retro = dict(previous.get("retro") or {})
+    own_circle = {(r.get("payout_tx") or "").lower() for r in
+                  ((_read(data / "withdrawals" / "latest.json").get("cctp") or {})
+                   .get("landed") or [])}
+
+    def wants(m, what):
+        if (retro.get(m["address"]) or {}).get(what):
+            return False
+        return m["role"] != "core" if what == "bridge2" else m["role"] in ("core", "deposit")
     pending = [m for m in index.members.values()
                if m["weight"] >= RETRO_MIN_WEIGHT and str(m["address"]).startswith("0x")
-               and m["role"] != "core" and not (retro.get(m["address"]) or {}).get("bridge2")]
+               and (wants(m, "bridge2") or wants(m, "circle"))]
     for m in sorted(pending, key=lambda m: m["address"])[:RETRO_MEMBERS_PER_RUN]:
-        try:
-            payouts = readers["payouts"](m["address"])
-            for tx in sorted({(p.get("transactionHash") or "").lower() for p in payouts}
-                             - own_txs)[:RETRO_TX_PER_MEMBER]:
-                for r in (bridge2.decode_withdrawal(x) for x in readers["tx_logs"](tx)):
-                    if r and r["destination"] == m["address"]:
-                        events.append(at.from_bridge2_withdrawal(r, retro=True))
-            retro.setdefault(m["address"], {})["bridge2"] = now_iso
-        except Exception as exc:  # noqa: BLE001
-            errors.append({"source": "retro", "address": m["address"], "error": str(exc)[:200]})
+        if wants(m, "bridge2"):
+            try:
+                payouts = readers["payouts"](m["address"])
+                for tx in sorted({(p.get("transactionHash") or "").lower() for p in payouts}
+                                 - own_txs)[:RETRO_TX_PER_MEMBER]:
+                    for r in (bridge2.decode_withdrawal(x) for x in readers["tx_logs"](tx)):
+                        if r and r["destination"] == m["address"]:
+                            events.append(at.from_bridge2_withdrawal(r, retro=True))
+                retro.setdefault(m["address"], {})["bridge2"] = now_iso
+            except Exception as exc:  # noqa: BLE001
+                errors.append({"source": "retro_bridge2", "address": m["address"],
+                               "error": str(exc)[:200]})
+        if wants(m, "circle"):
+            try:
+                events += retro_circle(m["address"], readers, own_circle, index.core)
+                retro.setdefault(m["address"], {})["circle"] = now_iso
+            except Exception as exc:  # noqa: BLE001
+                errors.append({"source": "retro_circle", "address": m["address"],
+                               "error": str(exc)[:200]})
 
     # Judge, merge, alert.
     found = at.classify_all(events, index)
