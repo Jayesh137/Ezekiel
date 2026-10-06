@@ -197,3 +197,34 @@ def test_hyperevm_inbound_is_read_with_a_key_and_final_without_one():
         return {"status": "0", "message": "No transactions found", "result": []}
     assert rp.make_inbound(Budget(10), has_key=True, get=get)("hyperevm", NEW, since_ts=0,
                                                               until_ts=10) == []
+
+
+def test_work_not_reached_this_run_stays_queued_for_the_next(sandbox):
+    # The 2026-10-06 dry run queued 1,529 accounts and reached 2; a deposit was
+    # queued only in the run that first read it, so the other 1,527 were gone
+    # once the cursor moved. The pool persists 30 days, and so does the work.
+    tmp, sent = sandbox
+    many = ["0x" + f"{i + 1:040x}" for i in range(rp.ACCOUNTS_PER_RUN + 5)]
+    r = readers(deposits=[dep(a, 2e5 + i, 900, f"0xd{i}") for i, a in enumerate(many)],
+                inbound={a: [] for a in many})
+    rp.main([], readers=r, now="2026-10-06T00:00:00+00:00")
+    first = json.loads((tmp / "provenance" / "latest.json").read_text())
+    assert first["attempted"] == rp.ACCOUNTS_PER_RUN
+    r2 = readers(head=1_100, inbound={a: [] for a in many})
+    rp.main([], readers=r2, now="2026-10-06T01:00:00+00:00")
+    second = json.loads((tmp / "provenance" / "latest.json").read_text())
+    assert second["attempted"] == 5 and second["counts"]["accounts_cached"] == len(many)
+
+
+def test_a_backlog_of_deposits_does_not_starve_the_newborns(sandbox):
+    tmp, sent = sandbox
+    many = ["0x" + f"{i + 1:040x}" for i in range(rp.ACCOUNTS_PER_RUN + 5)]
+    born = "0x" + "e" * 40
+    (tmp / "newborn").mkdir()
+    (tmp / "newborn" / "latest.json").write_text(json.dumps({"newborn": [
+        {"wallet": born, "account_value": 3e6}]}))
+    r = readers(deposits=[dep(a, 9e6, 900, f"0xd{i}") for i, a in enumerate(many)],
+                inbound={a: [] for a in [*many, born]})
+    rp.main([], readers=r, now="2026-10-06T00:00:00+00:00")
+    cached = json.loads((tmp / "provenance" / "latest.json").read_text())["recent"]
+    assert born in {row["account"] for row in cached}

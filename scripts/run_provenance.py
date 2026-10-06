@@ -26,6 +26,7 @@ FIRST_RUN_BLOCKS = 14 * 345_600      # 14 days of Arbitrum
 POOL_DAYS, POOL_MIN_USD = 30, 10_000.0
 QUEUE_MIN_USD = 100_000.0
 ACCOUNTS_PER_RUN = 30
+LEAD_EVERY = 3              # one slot in three goes to a lead when any is waiting
 # trace.yml gives this step 360s. One clock bounds every read: the deposit
 # walk, the account loop (no account starts with less than MIN_LEFT), the
 # Blockscout and HL budgets and the legacy log reads (2026-10-06 dry run: 216s
@@ -234,8 +235,14 @@ def default_readers(config: dict, data: Path, hl_budget, deadline: float) -> dic
     }
 
 
-def queue(data: Path, fresh: list, previous: dict, core: set) -> list[tuple]:
-    """(rank, -usd, account, reason) — fresh money first, then the leads."""
+def queue(data: Path, deposits: list, previous: dict, core: set) -> list[tuple]:
+    """(rank, -usd, account, reason) — new money first, then the leads.
+
+    Built from the persisted pools (Bridge2 30 days, Circle the correlator's
+    window), never from one run's reads alone: the 2026-10-06 dry run queued
+    1,529 accounts and reached 2, and work queued only by the run that first
+    read it is gone once the cursor moves. The cache says what is done.
+    """
     items: dict[str, tuple] = {}
 
     def add(account, rank, usd, reason):
@@ -245,12 +252,11 @@ def queue(data: Path, fresh: list, previous: dict, core: set) -> list[tuple]:
         key = (rank, -float(usd or 0))
         if a not in items or key < items[a][:2]:
             items[a] = (*key, a, reason)
-    for d in fresh:
-        if d["amount"] >= QUEUE_MIN_USD:
-            add(d["wallet"], 0, d["amount"], "bridge2 deposit")
-    seen_ts = int(previous.get("cctp_seen_ts") or 0)
+    for d in deposits:
+        if float(d.get("amount") or 0) >= QUEUE_MIN_USD:
+            add(d.get("wallet"), 0, d.get("amount"), "bridge2 deposit")
     for d in _read(data / "correlations" / "cctp_pool.json").get("deposits") or []:
-        if int(d.get("ts") or 0) > seen_ts and float(d.get("amount") or 0) >= QUEUE_MIN_USD:
+        if float(d.get("amount") or 0) >= QUEUE_MIN_USD:
             add(d.get("wallet"), 0, d.get("amount"), "circle deposit")
     for n in _read(data / "newborn" / "latest.json").get("newborn") or []:
         add(n.get("wallet"), 1, n.get("account_value"), "newborn")
@@ -263,6 +269,21 @@ def queue(data: Path, fresh: list, previous: dict, core: set) -> list[tuple]:
         if m.get("route") == "route_unknown":
             add(m.get("wallet"), 4, m.get("deposit_amount_usd"), "correlation route unknown")
     return sorted(items.values())
+
+
+def interleave(money: list, leads: list, every: int = LEAD_EVERY) -> list:
+    """Every `every`-th slot to a lead (newborn, roster, dormancy, route), so a
+    backlog of deposits can never starve the accounts most likely to be his."""
+    out, m, n = [], 0, 0
+    while m < len(money) or n < len(leads):
+        for _ in range(every - 1):
+            if m < len(money):
+                out.append(money[m])
+                m += 1
+        if n < len(leads):
+            out.append(leads[n])
+            n += 1
+    return out
 
 
 def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
@@ -325,10 +346,17 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
             cache = store.load(data / "provenance" / "accounts")
         except RuntimeError as exc:
             print(f"[provenance] cache unreadable, starting empty: {exc}")
-        fresh_wallets = {d["wallet"] for d in fresh if d["amount"] >= QUEUE_MIN_USD}
-        todo = [q for q in queue(data, fresh, previous, index.core)
-                if q[2] in fresh_wallets or q[2] not in cache or (cache.get(q[2]) or {}).get("retry")
-                or now_ts - int((cache.get(q[2]) or {}).get("resolved_at") or 0) >= CACHE_TTL_S]
+        # New money re-resolves an account already cached; the rest waits for
+        # its TTL unless its last read was cut short.
+        seen_ts = int(previous.get("cctp_seen_ts") or 0)
+        new_money = {d["wallet"] for d in fresh if d["amount"] >= QUEUE_MIN_USD} | {
+            (d.get("wallet") or "").lower()
+            for d in _read(data / "correlations" / "cctp_pool.json").get("deposits") or []
+            if int(d.get("ts") or 0) > seen_ts and float(d.get("amount") or 0) >= QUEUE_MIN_USD}
+        due = [q for q in queue(data, pool["deposits"], previous, index.core)
+               if q[2] in new_money or q[2] not in cache or (cache.get(q[2]) or {}).get("retry")
+               or now_ts - int((cache.get(q[2]) or {}).get("resolved_at") or 0) >= CACHE_TTL_S]
+        todo = interleave([q for q in due if q[0] == 0], [q for q in due if q[0] > 0])
 
         # 4. Resolve, one account never stopping the run.
         attempted, unreadable, retrying = 0, [], 0
