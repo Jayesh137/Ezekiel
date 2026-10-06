@@ -179,3 +179,15 @@ def test_a_circle_sender_matches_his_solana_wallet_by_its_raw_form():
                              now_ts=1_791_000_000)
     [f] = provenance.findings(rec)
     assert (f["severity"], f["role"], f["member"]) == ("CRITICAL", "identity", sol)
+
+
+def test_an_entry_whose_funder_was_not_found_is_unresolved_never_unrelated():
+    # USDC that left an address arrived there from somewhere. Nothing in the
+    # lookback (older, or inside an index hole - Blockscout's Arbitrum index is
+    # missing 2026-09-22 21:41 to 09-24 20:07) is an unknown, not a clean "no".
+    def nothing(chain, address, *, since_ts, until_ts):
+        return []
+    rec = provenance.resolve(NEW, ledger=_ledger_deposit(2e6), unit_events=[], index=INDEX,
+                             label_of=label_of, read_inbound=nothing, read_first_gas=no_gas,
+                             read_ledger=boom, circle_source=boom, now_ts=1_791_000_000)
+    assert not rec["complete"] and rec["verdict"] == "unresolved" and rec["retry"] is False

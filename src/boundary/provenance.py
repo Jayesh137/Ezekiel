@@ -211,8 +211,10 @@ def resolve(account, *, ledger, unit_events, index, label_of, read_inbound, read
         except ReadError as exc:
             hop1, why, transient = None, str(exc)[:160], not isinstance(exc, NoReader)
         else:
-            why, transient = "source not resolved", False
-        if hop1 is None:
+            why, transient = "source not resolved" if hop1 is None else "no funder found", False
+        if not hop1:
+            # None: not resolvable; []: nothing in the lookback (older, or in an
+            # index hole). Money arrived from somewhere — unknown, never a "no".
             record["unreadable"].append({"hop": 1, "entry": entry["ref"], "error": why,
                                          "transient": transient})
             record["complete"] = False
