@@ -67,7 +67,7 @@ def test_the_perimeter_is_written_with_roles_families_and_readings(sandbox):
 
 def test_his_deposit_addresses_stay_members_when_the_roster_calls_them_infrastructure(sandbox):
     # Production shape: the roster tiers every conduit INFRASTRUCTURE, and his
-    # private deposit addresses are conduits. Spec ง12: the perimeter contains
+    # private deposit addresses are conduits. Spec ยง12: the perimeter contains
     # the sentinels.
     tmp, sent = sandbox
     (tmp / "roster").mkdir()

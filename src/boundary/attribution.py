@@ -27,6 +27,11 @@ TITLES = {
 }
 VOTE_TRANSFER, VOTE_LINKAGE = "transfer", "linkage"
 HIGH_WEIGHT = 0.6
+# Not accounts. A vault holds pooled money (hl_surface reads vaults); USDC's
+# CCTP forwarder delivers every Circle deposit into Hyperliquid as a send, his
+# own included — 27 of the first dry run's 30 findings (2026-10-06).
+VAULT_KINDS = ("vaultDeposit", "vaultWithdraw")
+PROTOCOL_ACCOUNTS = frozenset({"0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"})
 
 
 def event(*, source, direction, hl_account, counterparty, chain, amount_usd, ts, ref,
@@ -68,7 +73,8 @@ def from_hl_edges(edges, core, *, exclude=frozenset()) -> list[dict]:
             other, direction = src, "out"
         else:
             continue
-        if other in exclude or other.startswith(SYSTEM_PREFIXES):
+        if (other in exclude or other in PROTOCOL_ACCOUNTS or other.startswith(SYSTEM_PREFIXES)
+                or e.get("kind") in VAULT_KINDS):
             continue
         counterparty = src if direction == "in" else dst
         out.append(event(source="hl_send", direction=direction, hl_account=other,
@@ -102,14 +108,18 @@ def classify(ev: dict, index) -> dict | None:
     usd = ev.get("amount_usd")
     if usd is not None and usd < DUST_USD:
         return None
+    if usd is None and ev.get("source") == "hl_send" and ev.get("direction") == "out":
+        return None     # an unpriced token sent INTO his world: anyone can airdrop one
     member = index.get(counterparty, raw)
     if account in index.core:
         if ev.get("direction") == "out" and counterparty != account and member is None:
             return _finding(ev, KIND_HIS_ACCOUNT_PAID_OUTSIDE, "CRITICAL", None, None)
         return None
-    if account == counterparty:
-        own = index.get(account)
-        if own is None:
+    own = index.get(account)
+    if account == counterparty or (own is not None and member is not None):
+        # A member's own HL account moving money: to itself, or with his world.
+        # A deposit address receiving his money is what makes it his.
+        if own is None or (account != counterparty and own["role"] == "deposit"):
             return None
         severity = "HIGH" if own["weight"] >= HIGH_WEIGHT else None
         return _finding(ev, KIND_MEMBER_ACTIVE, severity, None, own)

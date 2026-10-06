@@ -769,7 +769,9 @@ def build_roster(config: dict | None = None) -> dict:
             if not a or a == target or a in known_self:
                 continue
             e = entry(a)
-            if row.get("vote") == VECTOR_TRANSFER:
+            moved = row.get("amount_usd") if row.get("amount_usd") is not None else row.get("usd")
+            if (row.get("vote") == VECTOR_TRANSFER and moved is not None
+                    and float(moved) >= SELF_FLOW_MIN_USD):      # the transfer vote's bar
                 e["vectors"].add(VECTOR_TRANSFER)
             elif row.get("vote") == VECTOR_LINKAGE:
                 e["vectors"].add(VECTOR_LINKAGE)

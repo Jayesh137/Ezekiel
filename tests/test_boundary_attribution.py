@@ -125,3 +125,46 @@ def test_finding_keys_are_stable_and_distinct():
     assert a["key"] == at.finding_key(a) and a["key"] != b["key"]
     assert set(at.TITLES) == {at.KIND_PAID_HIS_WORLD, at.KIND_FUNDED_FROM_HIS_WORLD,
                               at.KIND_HIS_ACCOUNT_PAID_OUTSIDE, at.KIND_MEMBER_ACTIVE}
+
+
+FORWARDER = "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"
+VAULT = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+
+
+def test_vault_moves_and_circles_forwarder_are_not_accounts_paying_him():
+    # Dry run 2026-10-06: 27 of 30 findings were the forwarder delivering HIS
+    # Circle deposits (a false CRITICAL on every future one), and a vault
+    # withdrawal is a vault, not an account — excluded here, not only when the
+    # trace registry happens to call the vault a hub.
+    edges = [{"src": FORWARDER, "dst": T, "amount_usd": 3e6, "ts": 9, "tx_hash": "0xa",
+              "id": "e1", "kind": "send"},
+             {"src": VAULT, "dst": T, "amount_usd": 5e6, "ts": 10, "tx_hash": "0xb",
+              "id": "e2", "kind": "vaultWithdraw"},
+             {"src": T, "dst": VAULT, "amount_usd": 5e6, "ts": 11, "tx_hash": "0xc",
+              "id": "e3", "kind": "vaultDeposit"}]
+    assert at.from_hl_edges(edges, {T, TR}) == []
+
+
+def test_an_unpriced_token_sent_into_his_world_is_not_a_payment():
+    # MAX and LATINA airdropped to the target and the treasury seconds apart.
+    # Anyone can send any token; with no price it proves no payment. A token
+    # HE sends out is his own act and still counts.
+    assert at.classify(ev("out", OTHER, T, usd=None, source="hl_send"), INDEX) is None
+    mine = at.classify(ev("in", OTHER, T, usd=None, source="hl_send"), INDEX)
+    assert mine["kind"] == at.KIND_FUNDED_FROM_HIS_WORLD and mine["severity"] == "HIGH"
+
+
+def test_his_deposit_address_receiving_his_money_is_not_attribution():
+    # 0xf078969e paying his own HyperCore deposit address 0x4aecac3b: that is
+    # what makes it his deposit address, not an outside account.
+    assert at.classify(ev("in", S, T, source="hl_send"), INDEX) is None
+    assert at.classify(ev("out", S, T, source="hl_send"), INDEX) is None
+
+
+def test_a_sink_or_associate_moving_money_with_him_on_hl_is_that_member_active():
+    # Spec §6.2: a non-core member active on its own HL account — HIGH from
+    # weight 0.6, recorded for an associate, never a vote.
+    sink = at.classify(ev("out", SINK, T, source="hl_send"), INDEX)
+    assert (sink["kind"], sink["severity"], sink["vote"]) == (at.KIND_MEMBER_ACTIVE, "HIGH", None)
+    assoc = at.classify(ev("in", ASSOC, T, source="hl_send"), INDEX)
+    assert (assoc["kind"], assoc["severity"], assoc["vote"]) == (at.KIND_MEMBER_ACTIVE, None, None)
