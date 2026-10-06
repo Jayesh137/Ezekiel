@@ -159,9 +159,10 @@ def head_block(chain: str, *, get=None, deadline: float | None = None) -> int:
         raise LogReadError(f"head of {chain} unreadable: {exc}") from exc
 
 
-def block_at(chain: str, ts: int, *, closest: str = "before", get=None) -> int:
+def block_at(chain: str, ts: int, *, closest: str = "before", get=None,
+             deadline: float | None = None) -> int:
     """The block at a unix time (Etherscan-compatible getblocknobytime)."""
-    get = get or _http_get
+    get = get or partial(_http_get, deadline=deadline)
     params = {"module": "block", "action": "getblocknobytime", "timestamp": int(ts),
               "closest": closest}
     try:

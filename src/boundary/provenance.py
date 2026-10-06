@@ -14,7 +14,7 @@ A source that could not be read is UNREADABLE, never "no source" (rule 5).
 from __future__ import annotations
 
 from src.boundary.perimeter import STRONG_ROLES, SYSTEM_PREFIXES, low
-from src.boundary.readers import HOSTS, ReadError
+from src.boundary.readers import HOSTS, NoReader, ReadError
 
 FORWARDER = "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"
 ROUTE_BRIDGE2, ROUTE_CIRCLE, ROUTE_UNIT = "bridge2", "circle", "unit"
@@ -145,7 +145,7 @@ def classify_source(address, chain, *, index, label_of, is_contract: bool = Fals
     member = index.get(address)
     if member:
         return {"class": "perimeter", "role": member["role"], "weight": member["weight"],
-                "member_why": member.get("why")}
+                "member_why": member.get("why"), "member": member["address"]}
     out: dict = {}
     label = label_of(address, chain)
     family = index.families.get(low(address))
@@ -193,7 +193,7 @@ def _hop2(source, read_inbound, read_ledger) -> list[dict]:
                                 "hl_sender" if e["route"] == ROUTE_HL_SEND else "unit_source")
         return [r for r in rows if r["address"] != source["address"]]
     if source["chain"] not in HOSTS:
-        raise ReadError(f"no keyless reader for {source['chain']}")
+        raise NoReader(f"no keyless reader for {source['chain']}")
     return aggregate(read_inbound(source["chain"], source["address"],
                                   since_ts=(source.get("first_ts") or 0) - LOOKBACK_S,
                                   until_ts=source.get("last_ts") or source.get("first_ts") or 0))
@@ -209,11 +209,12 @@ def resolve(account, *, ledger, unit_events, index, label_of, read_inbound, read
         try:
             hop1 = _hop1(entry, account, read_inbound, read_first_gas, circle_source)
         except ReadError as exc:
-            hop1, why = None, str(exc)[:160]
+            hop1, why, transient = None, str(exc)[:160], not isinstance(exc, NoReader)
         else:
-            why = "source not resolved"
+            why, transient = "source not resolved", False
         if hop1 is None:
-            record["unreadable"].append({"hop": 1, "entry": entry["ref"], "error": why})
+            record["unreadable"].append({"hop": 1, "entry": entry["ref"], "error": why,
+                                         "transient": transient})
             record["complete"] = False
             continue
         total = sum(s["usd"] for s in hop1 if s.get("usd"))
@@ -229,13 +230,17 @@ def resolve(account, *, ledger, unit_events, index, label_of, read_inbound, read
             try:
                 hop2 = _hop2(s, read_inbound, read_ledger)
             except ReadError as exc:
-                record["unreadable"].append({"hop": 2, "via": s["address"], "error": str(exc)[:160]})
+                record["unreadable"].append({"hop": 2, "via": s["address"], "error": str(exc)[:160],
+                                             "transient": not isinstance(exc, NoReader)})
                 continue
             for t in hop2[:MAX_SOURCES]:
                 info2 = classify_source(t["address"], t["chain"], index=index, label_of=label_of,
                                         is_contract=t.get("is_contract", False))
                 record["sources"].append({**t, **info2, "hop": 2, "via": s["address"],
                                           "entry": entry["ref"], "route": entry["route"]})
+    # A throttled or budget-cut read is this run's problem, not the account's:
+    # the record is kept (its findings stand) and re-resolved next run.
+    record["retry"] = any(u.get("transient") for u in record["unreadable"])
     record["exchange_sources"] = sorted({s["address"] for s in record["sources"]
                                          if s["class"] in EXCHANGE_CLASSES})
     record["verdict"] = verdict(record)
@@ -275,7 +280,8 @@ def findings(record: dict) -> list[dict]:
         seen.add(key)
         out.append({"kind": "provenance_touches_his_world", "account": record["account"],
                     "severity": severity, "vote": vote, "hop": hop, "role": role,
-                    "member": s["address"], "member_why": s.get("member_why"), "via": s.get("via"),
+                    "member": s.get("member") or s["address"], "member_why": s.get("member_why"),
+                    "via": s.get("via"),
                     "route": s.get("route"), "usd": e.get("usd"), "ts": e.get("ts"),
                     "entry_ref": s.get("entry"), "key": key})
     return out

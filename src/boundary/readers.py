@@ -28,6 +28,10 @@ class ReadError(RuntimeError):
     pass
 
 
+class NoReader(ReadError):
+    """No reader exists for this chain: the same answer next run, so final."""
+
+
 class Budget:
     """Calls (and optionally seconds) a run may spend on Blockscout."""
 
@@ -64,7 +68,7 @@ def _call(url: str, params: dict, budget: Budget, get) -> dict:
 def _host(chain: str) -> str:
     host = HOSTS.get(chain)
     if not host:
-        raise ReadError(f"no keyless reader for {chain}")
+        raise NoReader(f"no keyless reader for {chain}")
     return host
 
 

@@ -117,3 +117,44 @@ def test_a_dry_run_can_read_a_perimeter_from_anywhere(sandbox, tmp_path_factory)
             now="2026-10-06T00:00:00+00:00")
     st = json.loads((out / "latest.json").read_text())
     assert st["findings"] and st["findings"][0]["member"] == OTHER
+
+
+def test_an_account_that_hit_a_transient_failure_is_retried_inside_its_ttl(sandbox):
+    tmp, sent = sandbox
+    r = readers(deposits=[dep(OTHER, 5e5, 900, "0xd3")],
+                ledgers={OTHER: _deposit_row(5e5, 1_790_000_900_000)})
+
+    def throttled(chain, address, *, since_ts, until_ts):
+        from src.boundary.readers import ReadError
+        raise ReadError("429")
+    r["inbound"] = throttled
+    rp.main([], readers=r, now="2026-10-06T00:00:00+00:00")
+    (tmp / "roster").mkdir()
+    (tmp / "roster" / "latest.json").write_text(json.dumps({"wallets": [
+        {"wallet": OTHER, "tier": "POSSIBLE"}]}))
+    calls = []
+    r2 = readers(head=1_100, ledgers={OTHER: _deposit_row(5e5, 1_790_000_900_000)},
+                 inbound={OTHER: []})
+    r2["ledger"] = lambda a: calls.append(a) or _deposit_row(5e5, 1_790_000_900_000)
+    rp.main([], readers=r2, now="2026-10-06T01:00:00+00:00")
+    assert calls == [OTHER]
+
+
+def test_a_slow_run_stops_starting_accounts_at_its_deadline(sandbox):
+    # trace.yml gives the step 360s; the 2026-10-06 dry run spent 216s on one
+    # account. Accounts not reached stay queued for the next run.
+    tmp, sent = sandbox
+    now = [0.0]
+    accounts = ["0x" + c * 40 for c in "789bcdef"]
+    r = readers(deposits=[dep(a, 5e5, 900 + i, f"0xd{i}") for i, a in enumerate(accounts)],
+                inbound={a: [] for a in accounts})
+
+    def slow_ledger(a):
+        now[0] += 60.0
+        return _deposit_row(5e5, 1_790_000_900_000)
+    r["ledger"] = slow_ledger
+    rp.main([], readers=r, now="2026-10-06T00:00:00+00:00", clock=lambda: now[0])
+    st = json.loads((tmp / "provenance" / "latest.json").read_text())
+    assert 0 < st["attempted"] < len(accounts)
+    assert now[0] <= rp.RUN_SECONDS + 60.0
+    assert st["deferred_accounts"] == len(accounts) - st["attempted"]

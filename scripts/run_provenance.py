@@ -25,7 +25,13 @@ from src import utils  # noqa: E402
 FIRST_RUN_BLOCKS = 14 * 345_600      # 14 days of Arbitrum
 POOL_DAYS, POOL_MIN_USD = 30, 10_000.0
 QUEUE_MIN_USD = 100_000.0
-ACCOUNTS_PER_RUN, SECONDS = 30, 150.0
+ACCOUNTS_PER_RUN = 30
+# trace.yml gives this step 360s. One clock bounds every read: the deposit
+# walk, the account loop (no account starts with less than MIN_LEFT), the
+# Blockscout and HL budgets and the legacy log reads (2026-10-06 dry run: 216s
+# on ONE account under a throttled host, with each budget timed separately).
+RUN_SECONDS = 200.0
+MIN_LEFT = 30.0
 CACHE_TTL_S = 7 * 86400
 KEEP_ACCOUNTS, KEEP_FINDINGS = 2000, 500
 # Hyperliquid's CCTP extension on Arbitrum: a Circle deposit through it is a
@@ -69,7 +75,7 @@ def make_label_of(config: dict, data: Path):
     return label_of
 
 
-def circle_source_reader(budget):
+def circle_source_reader(budget, deadline: float | None = None):
     """The burner behind a Circle deposit: the Arbitrum CCTP extension's own
     USDC transfer of the same amount in the 30 minutes before (keyless). A
     deposit from any other route stays unresolved here — recorded, not guessed."""
@@ -81,11 +87,11 @@ def circle_source_reader(budget):
             return None
         budget.spend()
         try:
-            lo = logs.block_at("arbitrum", ts - 1800)
-            hi = logs.block_at("arbitrum", ts + 120, closest="after")
+            lo = logs.block_at("arbitrum", ts - 1800, deadline=deadline)
+            hi = logs.block_at("arbitrum", ts + 120, closest="after", deadline=deadline)
             rows = logs.read_logs("arbitrum", bridge2.USDC,
                                   {0: bridge2.TOPIC_TRANSFER, 2: bridge2.topic_address(EXTENSION)},
-                                  lo, hi)
+                                  lo, hi, deadline=deadline)
         except logs.LogReadError:
             return None
         hits = [r for r in rows if abs(int(r["data"], 16) / 1e6 - usd) <= max(1.0, usd * 0.002)]
@@ -95,11 +101,12 @@ def circle_source_reader(budget):
     return resolve
 
 
-def default_readers(config: dict, data: Path, hl_budget) -> dict:
+def default_readers(config: dict, data: Path, hl_budget, deadline: float) -> dict:
+    """The network readers, every one bounded by the run's `deadline` (monotonic)."""
     from scripts.run_trace_engine import paced_post
     from src.boundary import bridge2, logs, readers, unit
     from src.trace import hl_ledger
-    budget = readers.Budget(120, seconds=SECONDS)
+    budget = readers.Budget(120, seconds=max(0.0, deadline - time.monotonic()))
     post = paced_post(hl_budget)
 
     def ledger(account):
@@ -108,15 +115,16 @@ def default_readers(config: dict, data: Path, hl_budget) -> dict:
             raise readers.ReadError(error)
         return rows
     return {
-        "head": lambda: logs.head_block("arbitrum"),
+        "head": lambda: logs.head_block("arbitrum", deadline=deadline),
         "deposits": lambda lo, hi: logs.read_logs("arbitrum", bridge2.USDC,
-                                                  bridge2.deposit_topics(), lo, hi),
+                                                  bridge2.deposit_topics(), lo, hi,
+                                                  deadline=deadline),
         "ledger": ledger,
         "unit": lambda a: unit.read_operations(a),
         "inbound": lambda chain, a, since_ts, until_ts: readers.inbound_transfers(
             chain, a, since_ts=since_ts, until_ts=until_ts, budget=budget),
         "first_gas": lambda chain, a: readers.first_gas(chain, a, budget=budget),
-        "circle_source": circle_source_reader(budget),
+        "circle_source": circle_source_reader(budget, deadline),
         "label_of": make_label_of(config, data),
     }
 
@@ -152,7 +160,7 @@ def queue(data: Path, fresh: list, previous: dict, core: set) -> list[tuple]:
     return sorted(items.values())
 
 
-def main(argv=None, *, readers=None, now=None) -> int:
+def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
     from src import alerts
     from src.boundary import attribution as at
     from src.boundary import bridge2, logs, provenance, unit
@@ -172,10 +180,14 @@ def main(argv=None, *, readers=None, now=None) -> int:
     previous = _read(data / "provenance" / "latest.json")
     doc = _read(Path(args.perimeter) if args.perimeter else data / "perimeter" / "latest.json")
     index = pm.Index(doc if doc.get("members") else pm.core_only(config, now_iso))
-    started = time.monotonic()
+    started = clock()
 
-    with ReadBudget(seconds=SECONDS, weight_per_minute=500) as hl_budget:
-        readers = readers or default_readers(config, data, hl_budget)
+    def left() -> float:
+        return RUN_SECONDS - (clock() - started)
+
+    with ReadBudget(seconds=RUN_SECONDS, weight_per_minute=500) as hl_budget:
+        readers = readers or default_readers(config, data, hl_budget,
+                                             deadline=time.monotonic() + RUN_SECONDS)
 
         # 1. The Bridge2 deposit feed -> the correlator's complete pool.
         pool = _read(data / "provenance" / "bridge_deposits.json")
@@ -184,7 +196,8 @@ def main(argv=None, *, readers=None, now=None) -> int:
         try:
             head = int(readers["head"]())
             start = int(cursor) + 1 if cursor is not None else max(0, head - FIRST_RUN_BLOCKS)
-            walk = logs.walk(readers["deposits"], start, head, max_calls=40, seconds=60)
+            walk = logs.walk(readers["deposits"], start, head, max_calls=40,
+                             seconds=min(60.0, max(0.0, left() - MIN_LEFT)), clock=clock)
         except Exception as exc:  # noqa: BLE001 - the head itself was unreadable
             walk["error"] = f"{type(exc).__name__}: {exc}"
         fresh = [{"wallet": d["depositor"], "amount": d["usd"], "ts": d["ts"],
@@ -209,13 +222,13 @@ def main(argv=None, *, readers=None, now=None) -> int:
             print(f"[provenance] cache unreadable, starting empty: {exc}")
         fresh_wallets = {d["wallet"] for d in fresh if d["amount"] >= QUEUE_MIN_USD}
         todo = [q for q in queue(data, fresh, previous, index.core)
-                if q[2] in fresh_wallets or q[2] not in cache
+                if q[2] in fresh_wallets or q[2] not in cache or (cache.get(q[2]) or {}).get("retry")
                 or now_ts - int((cache.get(q[2]) or {}).get("resolved_at") or 0) >= CACHE_TTL_S]
 
         # 4. Resolve, one account never stopping the run.
         attempted, unreadable = 0, []
         for _rank, _usd, account, reason in todo:
-            if attempted >= ACCOUNTS_PER_RUN or time.monotonic() - started >= SECONDS:
+            if attempted >= ACCOUNTS_PER_RUN or left() < MIN_LEFT:
                 break
             attempted += 1
             try:
@@ -265,6 +278,7 @@ def main(argv=None, *, readers=None, now=None) -> int:
         "computed_at": now_iso, "deposit_cursor": walk["last_block"],
         "blocks_read": max(0, blocks_read), "deposits_read": len(fresh),
         "read_error": walk.get("error"), "queue": len(todo), "attempted": attempted,
+        "deferred_accounts": len(todo) - attempted, "elapsed_s": round(clock() - started, 1),
         "resolved": attempted - len(unreadable), "unreadable_accounts": unreadable[:50],
         "findings": sorted(found, key=lambda f: -int(f.get("ts") or 0))[:KEEP_FINDINGS],
         "member_findings": member_found[:100],

@@ -140,3 +140,42 @@ def test_quiet_funders_shared_by_two_accounts_are_grouped():
             "0x2": {"sources": [{"hop": 1, "class": "quiet", "address": QUIET}]},
             "0x3": {"sources": [{"hop": 1, "class": "busy", "address": D7A}]}}
     assert provenance.shared_funders(recs) == [{"funder": QUIET, "accounts": ["0x1", "0x2"]}]
+
+
+def test_a_transient_failure_asks_for_a_retry_and_a_missing_reader_does_not():
+    # A 429 or a spent budget is this run's problem: caching that record for the
+    # 7-day TTL would hide the account for a week. A chain with no reader is
+    # the same answer next run, and is kept.
+    def throttled(chain, address, *, since_ts, until_ts):
+        raise readers.ReadError("429")
+    rec = provenance.resolve(NEW, ledger=_ledger_deposit(2e6), unit_events=[], index=INDEX,
+                             label_of=label_of, read_inbound=throttled, read_first_gas=no_gas,
+                             read_ledger=boom, circle_source=boom, now_ts=1_791_000_000)
+    assert rec["retry"] is True
+
+    def no_reader(chain, address, *, since_ts, until_ts):
+        raise readers.NoReader("no keyless reader for hyperevm")
+    rec = provenance.resolve(NEW, ledger=_ledger_deposit(2e6), unit_events=[], index=INDEX,
+                             label_of=label_of, read_inbound=no_reader, read_first_gas=no_gas,
+                             read_ledger=boom, circle_source=boom, now_ts=1_791_000_000)
+    assert rec["retry"] is False and not rec["complete"]
+
+
+def test_a_circle_sender_matches_his_solana_wallet_by_its_raw_form():
+    from src.circle_flows import base58_to_hex
+    sol = "2xm4bb8KmpafeC2Zcb37J7UFNcLfmKvaZmyhYKhRtVSv"
+    idx = perimeter.Index(perimeter.build(
+        config={"target_wallet": T, "known_self_wallets": []}, sentinels={},
+        trace_report={}, trace_registry={}, solana={sol: {"role": "cluster"}},
+        associates_found={}, families={}, services=set(), previous=None, now_iso="2026-10-06"))
+    ledger = [{"time": 1_790_000_000_000, "hash": "0xc", "delta": {
+        "type": "send", "user": provenance.FORWARDER, "destination": NEW, "token": "USDC",
+        "amount": "500000.0", "usdcValue": "500000.0"}}]
+    raw = base58_to_hex(sol)
+    rec = provenance.resolve(NEW, ledger=ledger, unit_events=[], index=idx, label_of=label_of,
+                             read_inbound=boom, read_first_gas=no_gas, read_ledger=boom,
+                             circle_source=lambda e, a: {"address": raw, "chain": "solana",
+                                                         "raw": raw},
+                             now_ts=1_791_000_000)
+    [f] = provenance.findings(rec)
+    assert (f["severity"], f["role"], f["member"]) == ("CRITICAL", "identity", sol)
