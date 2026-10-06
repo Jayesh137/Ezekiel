@@ -72,3 +72,12 @@ def test_census_summary_reports_a_rho_distribution():
 def census_summary_fixture():
     from src import execution_program as ep
     return ep.summarise_census([0.0, 0.2, 1.0], rhos=[0.1, 0.5, 0.95])
+
+
+def test_state_lives_in_the_committed_tree():
+    # bb21cb3092 moved the census state out of gitignored data/.local so the
+    # population could build across ephemeral Actions runs, but the old
+    # assignment stayed beneath the new one and won: every run started from an
+    # empty state, and the census sat at 1 measured account of 83.
+    assert census.STATE == census.OUT_DIR / "census_state.json"
+    assert ".local" not in census.STATE.parts

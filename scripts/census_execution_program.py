@@ -7,10 +7,11 @@ compares it to the target's clip table, and writes the distribution of match
 ratios to `data/execution_program/census.json`. `is_discriminating` then reads the
 99th-percentile ratio as the bar a candidate must beat.
 
-It is resumable: processed addresses and their ratios persist in the gitignored
-`data/.local/execution_census.json`, so a bounded run on a free VM accumulates the
-full population across restarts. Any account that itself reproduces the table
-(a real lead) is recorded in the output regardless of the threshold.
+It is resumable: processed addresses and their ratios persist in the committed
+`data/execution_program/census_state.json`, so successive Actions runs walk deeper
+into the population instead of re-measuring the same accounts. Any account that
+itself reproduces the table (a real lead) is recorded in the output regardless of
+the threshold.
 
 Population: leaderboard accounts with real size that traded recently, largest week
 volume first, skipping the extreme-volume market makers whose newest 2,000 fills
@@ -40,7 +41,6 @@ CENSUS_FILE = OUT_DIR / "census.json"
 # repo without bound.
 STATE = OUT_DIR / "census_state.json"
 MAX_STATE_ROWS = 20_000
-STATE = DATA_DIR / ".local" / "execution_census.json"
 # A wallet reproducing this many of his exact per-coin clip sizes is a lead worth
 # recording in the output whatever the population distribution turns out to be.
 HIT_MIN_CLIPS = 4

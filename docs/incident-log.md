@@ -1890,3 +1890,17 @@ all 22,199 authority snapshots kept. Found on the way: an empty protected list
 made `wallet NOT IN (NULL)` - never true - so the first version trimmed no fill
 at all. **A cap in rows does not bound bytes; a budget in bytes needs a byte
 check before it is enforced.**
+
+---
+
+**The execution census never accumulated (2026-09-29 to 2026-10-06).** Commit
+`bb21cb3092` moved the census state from gitignored `data/.local/` into the
+committed tree so the population would build across ephemeral Actions runs. It
+added the new `STATE = …/census_state.json` line above the old one and left
+`STATE = DATA_DIR / ".local" / "execution_census.json"` in place, and the second
+assignment won. Every run started from an empty state, walked the same
+hash-ordered accounts and wrote `measured 1 / attempted 83` (2026-10-05), so
+`is_discriminating`, which needs 20, never passed and the `execution_program`
+vector could not vote. No test pinned the path; CI stayed green. Found while
+designing the candidate study (spec 2026-10-06). **When a fix moves a path, test
+the path.**
