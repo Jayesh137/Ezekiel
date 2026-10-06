@@ -1814,8 +1814,27 @@ after them, rerun under a fully throttled Blockscout: 0 findings in 131s, the
 cursor kept and the failures reported. Provenance under the same throttle: 2
 accounts in 192s — `0x1cb5b5c2…` ($15.3M) final `unresolved` (paid in from its
 own HyperEVM address, whose funders need the Etherscan key), `0x96de0254…` six
-Circle messages from the Arbitrum extension, marked for retry. Live numbers
-come from the first CI runs.
+Circle messages from the Arbitrum extension, marked for retry. Correlator
+exits on the same data: **1,458 worth $3.388B before, 92 worth $0.275B after** —
+91 of them into his four private exchange deposit addresses ($219.9M to
+`0x8570c2ae…`), one $0.3M to a person (`0x1aa522b9…`), and all 146 of his HL
+withdrawals resolved by nonce to his own addresses. What is left is exactly the
+money that can come back out of an exchange into a new account.
+
+**The first live runs (2026-10-06, after merging PR #63) found two more.** The
+watch step read 2,136 Bridge2 withdrawals over 345,601 blocks and the 150 core
+withdrawals by nonce through Etherscan in 35s, and the perimeter step took 40s.
+But (1) that watch run came before any trace run had built the perimeter, so
+on the config-only fallback his own payment to his HyperCore deposit address
+`0x4aecac3b…` read as "his world funded an outside account" and **paged HIGH
+— a false alert, delivered**. Findings true only if the far address is not his
+are now held on the fallback and told only if they still stand once the
+perimeter exists, and stored findings are judged again every run. And (2) the
+provenance step crashed in 30s: with the key set, Bridge2 deposits now come
+from Etherscan, whose getLogs writes zero as a bare `"0x"` (`logIndex`,
+`transactionIndex`), and a deposit's USDC transfer is usually the first log of
+its transaction. Neither could show in a keyless local dry run — **a reader
+switched to a new source needs a run against that source before it ships.**
 
 **The rule: index the edge, not the graph.** A table of his addresses joined
 against a global feed of every crossing costs one lookup per event and scales

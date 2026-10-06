@@ -94,7 +94,7 @@ def extension_payer(entry: dict, usd: float, budget, deadline: float | None = No
                               lo, hi, deadline=deadline)
     except logs.LogReadError as exc:
         raise ReadError(str(exc)) from exc           # this run's problem: retried
-    hits = [r for r in rows if abs(int(r["data"], 16) / 1e6 - usd) <= max(1.0, usd * 0.002)]
+    hits = [r for r in rows if abs(logs.to_int(r["data"]) / 1e6 - usd) <= max(1.0, usd * 0.002)]
     if len(hits) != 1:
         return None
     return {"address": "0x" + hits[0]["topics"][1][-40:].lower(), "chain": "arbitrum"}

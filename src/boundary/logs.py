@@ -44,8 +44,12 @@ class LogReadError(RuntimeError):
 
 
 def to_int(value) -> int:
+    """Hex or decimal. Etherscan writes zero as a bare "0x" (logIndex,
+    transactionIndex) - every first log of a transaction."""
     s = str(value if value is not None else "0").strip()
-    return int(s, 16) if s.lower().startswith("0x") else int(s)
+    if s.lower().startswith("0x"):
+        return int(s[2:] or "0", 16)
+    return int(s)
 
 
 def _http_get(url: str, params: dict, *, tries: int = 4, sleep=time.sleep,

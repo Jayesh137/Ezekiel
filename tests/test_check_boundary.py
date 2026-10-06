@@ -298,3 +298,46 @@ def test_a_finding_already_alerted_is_never_sent_again_even_if_trimmed(sandbox):
     r["withdrawals"] = lambda lo, hi: [fw(OUT, S, 2.5e5, 400, "0xa")]   # seen again
     cb.main([], readers=r)
     assert sent["boundary"] == []
+
+
+HD = "0x4aecac3b90dd0ad50d274c19221874e5ba8a4d45"
+
+
+def _edge_store(tmp, rows):
+    (tmp / "trace" / "hl_edges").mkdir(parents=True, exist_ok=True)
+    (tmp / "trace" / "registry").mkdir(parents=True, exist_ok=True)
+    (tmp / "trace" / "registry" / "00.json").write_text("{}")
+    (tmp / "trace" / "hl_edges" / "45.json").write_text(json.dumps({T: rows}))
+
+
+def test_on_the_fallback_perimeter_flows_from_his_wallets_are_held_not_alerted(sandbox):
+    # First live run, 2026-10-06: no perimeter yet, so his own payment to his
+    # HyperCore deposit address read as "his world funded an outside account"
+    # and paged HIGH. Without the perimeter, an address of his looks outside.
+    tmp, sent = sandbox
+    (tmp / "perimeter" / "latest.json").unlink()
+    _edge_store(tmp, [{"id": "e1", "src": T, "dst": HD, "amount_usd": 24_429.0, "ts": 10,
+                       "tx_hash": "0xu", "kind": "spotTransfer"}])
+    cb.main([], readers=readers(head=500))
+    st = _state(tmp)
+    assert st["perimeter_fallback"] and not sent["boundary"] and st["held"]
+    (tmp / "perimeter" / "latest.json").write_text(json.dumps({"members": {
+        T: {"address": T, "role": "core", "weight": 1.0, "why": "config"},
+        HD: {"address": HD, "role": "deposit", "weight": 1.0, "why": "hl_deposit"}}}))
+    cb.main([], readers=readers(head=600))
+    st = _state(tmp)
+    assert not sent["boundary"] and st["held"] == [] and st["findings"] == []
+
+
+def test_a_held_finding_still_outside_his_world_alerts_once_the_perimeter_arrives(sandbox):
+    tmp, sent = sandbox
+    (tmp / "perimeter" / "latest.json").unlink()
+    _edge_store(tmp, [{"id": "e1", "src": T, "dst": NEW, "amount_usd": 50_000.0, "ts": 10,
+                       "tx_hash": "0xv", "kind": "send"}])
+    cb.main([], readers=readers(head=500))
+    assert not sent["boundary"]
+    (tmp / "perimeter" / "latest.json").write_text(json.dumps({"members": {
+        T: {"address": T, "role": "core", "weight": 1.0, "why": "config"}}}))
+    cb.main([], readers=readers(head=600))
+    cb.main([], readers=readers(head=700))
+    assert [r["ref"] for r in sent["boundary"]] == ["0xv"]

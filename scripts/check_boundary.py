@@ -37,6 +37,10 @@ RETRO_MIN_WEIGHT = 0.6
 # run: 441s with no budget). What is not reached waits for the next run.
 RUN_SECONDS = 140.0
 MIN_LEFT = 20.0
+# Findings that are only true if the far address is NOT his: judged on the
+# config-only fallback they are held, not told (2026-10-06, first live run: his
+# payment to his own HyperCore deposit address paged HIGH as an outsider).
+PERIMETER_DEPENDENT = ("his_world_funded_outside_account", "his_account_paid_outside_address")
 
 
 def _read(path: Path) -> dict:
@@ -300,20 +304,29 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
                 errors.append({"source": "retro_circle", "address": m["address"],
                                "error": str(exc)[:200]})
 
-    # Judge, merge, alert.
+    # Judge, merge, alert. Stored findings are judged again against today's
+    # perimeter: one judged while a member was missing from it does not stand.
     found = at.classify_all(events, index)
-    by_key = {f["key"]: f for f in previous.get("findings") or []}
+    by_key = {f["key"]: f for f in at.classify_all(previous.get("findings") or [], index)}
     new = [f for f in found if f["key"] not in by_key]
     for f in found:
         by_key[f["key"]] = f
     alerted = list(previous.get("alerted") or [])
-    undelivered, queue, queued = [], [], set(alerted)
+    undelivered, held, queue, queued = [], [], [], set(alerted)
+    # Held while the perimeter was missing: told now only if it still stands.
+    held_before = previous.get("held") or []
+    if not fallback:
+        held_before = at.classify_all(held_before, index)
     # `alerted` is the record of what he was told: a finding trimmed from the
     # kept 500 and read again from history is never told twice.
-    for row in (previous.get("undelivered") or []) + [f for f in new
-                                                      if f["severity"] in at.SEVERITIES]:
-        if row.get("key") not in queued:
-            queued.add(row.get("key"))
+    for row in (previous.get("undelivered") or []) + held_before + [
+            f for f in new if f["severity"] in at.SEVERITIES]:
+        if row.get("key") in queued or row.get("severity") not in at.SEVERITIES:
+            continue
+        queued.add(row.get("key"))
+        if fallback and row["kind"] in PERIMETER_DEPENDENT:
+            held.append(row)        # without the perimeter an address of his looks outside
+        else:
             queue.append(row)
     for row in queue if not args.dry_run else []:
         if row["kind"] == at.KIND_HIS_ACCOUNT_PAID_OUTSIDE:
@@ -342,6 +355,7 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
              "withdrawals_read": len(live), "read_error": walk.get("error"),
              "core_withdrawals": known, "hl_edges_cursor": new_edge_cursor,
              "findings": findings, "alerted": sorted(set(alerted)), "undelivered": undelivered,
+             "held": held,
              "unit_checked": unit_checked, "retro": retro, "counts": counts,
              "errors": errors[:50], "deferred": sorted(set(deferred)),
              "elapsed_s": round(clock() - started, 1)}
