@@ -125,3 +125,7 @@ def test_hyperevm_inbound_tells_an_empty_answer_from_a_failed_one():
         return {"status": "0", "message": "NOTOK", "result": "Max rate limit reached"}
     with pytest.raises(hyperevm.EvmReadError):
         hyperevm.inbound_transfers(ACCT, since_ts=0, until_ts=1, get=failed)
+
+
+def test_a_bare_0x_from_etherscan_reads_as_zero():
+    assert hyperevm._int("0x") == 0

@@ -40,7 +40,7 @@ def _call(call, method, params):
 
 def _int(value) -> int:
     s = str(value)
-    return int(s, 16) if s.startswith("0x") else int(s)
+    return int(s[2:] or "0", 16) if s.lower().startswith("0x") else int(s)
 
 
 def block_at(ts: int, *, call) -> int:

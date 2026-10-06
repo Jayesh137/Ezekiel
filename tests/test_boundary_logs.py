@@ -211,3 +211,17 @@ def test_a_whole_history_that_fills_a_page_is_refused_not_cut_short(monkeypatch)
         logs.read_history("arbitrum", "0xa", {0: "0x1"})
     monkeypatch.setattr(logs, "read_logs", lambda *a, **k: [{"n": 1}])
     assert logs.read_history("arbitrum", "0xa", {0: "0x1"}) == [{"n": 1}]
+
+
+def test_etherscan_writes_zero_as_a_bare_0x_and_it_reads_as_zero():
+    # First live trace run (2026-10-06): Etherscan's getLogs gives logIndex and
+    # transactionIndex "0x" for zero, so every deposit that was the first log of
+    # its transaction crashed the provenance step in 30 seconds.
+    from src.boundary import bridge2
+    assert logs.to_int("0x") == 0 and logs.to_int("0X") == 0
+    row = {"address": bridge2.USDC, "data": "0x" + format(250_000 * 10**6, "064x"),
+           "topics": [bridge2.TOPIC_TRANSFER, bridge2.topic_address("0x" + "5" * 40),
+                      bridge2.topic_address(bridge2.BRIDGE)],
+           "blockNumber": "0x1e8f2a3d", "timeStamp": "0x6900aa00", "logIndex": "0x",
+           "transactionIndex": "0x", "transactionHash": "0x" + "ab" * 32}
+    assert bridge2.decode_deposit(row)["usd"] == 250_000.0
