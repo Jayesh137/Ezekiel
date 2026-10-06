@@ -151,3 +151,63 @@ def test_read_logs_carries_its_deadline_to_the_default_reader(monkeypatch):
     monkeypatch.setattr(logs, "_http_get", fake)
     assert logs.read_logs("arbitrum", "0xabc", {0: "0xt"}, 1, 2, has_key=False, deadline=7.0) == []
     assert seen["deadline"] == 7.0
+
+
+def test_with_a_key_etherscan_is_read_first_because_blockscout_has_holes():
+    # 2026-10-06: Blockscout's Arbitrum index answered "Not found" for blocks
+    # 507,912,970 to at least 508,500,000, and getLogs over them answers "No logs
+    # found" - a hole that reads exactly like an empty range. Etherscan indexes
+    # every block, so with a key it is the reader and Blockscout the fallback.
+    calls = []
+
+    def bs(*a, **k):
+        calls.append("blockscout")
+        return [{"bs": 1}]
+
+    def es(*a, **k):
+        calls.append("etherscan")
+        return [{"es": 1}]
+    assert logs.read_logs("arbitrum", "0xa", {0: "0x1"}, 1, 2, blockscout=bs, etherscan=es,
+                          has_key=True) == [{"es": 1}]
+    assert calls == ["etherscan"]
+
+    def es_down(*a, **k):
+        raise logs.LogReadError("etherscan: Max rate limit reached")
+    assert logs.read_logs("arbitrum", "0xa", {0: "0x1"}, 1, 2, blockscout=bs, etherscan=es_down,
+                          has_key=True) == [{"bs": 1}]
+    assert logs.read_logs("arbitrum", "0xa", {0: "0x1"}, 1, 2, blockscout=bs, etherscan=es_down,
+                          has_key=False) == [{"bs": 1}]
+
+
+def test_block_at_refuses_a_blockscout_answer_from_inside_an_index_hole():
+    # Asked for 2026-09-23 19:41 and 20:13, Blockscout answered 507,912,969/970
+    # for both - the last block before its hole, 22 hours earlier.
+    def get(url, params):
+        if params.get("action") == "getblocknobytime":
+            return {"status": "1", "message": "OK", "result": {"blockNumber": "507912969"}}
+        raise AssertionError((url, params))
+
+    def block_ts(chain, number):
+        assert number == 507_912_969
+        return 1_790_113_296                      # 2026-09-22 21:41:36
+    with pytest.raises(logs.LogReadError, match="hole"):
+        logs.block_at("arbitrum", 1_790_192_472, get=get, block_ts=block_ts, has_key=False)
+    assert logs.block_at("arbitrum", 1_790_113_300, get=get, block_ts=block_ts,
+                         has_key=False) == 507_912_969
+
+
+def test_with_a_key_the_head_comes_from_etherscan_too(monkeypatch):
+    monkeypatch.setattr("src.utils.etherscan_get",
+                        lambda params, chain_id=None: {"jsonrpc": "2.0", "result": "0x1e8f2a3d"})
+
+    def bs(*a, **k):
+        raise AssertionError("Blockscout read with a key set")
+    assert logs.head_block("arbitrum", get=bs, has_key=True) == 0x1E8F2A3D
+
+
+def test_a_whole_history_that_fills_a_page_is_refused_not_cut_short(monkeypatch):
+    monkeypatch.setattr(logs, "read_logs", lambda *a, **k: [{"n": i} for i in range(logs.PAGE)])
+    with pytest.raises(logs.LogReadError, match="paging"):
+        logs.read_history("arbitrum", "0xa", {0: "0x1"})
+    monkeypatch.setattr(logs, "read_logs", lambda *a, **k: [{"n": 1}])
+    assert logs.read_history("arbitrum", "0xa", {0: "0x1"}) == [{"n": 1}]

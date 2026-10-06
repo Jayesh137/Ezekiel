@@ -36,6 +36,7 @@ PAGE = 1_000
 CHUNK_BLOCKS = 100_000       # ~7h of Arbitrum; one call stays fast
 PACE_SECONDS = 0.35
 BACKOFF_SECONDS = (2.0, 5.0, 10.0)
+HOLE_SECONDS = 120          # a block-by-time answer further off than this is a hole
 
 
 class LogReadError(RuntimeError):
@@ -126,57 +127,115 @@ def etherscan_logs(chain: str, address: str, topics: dict, from_block, to_block,
 def read_logs(chain: str, address: str, topics: dict, from_block, to_block, *,
               blockscout=None, etherscan=None, has_key=None,
               deadline: float | None = None) -> list[dict]:
-    """Blockscout first; Etherscan when Blockscout fails and a key is set."""
+    """Etherscan first when a key is set (CI); Blockscout keyless, or as fallback.
+
+    Blockscout's index has holes: on 2026-10-06 its Arbitrum instance answered
+    "Not found" for blocks 507,912,970 to at least 508,500,000, and getLogs
+    over a hole answers "No logs found" — exactly what an empty range says, so
+    no reader can tell the two apart. Etherscan indexes every block. Without a
+    key (a local run) Blockscout is all there is.
+    """
     blockscout = blockscout or partial(blockscout_logs, deadline=deadline)
     etherscan = etherscan or etherscan_logs
     has_key = bool(os.environ.get("ETHERSCAN_API_KEY")) if has_key is None else has_key
-    try:
-        if chain not in BLOCKSCOUT_API:
-            raise LogReadError(f"no keyless log reader for {chain}")
-        return blockscout(chain, address, topics, from_block, to_block)
-    except LogReadError as first:
-        if not has_key or chain not in ETHERSCAN_CHAIN_IDS:
-            raise
+    order = ([etherscan] if has_key and chain in ETHERSCAN_CHAIN_IDS else []) + \
+        ([blockscout] if chain in BLOCKSCOUT_API else [])
+    if not order:
+        raise LogReadError(f"no log reader for {chain}")
+    failures = []
+    for read in order:
         try:
-            return etherscan(chain, address, topics, from_block, to_block)
-        except LogReadError as second:
-            raise LogReadError(f"{first}; then {second}") from second
+            return read(chain, address, topics, from_block, to_block)
+        except LogReadError as exc:
+            failures.append(str(exc))
+    raise LogReadError("; then ".join(failures))
 
 
-def head_block(chain: str, *, get=None, deadline: float | None = None) -> int:
-    """The chain head (Blockscout eth_block_number; Etherscan proxy as fallback)."""
+def read_history(chain: str, address: str, topics: dict, *,
+                 deadline: float | None = None) -> list[dict]:
+    """Every log matching `topics`, genesis to head, in ONE page — or a
+    LogReadError: a full page is a history cut short, never all of it (rule 5)."""
+    rows = read_logs(chain, address, topics, 0, "latest", deadline=deadline)
+    if len(rows) >= PAGE:
+        raise LogReadError(f"{len(rows)} logs: this history needs paging; refusing a cut-short read")
+    return rows
+
+
+def head_block(chain: str, *, get=None, deadline: float | None = None, has_key=None) -> int:
+    """The chain head: Etherscan's proxy when a key is set, else Blockscout's."""
+    has_key = bool(os.environ.get("ETHERSCAN_API_KEY")) if has_key is None else has_key
+    failures = []
+    if has_key and chain in ETHERSCAN_CHAIN_IDS:
+        from src.utils import etherscan_get
+        result = etherscan_get({"module": "proxy", "action": "eth_blockNumber"},
+                               chain_id=ETHERSCAN_CHAIN_IDS[chain]).get("result")
+        if isinstance(result, str) and result.startswith("0x"):
+            return int(result, 16)
+        failures.append(f"etherscan: {result}")
+    if chain not in BLOCKSCOUT_API:
+        raise LogReadError(f"head of {chain} unreadable: {'; '.join(failures)}")
     get = get or partial(_http_get, deadline=deadline)
     try:
         return to_int(get(BLOCKSCOUT_API[chain],
                           {"module": "block", "action": "eth_block_number"})["result"])
     except Exception as exc:  # noqa: BLE001
-        if os.environ.get("ETHERSCAN_API_KEY") and chain in ETHERSCAN_CHAIN_IDS:
-            from src.utils import etherscan_get
-            result = etherscan_get({"module": "proxy", "action": "eth_blockNumber"},
-                                   chain_id=ETHERSCAN_CHAIN_IDS[chain]).get("result")
-            if isinstance(result, str) and result.startswith("0x"):
-                return int(result, 16)
-        raise LogReadError(f"head of {chain} unreadable: {exc}") from exc
+        failures.append(f"blockscout: {exc}")
+        raise LogReadError(f"head of {chain} unreadable: {'; '.join(failures)}") from exc
+
+
+def blockscout_block_ts(chain: str, number: int, *, get=None,
+                        deadline: float | None = None) -> int | None:
+    """A block's own timestamp from Blockscout v2; None when it is not indexed."""
+    from datetime import datetime
+    get = get or partial(_http_get, deadline=deadline)
+    try:
+        doc = get(f"{BLOCKSCOUT_API[chain][:-len('/api')]}/api/v2/blocks/{int(number)}", {})
+    except requests.HTTPError:
+        return None                          # 404: the block is not in the index
+    stamp = (doc or {}).get("timestamp") if isinstance(doc, dict) else None
+    if not stamp:
+        return None
+    return int(datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp())
 
 
 def block_at(chain: str, ts: int, *, closest: str = "before", get=None,
-             deadline: float | None = None) -> int:
-    """The block at a unix time (Etherscan-compatible getblocknobytime)."""
-    get = get or partial(_http_get, deadline=deadline)
+             deadline: float | None = None, block_ts=None, has_key=None) -> int:
+    """The block at a unix time (getblocknobytime): Etherscan's when a key is set.
+
+    A Blockscout answer is checked against the block's own timestamp: inside an
+    index hole it answers the last block before the hole — asked for 2026-09-23
+    19:41 and 20:13 it said 507,912,969 for both, a block from 22 hours earlier.
+    """
     params = {"module": "block", "action": "getblocknobytime", "timestamp": int(ts),
               "closest": closest}
+    has_key = bool(os.environ.get("ETHERSCAN_API_KEY")) if has_key is None else has_key
+    failures = []
+    if has_key and chain in ETHERSCAN_CHAIN_IDS:
+        from src.utils import etherscan_get
+        doc = etherscan_get(params, chain_id=ETHERSCAN_CHAIN_IDS[chain])
+        try:
+            if str(doc.get("status")) == "1":
+                return to_int(doc.get("result"))
+            failures.append(f"etherscan: {doc.get('message')} {doc.get('result')}")
+        except (TypeError, ValueError) as exc:
+            failures.append(f"etherscan: {exc}")
+    if chain not in BLOCKSCOUT_API:
+        raise LogReadError(f"block at {ts} on {chain} unreadable: {'; '.join(failures)}")
+    get = get or partial(_http_get, deadline=deadline)
+    block_ts = block_ts or partial(blockscout_block_ts, deadline=deadline)
     try:
-        if chain in BLOCKSCOUT_API:
-            doc = get(BLOCKSCOUT_API[chain], params)
-        else:
-            from src.utils import etherscan_get
-            doc = etherscan_get(params, chain_id=ETHERSCAN_CHAIN_IDS[chain])
-        result = doc.get("result")
+        result = get(BLOCKSCOUT_API[chain], params).get("result")
         if isinstance(result, dict):          # Blockscout: {"blockNumber": "…"}
             result = result.get("blockNumber")
-        return to_int(result)
+        number = to_int(result)
+        stamp = block_ts(chain, number)
     except Exception as exc:  # noqa: BLE001
-        raise LogReadError(f"block at {ts} on {chain} unreadable: {exc}") from exc
+        failures.append(f"blockscout: {exc}")
+        raise LogReadError(f"block at {ts} on {chain} unreadable: {'; '.join(failures)}") from exc
+    if stamp is None or abs(stamp - int(ts)) > HOLE_SECONDS:
+        raise LogReadError(f"Blockscout index hole near {ts} on {chain}: it answered block "
+                           f"{number}, stamped {stamp}")
+    return number
 
 
 def log_key(row: dict) -> tuple:

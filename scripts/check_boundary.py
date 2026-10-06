@@ -56,15 +56,15 @@ def default_readers(deadline: float | None = None) -> dict:
     def payouts(member):
         topics = {0: bridge2.TOPIC_TRANSFER, 1: bridge2.topic_address(bridge2.BRIDGE),
                   2: bridge2.topic_address(member)}
-        return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest", deadline=deadline)
+        return logs.read_history("arbitrum", bridge2.USDC, topics, deadline=deadline)
     return {
         "head": lambda: logs.head_block("arbitrum", deadline=deadline),
         "withdrawals": lambda lo, hi: logs.read_logs("arbitrum", bridge2.BRIDGE,
                                                      bridge2.withdrawal_topics(), lo, hi,
                                                      deadline=deadline),
-        "user_withdrawals": lambda u: logs.read_logs("arbitrum", bridge2.BRIDGE,
-                                                     bridge2.withdrawal_topics(u), 0, "latest",
-                                                     deadline=deadline),
+        "user_withdrawals": lambda u: logs.read_history("arbitrum", bridge2.BRIDGE,
+                                                        bridge2.withdrawal_topics(u),
+                                                        deadline=deadline),
         "payouts": payouts,
         "tx_logs": lambda tx: readers.tx_logs("arbitrum", tx, budget=budget),
         "unit": lambda a: unit.read_operations(a),
@@ -78,7 +78,7 @@ def mints(member: str, *, deadline: float | None = None) -> list:
     from src.boundary import bridge2, logs
     topics = {0: bridge2.TOPIC_TRANSFER, 1: bridge2.topic_address("0x" + "0" * 40),
               2: bridge2.topic_address(member)}
-    return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest", deadline=deadline)
+    return logs.read_history("arbitrum", bridge2.USDC, topics, deadline=deadline)
 
 
 def system_sends_from(start_ms: int) -> list:
