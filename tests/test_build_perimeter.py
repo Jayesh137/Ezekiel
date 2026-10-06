@@ -146,3 +146,19 @@ def test_a_step_killed_during_the_substrate_pass_still_leaves_a_perimeter(sandbo
                 is_hot=lambda a: a == HOT)
     doc = json.loads((tmp / "perimeter" / "latest.json").read_text())
     assert {a for a, m in doc["members"].items() if m["role"] in ("core", "deposit")} == {T, TR, F, S}
+
+
+def test_families_built_under_older_rules_are_rebuilt_now_not_tomorrow(sandbox):
+    # 2026-10-06: the fix keeping mints out of his exchange family waited for the
+    # daily substrate pass, so the zero address stayed a family member a day.
+    tmp, sent = sandbox
+    zero = "0x" + "0" * 40
+    (tmp / "perimeter").mkdir(exist_ok=True)
+    (tmp / "perimeter" / "latest.json").write_text(json.dumps({
+        "members": {}, "substrate_at": "2026-10-06T00:00:00+00:00",
+        "exchange_families": {"paid_him": [zero]}, "associates": {}}))
+    bp.main([], post=_post(), substrate=_substrate, now="2026-10-06T01:00:00+00:00",
+            is_hot=lambda a: a == HOT)
+    doc = json.loads((tmp / "perimeter" / "latest.json").read_text())
+    assert zero not in (doc["exchange_families"].get("paid_him") or [])
+    assert doc["rules_version"] == bp.RULES_VERSION

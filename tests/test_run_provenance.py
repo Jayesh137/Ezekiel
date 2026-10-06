@@ -238,3 +238,23 @@ def test_a_perimeter_member_finding_outlives_the_run_that_saw_it(sandbox):
     st = json.loads((tmp / "provenance" / "latest.json").read_text())
     assert [f["hl_account"] for f in st["member_findings"]] == [SINK]
     assert len(sent["boundary"]) == 1
+
+
+def test_a_record_resolved_by_an_older_resolver_is_resolved_again(sandbox):
+    # Records cached before a resolver fix kept their wrong verdicts for the
+    # 7-day TTL (2026-10-06: a mint read as 'same_exchange').
+    tmp, sent = sandbox
+    from src.trace import store
+    store.save(tmp / "provenance" / "accounts", {OTHER: {
+        "account": OTHER, "resolved_at": 1_791_200_000, "entries": [], "sources": [],
+        "unreadable": [], "complete": True, "verdict": "same_exchange"}})
+    (tmp / "roster").mkdir()
+    (tmp / "roster" / "latest.json").write_text(json.dumps({"wallets": [
+        {"wallet": OTHER, "tier": "POSSIBLE"}]}))
+    calls = []
+    r = readers(head=1_100)
+    r["ledger"] = lambda a: calls.append(a) or []
+    rp.main([], readers=r, now="2026-10-06T01:00:00+00:00")
+    assert calls == [OTHER]
+    cached = store.load(tmp / "provenance" / "accounts")[OTHER]
+    assert cached["resolver"] == rp.RESOLVER_VERSION
