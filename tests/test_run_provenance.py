@@ -103,3 +103,17 @@ def test_dry_run_writes_only_its_directory(sandbox, tmp_path_factory):
                             inbound={NEW: [(T, 2e6)]}), now="2026-10-06T00:00:00+00:00")
     assert (out / "latest.json").exists() and not (tmp / "provenance").exists()
     assert not sent["prov"]
+
+
+def test_a_dry_run_can_read_a_perimeter_from_anywhere(sandbox, tmp_path_factory):
+    tmp, sent = sandbox
+    other = tmp_path_factory.mktemp("per") / "latest.json"
+    other.write_text(json.dumps({"members": {
+        OTHER: {"address": OTHER, "role": "core", "weight": 1.0, "why": "test"}}}))
+    out = tmp_path_factory.mktemp("dry")
+    r = readers(deposits=[dep(NEW, 2e6, 900, "0xd1")],
+                ledgers={NEW: _deposit_row(2e6, 1_790_000_900_000)}, inbound={NEW: [(OTHER, 2e6)]})
+    rp.main(["--dry-run", str(out), "--perimeter", str(other)], readers=r,
+            now="2026-10-06T00:00:00+00:00")
+    st = json.loads((out / "latest.json").read_text())
+    assert st["findings"] and st["findings"][0]["member"] == OTHER

@@ -162,13 +162,15 @@ def main(argv=None, *, readers=None, now=None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", metavar="DIR")
+    parser.add_argument("--perimeter", metavar="PATH",
+                        help="read the perimeter from PATH (a dry run's own build)")
     args = parser.parse_args(argv)
     config, data = utils.load_config(), utils.DATA_DIR
     now_dt = datetime.fromisoformat(now) if now else datetime.now(UTC)
     now_ts, now_iso = int(now_dt.timestamp()), now_dt.isoformat()
     out_dir = Path(args.dry_run) if args.dry_run else data / "provenance"
     previous = _read(data / "provenance" / "latest.json")
-    doc = _read(data / "perimeter" / "latest.json")
+    doc = _read(Path(args.perimeter) if args.perimeter else data / "perimeter" / "latest.json")
     index = pm.Index(doc if doc.get("members") else pm.core_only(config, now_iso))
     started = time.monotonic()
 

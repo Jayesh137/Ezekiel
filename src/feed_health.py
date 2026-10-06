@@ -27,6 +27,7 @@ WATCH_FEEDS = {
     "close watch": ("watchlist/latest.json", "computed_at", 360),
     "deposit-address sentinels": ("deposit_sentinels/latest.json", "computed_at", 360),
     "Circle flows": ("circle_flows/latest.json", "computed_at", 360),
+    "boundary attribution": ("boundary/latest.json", "computed_at", 360),
 }
 OTHER_FEEDS = {
     "roster": ("roster/latest.json", "computed_at", 720),
@@ -40,6 +41,8 @@ OTHER_FEEDS = {
     "public wallet discovery": ("discovery/latest.json", "last_successful_read_ms", 720),
     "funding route index": ("routes/latest.json", "computed_at_ms", 720),
     "successor investigations": ("investigations/latest.json", "computed_at_ms", 720),
+    "his perimeter": ("perimeter/latest.json", "computed_at", 720),
+    "funding provenance": ("provenance/latest.json", "computed_at", 720),
 }
 GROUPS = {"watch": WATCH_FEEDS, "other": OTHER_FEEDS}
 
@@ -60,6 +63,9 @@ MIN_WALLETS = 20
 # ran at 26-45 per ~2,400 blocks when this was written, so a read this long
 # with none at all is a decoder or a feed that has stopped understanding.
 CIRCLE_MIN_BLOCKS_FOR_ZERO = 3_000
+# ~1.4h of Arbitrum. Bridge2 paid ~130 withdrawals an hour when this was
+# written (826 in 6.26h, 2026-10-06), so a read this long with none is blind.
+BOUNDARY_MIN_BLOCKS_FOR_ZERO = 20_000
 
 
 def _unreadable_share(doc: dict, checked_key: str, unreadable_key: str = "unreadable"):
@@ -140,6 +146,28 @@ def _discovery(doc: dict):
     return None
 
 
+def _boundary(doc: dict):
+    if doc.get("read_error") and not doc.get("withdrawals_read"):
+        return f"Bridge2 reads failing: {str(doc['read_error'])[:120]}"
+    blocks = doc.get("blocks_read")
+    if isinstance(blocks, int) and blocks >= BOUNDARY_MIN_BLOCKS_FOR_ZERO             and not doc.get("withdrawals_read"):
+        return f"0 Bridge2 withdrawals decoded in {blocks:,} blocks"
+    return None
+
+
+def _perimeter(doc: dict):
+    return None if (doc.get("counts") or {}).get("core") else "the perimeter holds no core wallet"
+
+
+def _provenance(doc: dict):
+    attempted = doc.get("attempted")
+    if isinstance(attempted, int) and attempted >= 5 and not doc.get("resolved"):
+        return f"0 of {attempted} accounts resolved"
+    if doc.get("read_error") and not doc.get("deposits_read"):
+        return f"Bridge2 deposit reads failing: {str(doc['read_error'])[:120]}"
+    return None
+
+
 # feed name -> a function answering "is this fresh reading blind?" with a reason.
 BLIND_CHECKS = {
     "close watch": _watch,
@@ -152,6 +180,9 @@ BLIND_CHECKS = {
     "behavioural scan": _scan,
     "amount correlation": _correlation,
     "public wallet discovery": _discovery,
+    "boundary attribution": _boundary,
+    "his perimeter": _perimeter,
+    "funding provenance": _provenance,
 }
 
 

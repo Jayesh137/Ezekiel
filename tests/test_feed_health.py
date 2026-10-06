@@ -136,3 +136,17 @@ def test_the_script_keeps_blind_state_per_group(tmp_path, monkeypatch):
     state = json.loads((root / "feed_health" / "other.json").read_text())
     assert list(state["blind_since"]) == ["roster"]
     assert not (root / "feed_health" / "watch.json").exists()
+
+
+def test_the_boundary_feeds_have_blind_checks():
+    assert fh.WATCH_FEEDS["boundary attribution"][0] == "boundary/latest.json"
+    assert fh.OTHER_FEEDS["his perimeter"][0] == "perimeter/latest.json"
+    assert fh.OTHER_FEEDS["funding provenance"][0] == "provenance/latest.json"
+    b = fh.BLIND_CHECKS["boundary attribution"]
+    assert b({"blocks_read": 50_000, "withdrawals_read": 0}).startswith("0 Bridge2")
+    assert b({"blocks_read": 500, "withdrawals_read": 0}) is None
+    assert "failing" in b({"read_error": "429", "withdrawals_read": 0})
+    assert fh.BLIND_CHECKS["his perimeter"]({"counts": {}}) and \
+        fh.BLIND_CHECKS["his perimeter"]({"counts": {"core": 3}}) is None
+    p = fh.BLIND_CHECKS["funding provenance"]
+    assert p({"attempted": 6, "resolved": 0}) and p({"attempted": 6, "resolved": 2}) is None

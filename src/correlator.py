@@ -492,7 +492,7 @@ def _stored_pools() -> dict:
         return {}
 
 
-def run_correlation(pools=POOLS) -> dict:
+def run_correlation(pools=POOLS, *, etherscan_bridge: bool = True) -> dict:
     """Gather exits and the requested candidate pools, assign hypotheses,
     persist per pool, alert.
 
@@ -514,7 +514,10 @@ def run_correlation(pools=POOLS) -> dict:
     pools = tuple(p for p in (pools or POOLS) if p in POOLS)
 
     exits = collect_target_exits(target, min_amount)
-    readers = {"bridge": get_recent_bridge_deposits, "cctp": get_recent_cctp_deposits}
+    # trace.yml has just rebuilt the complete bridge pool (run_provenance.py),
+    # so it never falls back to the slow, page-capped Etherscan reader.
+    readers = {"bridge": get_recent_bridge_deposits if etherscan_bridge else bridge_pool_from_file,
+               "cctp": get_recent_cctp_deposits}
     records = _provenance_records()
     stored = _stored_pools()
     blocks: dict[str, dict] = {}
@@ -581,8 +584,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Re-link target exits to fresh deposits.")
     parser.add_argument("--pools", nargs="+", choices=POOLS, default=list(POOLS),
                         help="candidate pools to read this run (default: all)")
+    parser.add_argument("--no-etherscan", action="store_true",
+                        help="bridge pool from data/provenance only (trace.yml just built it)")
     args = parser.parse_args(argv)
-    run_correlation(tuple(args.pools))
+    run_correlation(tuple(args.pools), etherscan_bridge=not args.no_etherscan)
 
 
 if __name__ == "__main__":

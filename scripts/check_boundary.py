@@ -142,13 +142,15 @@ def main(argv=None, *, readers=None, now=None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", metavar="DIR")
+    parser.add_argument("--perimeter", metavar="PATH",
+                        help="read the perimeter from PATH (a dry run's own build)")
     args = parser.parse_args(argv)
     readers = readers or default_readers()
     config, data = utils.load_config(), utils.DATA_DIR
     now_iso = now or datetime.now(UTC).isoformat()
     out_dir = Path(args.dry_run) if args.dry_run else data / "boundary"
     previous = _read(data / "boundary" / "latest.json")
-    doc = _read(data / "perimeter" / "latest.json")
+    doc = _read(Path(args.perimeter) if args.perimeter else data / "perimeter" / "latest.json")
     fallback = not doc.get("members")
     if fallback:
         doc = pm.core_only(config, now_iso)

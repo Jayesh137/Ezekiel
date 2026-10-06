@@ -191,3 +191,13 @@ def test_his_own_retro_circle_withdrawal_is_not_a_finding(sandbox):
     r["system_sends"] = lambda start: [{"user": T, "amount": 6_000_000.0, "ts_ms": 1, "hash": "x"}]
     cb.main([], readers=r)
     assert not [f for f in _state(tmp)["findings"] if f["source"] == "circle"]
+
+
+def test_a_dry_run_can_read_a_perimeter_from_anywhere(sandbox, tmp_path_factory):
+    tmp, sent = sandbox
+    other = tmp_path_factory.mktemp("per") / "latest.json"
+    other.write_text(json.dumps({"members": {
+        NEW: {"address": NEW, "role": "core", "weight": 1.0, "why": "test"}}}))
+    out = tmp_path_factory.mktemp("dry")
+    cb.main(["--dry-run", str(out), "--perimeter", str(other)], readers=readers(head=500))
+    assert json.loads((out / "latest.json").read_text())["perimeter_fallback"] is False
