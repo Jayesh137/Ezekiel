@@ -150,7 +150,8 @@ def _boundary(doc: dict):
     if doc.get("read_error") and not doc.get("withdrawals_read"):
         return f"Bridge2 reads failing: {str(doc['read_error'])[:120]}"
     blocks = doc.get("blocks_read")
-    if isinstance(blocks, int) and blocks >= BOUNDARY_MIN_BLOCKS_FOR_ZERO             and not doc.get("withdrawals_read"):
+    if (isinstance(blocks, int) and blocks >= BOUNDARY_MIN_BLOCKS_FOR_ZERO
+            and not doc.get("withdrawals_read")):
         return f"0 Bridge2 withdrawals decoded in {blocks:,} blocks"
     return None
 
@@ -163,6 +164,8 @@ def _provenance(doc: dict):
     attempted = doc.get("attempted")
     if isinstance(attempted, int) and attempted >= 5 and not doc.get("resolved"):
         return f"0 of {attempted} accounts resolved"
+    if isinstance(attempted, int) and attempted >= 5 and doc.get("retrying") == attempted:
+        return f"all {attempted} accounts cut short by failed reads (each must retry)"
     if doc.get("read_error") and not doc.get("deposits_read"):
         return f"Bridge2 deposit reads failing: {str(doc['read_error'])[:120]}"
     return None

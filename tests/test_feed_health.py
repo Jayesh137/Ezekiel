@@ -150,3 +150,10 @@ def test_the_boundary_feeds_have_blind_checks():
         fh.BLIND_CHECKS["his perimeter"]({"counts": {"core": 3}}) is None
     p = fh.BLIND_CHECKS["funding provenance"]
     assert p({"attempted": 6, "resolved": 0}) and p({"attempted": 6, "resolved": 2}) is None
+
+
+def test_provenance_is_blind_when_every_account_it_tried_must_be_retried():
+    # A throttled host makes every record transient: fresh, "resolved", and blind.
+    p = fh.BLIND_CHECKS["funding provenance"]
+    assert "retry" in p({"attempted": 6, "resolved": 6, "retrying": 6})
+    assert p({"attempted": 6, "resolved": 6, "retrying": 2}) is None

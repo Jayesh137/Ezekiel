@@ -308,7 +308,7 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
                 or now_ts - int((cache.get(q[2]) or {}).get("resolved_at") or 0) >= CACHE_TTL_S]
 
         # 4. Resolve, one account never stopping the run.
-        attempted, unreadable = 0, []
+        attempted, unreadable, retrying = 0, [], 0
         for _rank, _usd, account, reason in todo:
             if attempted >= ACCOUNTS_PER_RUN or left() < MIN_LEFT:
                 break
@@ -329,6 +329,7 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
                 continue
             record["reason"] = reason
             cache[account] = record
+            retrying += bool(record.get("retry"))
 
     # 5. Findings and alerts.
     found = [f for rec in cache.values() for f in provenance.findings(rec)]
@@ -362,6 +363,7 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
         "read_error": walk.get("error"), "queue": len(todo), "attempted": attempted,
         "deferred_accounts": len(todo) - attempted, "elapsed_s": round(clock() - started, 1),
         "resolved": attempted - len(unreadable), "unreadable_accounts": unreadable[:50],
+        "retrying": retrying,
         "findings": sorted(found, key=lambda f: -int(f.get("ts") or 0))[:KEEP_FINDINGS],
         "member_findings": member_found[:100],
         "alerted": sorted(set(alerted)), "undelivered": undelivered,
