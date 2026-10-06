@@ -16,6 +16,7 @@ Single writer: data/boundary/.
 import argparse
 import json
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,6 +31,12 @@ RETRO_MEMBERS_PER_RUN = 4
 RETRO_TX_PER_MEMBER = 8
 KEEP_FINDINGS = 500
 RETRO_MIN_WEIGHT = 0.6
+# watch.yml gives this step 240s. A network stage starts only with MIN_LEFT
+# to spare, and one read in flight can take ~70s (timeout 10+60), so the run
+# ends inside the step even when a host throttles every call (2026-10-06 dry
+# run: 441s with no budget). What is not reached waits for the next run.
+RUN_SECONDS = 140.0
+MIN_LEFT = 20.0
 
 
 def _read(path: Path) -> dict:
@@ -40,34 +47,38 @@ def _read(path: Path) -> dict:
     return doc if isinstance(doc, dict) else {}
 
 
-def default_readers() -> dict:
+def default_readers(deadline: float | None = None) -> dict:
+    """The network readers, each bounded by the run's `deadline` (monotonic)."""
     from src.boundary import bridge2, logs, readers, unit
-    budget = readers.Budget(40, seconds=90)
+    budget = readers.Budget(40, seconds=None if deadline is None
+                            else max(0.0, deadline - time.monotonic()))
 
     def payouts(member):
         topics = {0: bridge2.TOPIC_TRANSFER, 1: bridge2.topic_address(bridge2.BRIDGE),
                   2: bridge2.topic_address(member)}
-        return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest")
+        return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest", deadline=deadline)
     return {
-        "head": lambda: logs.head_block("arbitrum"),
+        "head": lambda: logs.head_block("arbitrum", deadline=deadline),
         "withdrawals": lambda lo, hi: logs.read_logs("arbitrum", bridge2.BRIDGE,
-                                                     bridge2.withdrawal_topics(), lo, hi),
+                                                     bridge2.withdrawal_topics(), lo, hi,
+                                                     deadline=deadline),
         "user_withdrawals": lambda u: logs.read_logs("arbitrum", bridge2.BRIDGE,
-                                                     bridge2.withdrawal_topics(u), 0, "latest"),
+                                                     bridge2.withdrawal_topics(u), 0, "latest",
+                                                     deadline=deadline),
         "payouts": payouts,
         "tx_logs": lambda tx: readers.tx_logs("arbitrum", tx, budget=budget),
         "unit": lambda a: unit.read_operations(a),
-        "mints": mints,
+        "mints": lambda m: mints(m, deadline=deadline),
         "system_sends": system_sends_from,
     }
 
 
-def mints(member: str) -> list:
+def mints(member: str, *, deadline: float | None = None) -> list:
     """Native-USDC mints (from the zero address) into a member on Arbitrum."""
     from src.boundary import bridge2, logs
     topics = {0: bridge2.TOPIC_TRANSFER, 1: bridge2.topic_address("0x" + "0" * 40),
               2: bridge2.topic_address(member)}
-    return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest")
+    return logs.read_logs("arbitrum", bridge2.USDC, topics, 0, "latest", deadline=deadline)
 
 
 def system_sends_from(start_ms: int) -> list:
@@ -115,26 +126,26 @@ def retro_circle(member: str, readers: dict, own: set, core: set) -> list:
     return out
 
 
-def hubs(data: Path) -> set:
+def not_accounts(data: Path) -> set:
+    """Hubs (token distributors, vaults) and services the trace engine measured.
+
+    Raises RuntimeError when the registry is unreadable: judged without it,
+    every airdrop would read as an account paying him (rule 5).
+    """
     from src.trace import store
-    try:
-        registry = store.load(data / "trace" / "registry")
-    except RuntimeError:
-        return set()
+    registry = store.load(data / "trace" / "registry")
     return {a for a, r in registry.items()
-            if r.get("class") == "hub" or (r.get("hl") or {}).get("hub")}
+            if r.get("class") in ("hub", "service") or (r.get("hl") or {}).get("hub")}
 
 
 def core_edges(data: Path, core: set) -> list[dict]:
+    """The core ledgers the trace engine stored; RuntimeError when unreadable."""
     from src.trace import store
-    try:
-        stored = store.load(data / "trace" / "hl_edges")
-    except RuntimeError:
-        return []
+    stored = store.load(data / "trace" / "hl_edges")
     return [e for owner in sorted(core) for e in stored.get(owner, [])]
 
 
-def main(argv=None, *, readers=None, now=None) -> int:
+def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
     from src import alerts
     from src.boundary import attribution as at
     from src.boundary import bridge2, logs, unit
@@ -145,7 +156,11 @@ def main(argv=None, *, readers=None, now=None) -> int:
     parser.add_argument("--perimeter", metavar="PATH",
                         help="read the perimeter from PATH (a dry run's own build)")
     args = parser.parse_args(argv)
-    readers = readers or default_readers()
+    started = clock()
+
+    def left() -> float:
+        return RUN_SECONDS - (clock() - started)
+    readers = readers or default_readers(deadline=started + RUN_SECONDS)
     config, data = utils.load_config(), utils.DATA_DIR
     now_iso = now or datetime.now(UTC).isoformat()
     out_dir = Path(args.dry_run) if args.dry_run else data / "boundary"
@@ -155,7 +170,7 @@ def main(argv=None, *, readers=None, now=None) -> int:
     if fallback:
         doc = pm.core_only(config, now_iso)
     index = pm.Index(doc)
-    errors, events = [], []
+    errors, events, deferred = [], [], []
 
     # 1. Every Bridge2 withdrawal since the cursor.
     cursor = previous.get("withdrawal_cursor")
@@ -165,7 +180,7 @@ def main(argv=None, *, readers=None, now=None) -> int:
         head = int(readers["head"]())
         start = int(cursor) + 1 if cursor is not None else max(0, head - FIRST_RUN_BLOCKS)
         walk = logs.walk(readers["withdrawals"], start, head, max_calls=WALK_CALLS,
-                         seconds=WALK_SECONDS)
+                         seconds=min(WALK_SECONDS, max(0.0, left() - MIN_LEFT)), clock=clock)
     except Exception as exc:  # noqa: BLE001 - the head itself was unreadable
         walk["error"] = f"{type(exc).__name__}: {exc}"
     live = [r for r in (bridge2.decode_withdrawal(x) for x in walk["logs"]) if r]
@@ -176,6 +191,9 @@ def main(argv=None, *, readers=None, now=None) -> int:
     known = dict(previous.get("core_withdrawals") or {})
     own_txs = set()
     for user in sorted(index.core):
+        if left() < MIN_LEFT:
+            deferred.append("core_withdrawals")
+            break
         try:
             rows = [r for r in (bridge2.decode_withdrawal(x)
                                 for x in readers["user_withdrawals"](user)) if r]
@@ -193,6 +211,9 @@ def main(argv=None, *, readers=None, now=None) -> int:
     members = sorted(index.members.values(),
                      key=lambda m: (unit_checked.get(m["address"]) or "", m["address"]))
     for m in [m for m in members if m["weight"] >= RETRO_MIN_WEIGHT][:UNIT_PER_RUN]:
+        if left() < MIN_LEFT:
+            deferred.append("unit")
+            break
         try:
             got = unit.events(readers["unit"](m["address"]))
         except Exception as exc:  # noqa: BLE001
@@ -202,12 +223,17 @@ def main(argv=None, *, readers=None, now=None) -> int:
         unit_checked[m["address"]] = now_iso
         events += [{**e, "retro": not seen_before} for e in got]
 
-    # 4. The core ledgers the trace engine walked (HL-native sends).
-    edge_cursor = int(previous.get("hl_edges_cursor") or 0)
-    edges = core_edges(data, index.core)
-    for e in at.from_hl_edges(edges, index.core, exclude=hubs(data)):
-        events.append({**e, "retro": not edge_cursor or int(e.get("ts") or 0) <= edge_cursor})
-    new_edge_cursor = max([edge_cursor] + [int(e.get("ts") or 0) for e in edges])
+    # 4. The core ledgers the trace engine walked (HL-native sends), judged only
+    # with its hubs and services in hand; unreadable, they wait (cursor kept).
+    edge_cursor = new_edge_cursor = int(previous.get("hl_edges_cursor") or 0)
+    try:
+        edges, skip = core_edges(data, index.core), not_accounts(data)
+    except RuntimeError as exc:
+        errors.append({"source": "hl_edges", "address": None, "error": str(exc)[:200]})
+    else:
+        for e in at.from_hl_edges(edges, index.core, exclude=skip):
+            events.append({**e, "retro": not edge_cursor or int(e.get("ts") or 0) <= edge_cursor})
+        new_edge_cursor = max([edge_cursor] + [int(e.get("ts") or 0) for e in edges])
 
     # 5. Retro: who ever withdrew to a member (bounded, resumable). Bridge2
     # payouts for every member but the core (whose own withdrawals are read
@@ -225,6 +251,9 @@ def main(argv=None, *, readers=None, now=None) -> int:
                if m["weight"] >= RETRO_MIN_WEIGHT and str(m["address"]).startswith("0x")
                and (wants(m, "bridge2") or wants(m, "circle"))]
     for m in sorted(pending, key=lambda m: m["address"])[:RETRO_MEMBERS_PER_RUN]:
+        if left() < MIN_LEFT:
+            deferred.append("retro")
+            break
         if wants(m, "bridge2"):
             try:
                 payouts = readers["payouts"](m["address"])
@@ -283,7 +312,8 @@ def main(argv=None, *, readers=None, now=None) -> int:
              "core_withdrawals": known, "hl_edges_cursor": new_edge_cursor,
              "findings": findings, "alerted": sorted(set(alerted)), "undelivered": undelivered,
              "unit_checked": unit_checked, "retro": retro, "counts": counts,
-             "errors": errors[:50]}
+             "errors": errors[:50], "deferred": sorted(set(deferred)),
+             "elapsed_s": round(clock() - started, 1)}
     out_dir.mkdir(parents=True, exist_ok=True)
     utils.atomic_write_json(out_dir / "latest.json", state)
     print(f"[boundary] {len(live)} withdrawal(s) read to block {walk['last_block']}"

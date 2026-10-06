@@ -201,3 +201,53 @@ def test_a_dry_run_can_read_a_perimeter_from_anywhere(sandbox, tmp_path_factory)
     out = tmp_path_factory.mktemp("dry")
     cb.main(["--dry-run", str(out), "--perimeter", str(other)], readers=readers(head=500))
     assert json.loads((out / "latest.json").read_text())["perimeter_fallback"] is False
+
+
+def test_an_unreadable_registry_skips_hl_sends_rather_than_judging_them_unfiltered(sandbox):
+    # Without the registry's hubs every token distributor's airdrop would read
+    # as an account paying him (rule 5: a failed read is not "no hubs").
+    tmp, sent = sandbox
+    (tmp / "trace" / "hl_edges").mkdir(parents=True)
+    (tmp / "trace" / "registry").mkdir(parents=True)
+    (tmp / "trace" / "registry" / "33.json").write_text("{not json")
+    (tmp / "trace" / "hl_edges" / "45.json").write_text(json.dumps({T: [
+        {"id": "e2", "src": HUB, "dst": T, "amount_usd": 6e3, "ts": 11, "tx_hash": "0xh2"}]}))
+    cb.main([], readers=readers(head=500))
+    st = _state(tmp)
+    assert not st["findings"] and st["hl_edges_cursor"] == 0
+    assert [e["source"] for e in st["errors"]] == ["hl_edges"]
+
+
+def test_a_service_in_the_registry_sending_to_him_is_not_an_account(sandbox):
+    tmp, sent = sandbox
+    svc = "0x" + "9" * 40
+    (tmp / "trace" / "hl_edges").mkdir(parents=True)
+    (tmp / "trace" / "registry").mkdir(parents=True)
+    (tmp / "trace" / "registry" / "99.json").write_text(json.dumps({svc: {"class": "service"}}))
+    (tmp / "trace" / "hl_edges" / "45.json").write_text(json.dumps({T: [
+        {"id": "e3", "src": svc, "dst": T, "amount_usd": 5e4, "ts": 12, "tx_hash": "0xh3"}]}))
+    cb.main([], readers=readers(head=500))
+    assert _state(tmp)["findings"] == []
+
+
+def test_a_throttled_run_stops_at_its_deadline_and_defers_the_rest(sandbox):
+    # Dry run 2026-10-06: 441s against the step's 240s, because a throttled
+    # host and the retro reads had no run budget. Live work first; the rest
+    # waits for the next run and is never marked done.
+    tmp, sent = sandbox
+    now = [0.0]
+
+    def slow(result):
+        def read(*a):
+            now[0] += 60.0
+            return result
+        return read
+    r = readers(head=500)
+    r["unit"] = slow({"addresses": [], "operations": []})
+    r["payouts"] = slow([])
+    cb.main([], readers=r, clock=lambda: now[0])
+    st = _state(tmp)
+    assert now[0] <= cb.RUN_SECONDS + 60.0          # at most one read past the line
+    assert "unit" in st["deferred"] and "retro" in st["deferred"]
+    assert len(st["unit_checked"]) < 4 and st["retro"] == {}
+    assert st["withdrawal_cursor"] == 500            # the live walk ran first
