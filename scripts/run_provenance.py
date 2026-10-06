@@ -183,6 +183,30 @@ def hyperevm_call(deadline: float | None = None):
     return call
 
 
+def make_inbound(budget, *, has_key=None, get=None):
+    """Value into an address before a deposit: Blockscout v2 (keyless) for the
+    L1s it serves; HyperEVM through Etherscan V2 on chain 999, which needs the
+    key — without it that hop is final (NoReader), never "no funder"."""
+    import os
+
+    from src.boundary import hyperevm, readers
+    has_key = bool(os.environ.get("ETHERSCAN_API_KEY")) if has_key is None else has_key
+
+    def inbound(chain, address, since_ts, until_ts):
+        if chain != "hyperevm":
+            return readers.inbound_transfers(chain, address, since_ts=since_ts,
+                                             until_ts=until_ts, budget=budget)
+        if not has_key:
+            raise readers.NoReader("HyperEVM transfers are read with the Etherscan key")
+        budget.spend()
+        try:
+            return hyperevm.inbound_transfers(address, since_ts=since_ts, until_ts=until_ts,
+                                              get=get or utils.etherscan_get)
+        except hyperevm.EvmReadError as exc:
+            raise readers.ReadError(str(exc)) from exc
+    return inbound
+
+
 def default_readers(config: dict, data: Path, hl_budget, deadline: float) -> dict:
     """The network readers, every one bounded by the run's `deadline` (monotonic)."""
     from scripts.run_trace_engine import paced_post
@@ -203,8 +227,7 @@ def default_readers(config: dict, data: Path, hl_budget, deadline: float) -> dic
                                                   deadline=deadline),
         "ledger": ledger,
         "unit": lambda a: unit.read_operations(a),
-        "inbound": lambda chain, a, since_ts, until_ts: readers.inbound_transfers(
-            chain, a, since_ts=since_ts, until_ts=until_ts, budget=budget),
+        "inbound": make_inbound(budget),
         "first_gas": lambda chain, a: readers.first_gas(chain, a, budget=budget),
         "circle_source": circle_source_reader(budget, deadline),
         "label_of": make_label_of(config, data),

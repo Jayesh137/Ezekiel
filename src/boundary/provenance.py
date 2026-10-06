@@ -14,7 +14,7 @@ A source that could not be read is UNREADABLE, never "no source" (rule 5).
 from __future__ import annotations
 
 from src.boundary.perimeter import STRONG_ROLES, SYSTEM_PREFIXES, low
-from src.boundary.readers import HOSTS, NoReader, ReadError
+from src.boundary.readers import NoReader, ReadError
 
 FORWARDER = "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"
 ROUTE_BRIDGE2, ROUTE_CIRCLE, ROUTE_UNIT = "bridge2", "circle", "unit"
@@ -178,6 +178,11 @@ def _hop1(entry, account, read_inbound, read_first_gas, circle_source):
         return aggregate(read_inbound("hyperevm", account, since_ts=ts - LOOKBACK_S, until_ts=ts))
     if route == ROUTE_CIRCLE:
         src = circle_source(entry, account)
+        if src and src["chain"] == "hyperevm" and low(src["address"]) == account:
+            # Paid in from its own HyperEVM address: like a Bridge2 deposit, the
+            # funders of that address are the first hop.
+            return aggregate(read_inbound("hyperevm", account, since_ts=ts - LOOKBACK_S,
+                                          until_ts=ts))
         return _single(src["address"], src["chain"], entry["usd"], ts, "circle_sender") if src else None
     if route == ROUTE_UNIT:
         return _single(entry["source"], entry["source_chain"], entry["usd"], ts, "unit_source")
@@ -192,8 +197,6 @@ def _hop2(source, read_inbound, read_ledger) -> list[dict]:
                 rows += _single(e["source"], e["source_chain"], e["usd"], e["ts"],
                                 "hl_sender" if e["route"] == ROUTE_HL_SEND else "unit_source")
         return [r for r in rows if r["address"] != source["address"]]
-    if source["chain"] not in HOSTS:
-        raise NoReader(f"no keyless reader for {source['chain']}")
     return aggregate(read_inbound(source["chain"], source["address"],
                                   since_ts=(source.get("first_ts") or 0) - LOOKBACK_S,
                                   until_ts=source.get("last_ts") or source.get("first_ts") or 0))

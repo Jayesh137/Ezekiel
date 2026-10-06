@@ -185,3 +185,15 @@ def test_the_circle_reader_follows_an_extension_message_to_the_depositor():
     read = rp.circle_source_reader(Budget(10), source=down, extension=extension)
     with pytest.raises(ReadError):
         read({"usd": 5e5, "ts": 1_790_000_000}, NEW)
+
+
+def test_hyperevm_inbound_is_read_with_a_key_and_final_without_one():
+    from src.boundary.readers import Budget, NoReader
+    read = rp.make_inbound(Budget(10), has_key=False)
+    with pytest.raises(NoReader):
+        read("hyperevm", NEW, since_ts=0, until_ts=10)
+
+    def get(params, chain_id=None):
+        return {"status": "0", "message": "No transactions found", "result": []}
+    assert rp.make_inbound(Budget(10), has_key=True, get=get)("hyperevm", NEW, since_ts=0,
+                                                              until_ts=10) == []

@@ -191,3 +191,33 @@ def test_an_entry_whose_funder_was_not_found_is_unresolved_never_unrelated():
                              label_of=label_of, read_inbound=nothing, read_first_gas=no_gas,
                              read_ledger=boom, circle_source=boom, now_ts=1_791_000_000)
     assert not rec["complete"] and rec["verdict"] == "unresolved" and rec["retry"] is False
+
+
+def test_an_account_paying_in_its_own_hyperevm_usdc_is_traced_to_its_funders_at_hop_one():
+    # The $15.3M dry-run account paid Circle's deposit wallet from its own
+    # HyperEVM address: like a Bridge2 deposit, the funders of that address are
+    # hop 1 - so his wallet funding it is CRITICAL, not a hop-2 HIGH.
+    ledger = [{"time": 1_790_000_000_000, "hash": "0xc", "delta": {
+        "type": "send", "user": provenance.FORWARDER, "destination": NEW, "token": "USDC",
+        "amount": "2000000.0", "usdcValue": "2000000.0"}}]
+    asked = []
+
+    def inbound(chain, address, *, since_ts, until_ts):
+        asked.append((chain, address))
+        return [{"from": T, "usd": 2e6, "ts": until_ts - 60, "chain": chain,
+                 "from_is_contract": False, "from_is_scam": False}]
+    rec = provenance.resolve(NEW, ledger=ledger, unit_events=[], index=INDEX, label_of=label_of,
+                             read_inbound=inbound, read_first_gas=no_gas, read_ledger=boom,
+                             circle_source=lambda e, a: {"address": NEW, "chain": "hyperevm",
+                                                         "kind": "hyperevm_payer"},
+                             now_ts=1_791_000_000)
+    assert asked == [("hyperevm", NEW)]
+    [f] = provenance.findings(rec)
+    assert (f["severity"], f["hop"], f["member"]) == ("CRITICAL", 1, T)
+
+
+def test_a_hyperevm_source_gets_its_second_hop_from_the_reader_not_a_shortcut():
+    src = {"address": QUIET, "chain": "hyperevm", "usd": 2e6, "first_ts": 1_000, "last_ts": 2_000}
+    rows = provenance._hop2(src, lambda chain, address, *, since_ts, until_ts: [
+        {"from": T, "usd": 2e6, "ts": 1_500, "chain": chain}], boom)
+    assert rows[0]["address"] == T and rows[0]["chain"] == "hyperevm"

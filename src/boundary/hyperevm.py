@@ -24,6 +24,7 @@ SECONDS_PER_BLOCK = 0.9837          # measured over 2M blocks, 2026-10-06
 SOLANA_DOMAIN = 5
 BEFORE, AFTER = 5, 2                # blocks around the credit's own
 SEARCH_READS = 4
+CHAIN_ID = 999
 
 
 class EvmReadError(RuntimeError):
@@ -85,3 +86,43 @@ def deposit_source(account: str, usd: float, ts: int, *, call) -> dict | None:
             "raw": m["counterparty_raw"], "chain": CCTP_DOMAINS.get(m["domain"], m["chain"]),
             "domain": m["domain"], "kind": "circle_message", "message_usd": m["amount_usd"],
             "tx_hash": m["tx_hash"]}
+
+
+def _rows(doc: dict, what: str) -> list[dict]:
+    if str((doc or {}).get("status")) == "1" and isinstance(doc.get("result"), list):
+        return doc["result"]
+    if "no transactions found" in str((doc or {}).get("message") or "").lower():
+        return []
+    raise EvmReadError(f"{what}: {(doc or {}).get('message')} {str((doc or {}).get('result'))[:120]}")
+
+
+def inbound_transfers(address: str, *, since_ts: int, until_ts: int, get) -> list[dict]:
+    """Value INTO `address` on HyperEVM in [since_ts, until_ts], newest first.
+
+    Etherscan V2 on chain 999 (`get` is `utils.etherscan_get`; a key is
+    required): ERC-20 transfers and native HYPE. Native USDC is valued by its
+    contract (rule 2); every other token, and HYPE, stays unvalued (rule 6).
+    """
+    address = (address or "").lower()
+    out = []
+    for action in ("tokentx", "txlist"):
+        rows = _rows(get({"module": "account", "action": action, "address": address,
+                          "startblock": 0, "endblock": 99_999_999_999, "page": 1,
+                          "offset": 1_000, "sort": "desc"}, chain_id=CHAIN_ID), action)
+        for r in rows:
+            ts = _int(r.get("timeStamp") or 0)
+            if (r.get("to") or "").lower() != address or not since_ts <= ts <= until_ts:
+                continue
+            if action == "txlist":
+                if str(r.get("isError")) == "1" or not _int(r.get("value") or 0):
+                    continue
+                token, symbol, usd = "native", "HYPE", None
+            else:
+                token, symbol = (r.get("contractAddress") or "").lower(), r.get("tokenSymbol")
+                usd = (_int(r["value"]) / 10 ** _int(r.get("tokenDecimal") or 6)
+                       if token == USDC else None)
+            out.append({"from": (r.get("from") or "").lower(), "usd": usd, "ts": ts,
+                        "chain": "hyperevm", "token": token, "symbol": symbol,
+                        "tx_hash": (r.get("hash") or "").lower(), "from_is_contract": False,
+                        "from_is_scam": False})
+    return sorted(out, key=lambda t: -t["ts"])

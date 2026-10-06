@@ -85,3 +85,43 @@ def test_a_failed_read_raises_and_is_never_read_as_no_deposit():
         raise RuntimeError("rate limited")
     with pytest.raises(hyperevm.EvmReadError):
         hyperevm.deposit_source(HOLDER, 10_000_000.0, FX["holder"]["block_ts"], call=down)
+
+
+ACCT = "0x" + "5" * 40
+HIM = "0x45d26f28196d226497130c4bac709d808fed4029"
+HYPE_TOKEN = "0x5555555555555555555555555555555555555555"
+
+
+def _tokentx(frm, to, value, decimals, contract, ts, symbol="USDC"):
+    """One Etherscan V2 `account/tokentx` row, in its documented shape."""
+    return {"blockNumber": "100", "timeStamp": str(ts), "hash": "0x" + "1" * 64, "from": frm,
+            "contractAddress": contract, "to": to, "value": str(value), "tokenName": symbol,
+            "tokenSymbol": symbol, "tokenDecimal": str(decimals)}
+
+
+def test_hyperevm_inbound_values_only_native_usdc_and_keeps_the_window():
+    def get(params, chain_id=None):
+        assert chain_id == 999
+        if params["action"] == "tokentx":
+            return {"status": "1", "message": "OK", "result": [
+                _tokentx(HIM, ACCT, 2_000_000 * 10**6, 6, hyperevm.USDC, 1_000),
+                _tokentx(HIM, ACCT, 5 * 10**18, 18, HYPE_TOKEN, 1_100, "WHYPE"),
+                _tokentx(ACCT, HIM, 7 * 10**6, 6, hyperevm.USDC, 1_200),        # outbound
+                _tokentx(HIM, ACCT, 9 * 10**6, 6, hyperevm.USDC, 99)]}           # before the window
+        return {"status": "1", "message": "OK", "result": [
+            {"timeStamp": "1050", "hash": "0x" + "2" * 64, "from": HIM, "to": ACCT,
+             "value": str(3 * 10**18), "isError": "0"}]}
+    rows = hyperevm.inbound_transfers(ACCT, since_ts=500, until_ts=2_000, get=get)
+    assert {(r["from"], r["usd"], r["symbol"]) for r in rows} == {
+        (HIM, 2_000_000.0, "USDC"), (HIM, None, "WHYPE"), (HIM, None, "HYPE")}
+
+
+def test_hyperevm_inbound_tells_an_empty_answer_from_a_failed_one():
+    def empty(params, chain_id=None):
+        return {"status": "0", "message": "No transactions found", "result": []}
+    assert hyperevm.inbound_transfers(ACCT, since_ts=0, until_ts=1, get=empty) == []
+
+    def failed(params, chain_id=None):
+        return {"status": "0", "message": "NOTOK", "result": "Max rate limit reached"}
+    with pytest.raises(hyperevm.EvmReadError):
+        hyperevm.inbound_transfers(ACCT, since_ts=0, until_ts=1, get=failed)
