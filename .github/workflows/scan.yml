@@ -54,7 +54,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-    timeout-minutes: 40
+    timeout-minutes: 45          # steps sum past 40; the checkpoint may now take up to 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -120,7 +120,11 @@ jobs:
       - name: Prepare discovery checkpoint
         id: discovery_snapshot
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' && steps.discovery_state.conclusion == 'success' }}
-        timeout-minutes: 2
+        # One snapshot of the ~260 MiB store takes ~15s here; over its 48 MiB
+        # budget it is trimmed oldest-first and taken again (src/discovery_state
+        # snapshot_within_budget, at most 8 rounds) instead of failing the run
+        # and freezing discovery, as it did from 2026-10-03.
+        timeout-minutes: 4
         run: python scripts/discovery_artifacts.py snapshot --kind state
       - uses: actions/upload-artifact@v4
         id: checkpoint_upload

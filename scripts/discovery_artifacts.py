@@ -20,6 +20,7 @@ from src.discovery_state import (
     import_observations,
     restore_archive,
     snapshot,
+    snapshot_within_budget,
 )
 from src.discovery_store import DiscoveryStore
 from src.utils import DATA_DIR, atomic_write_json
@@ -177,7 +178,10 @@ def main():
         print('No observation store was created; no artifact to publish.')
         return 0
     compact(args.db)
-    path = snapshot(args.db, args.output_dir)
+    # The owner's checkpoint is trimmed to fit its byte budget; a shard's facts
+    # are unseen and are never trimmed - an oversized shard still fails.
+    path = (snapshot_within_budget(args.db, args.output_dir) if args.kind == 'state'
+            else snapshot(args.db, args.output_dir))
     name = prefix(args.kind, args.branch) + os.environ.get('GITHUB_RUN_ID', 'local') + '-' + os.environ.get('GITHUB_RUN_ATTEMPT', '1')
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
@@ -186,6 +190,8 @@ def main():
         report = json.loads(args.state.read_text()) if args.state.exists() else {}
         report['checkpoint_prepared_at_ms'] = int(time.time() * 1000)
         report['checkpoint_bytes'] = path.stat().st_size
+        with DiscoveryStore(args.db) as store:
+            report['byte_trimmed'] = (store.meta('storage_retention', {}) or {}).get('byte_trimmed')
         atomic_write_json(args.state, report)
     print(json.dumps({'artifact_name': name, 'bytes': path.stat().st_size}))
     return 0

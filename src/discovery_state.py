@@ -2,6 +2,7 @@
 
 import gzip
 import json
+import math
 import os
 import sqlite3
 import tempfile
@@ -18,6 +19,17 @@ MAX_DATABASE_BYTES = 512 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 48 * 1024 * 1024
 MAX_FILL_ROWS = 250_000
 PENDING_FILL_ROWS = 100_000
+# Retention caps ROWS; the artifact budget is BYTES. With every table at its
+# cap the checkpoint compressed to ~48 MiB, and from 2026-10-03 each snapshot
+# was refused: discovery froze on a three-day-old checkpoint while observation
+# shards piled up toward their 7-day expiry. The owner's checkpoint is trimmed,
+# oldest replayable bulk first, until it fits.
+TRIM_FRACTION = 0.15
+TRIM_ROUNDS = 8
+
+
+class OverBudget(ValueError):
+    """A compressed checkpoint larger than its artifact budget."""
 
 
 def _copy_bounded(source, destination, limit):
@@ -47,10 +59,77 @@ def snapshot(db_path, output_dir):
         with copy.open('rb') as source, gzip.open(compressed, 'wb') as destination:
             _copy_bounded(source, destination, MAX_DATABASE_BYTES)
         if compressed.stat().st_size > MAX_ARCHIVE_BYTES:
-            raise ValueError('compressed discovery checkpoint exceeds artifact budget')
+            raise OverBudget('compressed discovery checkpoint exceeds artifact budget')
         result = output_dir / 'snapshot.sqlite3.gz'
         os.replace(compressed, result)
     return result
+
+
+def trim_oldest(db_path, fraction=TRIM_FRACTION) -> dict:
+    """Remove the oldest `fraction` of replayable bulk, for bytes.
+
+    Fills outside active backfills (a backfill's prefix is what lets it resume)
+    and generic observations other than authority snapshots, which cannot be
+    replayed after revocation. A wallet that loses fills loses its coverage
+    claim, as in compact().
+    """
+    out = {'fills': 0, 'observations': 0}
+    with DiscoveryStore(db_path) as store:
+        tables = {r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if 'fills' in tables:
+            # NOT EXISTS, never NOT IN: with no active backfill the list is
+            # empty, and `wallet NOT IN (NULL)` is never true - nothing trimmed.
+            spared = ('WHERE NOT EXISTS (SELECT 1 FROM fill_progress p WHERE p.wallet=fills.wallet)'
+                      if 'fill_progress' in tables else '')
+            spare = store.db.execute(f'SELECT count(*) FROM fills {spared}').fetchone()[0]
+            if spare:
+                before = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
+                out['fills'] = store.db.execute(
+                    f'DELETE FROM fills WHERE rowid IN (SELECT rowid FROM fills {spared} '
+                    'ORDER BY ts LIMIT ?)', (math.ceil(spare * fraction),)).rowcount
+                after = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
+                changed = [(w,) for w, n in before.items() if after.get(w, 0) != n]
+                for table in ('fill_coverage', 'fill_progress'):
+                    if table in tables:
+                        store.db.executemany(f'DELETE FROM {table} WHERE wallet=?', changed)
+        spare = store.db.execute("SELECT count(*) FROM discovery_observations "
+                                 "WHERE source!='authority_actions'").fetchone()[0]
+        if spare:
+            out['observations'] = store.db.execute(
+                'DELETE FROM discovery_observations WHERE rowid IN (SELECT rowid FROM '
+                "discovery_observations WHERE source!='authority_actions' "
+                'ORDER BY observed_at_ms LIMIT ?)', (math.ceil(spare * fraction),)).rowcount
+        store.db.commit()
+    return out
+
+
+def snapshot_within_budget(db_path, output_dir, *, rounds=TRIM_ROUNDS, fraction=TRIM_FRACTION,
+                           now_ms=None):
+    """The scanner's checkpoint, trimmed oldest-first until it fits its budget.
+
+    For the owner's state checkpoint only: its facts are already imported. An
+    observation shard's facts are unseen, so a shard over budget must still
+    fail (docs/discovery-operations.md). What was trimmed is recorded in
+    storage_retention.byte_trimmed, inside the checkpoint itself.
+    """
+    total = {'fills': 0, 'observations': 0, 'rounds': 0}
+    while True:
+        try:
+            return snapshot(db_path, output_dir)
+        except OverBudget:
+            if total['rounds'] >= rounds:
+                raise
+            got = trim_oldest(db_path, fraction)
+            if not got['fills'] and not got['observations']:
+                raise                       # nothing replayable is left to trim
+            total = {'fills': total['fills'] + got['fills'],
+                     'observations': total['observations'] + got['observations'],
+                     'rounds': total['rounds'] + 1}
+            with DiscoveryStore(db_path) as store:
+                retention = store.meta('storage_retention', {}) or {}
+                retention['byte_trimmed'] = {**total, 'at_ms': int(
+                    now_ms if now_ms is not None else time.time() * 1000)}
+                store.set_meta('storage_retention', retention)
 
 
 def restore_archive(archive, destination):
