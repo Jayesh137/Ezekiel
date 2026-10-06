@@ -214,16 +214,15 @@ def test_the_ledger_keeps_the_largest_rows_and_counts_the_rest():
 
 def test_folding_a_covered_span_again_changes_nothing():
     """Folding the same span twice should not double-count (idempotent)."""
+    import copy
     fills = program(DAY0 + HOUR, 20)
     days = {}
     rec.fold_fills(days, fills, wallet=W, role="studied", start_ms=DAY0,
                    end_ms=DAY0 + 2 * HOUR, last_fill_ms=None)
-    first_fills = days["2026-10-02"]["fills"]
-    first_orders = days["2026-10-02"]["orders"]
+    first_copy = copy.deepcopy(days)
     rec.fold_fills(days, fills, wallet=W, role="studied", start_ms=DAY0,
                    end_ms=DAY0 + 2 * HOUR, last_fill_ms=None)
-    assert days["2026-10-02"]["fills"] == first_fills
-    assert days["2026-10-02"]["orders"] == first_orders
+    assert days == first_copy
 
 
 def test_uncovered_returns_the_gaps():
@@ -232,3 +231,68 @@ def test_uncovered_returns_the_gaps():
     assert rec.uncovered([[0, 100]], 10, 20) == []
     assert rec.uncovered([], 10, 30) == [(10, 30)]
     assert rec.uncovered([[15, 25]], 10, 30) == [(10, 15), (25, 30)]
+
+
+def test_uncovered_edge_cases_with_intervals_past_hi():
+    """uncovered should not return inverted or empty spans when intervals lie at/after hi."""
+    assert rec.uncovered([[25, 30], [40, 45]], 0, 20) == [(0, 20)]
+    assert rec.uncovered([[5, 20], [25, 30]], 10, 20) == []
+
+
+def test_fold_orders_idempotence():
+    """Folding the same orders twice should not change the record."""
+    import copy
+    t = DAY0 + HOUR
+    entries = [order(t), order(t + 1, tif="FrontendMarket", otype="Market", px="0")]
+    days = {}
+    rec.fold_orders(days, entries, {str(t): 100.0}, wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    first_copy = copy.deepcopy(days)
+    rec.fold_orders(days, entries, {str(t): 100.0}, wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    assert days == first_copy
+
+
+def test_ledger_with_value_less_rows_past_the_cap():
+    """Ledger keeps largest by usd; value-less rows are dropped last."""
+    small = [{"time": DAY0 + i, "hash": f"0x{i:040x}", "delta": {"type": "send", "usd": "1.0"}}
+             for i in range(1, 56)]
+    value_less = [{"time": DAY0 + 56, "hash": "0x00", "delta": {"type": "spotGenesis"}},
+                  {"time": DAY0 + 57, "hash": "0x01", "delta": {"type": "spotGenesis"}},
+                  {"time": DAY0 + 58, "hash": "0x02", "delta": {"type": "spotGenesis"}}]
+    large = {"time": DAY0 + 100, "hash": "0xL", "delta": {"type": "withdraw", "usd": "5000000.0"}}
+    days = {}
+    rec.fold_ledger(days, small + value_less + [large], wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    day = days["2026-10-02"]
+    assert len(day["ledger"]) == rec.MAX_LEDGER
+    assert any(r["usd"] == 5000000.0 for r in day["ledger"])
+    assert day["ledger_overflow"] == 9
+
+
+def test_heavy_coin_arriving_in_later_fold_of_same_day():
+    """A heavy coin folded in a second batch should enter the table."""
+    fills_20 = [fill(DAY0 + i * 30_000, coin=f"C{i:02d}", sz=f"{i + 1}") for i in range(20)]
+    fills_zzz = program(DAY0 + 11 * HOUR, 200, coin="ZZZ")
+    days = {}
+    # First fold covers [DAY0, DAY0 + 11*HOUR)
+    rec.fold_fills(days, fills_20, wallet=W, role="studied", start_ms=DAY0,
+                   end_ms=DAY0 + 11 * HOUR, last_fill_ms=None)
+    assert "ZZZ" not in days["2026-10-02"]["coins"]
+    # Second fold covers [DAY0 + 11*HOUR, DAY0 + DAY_MS), with new ZZZ fills
+    rec.fold_fills(days, fills_zzz, wallet=W, role="studied", start_ms=DAY0 + 11 * HOUR,
+                   end_ms=DAY0 + rec.DAY_MS, last_fill_ms=None)
+    coins = days["2026-10-02"]["coins"]
+    assert "ZZZ" in coins and coins["ZZZ"]["orders"] == 200
+    assert len(coins) == rec.MAX_COINS
+
+
+def test_day_with_exactly_twenty_coins_keeps_all_and_no_other():
+    """A day with exactly MAX_COINS distinct coins keeps all and has no _other entry."""
+    fills = [fill(DAY0 + i * 30_000, coin=f"C{i:02d}", sz="1") for i in range(20)]
+    days = {}
+    rec.fold_fills(days, fills, wallet=W, role="studied", start_ms=DAY0,
+                   end_ms=DAY0 + rec.DAY_MS, last_fill_ms=None)
+    coins = days["2026-10-02"]["coins"]
+    assert len(coins) == 20
+    assert rec.OTHER not in coins

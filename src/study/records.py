@@ -122,8 +122,12 @@ def uncovered(intervals, lo: int, hi: int) -> list[tuple[int, int]]:
     gaps: list[tuple[int, int]] = []
     current = lo
     for a, b in merged:
+        if a >= hi:
+            break
         if current < a:
-            gaps.append((max(current, lo), min(a, hi)))
+            gap = (max(current, lo), min(a, hi))
+            if gap[0] < gap[1]:
+                gaps.append(gap)
         current = max(current, b)
     if current < hi:
         gaps.append((current, hi))
@@ -199,6 +203,8 @@ def _add_decision(record: dict, decision: list) -> None:
 
 def _cap_coins(record: dict) -> None:
     coins = record["coins"]
+    if len(coins) <= MAX_COINS:
+        return
     other = coins.pop(OTHER, {"orders": 0})
     ranked = sorted(coins.items(), key=lambda kv: (-kv[1]["orders"], kv[0]))
     kept = dict(ranked[:MAX_COINS - 1])
@@ -312,7 +318,8 @@ def fold_fills(days: dict, fills: list, *, wallet: str, role: str, start_ms: int
             else:
                 record["runs_overflow"] += 1
             _add_decision(record, [summary["start_ms"], summary["coin"], summary["side"], "run"])
-    return int(orders[-1]["t"]) if orders else last_fill_ms
+    last_row_time = int(max(r.get("time") for r in rows)) if rows else None
+    return last_row_time if last_row_time is not None else last_fill_ms
 
 
 # --- folding orders -------------------------------------------------------------------
@@ -463,7 +470,10 @@ def fold_ledger(days: dict, rows: list, *, wallet: str, role: str, start_ms: int
                 kept.append(item)
                 keys.add(key)
         if len(kept) > MAX_LEDGER:
-            sorted_kept = sorted(kept, key=lambda r: (-num(r.get("usd")) or 0, r["ts_ms"]))
+            def rank_ledger(r):
+                usd = num(r.get("usd"))
+                return (usd is None, -(usd or 0.0), r["ts_ms"])
+            sorted_kept = sorted(kept, key=rank_ledger)
             kept = sorted_kept[:MAX_LEDGER]
             record["ledger_overflow"] += len(sorted_kept) - MAX_LEDGER
         record["ledger"] = sorted(kept, key=lambda r: r["ts_ms"])
