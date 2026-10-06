@@ -59,7 +59,7 @@ mostly exchanges and protocols) for a measured yield near zero.
   Solana labels, roster, substrate      core withdrawals by topic1     │ attribution
         │                               Unit ops per member (rotating) │ (§6)
         ▼                               retro: payouts + mints into    │
-  data/boundary/perimeter.json ───────► members (bounded, resumable)  ─┘
+  data/perimeter/latest.json ───────► members (bounded, resumable)  ─┘
         │                                      │
         │                               data/boundary/latest.json
         ▼
@@ -91,22 +91,22 @@ Scripts (each the single writer of its files):
 
 | Script | Workflow | Writes |
 |---|---|---|
-| `scripts/build_perimeter.py` | trace.yml, after the trace engine | `data/boundary/perimeter.json` |
+| `scripts/build_perimeter.py` | trace.yml, after the trace engine | `data/perimeter/latest.json` |
 | `scripts/check_boundary.py` | watch.yml | `data/boundary/latest.json` |
 | `scripts/run_provenance.py` | trace.yml, before the correlator | `data/provenance/latest.json`, `data/provenance/accounts/<xx>.json`, `data/provenance/bridge_deposits.json` |
 
-watch.yml reads `perimeter.json` read-only; a perimeter up to one trace run
+watch.yml reads `data/perimeter/latest.json` read-only; a perimeter up to one trace run
 stale is acceptable for a tripwire.
 
-## 4. The perimeter (`data/boundary/perimeter.json`)
+## 4. The perimeter (`data/perimeter/latest.json`)
 
 Rebuilt every trace run from what other detectors measured. Each member:
-`{address, role, weight, why, sources, chains, first_seen, hl}`.
+`{address, role, weight, why, sources, chains, first_seen, hl}`. (Roster
+CONFIRMED is config-only by design, so there is no separate `confirmed` role.)
 
 | Role | Built from | Weight |
 |---|---|---|
 | `core` | `target_wallet` + `known_self_wallets` (ground truth) | 1.0 |
-| `confirmed` | roster CONFIRMED not in config | 0.8 |
 | `deposit` | `deposit_sentinels.sentinels`; trace-engine `deposit_addresses` the cluster paid (incl. HyperCore `0x4aecac3b…`) | 1.0 |
 | `identity` | `labels/solana_addresses.json` role `cluster` (with its bytes32 form) | 1.0 |
 | `sink` | trace registry: class `quiet_eoa` (measured), his-money share ≥ 0.5 and ≥ $100K | 0.6 |
@@ -126,8 +126,8 @@ provenance (§7) and the gap filter (§8). No exchange names are invented —
 **Closing the loop.** Up to 25 members per run whose HL reading is older than
 24 h get `clearinghouseState`, `spotClearinghouseState` and `portfolio`
 (strict reads). A non-core member with account value ≥ $10K or all-time volume
-≥ $100K is an **HL account in the perimeter**: HIGH for `sink`/`funder`/
-`confirmed`, recorded for `associate`, never for `core`. Failed reads are
+≥ $100K is an **HL account in the perimeter**: HIGH for `sink`/`funder`, recorded for
+`associate`, never for `core`. Failed reads are
 recorded as unreadable, never as absent.
 
 ## 5. Edge feeds
@@ -171,13 +171,13 @@ amount_usd, ts, ref, event_id}` where `direction` is relative to Hyperliquid:
 
 | Event | Severity | Roster vote |
 |---|---|---|
-| `out` by a non-core account to a `core`/`identity`/`confirmed` member | CRITICAL | `transfer` |
+| `out` by a non-core account to a `core`/`identity` member | CRITICAL | `transfer` |
 | `out` by a non-core account to a `deposit` member | CRITICAL | `linkage` (address reuse) |
 | `out` by a non-core account to a `sink`/`funder` member | HIGH | evidence only |
-| `in` to a non-core account from a `core`/`identity`/`confirmed` member | CRITICAL | `transfer` |
+| `in` to a non-core account from a `core`/`identity` member | CRITICAL | `transfer` |
 | `in` to a non-core account from a `sink`/`funder` member | HIGH | evidence only |
 | `out` by a core account to a non-perimeter address | CRITICAL (same alert and key as `withdrawals.py`, so no double page) | — |
-| A non-core member depositing into its own HL account (Bridge2 `in`, depositor ∈ perimeter) | HIGH for `sink`/`funder`/`confirmed` | evidence only |
+| A non-core member active on its own HL account (Bridge2 deposit or withdrawal to itself) | HIGH for weight ≥ 0.6 | evidence only |
 | Anything involving only an `associate` | recorded | evidence only |
 
 A withdrawal to its own address (user = destination) carries no relationship
@@ -240,8 +240,8 @@ Blockscout calls, 30 Unit calls, HL weight through `hl_budget.ReadBudget`.
    Unit (source = the operation's external address and chain); a send from
    `0x20…`/`0x2222…` → HyperEVM (source = the account on chain 999, Etherscan
    only); a send from any other account → HL-native (source = that account).
-   First native gas is read only for fresh addresses (≤ 50 transactions), with
-   the existing `linkage` first-funder reader.
+   First native gas is read only for fresh addresses (≤ 50 transactions): the
+   oldest value-bearing incoming transaction from Blockscout v2 (keyless).
 2. **Hop 1.** The sources that put value into the entry: for an L1 address,
    its inbound token transfers (Blockscout v2, newest first, ≤ 2 pages) in the
    30 days before the entry, plus who paid its first native gas; for an HL
@@ -257,7 +257,7 @@ Blockscout calls, 30 Unit calls, HL weight through `hl_budget.ReadBudget`.
 
 | Path | Severity | Vote |
 |---|---|---|
-| A `core`/`identity`/`confirmed` member at hop 1 | CRITICAL | `transfer` |
+| A `core`/`identity` member at hop 1 | CRITICAL | `transfer` |
 | A `sink`/`funder` member at hop 1 | HIGH | evidence |
 | Any member of weight ≥ 0.6 at hop 2 | HIGH | evidence (`graph_reach_only`, never a vote) |
 | An `associate` anywhere | recorded | evidence |
@@ -300,7 +300,7 @@ are unchanged (rule 4 spirit: no tuning to the story).
 
 ## 9. Visibility — dashboard `/trace`
 
-A new page reading `perimeter.json`, `boundary/latest.json`,
+A new page reading `perimeter/latest.json`, `boundary/latest.json`,
 `provenance/latest.json`, `trace/latest.json` and the feed-health state:
 
 1. **Status** — each feed: last read, cursor lag, blind or healthy.
@@ -320,10 +320,11 @@ The Transfers page stops calling config wallets "Migration candidate" (label
 ## 10. Health, alerts, roster
 
 - `feed_health`: "boundary attribution" (watch group, `data/boundary/latest.json`,
-  360 min) and "provenance" (other group, `data/provenance/latest.json`,
+  360 min), "his perimeter" (other group, `data/perimeter/latest.json`, 720 min)
+  and "funding provenance" (other group, `data/provenance/latest.json`,
   720 min). Blind when a boundary read covered ≥ 20,000 blocks with 0
-  withdrawals (impossible on a live bridge), or provenance attempted ≥ 5 accounts
-  and resolved none.
+  withdrawals (impossible on a live bridge), when the perimeter holds no core
+  member, or when provenance attempted ≥ 5 accounts and resolved none.
 - Alerts: `alert_boundary_finding(row)` and `alert_provenance_hit(row)`,
   subjects `[EZEKIEL] CRITICAL|HIGH: …`, cooldown keys per (kind, account,
   counterparty), 168 h. Only CRITICAL/HIGH route (`ESCALATING_SEVERITIES`).
