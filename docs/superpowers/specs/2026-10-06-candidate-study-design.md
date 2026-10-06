@@ -123,6 +123,9 @@ New code lives in `src/study/` as pure modules plus one I/O script:
 | `src/study/strategy.py` | T8 from archived coins: `calibration.market_rarity_bonus`, direction agreement, relative size |
 | `src/study/calibration.py` | panel summaries, Clopper–Pearson bounds, the fixed bars, statuses |
 | `src/study/verdict.py` | per-test → per-family verdicts, study rank, transitions |
+| `src/study/archive.py` | daily files, verified month archives, state, write-if-changed (added by the plan) |
+| `src/study/panels.py` | stranger and family panels for T1–T3 (added by the plan) |
+| `src/study/assemble.py` | his reference, his self-splits, per-wallet tests, rows, dossiers, latest (added by the plan) |
 | `scripts/run_study.py` | the only writer of `data/study/**`; orchestrates the run |
 
 **Single-writer map.** `run_study.py` writes everything under `data/study/` and
@@ -193,10 +196,12 @@ cursor advances to the boundary; the tail is re-read next run (deduped by `tid`,
 `oid`+time). The time of the wallet's last fill is kept in state, so the first fill
 after a boundary is classified correctly as a session start or not.
 
-Orders are counted once, by placement time, when their placement hour is sealed
-(≥ 1 h old); an order still open at that point counts as `open_at_seal` rather than
-waiting forever (maker bots always have open orders). If more than 10,000 fills or
-2,000 orders arrived since the cursor, the unreachable span is recorded as
+Orders are counted once, by placement time, as soon as they are read; an order
+still open is counted as `open`. (The first design waited an hour for each order's
+final status; the 2026-10-06 dry run showed that a busy bot's newest 2,000 orders
+are all minutes old, so its habits would never have been recorded, and only the
+cancel share — which no verdict uses — needed the wait.) If more than 10,000 fills
+or 2,000 orders arrived since the cursor, the unreachable span is recorded as
 `saturated`.
 
 ### 6.3 The daily record — `data/study/archive/<wallet>/<YYYY-MM-DD>.json`
@@ -219,7 +224,7 @@ waiting forever (maker bots always have open orders). If more than 10,000 fills 
   "runs_overflow": 0,
   "habits": {"orders_seen": 297, "taker": 297, "fills_seen": 812,
              "tif": {"Ioc": 290, "Gtc": 0, "Alo": 0, "FrontendMarket": 7, "other": 0},
-             "cloid": 0, "trigger": 0, "reduce_only": 0, "canceled": 0, "open_at_seal": 0,
+             "cloid": 0, "trigger": 0, "reduce_only": 0, "canceled": 0, "open": 0,
              "ioc_offset_seen": 290, "ioc_offset_5pct": 289},
   "cadence": [0, 0, 1, 2, 0, 1, 3, 2, 4, 3, 5, 4, 6, 4, 8, 22, 71, 48, 31, 12],
   "coins": {"BTC": {"orders": 40, "buy_usd": 0.0, "sell_usd": 340000.0,
@@ -229,6 +234,15 @@ waiting forever (maker bots always have open orders). If more than 10,000 fills 
 ```
 
 (`cadence` is shown truncated; it always holds 50 counts.)
+
+**As implemented (plan 2026-10-06):** the record also carries `taker_orders`,
+`program_runs`, `decisions_overflow` and `coin_minutes` (a minute map for each of
+the day's five busiest coins plus `_other`, which the cross-coin reading of T4
+needs); `decisions` are `[t_ms, coin, side, kind]` with kind `session`, `run` or
+`manual`; `habits` come from orders only (taker share comes from fills); and each
+coin carries `px_sum`/`px_n` instead of `px_median`, because a median cannot be
+added across batches. `habits`, `manual_minutes` and `ledger` stay `null` for a
+day no read of that kind covered.
 
 Rules: a field the reads did not cover is absent or `null`, never 0; minutes
 outside `coverage.fills` are *unknown*, never quiet; a **covered day** has ≥ 20
@@ -248,9 +262,10 @@ he and the candidates are measured by identical code.
 
 **Storage.** ≈ 2–5 KB a day for a studied wallet, ≤ 15 KB for a busy bot, ≈ 1 KB
 for a reference. Sealed months roll into `<YYYY-MM>.jsonl.gz` beside the daily
-files through `scripts/compact_data.py` (read-back verified; readers accept both
+files, done by `run_study.py` itself so `data/study/` keeps one writer (read-back
+verified; an archive that will not read is never overwritten; readers accept both
 forms — grep for readers before changing the format). The archive is
-irreplaceable data and joins `IRREPLACEABLE` for deletion purposes. Estimate:
+irreplaceable and `scripts/compact_data.py` never touches it. Estimate:
 10–15 MB a year compressed for 40 studied + 160 references.
 
 ### 6.4 Budget
@@ -358,8 +373,8 @@ the verdict carries `same_op_basis: "self_only"`.
 | Status | Condition |
 |---|---|
 | `uncalibrated` | fewer than 200 measurable strangers (T1–T3), 150 references (T4–T6), or 40 same-operator pairs (6 self windows for `self_only`). Shown grey with the raw numbers |
-| **for** | stranger match rate at least this good has a one-sided 95% Clopper–Pearson **upper bound ≤ 2%**, and the same-operator rate at this level is **≥ 50%** |
-| **against** (T1 only) | the candidate shows, on > 50% of ≥ 100 orders, a trait under 0.1% of his recorded orders (§7 T1), and the same-operator mismatch rate for that trait is **≤ 10%** |
+| **for** | stranger match rate at least this good has a one-sided 95% Clopper–Pearson **upper bound ≤ 2%**, and the same-operator rate at this level is **≥ 50%**. "This level" is the **looser** of the candidate's own statistic and each usable same-operator median, so a closer match can never fare worse than a looser one and the same-operator rate is at least one half by construction (refined with the implementation plan, 2026-10-06) |
+| **against** (T1 only) | the candidate shows, on > 50% of ≥ 100 orders, a trait under 0.1% of his recorded orders (§7 T1), and the same-operator mismatch rate for that trait is **≤ 10%** over ≥ 40 family pairs; like every T1 judgement it also needs the 200 strangers |
 | `neutral` | measured and calibrated, neither of the above |
 | `insufficient` | below the test's minimum data |
 
@@ -430,9 +445,10 @@ CRITICAL or HIGH only, and **against never alerts**:
 - timing turns **for** → HIGH; CRITICAL with a financial or protocol vector. New
   `alert_study_coactivity`, key `coactivity_<wallet>`, 72 h cooldown.
 
-**Feed health** gains a `study` group (`BLIND_HOURS` = 6): half of a run's reads
+**Feed health** gains a `candidate study` feed (`BLIND_HOURS` = 6), placed in the
+existing `other` group so `watch.yml` checks it crosswise: half of a run's reads
 failed; 0 wallets studied while the set is non-empty; or the stranger panel
-(`census.json` `measured`) has not grown for 48 hours.
+(`census.json` `habit_measured`) has not grown for 48 hours.
 
 ## 12. Dashboard and phone
 
@@ -483,7 +499,7 @@ Network-free tests; nothing writes to the real `data/`.
   selected, references exclude operator groups and the study set.
 - `test_study_records.py`: hour blocks are additive and idempotent under re-read;
   no run straddles a quiet boundary; `runs_split` fallback; coverage intervals;
-  saturation; unknown minutes stay unknown; open-at-seal orders.
+  saturation; unknown minutes stay unknown; a busy wallet's newest orders still count.
 - `test_study_collect.py`: a failed read never advances a cursor or writes a record;
   a budget refusal is not a failure; strict shape checks.
 - `test_study_tooling.py`, `test_study_timing.py`, `test_study_lifecycle.py`: each
@@ -510,9 +526,10 @@ checked in headless Chrome against live data.
 2. After the first study runs, every wallet in the set has day records with
    coverage, no failed read is stored as an empty day, and `latest.json` carries a
    row per studied wallet.
-3. Once the family panel holds ≥ 40 pairs, the maker bots among today's leads read
-   tooling **against** (client IDs and maker posting) and `0x12e16e3d…` reads
-   tooling **neutral**; before that they read **uncalibrated** with the raw numbers.
+3. Once the stranger panel passes 200 and the family panel 40 pairs, the maker bots
+   among today's leads read tooling **against** (client IDs and maker posting) and
+   `0x12e16e3d…` reads tooling **neutral**; before that they read **uncalibrated**
+   with the raw numbers.
 4. His own recent months read tooling **for** against his history once the stranger
    panel passes 200 (the self-recall check).
 5. The phone row, the Studied tab and the Study page render against live data.
