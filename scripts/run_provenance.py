@@ -335,10 +335,13 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
         pool = {"cursor": walk["last_block"], "updated_at": now_iso,
                 "deposits": sorted(kept.values(), key=lambda d: d["ts"])}
 
-        # 2. A perimeter member opening its own HL account.
+        # 2. A perimeter member opening its own HL account. Kept across runs by
+        # key: the roster's evidence and the dashboard read it from this file.
         member_found = at.classify_all([at.from_bridge2_deposit(
             {"depositor": d["wallet"], "usd": d["amount"], "ts": d["ts"], "tx_hash": d["hash"],
              "log_index": 0}) for d in fresh], index)
+        member_kept = {f["key"]: f for f in previous.get("member_findings") or []}
+        member_kept.update({f["key"]: f for f in member_found})
 
         # 3. Queue, skipping accounts resolved inside the cache's lifetime.
         cache = {}
@@ -416,7 +419,8 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
         "resolved": attempted - len(unreadable), "unreadable_accounts": unreadable[:50],
         "retrying": retrying,
         "findings": sorted(found, key=lambda f: -int(f.get("ts") or 0))[:KEEP_FINDINGS],
-        "member_findings": member_found[:100],
+        "member_findings": sorted(member_kept.values(),
+                                  key=lambda f: -int(f.get("ts") or 0))[:100],
         "alerted": sorted(set(alerted)), "undelivered": undelivered,
         "shared_funders": provenance.shared_funders(keep)[:200],
         "cctp_seen_ts": max([int(previous.get("cctp_seen_ts") or 0)] + cctp_ts),

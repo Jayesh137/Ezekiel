@@ -228,3 +228,13 @@ def test_a_backlog_of_deposits_does_not_starve_the_newborns(sandbox):
     rp.main([], readers=r, now="2026-10-06T00:00:00+00:00")
     cached = json.loads((tmp / "provenance" / "latest.json").read_text())["recent"]
     assert born in {row["account"] for row in cached}
+
+
+def test_a_perimeter_member_finding_outlives_the_run_that_saw_it(sandbox):
+    tmp, sent = sandbox
+    rp.main([], readers=readers(deposits=[dep(SINK, 2e5, 800, "0xd2")]),
+            now="2026-10-06T00:00:00+00:00")
+    rp.main([], readers=readers(head=1_100), now="2026-10-06T01:00:00+00:00")
+    st = json.loads((tmp / "provenance" / "latest.json").read_text())
+    assert [f["hl_account"] for f in st["member_findings"]] == [SINK]
+    assert len(sent["boundary"]) == 1
