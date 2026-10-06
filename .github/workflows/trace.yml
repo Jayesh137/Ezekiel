@@ -149,7 +149,9 @@ jobs:
     # cancelled. A wallet with real history reports TRUNCATED and the chains it
     # could not reach; src/chain/collect.py flushes cursors per chain, so the
     # next dispatch of this same workflow resumes rather than restarts.
-    timeout-minutes: 35
+    # 45 since 2026-10-06: the perimeter (<= 5) and provenance (<= 6) steps
+    # joined; healthy runs measured 21-25 minutes before them.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -206,22 +208,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         timeout-minutes: 4          # observed 2s; resolves unpaired ones on Etherscan
         run: python scripts/check_withdrawals.py
-      # The Circle candidate pool: every CCTP deposit into any Hyperliquid
-      # account, read from USDC's forwarder ledger with no key, incrementally
-      # from a stored cursor (src/cctp_feed.py). The bridge pool costs hundreds
-      # of Etherscan calls and stays on the daily analyze job; this pool is a
-      # few calls a run once filled, and a fresh wallet funded through Circle
-      # from Ethereum or Base enters the correlator here and nowhere else.
-      # Budgeted at config.correlation.cctp_time_budget_seconds (120s).
-      - name: Correlate Circle deposits
-        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
-        env:
-          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
-          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
-          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-          GITHUB_TOKEN: ${{ github.token }}
-        timeout-minutes: 4          # observed 123s against a 120s internal budget
-        run: python src/correlator.py --pools cctp
       # One public-RPC call per cluster Solana address (the CCTP recipient of
       # $22.75M of his). Solana reaches Hyperliquid through Circle too.
       - name: Watch cluster Solana addresses
@@ -289,6 +275,53 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         timeout-minutes: 8
         run: python scripts/run_trace_engine.py
+      # His world as one table (src/boundary/perimeter.py): config, deposit
+      # sentinels, the engine's sinks and funders, his Solana identity, large
+      # two-way counterparties; then each member put to Hyperliquid. After the
+      # engine (its registry is an input), before provenance (which joins on it).
+      - name: Build his perimeter
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        # A daily substrate pass (~60s) + at most 25 HL readings under a 120s budget.
+        timeout-minutes: 5
+        run: python scripts/build_perimeter.py
+      # Where large new money came from (src/boundary/provenance.py): the
+      # Bridge2 deposit feed (the correlator's complete bridge pool), then the
+      # accounts it and Circle just funded, the newborns and every lead, traced
+      # back one or two hops and joined against the perimeter.
+      - name: Resolve funding provenance
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        # Internal: one 200s clock (run_provenance.RUN_SECONDS) over the deposit
+        # walk, 30 accounts, 120 reads and 25 HyperEVM lookups.
+        timeout-minutes: 6
+        run: python scripts/run_provenance.py
+      # Custody-gap exits only (src/boundary/gaps.py) against BOTH pools: the
+      # Bridge2 pool provenance just rebuilt from Arbitrum logs (complete, no
+      # Etherscan) and Circle's forwarder feed (src/cctp_feed.py, keyless,
+      # budgeted at config.correlation.cctp_time_budget_seconds). A pair whose
+      # fully read route cannot have crossed an exchange is no hypothesis; an
+      # unread route is kept and queued for provenance. Replaces the Circle-only
+      # step that ran before the engine.
+      - name: Correlate custody-gap exits
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 4          # Circle pool 120s budget; the bridge pool is a file read
+        run: python src/correlator.py --pools bridge cctp --no-etherscan
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
       - name: Rebuild transfer graph

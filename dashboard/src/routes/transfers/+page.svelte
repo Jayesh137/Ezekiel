@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import {
-		fetchTransferGraph, fetchCandidates, fetchScanResults,
+		fetchTransferGraph, fetchCandidates, fetchScanResults, fetchJSON,
 		formatUSD, shortAddr, formatTime, getThresholds, explorerTx, currentScore
 	} from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
@@ -13,11 +13,19 @@
 	let expanded = null;
 	let showServices = false;
 
+	// His configured wallets (the perimeter's core), so they are labelled as
+	// known rather than as "Migration candidate" — the graph grades them by the
+	// flow they receive, which is right for a stranger and misleading for him.
+	let perimeter = null;
+	$: core = new Set(Object.values(perimeter?.members || {})
+		.filter((m) => m.role === 'core').map((m) => m.address));
+
 	onMount(async () => {
-		[graph, candidates, scan] = await Promise.all([
+		[graph, candidates, scan, perimeter] = await Promise.all([
 			fetchTransferGraph(),
 			fetchCandidates(),
-			fetchScanResults()
+			fetchScanResults(),
+			fetchJSON('data/perimeter/latest.json')
 		]);
 		loading = false;
 	});
@@ -411,12 +419,16 @@
 
 		{#each nodes as n (n.wallet)}
 			{@const bScore = behaviouralScore(n.wallet)}
-			<div class="card node" class:is-candidate={n.classification === 'MIGRATION_CANDIDATE'}>
+			<div class="card node" class:is-candidate={n.classification === 'MIGRATION_CANDIDATE' && !core.has(n.wallet)}>
 				<button class="node-head" onclick={() => toggle(n.wallet)}>
 					<div class="node-id">
-						<span class="badge {CLASS_BADGE[n.classification]}">
-							{CLASS_LABEL[n.classification] || n.classification}
-						</span>
+						{#if core.has(n.wallet)}
+							<span class="badge badge-grey">Known wallet (config)</span>
+						{:else}
+							<span class="badge {CLASS_BADGE[n.classification]}">
+								{CLASS_LABEL[n.classification] || n.classification}
+							</span>
+						{/if}
 						<Addr address={n.wallet} className="mono addr" />
 						{#if n.multi_hop}<span class="badge badge-grey">{n.depth} hops</span>{/if}
 						{#each n.chains ?? [] as c}<span class="badge badge-grey">{c}</span>{/each}

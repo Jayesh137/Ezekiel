@@ -47,6 +47,10 @@ READ_SECONDS = 120.0
 PACE_SECONDS = 0.35
 KEEP_FINDINGS = 200
 KEEP_ALERTED = 2_000
+# A forwarder-burned withdrawal whose withdrawer could not be read is held and
+# retried; past this many runs it is judged as unresolved rather than dropped.
+HOLD_RUNS = 12
+SYSTEM_LEDGER_HOURS = 36.0
 
 
 class RpcError(RuntimeError):
@@ -74,6 +78,51 @@ def rpc(method: str, params: list, *, post=None, sleep=time.sleep, tries: int = 
             raise RpcError(str(error))
         return doc.get("result")
     raise RpcError(f"{method} failed after {tries} tries: {last}")
+
+
+def system_sends_since(hours: float, *, post=None, pages: int = 8) -> tuple[list, bool]:
+    """Sends into the USDC system address over the last `hours`. (rows, readable).
+
+    Strict: a read that fails is `readable=False`, never an empty ledger (rule 5).
+    """
+    from src.cctp_feed import strict_post
+    post = post or (lambda body: strict_post(body, timeout=30, retries=2))
+    cursor = int((time.time() - hours * 3600) * 1000)
+    ledger = []
+    try:
+        for _ in range(pages):
+            page = post({"type": "userNonFundingLedgerUpdates", "user": cf.SYSTEM_USDC,
+                         "startTime": cursor})
+            if not isinstance(page, list):
+                return [], False
+            ledger += page
+            if len(page) < 2000:
+                break
+            cursor = int(page[-1].get("time") or cursor) + 1
+    except Exception:  # noqa: BLE001 - unreadable; the caller holds the row
+        return [], False
+    return cf.system_sends(ledger), True
+
+
+def resolve_forwarded(rows: list, held: list) -> tuple[list, list]:
+    """(rows to judge, rows to hold). Forwarder-burned withdrawals get their
+    account from the USDC system ledger (src/circle_flows.resolve_withdrawer)."""
+    forwarded = [r for r in rows if r.get("direction") == "out"
+                 and (r.get("message_sender") or "").lower() == cf.FORWARDER]
+    if not forwarded and not held:
+        return rows, []
+    fwd_ids = {id(r) for r in forwarded}
+    sends, readable = system_sends_since(hours=SYSTEM_LEDGER_HOURS)
+    resolved = cf.apply_withdrawers(forwarded + held, sends, readable=readable)
+    judge, hold = [], []
+    for r in resolved:
+        if r["hl_account_basis"] != "unreadable":
+            judge.append(r)
+        elif int(r.get("held_runs") or 0) + 1 >= HOLD_RUNS:
+            judge.append({**r, "hl_account_basis": "unresolved"})
+        else:
+            hold.append({**r, "held_runs": int(r.get("held_runs") or 0) + 1})
+    return [r for r in rows if id(r) not in fwd_ids] + judge, hold
 
 
 def his_identities(config: dict) -> tuple[set, set, set]:
@@ -227,6 +276,11 @@ def main() -> int:
         print(f"[circle] HyperEVM unreadable: {type(exc).__name__}: {exc} — cursor kept")
         return 0
 
+    # A forwarder-burned withdrawal names the forwarder, not the account
+    # (src/circle_flows.py, measured on his own 2026-09-15 withdrawal). Resolve
+    # it before anything judges it; an unreadable ledger holds it for later.
+    rows, pending = resolve_forwarded(rows, list(previous.get("pending_resolution") or []))
+
     # Persist all decoded observations before advancing the JSON cursor. Small
     # and non-cluster deposits can become useful when a later source leg joins.
     from src.discovery_store import DiscoveryStore
@@ -273,6 +327,7 @@ def main() -> int:
         "findings": ((previous.get("findings") or []) + found)[-KEEP_FINDINGS:],
         "alerted": alerted[-KEEP_ALERTED:],
         "undelivered": undelivered,
+        "pending_resolution": pending,
     }
     save_latest(str(path.parent), report)
     print(f"[circle] read {summary['windows_read']} window(s) to block {summary['last_block']} "

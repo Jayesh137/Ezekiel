@@ -46,6 +46,18 @@ USDC_DECIMALS = 6
 KIND_FUNDED_OUTSIDE = "his_wallet_funded_outside_account"
 KIND_OUTSIDE_PAID_HIM = "outside_account_paid_his_address"
 KIND_HIS_ACCOUNT_WITHDREW_OUTSIDE = "his_account_withdrew_to_outside_address"
+KIND_UNATTRIBUTED_PAID_HIM = "unattributed_withdrawal_paid_his_address"
+
+# USDC's linked contract on HyperEVM. A HyperCore-native Circle withdrawal
+# (`sendToEvmWithData`) is burned BY it, so its message names it as sender and
+# the account only in the hook (measured 2026-10-06 on his own $6,000,000
+# withdrawal of 2026-09-15). A HyperEVM-native burn names its own sender.
+FORWARDER = "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"
+# HyperCore's system address for USDC: every account's send into it (Circle
+# withdrawals and moves to HyperEVM, ~2,700 a day) is on its own ledger, with
+# the exact amount the Circle message carries.
+SYSTEM_USDC = "0x2000000000000000000000000000000000000000"
+AMOUNT_MATCH_USD = 0.005
 
 
 def _hex(data: str) -> str:
@@ -115,6 +127,7 @@ def decode_received(log: dict) -> dict | None:
         "counterparty": body["message_sender"],
         "counterparty_raw": body["message_sender_raw"],
         "hl_account": _hook_account(body["hook"]),
+        "hook_account": _hook_account(body["hook"]),
         "amount_usd": body["amount_usd"],
         "tx_hash": (log.get("transactionHash") or "").lower(),
         "block": int(log.get("blockNumber") or "0x0", 16),
@@ -122,8 +135,12 @@ def decode_received(log: dict) -> dict | None:
 
 
 def decode_sent(log: dict) -> dict | None:
-    """A MessageSent log from HyperEVM -> a withdrawal OUT of Hyperliquid, or None."""
-    from src.chain.bridges import CCTP_DOMAINS
+    """A MessageSent log from HyperEVM -> a withdrawal OUT of Hyperliquid, or None.
+
+    `hl_account` is the message sender; for a forwarder-burned withdrawal that
+    is the forwarder, and `apply_withdrawers` must resolve the real account.
+    """
+    from src.chain.bridges import CCTP_DOMAINS, _hook_account
 
     topics = log.get("topics") or []
     if not topics or topics[0].lower() != TOPIC_MESSAGE_SENT:
@@ -161,6 +178,7 @@ def decode_sent(log: dict) -> dict | None:
         "counterparty": body["mint_recipient"],
         "counterparty_raw": body["mint_recipient_raw"],
         "hl_account": body["message_sender"],
+        "hook_account": _hook_account(body["hook"]),
         "amount_usd": body["amount_usd"],
         "tx_hash": (log.get("transactionHash") or "").lower(),
         "block": int(log.get("blockNumber") or "0x0", 16),
@@ -169,6 +187,53 @@ def decode_sent(log: dict) -> dict | None:
 
 def decode(log: dict) -> dict | None:
     return decode_received(log) or decode_sent(log)
+
+
+def system_sends(ledger_rows) -> list[dict]:
+    """Every account's send into the USDC system address, from its ledger. Pure."""
+    out = []
+    for row in ledger_rows or []:
+        d = (row or {}).get("delta") or {}
+        if d.get("type") != "send" or (d.get("destination") or "").lower() != SYSTEM_USDC:
+            continue
+        user = (d.get("user") or "").lower()
+        try:
+            amount = float(d.get("amount"))
+        except (TypeError, ValueError):
+            continue
+        if user and user != SYSTEM_USDC:
+            out.append({"user": user, "amount": amount, "ts_ms": int(row.get("time") or 0),
+                        "hash": row.get("hash")})
+    return out
+
+
+def resolve_withdrawer(row: dict, sends, *, readable: bool = True) -> tuple:
+    """Who withdrew: the message sender, unless the forwarder burned it. Pure."""
+    if row.get("direction") != "out" or (row.get("message_sender") or "").lower() != FORWARDER:
+        return row.get("hl_account"), "message_sender"
+    if not readable:
+        return None, "unreadable"
+    try:
+        amount = float(row.get("amount_usd"))
+    except (TypeError, ValueError):
+        return None, "unresolved"
+    users = {s["user"] for s in sends or []
+             if abs(float(s["amount"]) - amount) <= AMOUNT_MATCH_USD}
+    if len(users) == 1:
+        return next(iter(users)), "system_ledger"
+    hook = (row.get("hook_account") or "").lower()
+    if hook and hook in users:
+        return hook, "system_ledger+hook"
+    return None, "unresolved"
+
+
+def apply_withdrawers(rows, sends, *, readable: bool) -> list[dict]:
+    """Rows with `hl_account` resolved for every forwarder-burned withdrawal. Pure."""
+    out = []
+    for row in rows or []:
+        account, basis = resolve_withdrawer(row, sends, readable=readable)
+        out.append({**row, "hl_account": account, "hl_account_basis": basis})
+    return out
 
 
 def base58_to_hex(address: str) -> str | None:
@@ -192,19 +257,26 @@ def classify(row: dict, his_evm: set, his_raw: set, cluster_accounts: set) -> st
     CONFIRMED, private deposit addresses). `his_raw`: 0x-prefixed bytes32 forms of
     non-EVM addresses (his Solana wallet). `cluster_accounts`: the Hyperliquid
     accounts that are his — the config cluster.
+
+    A forwarder-burned withdrawal must have had its account resolved first
+    (`apply_withdrawers`): its message sender is the forwarder, never the
+    account. One resolved to nobody that paid his address is its own kind; one
+    whose ledger could not be read is not judged here (it is retried).
     """
-    account = (row.get("hl_account") or "").lower()
-    if not account:
-        return None
     theirs_is_his = ((row.get("counterparty") or "").lower() in his_evm
                      or (row.get("counterparty_raw") or "").lower() in his_raw)
+    account = (row.get("hl_account") or "").lower()
+    if not account:
+        if (row.get("direction") == "out" and theirs_is_his
+                and row.get("hl_account_basis") == "unresolved"):
+            return KIND_UNATTRIBUTED_PAID_HIM
+        return None
     account_is_his = account in cluster_accounts
     if row.get("direction") == "in" and theirs_is_his and not account_is_his:
         return KIND_FUNDED_OUTSIDE
     if row.get("direction") == "out" and theirs_is_his and not account_is_his:
         return KIND_OUTSIDE_PAID_HIM
-    if row.get("direction") == "out" and account_is_his and not theirs_is_his \
-            and (row.get("counterparty") or row.get("counterparty_raw")):
+    if row.get("direction") == "out" and account_is_his and not theirs_is_his             and (row.get("counterparty") or row.get("counterparty_raw")):
         return KIND_HIS_ACCOUNT_WITHDREW_OUTSIDE
     return None
 

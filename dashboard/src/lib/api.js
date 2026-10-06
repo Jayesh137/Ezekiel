@@ -694,7 +694,10 @@ export const DETECTOR_FEEDS = [
 	{ name: 'Amount correlation', path: 'data/correlations/latest.json', key: 'computed_at', limitMin: 2160 },
 	{ name: 'Public wallet discovery', path: 'data/discovery/latest.json', key: 'last_successful_read_ms', limitMin: 720 },
 	{ name: 'Funding route index', path: 'data/routes/latest.json', key: 'computed_at_ms', limitMin: 720 },
-	{ name: 'Successor investigations', path: 'data/investigations/latest.json', key: 'computed_at_ms', limitMin: 720 }
+	{ name: 'Successor investigations', path: 'data/investigations/latest.json', key: 'computed_at_ms', limitMin: 720 },
+	{ name: 'Boundary attribution', path: 'data/boundary/latest.json', key: 'computed_at', limitMin: 360 },
+	{ name: 'His perimeter', path: 'data/perimeter/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Funding provenance', path: 'data/provenance/latest.json', key: 'computed_at', limitMin: 720 }
 ];
 
 /**
@@ -754,4 +757,72 @@ export async function fetchTripwires() {
 		circle,
 		watch
 	};
+}
+
+// --- trace (src/boundary, docs/superpowers/specs/2026-10-06-boundary-trace-design.md) ---
+
+/** Everything the Trace page reads: four small reports, no per-wallet files. */
+export async function fetchTrace() {
+	const [perimeter, boundary, provenance, engine] = await Promise.all([
+		fetchJSON('data/perimeter/latest.json'),
+		fetchJSON('data/boundary/latest.json'),
+		fetchJSON('data/provenance/latest.json'),
+		fetchJSON('data/trace/latest.json')
+	]);
+	return { perimeter, boundary, provenance, engine };
+}
+
+export const TRACE_KIND_LABEL = {
+	outside_account_paid_his_world: 'An outside account paid his address',
+	his_world_funded_outside_account: 'His address funded an outside account',
+	his_account_paid_outside_address: 'His account sent money to a new address',
+	perimeter_member_active_on_hl: 'An address holding his money is active on Hyperliquid',
+	provenance_touches_his_world: "A Hyperliquid account's money came from his world"
+};
+
+export const VERDICT_LABEL = {
+	touches_his_world: 'Touches his world',
+	same_exchange: 'Funded by his exchange',
+	exchange: 'Funded by an exchange',
+	unresolved: 'Could not be fully read',
+	unrelated: 'Unrelated'
+};
+
+export const ROLE_ORDER = ['core', 'deposit', 'identity', 'sink', 'funder', 'associate'];
+
+/**
+ * Attribution and provenance findings as one list, newest first. Pure.
+ * A row with no severity was recorded, never alerted (an associate, say).
+ */
+export function traceFindings(boundary, provenance) {
+	const rows = [];
+	for (const f of boundary?.findings || []) {
+		rows.push({ origin: 'boundary', kind: f.kind, label: TRACE_KIND_LABEL[f.kind] || f.kind,
+			severity: f.severity || null, account: f.hl_account, other: f.counterparty || f.counterparty_raw,
+			role: f.role, usd: f.amount_usd ?? null, ts: f.ts || 0, route: f.source, hop: null,
+			retro: !!f.retro });
+	}
+	for (const f of [...(provenance?.findings || []), ...(provenance?.member_findings || [])]) {
+		rows.push({ origin: 'provenance', kind: f.kind, label: TRACE_KIND_LABEL[f.kind] || f.kind,
+			severity: f.severity || null, account: f.account || f.hl_account,
+			other: f.member || f.counterparty, role: f.role, usd: f.usd ?? f.amount_usd ?? null,
+			ts: f.ts || 0, route: f.route || f.source, hop: f.hop ?? null, retro: !!f.retro });
+	}
+	return rows.sort((a, b) => b.ts - a.ts);
+}
+
+/** Perimeter members, strongest role first. Pure. */
+export function perimeterRows(perimeter) {
+	return Object.values(perimeter?.members || {})
+		.map((m) => ({ address: m.address, role: m.role, weight: m.weight, why: m.why,
+			active: m.hl?.active ?? null, checked: m.hl?.checked_at || null }))
+		.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role)
+			|| String(a.address).localeCompare(String(b.address)));
+}
+
+/** The newest resolved accounts with a readable verdict. Pure. */
+export function provenanceRows(provenance) {
+	return (provenance?.recent || []).map((r) => ({ account: r.account, verdict: r.verdict,
+		verdictLabel: VERDICT_LABEL[r.verdict] || r.verdict, reason: r.reason, routes: r.routes || [],
+		usd: r.usd, hop1: r.hop1 || [], when: r.resolved_at ? new Date(r.resolved_at * 1000) : null }));
 }

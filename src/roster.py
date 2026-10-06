@@ -748,6 +748,41 @@ def build_roster(config: dict | None = None) -> dict:
         if reason not in e["reasons"]:
             e["reasons"].append(reason)
 
+    # Hyperliquid's edge (src/boundary, spec 2026-10-06): an account that paid
+    # his world, one his world funded, or a new account whose money came from
+    # it. Each is an observed transfer named by the protocol's own record, so it
+    # carries the vote its finding was given — `transfer` for his wallets,
+    # `linkage` for his private deposit addresses — and none for an address that
+    # only holds his money (evidence, never a vote: the graph_reach_only rule).
+    boundary_reasons = {
+        "outside_account_paid_his_world": "Paid an address of his (protocol record)",
+        "his_world_funded_outside_account": "Funded by an address of his (protocol record)",
+        "provenance_touches_his_world": "Its money came from his world (traced back)",
+        "perimeter_member_active_on_hl": "An address holding his money, active on Hyperliquid",
+    }
+    for path, subject, key in ((DATA_DIR / "boundary" / "latest.json", "hl_account", "findings"),
+                               (DATA_DIR / "provenance" / "latest.json", "account", "findings"),
+                               (DATA_DIR / "provenance" / "latest.json", "hl_account",
+                                "member_findings")):
+        for row in _read(path, key):
+            a = (row.get(subject) or "").lower() if isinstance(row, dict) else ""
+            if not a or a == target or a in known_self:
+                continue
+            e = entry(a)
+            moved = row.get("amount_usd") if row.get("amount_usd") is not None else row.get("usd")
+            if (row.get("vote") == VECTOR_TRANSFER and moved is not None
+                    and float(moved) >= SELF_FLOW_MIN_USD):      # the transfer vote's bar
+                e["vectors"].add(VECTOR_TRANSFER)
+            elif row.get("vote") == VECTOR_LINKAGE:
+                e["vectors"].add(VECTOR_LINKAGE)
+            e["evidence"].setdefault("boundary", []).append(
+                {k: row.get(k) for k in ("kind", "severity", "vote", "role", "member", "source",
+                                         "chain", "amount_usd", "usd", "ts", "ref", "entry_ref",
+                                         "hop", "route")})
+            reason = boundary_reasons.get(row.get("kind"))
+            if reason and reason not in e["reasons"]:
+                e["reasons"].append(reason)
+
     for party in _read(DATA_DIR / "hl_transfers" / "latest.json", "counterparties"):
         a = (party.get("wallet") or "").lower()
         if not a or a == target:

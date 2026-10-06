@@ -85,7 +85,8 @@ jobs:
     # to 20 when the deposit-address step joined: the job ceiling must stay
     # above the sum of its step timeouts (8 + 3 + 5), or a slow run is
     # CANCELLED and the commit step never persists what the others read.
-    # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 + 2 = 22).
+    # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 + 2 = 22), and
+    # the boundary-attribution step keeps it inside 30 (8 + 3 + 5 + 4 + 4 + 2 + 2 = 28).
     timeout-minutes: 30
     env:
       PYTHONUNBUFFERED: "1"
@@ -164,6 +165,25 @@ jobs:
         # READ_SECONDS is 120; a hung call is bounded by its own 30s timeout.
         timeout-minutes: 4
         run: python scripts/check_circle_flows.py
+      # Hyperliquid's own edge, read on Arbitrum: Bridge2's FinalizedWithdrawal
+      # names the account that withdrew AND where the money went, for every
+      # account (docs/superpowers/specs/2026-10-06-boundary-trace-design.md).
+      # An outside account paying one of his addresses — a wallet, a private
+      # deposit address, his Solana wallet through Unit — is the attribution
+      # no other detector makes. Reads the perimeter trace.yml builds; with
+      # none yet it watches the config wallets alone.
+      - name: Attribute withdrawals to his world
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        # Internal: one 140s clock (check_boundary.RUN_SECONDS): a <=60s Bridge2
+        # walk, then core histories, 8 Unit reads and retro; the rest waits.
+        timeout-minutes: 4
+        run: python scripts/check_boundary.py
       # Crosswise freshness: this job reports the feeds trace, scan, analyze
       # and the collector write; trace.yml reports this job's. A dead detector
       # writes the same nothing as a quiet target (src/feed_health.py).

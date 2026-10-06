@@ -152,7 +152,7 @@ def test_the_circle_pool_is_filtered_to_the_window_and_floor(monkeypatch):
 
 def test_main_passes_the_pools_flag_through(monkeypatch):
     got = []
-    monkeypatch.setattr(correlator, "run_correlation", lambda pools: got.append(pools))
+    monkeypatch.setattr(correlator, "run_correlation", lambda pools, **kw: got.append(pools))
     correlator.main(["--pools", "cctp"])
     correlator.main([])
     assert got == [("cctp",), ("bridge", "cctp")]
@@ -232,3 +232,12 @@ def test_migrating_a_legacy_file_happens_once_and_never_doubles(tmp_path, monkey
 
     assert result["matches"] == []
     assert result["pools"]["bridge"]["matches"] == []
+
+
+
+def test_main_can_keep_the_bridge_pool_off_etherscan(monkeypatch):
+    got = []
+    monkeypatch.setattr(correlator, "run_correlation", lambda pools, **kw: got.append(kw))
+    correlator.main(["--pools", "bridge", "cctp", "--no-etherscan"])
+    correlator.main([])
+    assert got == [{"etherscan_bridge": False}, {"etherscan_bridge": True}]
