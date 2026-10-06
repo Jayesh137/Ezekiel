@@ -34,6 +34,11 @@ LEAD_EVERY = 3              # one slot in three goes to a lead when any is waiti
 RUN_SECONDS = 200.0
 MIN_LEFT = 30.0
 CACHE_TTL_S = 7 * 86400
+# Bumped when resolution changes, so a record cached by the older resolver is
+# resolved again now instead of keeping its verdict for the TTL. 2 (2026-10-06):
+# mints, system addresses and Circle's wallet are no funders; an empty hop is
+# unresolved; vault withdrawals are not funding.
+RESOLVER_VERSION = 3       # 3: an account paying in from its own address, on any chain
 KEEP_ACCOUNTS, KEEP_FINDINGS = 2000, 500
 # Hyperliquid's CCTP extension on Arbitrum: a Circle deposit through it is a
 # USDC transfer from the depositor's own address into this contract.
@@ -358,6 +363,7 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
             if int(d.get("ts") or 0) > seen_ts and float(d.get("amount") or 0) >= QUEUE_MIN_USD}
         due = [q for q in queue(data, pool["deposits"], previous, index.core)
                if q[2] in new_money or q[2] not in cache or (cache.get(q[2]) or {}).get("retry")
+               or (cache.get(q[2]) or {}).get("resolver") != RESOLVER_VERSION
                or now_ts - int((cache.get(q[2]) or {}).get("resolved_at") or 0) >= CACHE_TTL_S]
         todo = interleave([q for q in due if q[0] == 0], [q for q in due if q[0] > 0])
 
@@ -381,7 +387,7 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
             except Exception as exc:  # noqa: BLE001
                 unreadable.append({"account": account, "error": f"{type(exc).__name__}: {exc}"[:200]})
                 continue
-            record["reason"] = reason
+            record["reason"], record["resolver"] = reason, RESOLVER_VERSION
             cache[account] = record
             retrying += bool(record.get("retry"))
 

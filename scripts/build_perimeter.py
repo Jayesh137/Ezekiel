@@ -24,6 +24,10 @@ from src import utils  # noqa: E402
 CLOSE_PER_RUN = 25
 CLOSE_EVERY_S = 24 * 3600
 SUBSTRATE_EVERY_S = 24 * 3600
+# Bumped when the rules that build associates or families change, so a fix
+# lands on the next run instead of waiting for the daily pass. 2 (2026-10-06):
+# mints and system addresses kept out of his exchange families.
+RULES_VERSION = 3          # 3: a contract (the Bridge2 contract) is no exchange that paid him
 ACTIVE_VALUE_USD = 10_000.0
 ACTIVE_VOLUME_USD = 100_000.0
 
@@ -115,35 +119,37 @@ def main(argv=None, *, post=None, substrate=None, now=None, is_hot=None,
                                  for r in trace_report.get("deposit_addresses") or []}
     deposits.discard("")
 
-    def build(found, families, substrate_at):
+    def build(found, families, substrate_at, rules_version):
         doc = pm.build(config=config, sentinels=sentinels, trace_report=trace_report,
                        trace_registry=registry, solana=solana, associates_found=found,
                        families=families, services=services, previous=previous, now_iso=now_iso)
-        doc.update(associates=found, substrate_at=substrate_at, notes=notes,
-                   alerted=list(previous.get("alerted") or []))
+        doc.update(associates=found, substrate_at=substrate_at, rules_version=rules_version,
+                   notes=notes, alerted=list(previous.get("alerted") or []))
         return doc
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    if not previous or _age_s(previous.get("substrate_at"), now_dt) >= SUBSTRATE_EVERY_S:
+    if (not previous or previous.get("rules_version") != RULES_VERSION
+            or _age_s(previous.get("substrate_at"), now_dt) >= SUBSTRATE_EVERY_S):
         # Written first from what other detectors measured, so a step killed in
         # the slow substrate pass still leaves a current perimeter behind.
         utils.atomic_write_json(out_dir / "latest.json", build(
             previous.get("associates") or {}, previous.get("exchange_families") or {},
-            previous.get("substrate_at")))
+            previous.get("substrate_at"), previous.get("rules_version")))
         if substrate is None:
             from src.chain.collect import records_by_wallet as substrate
         rows = substrate(sorted(core | deposits))
         records = [r for a in sorted(rows) for r in rows[a]]
         found = pm.associates([r for a in sorted(core) for r in rows.get(a, [])], core,
                               is_contract=contract, is_busy=busy, services=services)
-        families = pm.exchange_families(records, deposits, core, is_hot=hot_test)
-        substrate_at = now_iso
+        families = pm.exchange_families(records, deposits, core, is_hot=hot_test,
+                                        is_contract=contract)
+        substrate_at, rules_version = now_iso, RULES_VERSION
     else:
         found = previous.get("associates") or {}
         families = previous.get("exchange_families") or {}
-        substrate_at = previous.get("substrate_at")
+        substrate_at, rules_version = previous.get("substrate_at"), previous.get("rules_version")
 
-    doc = build(found, families, substrate_at)
+    doc = build(found, families, substrate_at, rules_version)
 
     post = post or default_post()
     due = sorted((m for m in doc["members"].values()

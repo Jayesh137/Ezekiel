@@ -184,10 +184,11 @@ def _hop1(entry, account, read_inbound, read_first_gas, circle_source):
         return aggregate(read_inbound("hyperevm", account, since_ts=ts - LOOKBACK_S, until_ts=ts))
     if route == ROUTE_CIRCLE:
         src = circle_source(entry, account)
-        if src and src["chain"] == "hyperevm" and low(src["address"]) == account:
-            # Paid in from its own HyperEVM address: like a Bridge2 deposit, the
+        if src and low(src["address"]) == account:
+            # Paid in from its own address - on HyperEVM, or on another chain
+            # through Hyperliquid's extension: like a Bridge2 deposit, the
             # funders of that address are the first hop.
-            return aggregate(read_inbound("hyperevm", account, since_ts=ts - LOOKBACK_S,
+            return aggregate(read_inbound(src["chain"], account, since_ts=ts - LOOKBACK_S,
                                           until_ts=ts))
         return _single(src["address"], src["chain"], entry["usd"], ts, "circle_sender") if src else None
     if route == ROUTE_UNIT:

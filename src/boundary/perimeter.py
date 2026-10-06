@@ -63,8 +63,14 @@ def associates(records, core, *, is_contract, is_busy, services,
     return out
 
 
-def exchange_families(records, deposit_members, core, *, is_hot) -> dict:
-    """Hot wallets behind his deposit addresses, and exchange wallets that paid him."""
+def exchange_families(records, deposit_members, core, *, is_hot,
+                      is_contract=lambda a: False) -> dict:
+    """Hot wallets behind his deposit addresses, and exchange wallets that paid him.
+
+    An exchange that paid him is an EOA: the Bridge2 contract "paid him" every
+    HL withdrawal, and as a family member it made any account it paid read
+    same_exchange (live, 2026-10-06).
+    """
     deposit_members = {low(d) for d in deposit_members}
     core = {low(c) for c in core}
     families: dict[str, set] = {}
@@ -78,7 +84,8 @@ def exchange_families(records, deposit_members, core, *, is_hot) -> dict:
             continue        # a mint (from 0x0) or a system address is no exchange
         if src in deposit_members and dst not in core and is_hot(dst):
             families.setdefault(src, set()).add(dst)
-        elif dst in core and src not in core and usd is not None and is_hot(src):
+        elif (dst in core and src not in core and usd is not None and is_hot(src)
+              and not is_contract(src)):
             paid_him[src] = paid_him.get(src, 0.0) + float(usd)
     out = {f"deposit:{d}": sorted(h) for d, h in sorted(families.items())}
     withdraws = sorted(a for a, usd in paid_him.items() if usd >= HOT_MIN_USD)
