@@ -117,6 +117,13 @@ def significant(entries, *, min_usd: float = MIN_ENTRY_USD, limit: int = MAX_ENT
     return sorted(keep, key=lambda e: -(e["usd"] or 0))[:limit]
 
 
+def not_a_funder(address: str) -> bool:
+    """A mint (0x0), a HyperCore system address or Circle's deposit wallet moved
+    the money; none chose to fund the account (live run, 2026-10-06)."""
+    a = low(address)
+    return a == "0x" + "0" * 40 or a == FORWARDER or a.startswith(SYSTEM_PREFIXES)
+
+
 def aggregate(transfers) -> list[dict]:
     """Inbound transfers grouped by sender. Dust (valued < $100) is the shape of
     address poisoning, and a sender Blockscout flags as a scam is not a funder."""
@@ -124,6 +131,8 @@ def aggregate(transfers) -> list[dict]:
     for t in transfers or []:
         usd = t.get("usd")
         if t.get("from_is_scam") or not t.get("from") or (usd is not None and usd < DUST_USD):
+            continue
+        if not_a_funder(t["from"]):
             continue
         a = by.setdefault(t["from"], {"address": t["from"], "chain": t.get("chain"), "usd": 0.0,
                                       "unvalued": 0, "count": 0, "first_ts": t["ts"],

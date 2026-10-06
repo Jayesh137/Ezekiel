@@ -74,6 +74,8 @@ def exchange_families(records, deposit_members, core, *, is_hot) -> dict:
             continue
         src, dst = low(rec.get("src")), low(rec.get("dst"))
         usd = rec.get("amount_usd")
+        if excluded(src, ()) or excluded(dst, ()):
+            continue        # a mint (from 0x0) or a system address is no exchange
         if src in deposit_members and dst not in core and is_hot(dst):
             families.setdefault(src, set()).add(dst)
         elif dst in core and src not in core and usd is not None and is_hot(src):
