@@ -341,3 +341,15 @@ def test_a_held_finding_still_outside_his_world_alerts_once_the_perimeter_arrive
     cb.main([], readers=readers(head=600))
     cb.main([], readers=readers(head=700))
     assert [r["ref"] for r in sent["boundary"]] == ["0xv"]
+
+
+def test_a_retro_payout_carries_the_payouts_own_time(sandbox):
+    # A transaction's logs carry no timestamp; the payout row does. Without it
+    # the finding read 1970 and sorted below everything on the Trace page.
+    tmp, sent = sandbox
+    payout = {"transactionHash": "0xpay", "blockNumber": hex(10), "logIndex": "0x0",
+              "timeStamp": hex(1_789_000_000)}
+    log = {**fw(OUT, S, 2e5, 10, "0xpay"), "timeStamp": None}
+    cb.main([], readers=readers(head=500, payouts={S: [payout]}, tx_logs={"0xpay": [log]}))
+    [f] = [f for f in _state(tmp)["findings"] if f["ref"] == "0xpay"]
+    assert f["ts"] == 1_789_000_000

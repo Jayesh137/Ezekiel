@@ -83,3 +83,67 @@ def test_tx_logs_come_back_with_hex_block_numbers_so_every_decoder_applies():
                 if r["address"] == cf.MESSAGE_TRANSMITTER_V2]
     assert received and received[0]["domain"] == 19
     assert all(str(r["blockNumber"]).startswith("0x") for r in rows)
+
+
+USDC_ARB = "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+ACCT2, PAYER = "0x" + "5" * 40, "0x" + "6" * 40
+
+
+def _es(rows_by_action):
+    calls = []
+
+    def get(params, chain_id=None):
+        calls.append(params.get("action"))
+        rows = rows_by_action.get(params.get("action"))
+        if rows is None:
+            return {"status": "0", "message": "NOTOK", "result": "Free API access is not supported"}
+        if isinstance(rows, dict):
+            return {"jsonrpc": "2.0", "result": rows}
+        return {"status": "1", "message": "OK", "result": rows} if rows else \
+            {"status": "0", "message": "No transactions found", "result": []}
+    return get, calls
+
+
+def test_with_a_key_inbound_comes_from_etherscan_valued_by_contract():
+    # Blockscout's v2 API answered 403 to the GitHub runner on the first live
+    # run, and its index has holes; with the key, Etherscan is read first.
+    get, calls = _es({"tokentx": [
+        {"timeStamp": "1500", "hash": "0xa", "from": PAYER, "to": ACCT2, "value": str(250_000 * 10**6),
+         "tokenDecimal": "6", "tokenSymbol": "USDC", "contractAddress": USDC_ARB},
+        {"timeStamp": "1400", "hash": "0xb", "from": PAYER, "to": ACCT2, "value": str(10**6),
+         "tokenDecimal": "6", "tokenSymbol": "USDC", "contractAddress": "0x" + "9" * 40},
+        {"timeStamp": "100", "hash": "0xc", "from": PAYER, "to": ACCT2, "value": "1",
+         "tokenDecimal": "6", "tokenSymbol": "USDC", "contractAddress": USDC_ARB}]})
+
+    def blockscout(*a, **k):
+        raise AssertionError("Blockscout read with a key set")
+    rows = readers.inbound_transfers("arbitrum", ACCT2, since_ts=1_000, until_ts=2_000,
+                                     budget=readers.Budget(5), get=blockscout, has_key=True,
+                                     etherscan=get)
+    assert [(r["tx_hash"], r["usd"]) for r in rows] == [("0xa", 250_000.0), ("0xb", None)]
+    assert calls == ["tokentx"]
+
+
+def test_an_etherscan_refusal_falls_back_to_blockscout():
+    get, _ = _es({})
+    page = {"items": [], "next_page_params": None}
+    rows = readers.inbound_transfers("base", ACCT2, since_ts=0, until_ts=10,
+                                     budget=readers.Budget(5), get=lambda url, params: page,
+                                     has_key=True, etherscan=get)
+    assert rows == []
+
+
+def test_with_a_key_tx_logs_and_first_gas_come_from_etherscan():
+    receipt = {"logs": [{"address": USDC_ARB, "topics": ["0xt"], "data": "0x01",
+                         "blockNumber": "0x10", "logIndex": "0x", "transactionHash": "0xh"}]}
+    get, _ = _es({"eth_getTransactionReceipt": receipt, "txlist": [
+        {"timeStamp": "900", "hash": "0xg", "from": PAYER, "to": ACCT2, "value": "5000", "isError": "0"}]})
+
+    def blockscout(*a, **k):
+        raise AssertionError("Blockscout read with a key set")
+    logs_ = readers.tx_logs("arbitrum", "0xh", budget=readers.Budget(5), get=blockscout,
+                            has_key=True, etherscan=get)
+    assert logs_[0]["address"] == USDC_ARB and logs_[0]["logIndex"] == "0x"
+    gas = readers.first_gas("arbitrum", ACCT2, budget=readers.Budget(5), get=blockscout,
+                            has_key=True, etherscan=get)
+    assert (gas["from"], gas["ts"], gas["fresh"]) == (PAYER, 900, True)
