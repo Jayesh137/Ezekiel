@@ -1869,3 +1869,24 @@ everybody's exchange.
 against a global feed of every crossing costs one lookup per event and scales
 with the table; a forward walk costs a sweep per wallet, and its yield had
 fallen to zero.
+
+---
+
+**The scanner's discovery checkpoint stopped saving for three days (2026-10-03
+to 10-06, issue #57).** Every scan failed at "Prepare discovery checkpoint":
+`compressed discovery checkpoint exceeds artifact budget`. Retention caps
+ROWS (250,000 fills, 100,000 observations, 100,000 market events) and the
+artifact budget is BYTES (48 MiB compressed); the last two checkpoints that
+saved were 47.7 and 47.9 MiB, the store was 262 MiB with fills (92.9 MiB of
+raw JSON) and observations (51 MiB) both exactly at their caps, and from then
+on nothing fit. Because observation shards are deleted only after a saved
+checkpoint, 465 piled up, and each run imported the same oldest 40 and threw
+the work away with the failed snapshot - discovery was frozen on Oct 3 while
+the shards ran toward their 7-day expiry. Fixed by `snapshot_within_budget`:
+the owner's checkpoint is trimmed oldest-first (never active backfills, never
+authority, never a shard) until it fits. On a copy of the real checkpoint under
+a 44 MiB test budget: 2 rounds, 36,659 fills and 21,591 observations, 40.9 MiB,
+all 22,199 authority snapshots kept. Found on the way: an empty protected list
+made `wallet NOT IN (NULL)` - never true - so the first version trimmed no fill
+at all. **A cap in rows does not bound bytes; a budget in bytes needs a byte
+check before it is enforced.**
