@@ -180,7 +180,8 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
-        # Internal: a 60s Bridge2 walk, at most 8 Unit and 40 Blockscout calls.
+        # Internal: one 140s clock (check_boundary.RUN_SECONDS): a <=60s Bridge2
+        # walk, then core histories, 8 Unit reads and retro; the rest waits.
         timeout-minutes: 4
         run: python scripts/check_boundary.py
       # Crosswise freshness: this job reports the feeds trace, scan, analyze

@@ -302,7 +302,8 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
-        # Internal: 150s, 30 accounts, 120 Blockscout calls.
+        # Internal: one 200s clock (run_provenance.RUN_SECONDS) over the deposit
+        # walk, 30 accounts, 120 reads and 25 HyperEVM lookups.
         timeout-minutes: 6
         run: python scripts/run_provenance.py
       # Custody-gap exits only (src/boundary/gaps.py) against BOTH pools: the
