@@ -165,10 +165,14 @@ class Index:
     def __init__(self, perimeter: dict | None):
         self.members = dict((perimeter or {}).get("members") or {})
         self._by: dict[str, dict] = {}
+        from src.circle_flows import base58_to_hex
         for a, m in self.members.items():
             self._by[low(a)] = m
-            if m.get("raw"):
-                self._by.setdefault(low(m["raw"]), m)
+            # A Solana member by its key too: a burn FROM it names the signer,
+            # while `raw` is the token account Circle minted TO.
+            for raw in (m.get("raw"), None if str(a).startswith("0x") else base58_to_hex(a)):
+                if raw:
+                    self._by.setdefault(low(raw), m)
         self.core = {a for a, m in self.members.items() if m.get("role") == "core"}
         self.families = family_index((perimeter or {}).get("exchange_families") or {})
 

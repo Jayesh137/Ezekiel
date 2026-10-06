@@ -106,3 +106,14 @@ def test_index_finds_members_by_address_or_raw_form_and_knows_core():
 def test_core_only_is_a_working_perimeter_from_config_alone():
     idx = perimeter.Index(perimeter.core_only(CONFIG, "2026-10-06T00:00:00+00:00"))
     assert idx.core == {T, TR, F} and len(idx.members) == 3
+
+
+def test_a_solana_member_is_found_by_its_own_key_as_well_as_its_token_account():
+    # A CCTP burn FROM his Solana wallet names the signer's key as messageSender;
+    # the stored raw form is the token account Circle minted TO. Both are his
+    # (check_circle_flows.his_identities matches both).
+    from src.circle_flows import base58_to_hex
+    idx = perimeter.Index(_build(solana={SOL: {"role": "cluster",
+                                               "mint_recipient_hex": "0xABCD"}}))
+    assert idx.get(None, raw=base58_to_hex(SOL))["address"] == SOL
+    assert idx.get(None, raw="0xABCD")["address"] == SOL
