@@ -115,12 +115,19 @@ def _rarity(amount: float, population: list[float], tol_pct: float) -> tuple[flo
 
 def find_correlations(exits: list[dict], entries: list[dict],
                       tol_pct: float = 0.03, window_days: float = 14,
-                      min_amount: float = 100_000, min_confidence: float = 0.55) -> list[dict]:
+                      min_amount: float = 100_000, min_confidence: float = 0.55,
+                      route_records: dict | None = None) -> list[dict]:
     """Score competing hypotheses before deterministic one-to-one assignment.
 
     Rejected edges never consume an exit. Alternatives remain visible because
     the selected assignment is a useful investigation order, not hidden CEX truth.
+
+    `route_records` (account -> provenance record, scripts/run_provenance.py)
+    removes a pair whose route cannot have crossed the exit's custody gap
+    BEFORE assignment: filtered afterwards, an impossible best pair would take
+    its exit's valid alternative down with it.
     """
+    from src.boundary.gaps import route_consistent
     from src.matching import maximum_weight_pairs
     from src.movements import positive_number
 
@@ -162,12 +169,18 @@ def find_correlations(exits: list[dict], entries: list[dict],
                 "wallet": entry.get("wallet", ""), "deposit_amount_usd": round(entry["amount"], 2),
                 "exit_amount_usd": round(ex["amount"], 2), "amount_diff_pct": round(ratio * 100, 3),
                 "gap_hours": round(elapsed / 3600, 1), "exit_source": ex.get("source", "unknown"),
+                "exit_gap": ex.get("gap"),
                 "exit_ref": ex.get("ref", ""), "exit_id": ex.get("id"),
                 "event_ids": ex.get("event_ids", [ex.get("ref", "")]),
                 "deposit_ref": entry.get("ref") or entry.get("hash"),
                 "uniqueness": rarity, "competing_deposits": competitors,
                 "confidence": score, "score_kind": "heuristic", "deposit_ts": entry["ts"],
             }
+            if route_records is not None:
+                ok, finding["route"] = route_consistent(
+                    finding, route_records.get(str(entry.get("wallet") or "").lower()))
+                if not ok:
+                    continue
             hypotheses[i, j] = finding
             by_exit.setdefault(i, []).append((i, j))
             by_entry.setdefault(j, []).append((i, j))
@@ -211,7 +224,15 @@ def collect_target_movements(target: str, min_amount: float = 0, *,
     if isinstance(bindings, dict):
         records = [{**row, 'route_decode': row.get('route_decode') or bindings.get(row.get('id'))}
                    for row in records]
-    result = reconcile_movements(records, ledger, cluster, decodes, min_amount)
+    # Bridge2 names each of his withdrawals' destination by nonce
+    # (scripts/check_boundary.py); without it the ledger row names none.
+    try:
+        boundary = json.loads((directory / "boundary" / "latest.json").read_text())
+    except (OSError, ValueError):
+        boundary = {}
+    exact = boundary.get("core_withdrawals") if isinstance(boundary, dict) else None
+    result = reconcile_movements(records, ledger, cluster, decodes, min_amount,
+                                 withdrawal_destinations=exact if isinstance(exact, dict) else None)
     circle = unpaired_cctp_exits(target, ledger, min_amount, config=config)
     result["unresolved_exits"].extend({**row, "id": f"hl-cctp:{row['ref']}",
                                       "event_ids": [f"hl:{row['ref']}"],
@@ -224,7 +245,50 @@ def collect_target_movements(target: str, min_amount: float = 0, *,
 
 
 def collect_target_exits(target: str, min_amount: float) -> list[dict]:
-    return collect_target_movements(target, min_amount)["unresolved_exits"]
+    """Only money that crossed a custody gap (src/boundary/gaps.py, spec §8).
+
+    Measured 2026-10-06: the movements' "unresolved exits" were $3.39B, mostly
+    DeFi positions he still holds and bridges to himself. An exit is money that
+    could re-emerge in a new account: into an exchange, to a person, or out of
+    Hyperliquid to an address outside his world.
+    """
+    import json
+
+    from src.boundary import gaps
+    from src.boundary import perimeter as pm
+
+    config = load_config()
+    moved = collect_target_movements(target, 0, config=config)
+    try:
+        doc = json.loads((DATA_DIR / "perimeter" / "latest.json").read_text())
+    except (OSError, ValueError):
+        doc = {}
+    index = pm.Index(doc if isinstance(doc, dict) and doc.get("members")
+                     else pm.core_only(config, utc_now()))
+    found = gaps.exits(moved["movements"], index=index,
+                       classify_destination=_destination_classifier(config),
+                       min_amount=min_amount)
+    found += [row for row in moved["unresolved_exits"]
+              if row.get("source") == "hl_cctp" and row.get("amount", 0) >= min_amount]
+    return found
+
+
+def _destination_classifier(config: dict):
+    """contract / busy / eoa / unmeasured, from what the project already measured."""
+    from src.boundary.measure import load_services, measured
+    services, hot = load_services(config, DATA_DIR)
+    contract, busy, known = measured(DATA_DIR)
+
+    def classify(address: str, chain) -> str:
+        a = (address or "").lower()
+        if a in hot:
+            return "busy"
+        if a in services or contract(a):
+            return "contract"
+        if busy(a):
+            return "busy"
+        return "eoa" if known(a) else "unmeasured"
+    return classify
 
 
 def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float, *,
@@ -253,7 +317,40 @@ def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float, *,
             for w in m["unmatched"] + m["settling"] if float(w["gross_usd"]) >= min_amount]
 
 
+def bridge_pool_from_file(window_days: float, min_amount: float) -> tuple[list[dict], str | None]:
+    """The Bridge2 deposit pool scripts/run_provenance.py keeps from Arbitrum logs.
+
+    Complete by construction (a cursor that never skips); the Etherscan reader
+    below hit its page ceiling ("candidate pool is incomplete", 2026-10-05).
+    """
+    import json
+    try:
+        pool = json.loads((DATA_DIR / "provenance" / "bridge_deposits.json").read_text())
+    except (OSError, ValueError):
+        return [], "bridge deposit pool not built yet"
+    try:
+        updated = datetime.fromisoformat(str(pool.get("updated_at")))
+        age_h = (datetime.now(UTC) - updated).total_seconds() / 3600
+    except (TypeError, ValueError):
+        return [], "bridge deposit pool has no timestamp"
+    if age_h > 12:
+        return [], f"bridge deposit pool is {age_h:.0f}h old"
+    horizon = time.time() - window_days * 86400
+    return ([d for d in pool.get("deposits") or []
+             if float(d.get("amount") or 0) >= min_amount and int(d.get("ts") or 0) >= horizon],
+            None)
+
+
 def get_recent_bridge_deposits(window_days: float, min_amount: float,
+                               budget=None) -> tuple[list[dict], str | None]:
+    """The complete pool when it is fresh, else the Etherscan reader below."""
+    entries, error = bridge_pool_from_file(window_days, min_amount)
+    if error is None:
+        return entries, None
+    return _etherscan_bridge_deposits(window_days, min_amount, budget)
+
+
+def _etherscan_bridge_deposits(window_days: float, min_amount: float,
                                budget=None) -> tuple[list[dict], str | None]:
     """Every fresh HL bridge deposit within the window. Returns (deposits, error).
 
@@ -351,6 +448,15 @@ def get_recent_cctp_deposits(window_days: float, min_amount: float, *, post=None
     return kept, error
 
 
+def _provenance_records() -> dict:
+    """Provenance records by account (scripts/run_provenance.py); {} if none yet."""
+    from src.trace import store
+    try:
+        return store.load(DATA_DIR / "provenance" / "accounts")
+    except (RuntimeError, OSError):
+        return {}
+
+
 def _stored_pools() -> dict:
     """The per-pool blocks last written, migrating a pre-`pools` file once.
 
@@ -409,6 +515,7 @@ def run_correlation(pools=POOLS) -> dict:
 
     exits = collect_target_exits(target, min_amount)
     readers = {"bridge": get_recent_bridge_deposits, "cctp": get_recent_cctp_deposits}
+    records = _provenance_records()
     stored = _stored_pools()
     blocks: dict[str, dict] = {}
     for name in POOLS:
@@ -424,7 +531,11 @@ def run_correlation(pools=POOLS) -> dict:
             # not cleared the target — it has not looked. Saying so is the
             # difference between "no match" and "no idea".
             print(f"[correlator] {name}: INCOMPLETE candidate pool: {entries_error}")
-        findings = find_correlations(exits, entries, tol_pct, window_days, min_amount, min_conf)
+        # Route physics (src/boundary/gaps.py): money that went into an exchange
+        # can only come back out as an exchange withdrawal. A pair whose fully
+        # read funding never touched one is not a hypothesis; an unread one is.
+        findings = find_correlations(exits, entries, tol_pct, window_days, min_amount, min_conf,
+                                     route_records=records)
         for f in findings:
             f["via"] = name
         blocks[name] = {

@@ -35,7 +35,12 @@ def event_identity(record: dict) -> str:
 
 
 def reconcile_movements(records: list[dict], ledger: list[dict], cluster: set[str],
-                        bridge_decodes: dict, min_amount: float = 0) -> dict:
+                        bridge_decodes: dict, min_amount: float = 0,
+                        withdrawal_destinations: dict | None = None) -> dict:
+    """`withdrawal_destinations` maps a withdrawal's nonce to Bridge2's own
+    FinalizedWithdrawal (src/boundary/bridge2.py): the ledger's `withdraw` row
+    names no destination, so without it $370M of the target's withdrawals to
+    himself read as unresolved exits (measured 2026-10-06)."""
     cluster = {str(wallet).lower() for wallet in cluster if wallet}
     movements, seen, clean = [], set(), []
     coverage = {"unpriced_or_invalid": 0, "ignored_spam": 0,
@@ -76,6 +81,9 @@ def reconcile_movements(records: list[dict], ledger: list[dict], cluster: set[st
         pairs = exact_payouts.get(ref, [])
         destinations = {str(row.get("dst") or "").lower() for _, row in pairs}
         destination = str(delta.get("destination") or "").lower()
+        exact = (withdrawal_destinations or {}).get(str(delta.get("nonce")))
+        if exact and not pairs:
+            destination = str(exact.get("destination") or "").lower()
         if len(destinations) == 1 and "" not in destinations:
             destination = next(iter(destinations))
         conflict = len(destinations) > 1
