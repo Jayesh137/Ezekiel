@@ -251,3 +251,50 @@ def test_a_throttled_run_stops_at_its_deadline_and_defers_the_rest(sandbox):
     assert "unit" in st["deferred"] and "retro" in st["deferred"]
     assert len(st["unit_checked"]) < 4 and st["retro"] == {}
     assert st["withdrawal_cursor"] == 500            # the live walk ran first
+
+
+def test_retro_reads_every_payout_across_runs_before_calling_a_member_done(sandbox):
+    # A per-run cap that marks the member done would leave every payout past it
+    # unread for ever - and the cap's order was the transaction hash, which
+    # means nothing (CLAUDE.md: ask what a cap's sort order MEANS).
+    tmp, sent = sandbox
+    n = cb.RETRO_TX_PER_MEMBER + 4
+    payouts = [{"transactionHash": f"0x{i:064x}", "blockNumber": hex(10 + i), "logIndex": "0x0"}
+               for i in range(n)]
+    tx_logs = {p["transactionHash"]: [fw("0x" + f"{i + 1:040x}", S, 2e5, 10 + i,
+                                         p["transactionHash"], nonce=100 + i)]
+               for i, p in enumerate(payouts)}
+    r = readers(head=500, payouts={S: payouts}, tx_logs=tx_logs)
+    cb.main([], readers=r)
+    st = _state(tmp)
+    assert not st["retro"][S].get("bridge2")
+    cb.main([], readers=r)
+    st = _state(tmp)
+    assert st["retro"][S]["bridge2"]
+    assert len({f["ref"] for f in st["findings"] if f["source"] == "bridge2"}) == n
+
+
+def test_an_outsider_ever_paying_a_core_wallet_is_found_in_its_history(sandbox):
+    # The core's own withdrawals are read exactly by nonce; who ELSE withdrew to
+    # a core wallet was never asked of history (0xf078969e had never been).
+    tmp, sent = sandbox
+    payout = {"transactionHash": "0xin", "blockNumber": hex(20), "logIndex": "0x0"}
+    r = readers(head=500, payouts={TR: [payout]}, tx_logs={"0xin": [fw(OUT, TR, 3e5, 20, "0xin")]})
+    cb.main([], readers=r)
+    f = [f for f in _state(tmp)["findings"] if f["ref"] == "0xin"]
+    assert f and (f[0]["kind"], f[0]["hl_account"], f[0]["role"]) == \
+        ("outside_account_paid_his_world", OUT, "core")
+
+
+def test_a_finding_already_alerted_is_never_sent_again_even_if_trimmed(sandbox):
+    tmp, sent = sandbox
+    cb.main([], readers=readers(head=500, live=[fw(OUT, S, 2.5e5, 400, "0xa")]))
+    st = _state(tmp)
+    assert sent["boundary"] and st["alerted"]
+    st["findings"] = []                                   # trimmed from the kept 500
+    (tmp / "boundary" / "latest.json").write_text(json.dumps(st))
+    sent["boundary"].clear()
+    r = readers(head=600, user={T: []})
+    r["withdrawals"] = lambda lo, hi: [fw(OUT, S, 2.5e5, 400, "0xa")]   # seen again
+    cb.main([], readers=r)
+    assert sent["boundary"] == []

@@ -93,20 +93,33 @@ def system_sends_from(start_ms: int) -> list:
     return rows
 
 
-def retro_circle(member: str, readers: dict, own: set, core: set) -> list:
+def newest_unread(rows: list, skip: set) -> list[dict]:
+    """One row per transaction not in `skip`, newest block first."""
+    from src.boundary.logs import to_int
+    by: dict[str, dict] = {}
+    for x in rows or []:
+        tx = (x.get("transactionHash") or "").lower()
+        if tx and tx not in skip and tx not in by:
+            by[tx] = x
+    return sorted(by.values(), key=lambda x: -to_int(x.get("blockNumber") or 0))
+
+
+def retro_circle(member: str, readers: dict, own: set, core: set, *, done=(),
+                 on_read=lambda tx: None) -> tuple[list, int]:
     """Circle withdrawals out of Hyperliquid that minted at a member, by whom.
 
-    A mint already paired with one of his own withdrawals (withdrawals.py) is
-    skipped. A forwarder-burned message names the forwarder, so its withdrawer
-    comes from the USDC system ledger (src/circle_flows.resolve_withdrawer).
+    A mint already paired with one of his own withdrawals (withdrawals.py), or
+    read on an earlier run (`done`), is skipped; at most RETRO_TX_PER_MEMBER are
+    read per run, newest first, each reported to `on_read` once read. Returns
+    (events, mints still unread). A forwarder-burned message names the
+    forwarder, so its withdrawer comes from the USDC system ledger.
     """
     from src import circle_flows as cf
     from src.boundary import attribution as at
     from src.boundary.logs import to_int
     out = []
-    fresh = [x for x in readers["mints"](member)
-             if (x.get("transactionHash") or "").lower() not in own]
-    for mint in fresh[:RETRO_TX_PER_MEMBER]:
+    todo = newest_unread(readers["mints"](member), set(own) | set(done))
+    for mint in todo[:RETRO_TX_PER_MEMBER]:
         ts = to_int(mint.get("timeStamp")) if mint.get("timeStamp") else None
         for log in readers["tx_logs"](mint["transactionHash"]):
             if (log.get("address") or "").lower() != cf.MESSAGE_TRANSMITTER_V2:
@@ -123,7 +136,8 @@ def retro_circle(member: str, readers: dict, own: set, core: set) -> list:
                                     counterparty=member, chain="arbitrum",
                                     amount_usd=msg["amount_usd"], ts=ts,
                                     ref=(mint.get("transactionHash") or "").lower(), retro=True))
-    return out
+        on_read((mint.get("transactionHash") or "").lower())
+    return out, max(0, len(todo) - RETRO_TX_PER_MEMBER)
 
 
 def not_accounts(data: Path) -> set:
@@ -235,18 +249,22 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
             events.append({**e, "retro": not edge_cursor or int(e.get("ts") or 0) <= edge_cursor})
         new_edge_cursor = max([edge_cursor] + [int(e.get("ts") or 0) for e in edges])
 
-    # 5. Retro: who ever withdrew to a member (bounded, resumable). Bridge2
-    # payouts for every member but the core (whose own withdrawals are read
-    # exactly above); Circle mints for the core and his deposit addresses.
+    # 5. Retro: who ever withdrew to a member. Bounded per run and resumable:
+    # every payout and mint is read, newest first, before a member counts as
+    # done. Bridge2 payouts into every EVM member less his own withdrawals -
+    # so only in a run that read every core history; Circle mints into the
+    # core and his deposit addresses.
     retro = dict(previous.get("retro") or {})
     own_circle = {(r.get("payout_tx") or "").lower() for r in
                   ((_read(data / "withdrawals" / "latest.json").get("cctp") or {})
                    .get("landed") or [])}
+    core_read = (not any(e["source"] == "core_withdrawals" for e in errors)
+                 and "core_withdrawals" not in deferred)
 
     def wants(m, what):
         if (retro.get(m["address"]) or {}).get(what):
             return False
-        return m["role"] != "core" if what == "bridge2" else m["role"] in ("core", "deposit")
+        return core_read if what == "bridge2" else m["role"] in ("core", "deposit")
     pending = [m for m in index.members.values()
                if m["weight"] >= RETRO_MIN_WEIGHT and str(m["address"]).startswith("0x")
                and (wants(m, "bridge2") or wants(m, "circle"))]
@@ -254,22 +272,30 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
         if left() < MIN_LEFT:
             deferred.append("retro")
             break
+        mine = retro.setdefault(m["address"], {})
         if wants(m, "bridge2"):
+            read = mine.setdefault("bridge2_read", [])
             try:
-                payouts = readers["payouts"](m["address"])
-                for tx in sorted({(p.get("transactionHash") or "").lower() for p in payouts}
-                                 - own_txs)[:RETRO_TX_PER_MEMBER]:
+                todo = newest_unread(readers["payouts"](m["address"]), own_txs | set(read))
+                for p in todo[:RETRO_TX_PER_MEMBER]:
+                    tx = (p.get("transactionHash") or "").lower()
                     for r in (bridge2.decode_withdrawal(x) for x in readers["tx_logs"](tx)):
                         if r and r["destination"] == m["address"]:
                             events.append(at.from_bridge2_withdrawal(r, retro=True))
-                retro.setdefault(m["address"], {})["bridge2"] = now_iso
+                    read.append(tx)
+                if len(todo) <= RETRO_TX_PER_MEMBER:
+                    mine["bridge2"] = now_iso
             except Exception as exc:  # noqa: BLE001
                 errors.append({"source": "retro_bridge2", "address": m["address"],
                                "error": str(exc)[:200]})
         if wants(m, "circle"):
+            read = mine.setdefault("circle_read", [])
             try:
-                events += retro_circle(m["address"], readers, own_circle, index.core)
-                retro.setdefault(m["address"], {})["circle"] = now_iso
+                got, unread = retro_circle(m["address"], readers, own_circle, index.core,
+                                           done=read, on_read=read.append)
+                events += got
+                if not unread:
+                    mine["circle"] = now_iso
             except Exception as exc:  # noqa: BLE001
                 errors.append({"source": "retro_circle", "address": m["address"],
                                "error": str(exc)[:200]})
@@ -281,9 +307,14 @@ def main(argv=None, *, readers=None, now=None, clock=time.monotonic) -> int:
     for f in found:
         by_key[f["key"]] = f
     alerted = list(previous.get("alerted") or [])
-    undelivered = []
-    queue = [r for r in previous.get("undelivered") or [] if r.get("key") not in alerted]
-    queue += [f for f in new if f["severity"] in at.SEVERITIES]
+    undelivered, queue, queued = [], [], set(alerted)
+    # `alerted` is the record of what he was told: a finding trimmed from the
+    # kept 500 and read again from history is never told twice.
+    for row in (previous.get("undelivered") or []) + [f for f in new
+                                                      if f["severity"] in at.SEVERITIES]:
+        if row.get("key") not in queued:
+            queued.add(row.get("key"))
+            queue.append(row)
     for row in queue if not args.dry_run else []:
         if row["kind"] == at.KIND_HIS_ACCOUNT_PAID_OUTSIDE:
             when = (datetime.fromtimestamp(int(row["ts"]), tz=UTC).isoformat()
