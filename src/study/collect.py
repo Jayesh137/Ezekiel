@@ -53,7 +53,7 @@ def read_fills(wallet: str, start_ms: int, now_ms: int, fetch=None,
     keeps only an account's newest 10,000 fills, so when five full pages come back
     the span between start_ms and the first fill read may be missing.
     """
-    empty = {"fills": [], "known_until_ms": None, "saturated": False, "first_ms": None}
+    empty = {"fills": [], "known_until_ms": None, "saturated": None, "first_ms": None}
     rows, cursor, pages, full_pages, complete = {}, int(start_ms), 0, 0, False
     while pages < max_pages:
         pages += 1
@@ -95,18 +95,19 @@ def read_recent_fills(wallet: str, fetch=None) -> dict:
 
 
 def read_orders(wallet: str, fetch=None) -> dict:
-    """The newest 2,000 orders. With a full page, orders placed before `oldest_ms`
-    may be missing, so the caller vouches only from there."""
+    """The newest 2,000 orders, ordered by status time. Hyperliquid orders the page
+    by statusTimestamp, so the caller vouches only from the oldest status time."""
     got = _call(fetch, {"type": "historicalOrders", "user": wallet})
-    empty = {"orders": [], "oldest_ms": None, "full": False}
+    empty = {"orders": [], "oldest_ms": None, "full": None}
     if not got["ok"]:
         return _failed(got, **empty)
     data = got["data"]
     if not isinstance(data, list) or not all(
             isinstance(r, dict) and isinstance(r.get("order"), dict) for r in data):
         return _failed({"error": "unexpected orders shape"}, **empty)
-    stamps = [r["order"]["timestamp"] for r in data
-              if isinstance(r["order"].get("timestamp"), (int, float))]
+    stamps = [r.get("statusTimestamp") if isinstance(r.get("statusTimestamp"), (int, float))
+              else r["order"]["timestamp"]
+              for r in data if isinstance(r["order"].get("timestamp"), (int, float))]
     return {"ok": True, "stopped": False, "error": None, "orders": data,
             "oldest_ms": int(min(stamps)) if stamps else None, "full": len(data) >= PAGE}
 
