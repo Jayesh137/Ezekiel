@@ -126,7 +126,7 @@ jobs:
         # and freezing discovery, as it did from 2026-10-03.
         timeout-minutes: 4
         run: python scripts/discovery_artifacts.py snapshot --kind state
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         id: checkpoint_upload
         if: ${{ !cancelled() && steps.discovery_snapshot.conclusion == 'success' && steps.discovery_snapshot.outputs.artifact_path != '' }}
         with:

@@ -199,7 +199,7 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 2
         run: python scripts/discovery_artifacts.py snapshot --kind observations --db data/.local/analysis-observations.sqlite3
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         id: observation_upload
         if: ${{ !cancelled() && steps.discovery_snapshot.conclusion == 'success' && steps.discovery_snapshot.outputs.artifact_path != '' }}
         with:
