@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import os
 import time
+from functools import partial
+from itertools import combinations
 
 import requests
 
@@ -33,6 +35,7 @@ ETHERSCAN_CHAIN_IDS = {"arbitrum": 42161, "ethereum": 1, "base": 8453, "optimism
 PAGE = 1_000
 CHUNK_BLOCKS = 100_000       # ~7h of Arbitrum; one call stays fast
 PACE_SECONDS = 0.35
+BACKOFF_SECONDS = (2.0, 5.0, 10.0)
 
 
 class LogReadError(RuntimeError):
@@ -44,23 +47,34 @@ def to_int(value) -> int:
     return int(s, 16) if s.lower().startswith("0x") else int(s)
 
 
-def _http_get(url: str, params: dict, *, tries: int = 4, sleep=time.sleep) -> dict:
-    """GET JSON. Backs off on 429: Blockscout throttles a busy IP."""
+def _http_get(url: str, params: dict, *, tries: int = 4, sleep=time.sleep,
+              deadline: float | None = None, clock=time.monotonic) -> dict:
+    """GET JSON. Backs off on 429 (Blockscout throttles a busy IP), briefly.
+
+    A throttle that outlasts BACKOFF_SECONDS outlasts the run too: on the
+    2026-10-06 dry run each throttled call slept 10+20+30+40s, the last after
+    its final try, and the watch step ran 441s against its 240s limit. Never
+    sleeps past `deadline` (a `clock` time), and never after the last try.
+    """
     last = None
     for attempt in range(tries):
+        if deadline is not None and clock() + PACE_SECONDS >= deadline:
+            raise LogReadError(f"run deadline reached ({last or 'before the first try'})")
         sleep(PACE_SECONDS)
         try:
             response = requests.get(url, params=params, timeout=(10, 60))
         except requests.RequestException as exc:
             last = exc
-            sleep(2 * (attempt + 1))
-            continue
-        if response.status_code == 429:
+        else:
+            if response.status_code != 429:
+                response.raise_for_status()
+                return response.json()
             last = RuntimeError("rate limited (HTTP 429)")
-            sleep(10 * (attempt + 1))
-            continue
-        response.raise_for_status()
-        return response.json()
+        if attempt + 1 < tries:
+            pause = BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)]
+            if deadline is not None and clock() + pause >= deadline:
+                raise LogReadError(f"run deadline reached: {last}")
+            sleep(pause)
     raise LogReadError(f"unavailable after {tries} tries: {last}")
 
 
@@ -70,7 +84,7 @@ def _params(address: str, topics: dict, from_block, to_block) -> dict:
     keys = sorted(topics)
     for i in keys:
         params[f"topic{i}"] = topics[i]
-    for a, b in zip(keys, keys[1:], strict=False):
+    for a, b in combinations(keys, 2):     # every pair: Blockscout requires each
         params[f"topic{a}_{b}_opr"] = "and"
     return params
 
@@ -90,8 +104,8 @@ def rows_of(doc, source: str) -> list[dict]:
 
 
 def blockscout_logs(chain: str, address: str, topics: dict, from_block, to_block,
-                    *, get=None) -> list[dict]:
-    get = get or _http_get
+                    *, get=None, deadline: float | None = None) -> list[dict]:
+    get = get or partial(_http_get, deadline=deadline)
     try:
         doc = get(BLOCKSCOUT_API[chain], _params(address, topics, from_block, to_block))
     except LogReadError:
@@ -110,9 +124,10 @@ def etherscan_logs(chain: str, address: str, topics: dict, from_block, to_block,
 
 
 def read_logs(chain: str, address: str, topics: dict, from_block, to_block, *,
-              blockscout=None, etherscan=None, has_key=None) -> list[dict]:
+              blockscout=None, etherscan=None, has_key=None,
+              deadline: float | None = None) -> list[dict]:
     """Blockscout first; Etherscan when Blockscout fails and a key is set."""
-    blockscout = blockscout or blockscout_logs
+    blockscout = blockscout or partial(blockscout_logs, deadline=deadline)
     etherscan = etherscan or etherscan_logs
     has_key = bool(os.environ.get("ETHERSCAN_API_KEY")) if has_key is None else has_key
     try:
@@ -128,9 +143,9 @@ def read_logs(chain: str, address: str, topics: dict, from_block, to_block, *,
             raise LogReadError(f"{first}; then {second}") from second
 
 
-def head_block(chain: str, *, get=None) -> int:
+def head_block(chain: str, *, get=None, deadline: float | None = None) -> int:
     """The chain head (Blockscout eth_block_number; Etherscan proxy as fallback)."""
-    get = get or _http_get
+    get = get or partial(_http_get, deadline=deadline)
     try:
         return to_int(get(BLOCKSCOUT_API[chain],
                           {"module": "block", "action": "eth_block_number"})["result"])

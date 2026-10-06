@@ -19,6 +19,14 @@ def test_an_error_answer_is_never_empty():
             logs.rows_of(doc, "x")
 
 
+def test_three_topics_name_an_operator_for_every_pair():
+    # Blockscout refuses a three-topic query without topic0_2_opr ("Required
+    # query parameters missing"), which failed every retro Circle read on the
+    # 2026-10-06 dry run.
+    p = logs._params("0xabc", {0: "0xt0", 1: "0xt1", 2: "0xt2"}, 5, 9)
+    assert p["topic0_1_opr"] == p["topic0_2_opr"] == p["topic1_2_opr"] == "and"
+
+
 def test_params_join_topics_with_and():
     p = logs._params("0xabc", {0: "0xt0", 2: "0xt2"}, 5, 9)
     assert p["topic0"] == "0xt0" and p["topic2"] == "0xt2" and p["topic0_2_opr"] == "and"
@@ -105,3 +113,41 @@ def test_http_get_backs_off_on_429_then_raises(monkeypatch):
 
 def test_to_int_reads_hex_and_decimal():
     assert logs.to_int("0x10") == 16 and logs.to_int("16") == 16 and logs.to_int(16) == 16
+
+
+def test_http_get_never_sleeps_past_its_deadline_nor_after_its_last_try(monkeypatch):
+    # A throttled host cost ~100s per call on the 2026-10-06 dry run (10+20+30+40s,
+    # the last sleep after the final try).
+    class R:
+        status_code = 429
+
+        def json(self):
+            return {}
+
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(logs.requests, "get", lambda *a, **k: R())
+    now, slept = [0.0], []
+
+    def sleep(s):
+        slept.append(s)
+        now[0] += s
+    with pytest.raises(logs.LogReadError):
+        logs._http_get("u", {}, sleep=sleep, clock=lambda: now[0])
+    unbounded = now[0]
+    assert unbounded < 30.0 and slept[-1] == logs.PACE_SECONDS
+    now[0], slept[:] = 0.0, []
+    with pytest.raises(logs.LogReadError, match="deadline"):
+        logs._http_get("u", {}, sleep=sleep, clock=lambda: now[0], deadline=4.0)
+    assert now[0] <= 4.0
+
+
+def test_read_logs_carries_its_deadline_to_the_default_reader(monkeypatch):
+    seen = {}
+
+    def fake(url, params, **kw):
+        seen.update(kw)
+        return {"status": "0", "message": "No logs found", "result": []}
+    monkeypatch.setattr(logs, "_http_get", fake)
+    assert logs.read_logs("arbitrum", "0xabc", {0: "0xt"}, 1, 2, has_key=False, deadline=7.0) == []
+    assert seen["deadline"] == 7.0
