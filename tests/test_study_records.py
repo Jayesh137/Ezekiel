@@ -174,3 +174,61 @@ def test_covered_day_needs_twenty_hours():
     assert not rec.covered_day(day)
     day["coverage"]["fills"] = [[DAY0, DAY0 + 21 * HOUR]]
     assert rec.covered_day(day)
+
+
+def test_a_heavy_coin_arriving_after_twenty_others_still_ranks():
+    """A heavy coin folded after 20 coins are already in the table should still enter."""
+    fills_20 = [fill(DAY0 + i * 30_000, coin=f"C{i:02d}", sz=f"{i + 1}") for i in range(20)]
+    fills_zzz = program(DAY0 + 11 * HOUR, 200, coin="ZZZ")
+    days = {}
+    rec.fold_fills(days, fills_20 + fills_zzz, wallet=W, role="studied",
+                   start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS, last_fill_ms=None)
+    coins = days["2026-10-02"]["coins"]
+    assert "ZZZ" in coins and coins["ZZZ"]["orders"] == 200
+    assert len(coins) == rec.MAX_COINS
+    assert sum(c["orders"] for c in coins.values()) == 220
+
+
+def test_the_boundary_defers_a_run_that_starts_the_window():
+    """A run starting exactly at the first in-window time should defer up to it."""
+    cursor = DAY0 + 8 * HOUR + 50 * 60_000
+    run = [DAY0 + 8 * HOUR + 58 * 60_000 + i * 1_700 for i in range(400)]
+    now = DAY0 + 9 * HOUR + 8 * 60_000
+    boundary, split = rec.quiet_boundary(run, cursor, now)
+    assert (boundary, split) == (run[0], False)
+
+
+def test_the_ledger_keeps_the_largest_rows_and_counts_the_rest():
+    """Ledger keeps the largest by usd, and counts dropped rows in ledger_overflow."""
+    small = [{"time": DAY0 + i, "hash": f"0x{i:040x}", "delta": {"type": "send", "usd": "1.0"}}
+             for i in range(1, 60)]
+    large = {"time": DAY0 + 60, "hash": "0xL", "delta": {"type": "withdraw", "usd": "5000000.0"}}
+    days = {}
+    rec.fold_ledger(days, small + [large], wallet=W, role="studied",
+                    start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
+    day = days["2026-10-02"]
+    assert len(day["ledger"]) == rec.MAX_LEDGER
+    assert any(r["usd"] == 5000000.0 for r in day["ledger"])
+    assert day["ledger_overflow"] == 10
+
+
+def test_folding_a_covered_span_again_changes_nothing():
+    """Folding the same span twice should not double-count (idempotent)."""
+    fills = program(DAY0 + HOUR, 20)
+    days = {}
+    rec.fold_fills(days, fills, wallet=W, role="studied", start_ms=DAY0,
+                   end_ms=DAY0 + 2 * HOUR, last_fill_ms=None)
+    first_fills = days["2026-10-02"]["fills"]
+    first_orders = days["2026-10-02"]["orders"]
+    rec.fold_fills(days, fills, wallet=W, role="studied", start_ms=DAY0,
+                   end_ms=DAY0 + 2 * HOUR, last_fill_ms=None)
+    assert days["2026-10-02"]["fills"] == first_fills
+    assert days["2026-10-02"]["orders"] == first_orders
+
+
+def test_uncovered_returns_the_gaps():
+    """uncovered should return the sub-spans not in intervals."""
+    assert rec.uncovered([[10, 20], [30, 40]], 0, 50) == [(0, 10), (20, 30), (40, 50)]
+    assert rec.uncovered([[0, 100]], 10, 20) == []
+    assert rec.uncovered([], 10, 30) == [(10, 30)]
+    assert rec.uncovered([[15, 25]], 10, 30) == [(10, 15), (25, 30)]

@@ -108,11 +108,26 @@ def empty_day(wallet: str, day: str, role: str) -> dict:
             "minutes": encode_minutes(()), "coin_minutes": {}, "manual_minutes": None,
             "decisions": [], "decisions_overflow": 0,
             "runs": [], "runs_overflow": 0, "program_runs": 0,
-            "habits": None, "cadence": [0] * CADENCE_BINS, "coins": {}, "ledger": None}
+            "habits": None, "cadence": [0] * CADENCE_BINS, "coins": {}, "ledger": None,
+            "ledger_overflow": 0}
 
 
 def size_key(size: float) -> str:
     return format(size, ".10g")
+
+
+def uncovered(intervals, lo: int, hi: int) -> list[tuple[int, int]]:
+    """Sub-spans of [lo, hi) not already in intervals (merged first)."""
+    merged = merge_intervals(intervals)
+    gaps: list[tuple[int, int]] = []
+    current = lo
+    for a, b in merged:
+        if current < a:
+            gaps.append((max(current, lo), min(a, hi)))
+        current = max(current, b)
+    if current < hi:
+        gaps.append((current, hi))
+    return gaps
 
 
 # --- runs ---------------------------------------------------------------------------
@@ -194,6 +209,7 @@ def _cap_coins(record: dict) -> None:
 
 
 def _add_coin(record: dict, order: dict) -> None:
+    """Add an order's stats to a coin (does not cap; capping is done per fold)."""
     stats = record["coins"].setdefault(str(order["coin"]), {
         "orders": 0, "buy_usd": 0.0, "sell_usd": 0.0, "taker_clips": {},
         "px_sum": 0.0, "px_n": 0})
@@ -205,8 +221,6 @@ def _add_coin(record: dict, order: dict) -> None:
         stats["taker_clips"][key] = stats["taker_clips"].get(key, 0) + 1
         stats["px_sum"] = round(stats["px_sum"] + order["first_px"], 8)
         stats["px_n"] += 1
-    if len(record["coins"]) > MAX_COINS:
-        _cap_coins(record)
 
 
 def _merge_coin_minutes(record: dict, batch: dict[str, set]) -> None:
@@ -246,19 +260,25 @@ def fold_fills(days: dict, fills: list, *, wallet: str, role: str, start_ms: int
             continue
         seen.add(key)
         rows.append(fill)
+    day_to_uncovered: dict[str, list[tuple[int, int]]] = {}
     for day, lo, hi in split_by_day(start_ms, end_ms):
         record = days.setdefault(day, empty_day(wallet, day, role))
         coverage = record["coverage"]
+        day_to_uncovered[day] = uncovered(coverage["fills"], lo, hi)
         coverage["fills"] = merge_intervals(coverage["fills"] + [[lo, hi]])
         if saturated and lo == start_ms:
             coverage["saturated"] = True
         if runs_split:
             coverage["runs_split"] = True
-    minutes: dict[str, set] = {}
-    coin_minutes: dict[str, dict[str, set]] = {}
+    uncovered_rows, minutes, coin_minutes = [], {}, {}
     for fill in rows:
         t = int(fill["time"])
-        day, minute = day_of(t), (t % DAY_MS) // MINUTE_MS
+        day = day_of(t)
+        uncov = day_to_uncovered.get(day, [])
+        if not any(lo <= t < hi for lo, hi in uncov):
+            continue
+        uncovered_rows.append(fill)
+        minute = (t % DAY_MS) // MINUTE_MS
         days[day]["fills"] += 1
         minutes.setdefault(day, set()).add(minute)
         coin_minutes.setdefault(day, {}).setdefault(str(fill.get("coin")), set()).add(minute)
@@ -266,7 +286,7 @@ def fold_fills(days: dict, fills: list, *, wallet: str, role: str, start_ms: int
         record = days[day]
         record["minutes"] = encode_minutes(decode_minutes(record["minutes"]) | found)
         _merge_coin_minutes(record, coin_minutes[day])
-    orders = ep.reconstruct_orders(rows)
+    orders = ep.reconstruct_orders(uncovered_rows)
     previous = last_fill_ms
     for order in orders:
         t = int(order["t"])
@@ -279,6 +299,8 @@ def fold_fills(days: dict, fills: list, *, wallet: str, role: str, start_ms: int
         if session:
             _add_decision(record, [t, order["coin"], order["side"], "session"])
         previous = t
+    for day in {day_of(int(o["t"])) for o in orders}:
+        _cap_coins(days[day])
     for run in taker_runs(orders):
         summary = run_summary(run)
         record = days[day_of(summary["start_ms"])]
@@ -382,10 +404,15 @@ def fold_orders(days: dict, entries: list, first_px: dict, *, wallet: str, role:
         t = order.get("timestamp") if isinstance(order, dict) else None
         if isinstance(t, (int, float)) and start_ms <= t < end_ms:
             by_day.setdefault(day_of(int(t)), []).append(entry)
+    day_to_uncovered: dict[str, list[tuple[int, int]]] = {}
     for day, lo, hi in split_by_day(start_ms, end_ms):
         record = days.setdefault(day, empty_day(wallet, day, role))
+        day_to_uncovered[day] = uncovered(record["coverage"]["orders"], lo, hi)
         record["coverage"]["orders"] = merge_intervals(record["coverage"]["orders"] + [[lo, hi]])
-        placed = by_day.get(day, [])
+        uncov = day_to_uncovered[day]
+        placed = [e for e in by_day.get(day, [])
+                  if any(lo <= int(e.get("order", {}).get("timestamp", 0)) < hi
+                         for lo, hi in uncov)]
         record["habits"] = add_habits(record["habits"], habit_counts(placed, first_px))
         manual = decode_minutes(record["manual_minutes"])
         for entry in placed:
@@ -420,16 +447,25 @@ def fold_ledger(days: dict, rows: list, *, wallet: str, role: str, start_ms: int
             picked.setdefault(day_of(int(t)), []).append(
                 {"ts_ms": int(t), "type": delta.get("type"), "usd": ledger_usd(delta),
                  "hash": row.get("hash")})
+    day_to_uncovered: dict[str, list[tuple[int, int]]] = {}
     for day, lo, hi in split_by_day(start_ms, end_ms):
         record = days.setdefault(day, empty_day(wallet, day, role))
+        day_to_uncovered[day] = uncovered(record["coverage"]["ledger"], lo, hi)
         record["coverage"]["ledger"] = merge_intervals(record["coverage"]["ledger"] + [[lo, hi]])
+        uncov = day_to_uncovered[day]
         kept = list(record["ledger"] or [])
         keys = {(r["ts_ms"], r["type"], r.get("hash")) for r in kept}
         for item in picked.get(day, []):
+            if not any(lo <= item["ts_ms"] < hi for lo, hi in uncov):
+                continue
             key = (item["ts_ms"], item["type"], item["hash"])
-            if key not in keys and len(kept) < MAX_LEDGER:
+            if key not in keys:
                 kept.append(item)
                 keys.add(key)
+        if len(kept) > MAX_LEDGER:
+            sorted_kept = sorted(kept, key=lambda r: (-num(r.get("usd")) or 0, r["ts_ms"]))
+            kept = sorted_kept[:MAX_LEDGER]
+            record["ledger_overflow"] += len(sorted_kept) - MAX_LEDGER
         record["ledger"] = sorted(kept, key=lambda r: r["ts_ms"])
 
 
@@ -451,8 +487,9 @@ def quiet_boundary(times, cursor_ms: int, known_until_ms: int) -> tuple[int, boo
     after = [t for t in ts if t >= cap]
     if not before or not after or after[0] - before[-1] >= QUIET_GAP_MS:
         return cap, False
-    for i in range(len(before) - 1, 0, -1):
-        if before[i] - before[i - 1] >= QUIET_GAP_MS:
+    for i in range(len(before) - 1, -1, -1):
+        prev = before[i - 1] if i > 0 else cursor_ms
+        if before[i] - prev >= QUIET_GAP_MS:
             return before[i], False
     hour = cap // HOUR_MS * HOUR_MS
     return (hour, True) if hour > cursor_ms else (cursor_ms, False)
