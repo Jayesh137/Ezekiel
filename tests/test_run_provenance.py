@@ -158,3 +158,30 @@ def test_a_slow_run_stops_starting_accounts_at_its_deadline(sandbox):
     assert 0 < st["attempted"] < len(accounts)
     assert now[0] <= rp.RUN_SECONDS + 60.0
     assert st["deferred_accounts"] == len(accounts) - st["attempted"]
+
+
+def test_the_circle_reader_follows_an_extension_message_to_the_depositor():
+    # A Circle message from Hyperliquid's Arbitrum extension names the extension;
+    # the depositor is the extension's own USDC transfer of the message's amount.
+    from src.boundary.readers import Budget, ReadError
+    msg = {"address": rp.EXTENSION, "chain": "arbitrum", "domain": 3, "kind": "circle_message",
+           "message_usd": 29_942.24}
+    seen = {}
+
+    def extension(entry, usd):
+        seen["usd"] = usd
+        return {"address": T, "chain": "arbitrum"}
+    read = rp.circle_source_reader(Budget(10), source=lambda a, u, t: msg, extension=extension)
+    assert read({"usd": 29_942.04, "ts": 1_790_000_000}, NEW) == {"address": T, "chain": "arbitrum"}
+    assert seen["usd"] == 29_942.24
+
+    holder = {"address": NEW, "chain": "hyperevm", "kind": "hyperevm_payer"}
+    read = rp.circle_source_reader(Budget(10), source=lambda a, u, t: holder, extension=extension)
+    assert read({"usd": 5e5, "ts": 1_790_000_000}, NEW) == holder
+
+    def down(a, u, t):
+        from src.boundary.hyperevm import EvmReadError
+        raise EvmReadError("rate limited")
+    read = rp.circle_source_reader(Budget(10), source=down, extension=extension)
+    with pytest.raises(ReadError):
+        read({"usd": 5e5, "ts": 1_790_000_000}, NEW)

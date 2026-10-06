@@ -37,6 +37,7 @@ KEEP_ACCOUNTS, KEEP_FINDINGS = 2000, 500
 # Hyperliquid's CCTP extension on Arbitrum: a Circle deposit through it is a
 # USDC transfer from the depositor's own address into this contract.
 EXTENSION = "0xa95d9c1f655341597c94393fddc30cf3c08e4fce"
+EVM_LOOKUPS = 25           # Circle-route payers read on HyperEVM per run (~4 calls each)
 
 
 def _read(path: Path) -> dict:
@@ -75,30 +76,111 @@ def make_label_of(config: dict, data: Path):
     return label_of
 
 
-def circle_source_reader(budget, deadline: float | None = None):
-    """The burner behind a Circle deposit: the Arbitrum CCTP extension's own
-    USDC transfer of the same amount in the 30 minutes before (keyless). A
-    deposit from any other route stays unresolved here — recorded, not guessed."""
+def extension_payer(entry: dict, usd: float, budget, deadline: float | None = None):
+    """Who paid Hyperliquid's Arbitrum CCTP extension `usd` in the 30 minutes
+    before the credit: its own USDC transfer in (keyless Blockscout logs)."""
     from src.boundary import bridge2, logs
+    from src.boundary.readers import ReadError
+    ts = int(entry.get("ts") or 0)
+    if not budget.can(3):
+        raise ReadError("read budget spent")
+    budget.spend()
+    try:
+        lo = logs.block_at("arbitrum", ts - 1800, deadline=deadline)
+        hi = logs.block_at("arbitrum", ts + 120, closest="after", deadline=deadline)
+        rows = logs.read_logs("arbitrum", bridge2.USDC,
+                              {0: bridge2.TOPIC_TRANSFER, 2: bridge2.topic_address(EXTENSION)},
+                              lo, hi, deadline=deadline)
+    except logs.LogReadError as exc:
+        raise ReadError(str(exc)) from exc           # this run's problem: retried
+    hits = [r for r in rows if abs(int(r["data"], 16) / 1e6 - usd) <= max(1.0, usd * 0.002)]
+    if len(hits) != 1:
+        return None
+    return {"address": "0x" + hits[0]["topics"][1][-40:].lower(), "chain": "arbitrum"}
+
+
+def circle_source_reader(budget, deadline: float | None = None, *, source=None, extension=None,
+                         lookups: int = EVM_LOOKUPS):
+    """The payer behind a credit from Circle's deposit wallet (spec §7.2).
+
+    Read on HyperEVM (`src/boundary/hyperevm.py`): a Circle message names its
+    source chain and sender, any other payer is a HyperEVM address. A message
+    sent by Hyperliquid's Arbitrum extension names the extension, so the
+    depositor is the extension's own transfer of the message's amount. A read
+    that failed raises (retried next run); a payer that is not unique is None.
+    """
+    from src.boundary import hyperevm
+    from src.boundary.readers import ReadError
+    if source is None:
+        call = hyperevm_call(deadline)
+
+        def source(account, usd, ts):
+            return hyperevm.deposit_source(account, usd, ts, call=call)
+    if extension is None:
+        def extension(entry, usd):
+            return extension_payer(entry, usd, budget, deadline)
+    left = [lookups]
 
     def resolve(entry: dict, account: str):
         usd, ts = entry.get("usd"), int(entry.get("ts") or 0)
-        if not usd or not ts or not budget.can(3):
+        if not usd or not ts:
             return None
-        budget.spend()
+        if left[0] <= 0:
+            raise ReadError("HyperEVM lookup budget spent")
+        left[0] -= 1
         try:
-            lo = logs.block_at("arbitrum", ts - 1800, deadline=deadline)
-            hi = logs.block_at("arbitrum", ts + 120, closest="after", deadline=deadline)
-            rows = logs.read_logs("arbitrum", bridge2.USDC,
-                                  {0: bridge2.TOPIC_TRANSFER, 2: bridge2.topic_address(EXTENSION)},
-                                  lo, hi, deadline=deadline)
-        except logs.LogReadError:
-            return None
-        hits = [r for r in rows if abs(int(r["data"], 16) / 1e6 - usd) <= max(1.0, usd * 0.002)]
-        if len(hits) != 1:
-            return None
-        return {"address": "0x" + hits[0]["topics"][1][-40:].lower(), "chain": "arbitrum"}
+            src = source(account, usd, ts)
+        except hyperevm.EvmReadError as exc:
+            raise ReadError(str(exc)) from exc
+        if src and src["chain"] == "arbitrum" and src["address"] == EXTENSION:
+            return extension(entry, src.get("message_usd") or usd)
+        return src
     return resolve
+
+
+def hyperevm_call(deadline: float | None = None):
+    """EVM JSON-RPC on chain 999: Etherscan V2's proxy when a key is set (CI),
+    else the public RPC. Never starts a call past `deadline` (monotonic)."""
+    import os
+    from itertools import combinations
+
+    from scripts.check_circle_flows import HYPEREVM_CHAIN_ID, rpc
+
+    def etherscan(method, params):
+        if method == "eth_getLogs":
+            q = params[0]
+            req = {"module": "logs", "action": "getLogs", "address": q["address"],
+                   "fromBlock": int(q["fromBlock"], 16), "toBlock": int(q["toBlock"], 16)}
+            named = [i for i, t in enumerate(q.get("topics") or []) if t]
+            for i in named:
+                req[f"topic{i}"] = q["topics"][i]
+            for a, b in combinations(named, 2):
+                req[f"topic{a}_{b}_opr"] = "and"
+            doc = utils.etherscan_get(req, chain_id=HYPEREVM_CHAIN_ID)
+            if str(doc.get("status")) == "1" and isinstance(doc.get("result"), list):
+                return doc["result"]
+            if "no records" in str(doc.get("message") or "").lower():
+                return []
+            raise RuntimeError(f"etherscan getLogs: {doc.get('message')} {doc.get('result')}")
+        extra = {"eth_blockNumber": {},
+                 "eth_getBlockByNumber": {"tag": params[0] if params else None, "boolean": "false"},
+                 "eth_getTransactionReceipt": {"txhash": params[0] if params else None}}[method]
+        doc = utils.etherscan_get({"module": "proxy", "action": method, **extra},
+                                  chain_id=HYPEREVM_CHAIN_ID)
+        result = doc.get("result")
+        if not result or (isinstance(result, str) and not result.startswith("0x")):
+            raise RuntimeError(f"etherscan {method}: {str(doc)[:160]}")
+        return result
+
+    def public(method, params):
+        return rpc(method, params, tries=3)
+    inner = etherscan if os.environ.get("ETHERSCAN_API_KEY") else public
+
+    def call(method, params):
+        if deadline is not None and time.monotonic() >= deadline:
+            raise RuntimeError("run deadline reached")
+        return inner(method, params)
+    return call
 
 
 def default_readers(config: dict, data: Path, hl_budget, deadline: float) -> dict:
