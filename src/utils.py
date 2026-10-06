@@ -86,6 +86,10 @@ def hl_post(request_body: dict, retries: int = 3) -> dict | list:
 
 # --- Etherscan V2 API ---
 
+ETHERSCAN_PACE_SECONDS = 0.34      # the plan's 3 calls a second
+ETHERSCAN_PER_SECOND_TRIES = 3
+
+
 def etherscan_get(params: dict, chain_id: int | None = None) -> dict:
     """GET from the Etherscan V2 API.
 
@@ -101,23 +105,34 @@ def etherscan_get(params: dict, chain_id: int | None = None) -> dict:
         "apikey": api_key,
     }
     base_params.update(params)
-    time.sleep(0.25)  # Rate limit: 5 req/sec
-    try:
-        resp = requests.get(
-            config["etherscan_v2_base"],
-            params=base_params,
-            # (connect, read), not one scalar doing both jobs. The frontier
-            # slices its clock per lookup, but a slice cannot interrupt a
-            # request already in flight — an internal budget is checked BETWEEN
-            # calls — so this argument is the only bound on a stalled socket.
-            # A connect that has not landed in 10s will not land.
-            timeout=(10, 30),
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        print(f"[etherscan] API error: {e}")
-        return {"status": "0", "message": str(e), "result": []}
+    for attempt in range(ETHERSCAN_PER_SECOND_TRIES):
+        # The key's plan is 3 calls a second (measured 2026-10-06: "Max calls
+        # per sec rate limit reached (3/sec)" while this paced 4).
+        time.sleep(ETHERSCAN_PACE_SECONDS)
+        try:
+            resp = requests.get(
+                config["etherscan_v2_base"],
+                params=base_params,
+                # (connect, read), not one scalar doing both jobs. The frontier
+                # slices its clock per lookup, but a slice cannot interrupt a
+                # request already in flight — an internal budget is checked BETWEEN
+                # calls — so this argument is the only bound on a stalled socket.
+                # A connect that has not landed in 10s will not land.
+                timeout=(10, 30),
+            )
+            resp.raise_for_status()
+            doc = resp.json()
+        except Exception as e:
+            print(f"[etherscan] API error: {e}")
+            return {"status": "0", "message": str(e), "result": []}
+        # A per-second refusal is a wait, not an answer: handed back, it read
+        # as a failed read and fell through to Blockscout (403 on the runner).
+        if (attempt + 1 < ETHERSCAN_PER_SECOND_TRIES and isinstance(doc, dict)
+                and "per sec" in str(doc.get("result") or doc.get("message") or "").lower()):
+            time.sleep(1.0)
+            continue
+        return doc
+    return doc
 
 # --- Cursor Management ---
 
