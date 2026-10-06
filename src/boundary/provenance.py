@@ -20,7 +20,9 @@ FORWARDER = "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24"
 ROUTE_BRIDGE2, ROUTE_CIRCLE, ROUTE_UNIT = "bridge2", "circle", "unit"
 ROUTE_HYPEREVM, ROUTE_HL_SEND = "hyperevm", "hl_send"
 EXCHANGE_CLASSES = ("exchange", "busy")
-MOVES = ("send", "spotTransfer", "internalTransfer", "subAccountTransfer", "vaultWithdraw")
+# Value from another account. Not a vault withdrawal: that is the account's
+# own earlier deposit coming back, and HLP reads as a hub ("exchange").
+MOVES = ("send", "spotTransfer", "internalTransfer", "subAccountTransfer")
 MIN_ENTRY_USD = 10_000.0
 MAX_ENTRIES = 6
 MAX_SOURCES = 6
@@ -90,14 +92,9 @@ def route_entries(ledger, account, *, unit_events=()) -> list[dict]:
             continue
         if kind not in MOVES:
             continue
-        if kind == "vaultWithdraw":
-            src, dst, token = low(delta.get("vault")), low(delta.get("user")) or account, "USDC"
-            usd = _num(delta.get("netWithdrawnUsd"))
-            usd = usd if usd is not None else _num(delta.get("requestedUsd"))
-        else:
-            src, dst = low(delta.get("user")), low(delta.get("destination"))
-            token = str(delta.get("token") or "USDC")
-            usd = _usd(delta, token)
+        src, dst = low(delta.get("user")), low(delta.get("destination"))
+        token = str(delta.get("token") or "USDC")
+        usd = _usd(delta, token)
         if dst != account or not src or src == account:
             continue
         if src == FORWARDER:

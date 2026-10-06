@@ -221,3 +221,12 @@ def test_a_hyperevm_source_gets_its_second_hop_from_the_reader_not_a_shortcut():
     rows = provenance._hop2(src, lambda chain, address, *, since_ts, until_ts: [
         {"from": T, "usd": 2e6, "ts": 1_500, "chain": chain}], boom)
     assert rows[0]["address"] == T and rows[0]["chain"] == "hyperevm"
+
+
+def test_money_back_from_a_vault_is_not_new_funding():
+    # The account's own earlier deposit (plus PnL) coming back; HLP is a hub in
+    # the registry, so tracing it as a source would call the account 'exchange'.
+    ledger = [{"time": 1_790_000_000_000, "hash": "0xv", "delta": {
+        "type": "vaultWithdraw", "vault": "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303",
+        "user": NEW, "requestedUsd": "500000.0", "netWithdrawnUsd": "500000.0"}}]
+    assert provenance.route_entries(ledger, NEW) == []
