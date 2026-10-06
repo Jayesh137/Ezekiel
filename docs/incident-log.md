@@ -1836,6 +1836,18 @@ from Etherscan, whose getLogs writes zero as a bare `"0x"` (`logIndex`,
 its transaction. Neither could show in a keyless local dry run — **a reader
 switched to a new source needs a run against that source before it ships.**
 
+The next runs, now on Etherscan, found three more (PRs #66 and after):
+Blockscout's v2 API answers **403 Forbidden to the GitHub runner**, so the
+provenance and retro readers (inbound transfers, first gas, transaction logs)
+read Etherscan first with the key; the key's plan is **3 calls a second** and
+`utils.etherscan_get` paced 4, handing the refusal back as a failed read — it
+now paces 0.34s and waits out a per-second refusal; and the **zero address sat
+in his exchange family** (it "paid him" every USDC mint and is busy), so an
+account funded by a mint read `same_exchange`, while mints, `0x2222…` and
+Circle's deposit wallet came back as hop-1 funders. First successful live
+provenance run: 28 accounts in 206s, 21 marked to retry the reads it could not
+make.
+
 **The rule: index the edge, not the graph.** A table of his addresses joined
 against a global feed of every crossing costs one lookup per event and scales
 with the table; a forward walk costs a sweep per wallet, and its yield had

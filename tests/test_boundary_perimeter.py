@@ -117,3 +117,12 @@ def test_a_solana_member_is_found_by_its_own_key_as_well_as_its_token_account():
                                                "mint_recipient_hex": "0xABCD"}}))
     assert idx.get(None, raw=base58_to_hex(SOL))["address"] == SOL
     assert idx.get(None, raw="0xABCD")["address"] == SOL
+
+
+def test_a_mint_is_no_exchange_that_paid_him():
+    # The zero address 'paid him' every USDC mint and is busy, so it joined his
+    # exchange family - and every account funded by a mint read same_exchange.
+    zero = "0x" + "0" * 40
+    fam = perimeter.exchange_families([rec(zero, T, 5e6), rec(SVC, T, 5e6)], set(), {T},
+                                      is_hot=lambda a: True)
+    assert fam == {"paid_him": [SVC]}

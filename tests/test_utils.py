@@ -148,3 +148,29 @@ def test_an_etherscan_request_bounds_connect_and_read_separately(monkeypatch):
     connect, read = seen["timeout"]
     assert connect <= 10, "a connect that has not landed in 10s will not land"
     assert read <= 30
+
+
+def test_etherscan_get_retries_its_per_second_refusal_and_paces_for_its_plan(monkeypatch):
+    # First live provenance run (2026-10-06): "Max calls per sec rate limit
+    # reached (3/sec)" - the key's plan is 3 calls a second and this paced 4.
+    # The refusal was handed back as a failed read; it is a wait.
+    from src import utils
+
+    answers = [{"status": "0", "message": "NOTOK",
+                "result": "Max calls per sec rate limit reached (3/sec)"},
+               {"status": "1", "message": "OK", "result": [1]}]
+
+    class R:
+        def __init__(self, doc):
+            self.doc = doc
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self.doc
+    monkeypatch.setattr(utils.requests, "get", lambda *a, **k: R(answers.pop(0)))
+    slept = []
+    monkeypatch.setattr(utils.time, "sleep", slept.append)
+    assert utils.etherscan_get({"module": "logs", "action": "getLogs"})["result"] == [1]
+    assert min(slept) >= 1 / 3 and max(slept) >= 1.0

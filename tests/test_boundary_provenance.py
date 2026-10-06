@@ -230,3 +230,15 @@ def test_money_back_from_a_vault_is_not_new_funding():
         "type": "vaultWithdraw", "vault": "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303",
         "user": NEW, "requestedUsd": "500000.0", "netWithdrawnUsd": "500000.0"}}]
     assert provenance.route_entries(ledger, NEW) == []
+
+
+def test_mints_system_and_protocol_addresses_are_never_funders():
+    # Live run: 0x000... (a mint), 0x2222... (HYPE system) and Circle's deposit
+    # wallet 0x6b9e7731 came back as hop-1 'sources'; none is a funder.
+    rows = provenance.aggregate([
+        {"from": "0x" + "0" * 40, "usd": 5e6, "ts": 1, "chain": "hyperevm"},
+        {"from": "0x2222222222222222222222222222222222222222", "usd": None, "ts": 1,
+         "chain": "hyperevm"},
+        {"from": provenance.FORWARDER, "usd": 5e5, "ts": 1, "chain": "hyperevm"},
+        {"from": QUIET, "usd": 2e5, "ts": 1, "chain": "hyperevm"}])
+    assert [r["address"] for r in rows] == [QUIET]
