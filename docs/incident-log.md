@@ -1848,6 +1848,23 @@ Circle's deposit wallet came back as hop-1 funders. First successful live
 provenance run: 28 accounts in 206s, 21 marked to retry the reads it could not
 make.
 
+Reading the live verdicts found the last two (PR #68): accounts that paid in
+from **their own address** through Hyperliquid's Arbitrum extension read as
+their own hop-1 source, pushing their real funders to hop 2; and the **Bridge2
+contract** ("paid him" every HL withdrawal) sat in his exchange family as if
+it were an exchange. And both caches outlived their code — perimeter families
+are rebuilt by a daily pass and provenance records live 7 days — so the fixes
+would have waited a day and a week; `RULES_VERSION` and `RESOLVER_VERSION` now
+make a fix land on the next run. **A cache that outlives its code needs a
+version stamp.** After #68, live: families rebuilt at once (`paid_him` 60 -> 11
+entries, neither the zero address nor the bridge), the Bridge2 deposit feed
+current to the head, the correlator's two pools complete (1,204 + 1,353
+candidates, 0 matches against the 92 exits — a real no), and four large new
+accounts (`0x96de0254…` $20.4M, `0xcfe27294…` $18.0M, `0x60a8c761…` $37.0M,
+`0xd978850b…` $7.5M) traced to `0xee7ae85f…`, the Binance hot wallet his own
+deposit address forwards into: `same_exchange`, evidence only — Binance is
+everybody's exchange.
+
 **The rule: index the edge, not the graph.** A table of his addresses joined
 against a global feed of every crossing costs one lookup per event and scales
 with the table; a forward walk costs a sweep per wallet, and its yield had
