@@ -105,3 +105,30 @@ def test_dry_run_writes_only_into_its_directory(sandbox, tmp_path_factory):
     bp.main(["--dry-run", str(out)], post=_post(active={SINK}), substrate=_substrate,
             now="2026-10-06T00:00:00+00:00", is_hot=lambda a: False)
     assert (out / "latest.json").exists() and not (tmp / "perimeter").exists() and not sent
+
+
+def test_spot_usdc_counts_toward_a_members_value():
+    # CLAUDE.md: ask an account's whole surface - a spot-only account is still
+    # an account. The spot state was read and then thrown away.
+    def post(body):
+        if body["type"] == "clearinghouseState":
+            return {"marginSummary": {"accountValue": "0.0"}}
+        if body["type"] == "spotClearinghouseState":
+            return {"balances": [{"coin": "USDC", "total": "50000.0"},
+                                 {"coin": "SPAM", "total": "9999999.0"}]}
+        return []
+    reading = bp.hl_reading(SINK, post)
+    assert reading["account_value"] == 50_000.0 and reading["active"] is True
+
+
+def test_a_hypercore_deposit_address_is_recorded_but_never_alerted_as_active(sandbox):
+    # 0x4aecac3b is an exchange's account ON Hyperliquid: being active there is
+    # what it is, not news.
+    tmp, sent = sandbox
+    hd = "0x4aecac3b90dd0ad50d274c19221874e5ba8a4d45"
+    (tmp / "trace" / "latest.json").write_text(json.dumps({"funders": [], "deposit_addresses": [
+        {"address": hd, "kind": "hl_deposit", "hub": "0x" + "1" * 40}]}))
+    bp.main([], post=_post(active={hd}), substrate=_substrate, now="2026-10-06T00:00:00+00:00",
+            is_hot=lambda a: a == HOT)
+    doc = json.loads((tmp / "perimeter" / "latest.json").read_text())
+    assert doc["members"][hd]["hl"]["active"] is True and hd not in sent

@@ -48,12 +48,16 @@ def hl_reading(address: str, post) -> dict:
     checked = datetime.now(UTC).isoformat()
     try:
         state = post({"type": "clearinghouseState", "user": address}) or {}
-        post({"type": "spotClearinghouseState", "user": address})
+        spot = post({"type": "spotClearinghouseState", "user": address}) or {}
         portfolio = post({"type": "portfolio", "user": address}) or []
     except Exception as exc:  # noqa: BLE001 - transport or budget, reported
         return {"checked_at": checked, "read_ok": False,
                 "error": f"{type(exc).__name__}: {exc}"[:200]}
-    value = float((state.get("marginSummary") or {}).get("accountValue") or 0)
+    # Spot counts (an account can be spot-only); only USDC is valued, since any
+    # airdropped token would otherwise make every address look active.
+    spot_usdc = sum(float(b.get("total") or 0) for b in (spot.get("balances") or [])
+                    if isinstance(b, dict) and b.get("coin") == "USDC")
+    value = float((state.get("marginSummary") or {}).get("accountValue") or 0) + spot_usdc
     volume, peak, birth = 0.0, 0.0, None
     for name, body in portfolio if isinstance(portfolio, list) else []:
         if name != "allTime":
@@ -67,7 +71,8 @@ def hl_reading(address: str, post) -> dict:
     active = (value >= ACTIVE_VALUE_USD or peak >= ACTIVE_VALUE_USD
               or volume >= ACTIVE_VOLUME_USD)
     return {"checked_at": checked, "read_ok": True, "account_value": value,
-            "all_time_volume": volume, "max_value": peak, "birth": birth, "active": active}
+            "spot_usdc": spot_usdc, "all_time_volume": volume, "max_value": peak,
+            "birth": birth, "active": active}
 
 
 def default_post():
@@ -149,8 +154,8 @@ def main(argv=None, *, post=None, substrate=None, now=None, is_hot=None,
         from src.alerts import alert_perimeter_hl_account
         for addr in closed["active"]:
             m = doc["members"][addr]
-            if addr in doc["alerted"] or m["weight"] < 0.6:
-                continue
+            if addr in doc["alerted"] or m["weight"] < 0.6 or m.get("hl_native"):
+                continue            # an exchange's HyperCore deposit account is HL by nature
             if alert_perimeter_hl_account(m, m["hl"]):
                 doc["alerted"].append(addr)
     out_dir.mkdir(parents=True, exist_ok=True)

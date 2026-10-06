@@ -125,7 +125,8 @@ def build(*, config: dict, sentinels: dict, trace_report: dict, trace_registry: 
             + str((s or {}).get("reason") or "deposit sentinel"), "deposit_sentinels")
     for row in (trace_report or {}).get("deposit_addresses") or []:
         add(row.get("address"), "deposit", f"{row.get('kind')} the cluster paid "
-            f"(hub {row.get('hub') or 'unknown'})", "trace_engine")
+            f"(hub {row.get('hub') or 'unknown'})", "trace_engine",
+            hl_native=row.get("kind") == "hl_deposit")
     for addr, info in sorted((solana or {}).items()):
         if (info or {}).get("role") == "cluster":
             add(addr, "identity", "Solana address his CCTP burns minted to",
