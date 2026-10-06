@@ -117,6 +117,16 @@ def _never_write_to_real_data(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_etherscan_key(monkeypatch):
+    """Tests are network-free whatever the shell exports. With a key set, the
+    boundary readers read Etherscan FIRST (src/boundary/logs.py, readers.py),
+    so a developer with ETHERSCAN_API_KEY in their environment would otherwise
+    send every reader test to the real API. A test that wants the keyed path
+    passes has_key=True, or sets the variable itself."""
+    monkeypatch.delenv("ETHERSCAN_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _fail_if_the_real_data_dir_was_touched():
     """Backstop: catch a module that captured DATA_DIR before we patched it.
 
