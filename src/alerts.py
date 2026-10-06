@@ -1259,6 +1259,81 @@ def alert_trace_reached(row: dict) -> bool:
     return _send_with_cooldown(f"trace_reached_{address.lower()}", 168, subject, body)
 
 
+def _when(ts) -> str:
+    try:
+        return datetime.fromtimestamp(int(ts), tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+    except (TypeError, ValueError, OSError):
+        return "unknown"
+
+
+def alert_boundary_finding(row: dict) -> bool:
+    """Money crossed Hyperliquid's edge between an outside account and his world.
+
+    Read from the protocol's own record (Bridge2's FinalizedWithdrawal, Circle's
+    message, Unit's operation, the HL ledger), so both ends are named. The
+    severity is decided in src/boundary/attribution.py: CRITICAL is a live move
+    touching his wallets or private deposit addresses; HIGH is history, an
+    unknown amount, or an address that only holds his money.
+    """
+    from src.boundary.attribution import SEVERITIES, TITLES
+
+    level = row.get("severity")
+    if level not in SEVERITIES:
+        return False
+    title = TITLES.get(row.get("kind"), "Money Crossed Hyperliquid's Edge")
+    if row.get("retro"):
+        title += " (historical)"
+    usd = row.get("amount_usd")
+    amount = f"${float(usd):,.0f}" if usd is not None else "unknown (not priced)"
+    body = (
+        f"{address_line(row.get('hl_account') or '', 'Hyperliquid account')}\n"
+        f"{address_line(row.get('counterparty') or row.get('counterparty_raw') or '', 'Address')}\n"
+        f"Route: {row.get('source')} on {row.get('chain')} ({row.get('direction')} of Hyperliquid)\n"
+        f"Amount: {amount}\nWhen: {_when(row.get('ts'))}\nReference: {row.get('ref')}\n"
+        f"His world: {row.get('role') or 'outside'} - {row.get('member_why') or 'n/a'}\n\n"
+        f"The protocol's own record names both ends. A transfer is still not\n"
+        f"ownership: check the account on Hyperliquid, then who funded it.\n")
+    return _send_with_cooldown(f"boundary_{row.get('key')}", 168,
+                               f"[EZEKIEL] {level}: {title}", body)
+
+
+def alert_provenance_hit(row: dict) -> bool:
+    """A new or reactivated Hyperliquid account's money came from his world."""
+    from src.boundary.attribution import SEVERITIES
+
+    level = row.get("severity")
+    if level not in SEVERITIES:
+        return False
+    usd = row.get("usd")
+    amount = f"${float(usd):,.0f}" if usd is not None else "unknown"
+    via = f" via {row.get('via')}" if row.get("via") else ""
+    body = (
+        f"{address_line(row.get('account') or '', 'Hyperliquid account')}\n"
+        f"{address_line(row.get('member') or '', 'Funded from')}\n"
+        f"Role of the source: {row.get('role')} - {row.get('member_why') or 'n/a'}\n"
+        f"Hops from the account: {row.get('hop')}{via}\n"
+        f"Entry route: {row.get('route')}; amount {amount} at {_when(row.get('ts'))}\n\n"
+        f"Traced backwards from the account's own funding. Hop 1 is a direct\n"
+        f"transfer; hop 2 runs through one wallet in between.\n")
+    return _send_with_cooldown(f"provenance_{row.get('key')}", 168,
+                               f"[EZEKIEL] {level}: A Hyperliquid Account Was Funded From His World",
+                               body)
+
+
+def alert_perimeter_hl_account(member: dict, reading: dict) -> bool:
+    """An address holding his money (or that funded him) is a Hyperliquid account."""
+    body = (
+        f"{address_line(member.get('address') or '', 'Address')}\n"
+        f"Why it is in his world: {member.get('role')} - {member.get('why')}\n"
+        f"Hyperliquid: account value ${float(reading.get('account_value') or 0):,.0f}, "
+        f"all-time volume ${float(reading.get('all_time_volume') or 0):,.0f}, "
+        f"first funded {reading.get('birth') or 'unknown'}\n\n"
+        f"Not one of his configured wallets. Check whether it trades like him.\n")
+    return _send_with_cooldown(f"perimeter_hl_{(member.get('address') or '').lower()}", 168,
+                               "[EZEKIEL] HIGH: An Address Holding His Money Trades On Hyperliquid",
+                               body)
+
+
 def alert_feed_stale(feed: str, problem: str, path: str) -> bool:
     """A detector has stopped producing readings — a capability of OURS, so HIGH.
 
