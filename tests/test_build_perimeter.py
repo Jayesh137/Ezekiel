@@ -132,3 +132,17 @@ def test_a_hypercore_deposit_address_is_recorded_but_never_alerted_as_active(san
             is_hot=lambda a: a == HOT)
     doc = json.loads((tmp / "perimeter" / "latest.json").read_text())
     assert doc["members"][hd]["hl"]["active"] is True and hd not in sent
+
+
+def test_a_step_killed_during_the_substrate_pass_still_leaves_a_perimeter(sandbox):
+    # The daily substrate pass is the slow part (211-378s locally, step limit
+    # 300s): a kill there must not cost the whole perimeter, run after run.
+    tmp, sent = sandbox
+
+    def killed(addresses):
+        raise KeyboardInterrupt("step timeout")
+    with pytest.raises(KeyboardInterrupt):
+        bp.main([], post=_post(), substrate=killed, now="2026-10-06T00:00:00+00:00",
+                is_hot=lambda a: a == HOT)
+    doc = json.loads((tmp / "perimeter" / "latest.json").read_text())
+    assert {a for a, m in doc["members"].items() if m["role"] in ("core", "deposit")} == {T, TR, F, S}

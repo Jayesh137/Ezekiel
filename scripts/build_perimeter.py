@@ -115,7 +115,21 @@ def main(argv=None, *, post=None, substrate=None, now=None, is_hot=None,
                                  for r in trace_report.get("deposit_addresses") or []}
     deposits.discard("")
 
+    def build(found, families, substrate_at):
+        doc = pm.build(config=config, sentinels=sentinels, trace_report=trace_report,
+                       trace_registry=registry, solana=solana, associates_found=found,
+                       families=families, services=services, previous=previous, now_iso=now_iso)
+        doc.update(associates=found, substrate_at=substrate_at, notes=notes,
+                   alerted=list(previous.get("alerted") or []))
+        return doc
+
+    out_dir.mkdir(parents=True, exist_ok=True)
     if not previous or _age_s(previous.get("substrate_at"), now_dt) >= SUBSTRATE_EVERY_S:
+        # Written first from what other detectors measured, so a step killed in
+        # the slow substrate pass still leaves a current perimeter behind.
+        utils.atomic_write_json(out_dir / "latest.json", build(
+            previous.get("associates") or {}, previous.get("exchange_families") or {},
+            previous.get("substrate_at")))
         if substrate is None:
             from src.chain.collect import records_by_wallet as substrate
         rows = substrate(sorted(core | deposits))
@@ -129,11 +143,7 @@ def main(argv=None, *, post=None, substrate=None, now=None, is_hot=None,
         families = previous.get("exchange_families") or {}
         substrate_at = previous.get("substrate_at")
 
-    doc = pm.build(config=config, sentinels=sentinels, trace_report=trace_report,
-                   trace_registry=registry, solana=solana, associates_found=found,
-                   families=families, services=services, previous=previous, now_iso=now_iso)
-    doc.update(associates=found, substrate_at=substrate_at, notes=notes,
-               alerted=list(previous.get("alerted") or []))
+    doc = build(found, families, substrate_at)
 
     post = post or default_post()
     due = sorted((m for m in doc["members"].values()
@@ -158,7 +168,6 @@ def main(argv=None, *, post=None, substrate=None, now=None, is_hot=None,
                 continue            # an exchange's HyperCore deposit account is HL by nature
             if alert_perimeter_hl_account(m, m["hl"]):
                 doc["alerted"].append(addr)
-    out_dir.mkdir(parents=True, exist_ok=True)
     utils.atomic_write_json(out_dir / "latest.json", doc)
     print(f"[perimeter] {len(doc['members'])} members {doc['counts']}; HL checked "
           f"{closed['checked']} ({len(closed['unreadable'])} unreadable), "
