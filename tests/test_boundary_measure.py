@@ -21,7 +21,12 @@ def test_measured_reads_activity_and_bytecode_caches(tmp_path):
     assert known(QUIET) and known(BUSY) and not known(UNSEEN)
 
 
-def test_services_come_from_labels_config_and_roster_infrastructure(tmp_path):
+def test_services_come_from_labels_and_config_never_a_roster_tier(tmp_path):
+    # The roster tiers his private deposit addresses INFRASTRUCTURE ("conduit:
+    # forwards 100% ... to infrastructure"), so a roster tier used as a service
+    # list dropped all four sentinels from the perimeter and made every exit to
+    # 0x8570c2ae a "contract" (dry run, 2026-10-06). Busy and contract are
+    # measured separately; ground truth is never a roster tier.
     (tmp_path / "labels").mkdir()
     (tmp_path / "labels" / "entities.json").write_text(json.dumps({"entities": [
         {"address": HOT, "category": "cex_hot"}, {"address": SVC, "category": "bridge"}]}))
@@ -31,4 +36,5 @@ def test_services_come_from_labels_config_and_roster_infrastructure(tmp_path):
     services, hot = measure.load_services({"known_service_addresses": [BUSY],
                                            "excluded_addresses": []}, tmp_path)
     assert hot == {HOT}
-    assert {HOT, SVC, INFRA, BUSY} <= services and UNSEEN not in services
+    assert {HOT, SVC, BUSY} <= services
+    assert INFRA not in services and UNSEEN not in services

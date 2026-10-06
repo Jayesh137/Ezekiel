@@ -65,6 +65,20 @@ def test_the_perimeter_is_written_with_roles_families_and_readings(sandbox):
     assert doc["closed"]["active"] == [SINK]
 
 
+def test_his_deposit_addresses_stay_members_when_the_roster_calls_them_infrastructure(sandbox):
+    # Production shape: the roster tiers every conduit INFRASTRUCTURE, and his
+    # private deposit addresses are conduits. Spec §12: the perimeter contains
+    # the sentinels.
+    tmp, sent = sandbox
+    (tmp / "roster").mkdir()
+    (tmp / "roster" / "latest.json").write_text(json.dumps({"wallets": [
+        {"wallet": S, "tier": "INFRASTRUCTURE"}]}))
+    bp.main(["--dry-run", str(tmp / "dry")], post=_post(), substrate=_substrate,
+            now="2026-10-06T00:00:00+00:00", is_hot=lambda a: a == HOT)
+    doc = json.loads((tmp / "dry" / "latest.json").read_text())
+    assert doc["members"][S]["role"] == "deposit"
+
+
 def test_an_active_member_alerts_once(sandbox):
     tmp, sent = sandbox
     for _ in range(2):

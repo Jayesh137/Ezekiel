@@ -21,16 +21,19 @@ def _read(path: Path) -> dict:
 
 
 def load_services(config: dict, data_dir: Path) -> tuple[set, set]:
-    """(services, labelled exchange hot wallets), read at call time."""
+    """(services, labelled exchange hot wallets), read at call time.
+
+    Labels and config only, as the trace engine's own list is. Never a roster
+    tier: the roster calls his private deposit addresses INFRASTRUCTURE (they
+    forward everything to an exchange), and reading that tier as "service"
+    dropped all four from the perimeter. Busy and contract are measured.
+    """
     from src.chain.labels import SERVICE_CATEGORIES, load_registry
     registry = load_registry(Path(data_dir) / "labels" / "entities.json")
     services = {a for a, e in registry.items()
                 if e.get("category") in SERVICE_CATEGORIES - {"cex_deposit", "cex_deposit_sweep"}}
     services |= {(a or "").lower() for a in (config.get("known_service_addresses") or [])
                  + (config.get("excluded_addresses") or [])}
-    services |= {(w.get("wallet") or "").lower()
-                 for w in _read(Path(data_dir) / "roster" / "latest.json").get("wallets") or []
-                 if isinstance(w, dict) and w.get("tier") == "INFRASTRUCTURE"}
     hot = {a for a, e in registry.items() if e.get("category") == "cex_hot"}
     return services - {""}, hot
 
