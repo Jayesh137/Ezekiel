@@ -136,11 +136,15 @@ def test_f1_t1_returns_insufficient_when_style_undecidable():
 
 def test_f1_measure_snapshot_with_empty_fills_returns_none_style():
     t0 = 1_790_899_200_000
-    # 120 IOC orders but no entries to compute first prices
-    fills = program_fills(t0, 120, "BTC", "0.1")
-    snap = tooling.measure_snapshot(fills, [])
-    # With empty entries, first_prices will be empty, so ioc_offset_seen will be 0
+    # 120 IOC order entries but no fills to compute first prices
+    entries = [{"order": {"coin": "BTC", "side": "A", "limitPx": "95.0", "oid": t0 + i * 1_700,
+                          "timestamp": t0 + i * 1_700, "tif": "Ioc", "cloid": None,
+                          "isTrigger": False, "orderType": "Limit", "reduceOnly": False},
+                "status": "filled"} for i in range(120)]
+    snap = tooling.measure_snapshot([], entries)
+    # With empty fills, first_prices will be empty, so ioc_offset_seen will be 0
     assert snap["style"] is None
+    assert snap["shares"]["taker"] is None
 
 
 # F2: against_traits needs 1000+ orders in his_all
@@ -162,9 +166,10 @@ def test_f2_against_traits_populated_with_sufficient_his_all():
 
 # F3: taker is in SHARE_KEYS and None-safe
 def test_f3_taker_in_shares_and_none_safe():
-    prof_no_orders = tooling.profile(habits(100, ioc=100, seen=100, hit=100), orders=0)
-    shares = {k: (round(prof_no_orders[k], 4) if prof_no_orders[k] is not None else None) for k in tooling.SHARE_KEYS}
-    assert shares["taker"] is None
+    # Candidate has orders but no fills, so taker is unknown
+    candidate = tooling.profile(habits(500, alo=500, cloid=500), 0, 0)
+    t1 = tooling.t1_style(candidate, HIS, HIS)
+    assert t1["detail"]["shares"]["taker"] is None
     assert "taker" in tooling.SHARE_KEYS
 
 
@@ -179,6 +184,24 @@ def test_f4_insufficient_t1_says_short_his():
     enough_candidate = tooling.profile(habits(100, ioc=100, seen=100, hit=100), 100, 100)
     t1 = tooling.t1_style(enough_candidate, None, HIS)
     assert t1["status"] == "insufficient" and t1["detail"]["short"] == "his"
+
+
+def test_f4_candidate_checked_before_his_orders():
+    # Undecidable candidate (990 IOC, 0 offsets) vs short his_recent (50 orders)
+    undecidable_candidate = tooling.profile(habits(1000, ioc=990, seen=0, hit=0), 1000, 1000)
+    short_his_recent = tooling.profile(habits(50, ioc=50, seen=50, hit=50), 50, 50)
+    t1 = tooling.t1_style(undecidable_candidate, short_his_recent, HIS)
+    # Should report candidate is short, not his
+    assert t1["detail"]["short"] == "candidate"
+
+
+def test_f4_his_style_checked_after_candidate():
+    # Measurable candidate vs undecidable his_recent
+    candidate = tooling.profile(habits(100, ioc=100, seen=100, hit=100), 100, 100)
+    undecidable_his = tooling.profile(habits(1000, ioc=990, seen=0, hit=0), 1000, 1000)
+    t1 = tooling.t1_style(candidate, undecidable_his, HIS)
+    # Should report his is short/undecidable
+    assert t1["detail"]["short"] == "his"
 
 
 # F5: snapshot_signature does not invent readings
@@ -203,21 +226,52 @@ def test_f5_snapshot_signature_no_invented_share_count():
 # F6: spec rule tests
 def test_f6_parity_with_execution_program():
     from src import execution_program as ep
-    t0 = 1_790_899_200_000
-    fills = (program_fills(t0, 30, "ZEC", "1.0") +
-             program_fills(t0 + 300_000, 7, "BTC", "0.1") +  # under MIN_CLIP_ORDERS (7 < 8)
-             program_fills(t0 + 600_000, 50, "ETH", "0.05") +  # 50 orders at 0.05
-             program_fills(t0 + 686_500, 30, "ETH", "0.06"))  # + 30 at 0.06 after the first batch
+    # Span three UTC days: 30 fills per coin, different sizes/counts to test MIN_CLIP rules
+    # ZEC: 30 orders at 1.0 across three days (≥ MIN_CLIP_ORDERS, 100% share) — PASSES
+    # BTC: 7 orders at 0.1 (< MIN_CLIP_ORDERS) — EXCLUDED
+    # ETH: 21 orders at 0.05 + 9 at 0.06 (30 total, 70% < MIN_CLIP_SHARE) — EXCLUDED
+    day1 = 1_790_899_200_000
+    day2 = day1 + 86_400_000  # +1 day
+    start_id = 1000000
+    fills = []
+    # ZEC: 30 orders spread across 3 days
+    for day_offset, count in [(0, 12), (1, 12), (2, 6)]:
+        day = day1 + day_offset * 86_400_000
+        for i in range(count):
+            start_id += 1
+            fills.append({"coin": "ZEC", "side": "A", "sz": "1.0", "px": "100.0",
+                         "time": day + i * 1_700, "crossed": True, "oid": start_id, "tid": start_id})
+    # BTC: 7 orders (below MIN_CLIP_ORDERS=8)
+    for i in range(7):
+        start_id += 1
+        fills.append({"coin": "BTC", "side": "A", "sz": "0.1", "px": "100.0",
+                     "time": day1 + 50_000 + i * 1_700, "crossed": True, "oid": start_id, "tid": start_id})
+    # ETH: 21+9 orders at two sizes
+    for i in range(21):
+        start_id += 1
+        fills.append({"coin": "ETH", "side": "A", "sz": "0.05", "px": "100.0",
+                     "time": day1 + 100_000 + i * 1_700, "crossed": True, "oid": start_id, "tid": start_id})
+    for i in range(9):
+        start_id += 1
+        fills.append({"coin": "ETH", "side": "A", "sz": "0.06", "px": "100.0",
+                     "time": day2 + 100_000 + i * 1_700, "crossed": True, "oid": start_id, "tid": start_id})
+    # Create entries for ep.signature
+    entries = [{"order": {"coin": f["coin"], "side": f["side"], "limitPx": f["px"], "oid": f["oid"],
+                          "timestamp": f["time"], "tif": "Ioc", "cloid": None,
+                          "isTrigger": False, "orderType": "Limit", "reduceOnly": False},
+                "status": "filled"} for f in fills]
     days = {}
     times = [f["time"] for f in fills]
     records.fold_fills(days, fills, wallet=W, role="studied", start_ms=min(times),
                        end_ms=max(times) + 1, last_fill_ms=None)
     summary = tooling.summarise(list(days.values()))
     summary_sig = tooling.clip_signature(summary)
-    direct_sig = ep.signature(fills, [])
-    # Both should have ZEC; both should lack BTC (7 < MIN_CLIP_ORDERS) and ETH (share < MIN_CLIP_SHARE)
+    direct_sig = ep.signature(fills, entries)
+    # Both should have only ZEC at 1.0; BTC and ETH excluded
+    assert {coin: v["size"] for coin, v in summary_sig["clip_table"].items()} == \
+           {coin: v["size"] for coin, v in direct_sig["clip_table"].items()}
     assert set(summary_sig["clip_table"].keys()) == set(direct_sig["clip_table"].keys())
-    assert "ZEC" in summary_sig["clip_table"]
+    assert "ZEC" in summary_sig["clip_table"] and summary_sig["clip_table"]["ZEC"]["size"] == 1.0
     assert "BTC" not in summary_sig["clip_table"]
     assert "ETH" not in summary_sig["clip_table"]
 
@@ -255,3 +309,28 @@ def test_f6_summarise_empty():
     assert summary["taker_orders"] == 0 and summary["program_runs"] == 0
     assert summary["habits"] is None
     assert sum(summary["cadence"]) == 0 and len(summary["cadence"]) == records.CADENCE_BINS
+
+
+# G5: small pins
+def test_g5_t1_compares_flags_too():
+    # Candidate: PROGRAM_IOC5 but with client_ids
+    candidate = tooling.profile(habits(1000, ioc=990, seen=1000, hit=1000, cloid=100), 1000, 1000)
+    # His: PROGRAM_IOC5 without client_ids
+    his = tooling.profile(habits(1000, ioc=990, seen=1000, hit=1000, cloid=0), 1000, 1000)
+    t1 = tooling.t1_style(candidate, his, his)
+    # Styles match but flags differ
+    assert t1["detail"]["candidate"]["style"] == "PROGRAM_IOC5"
+    assert t1["detail"]["his"]["style"] == "PROGRAM_IOC5"
+    assert t1["statistic"] is False  # Not a full match
+
+
+def test_g5_program_runs_zero_preserved():
+    snap = {"clip_table": {"BTC": 0.1}, "clip_notionals": {"BTC": 1000.0}, "program_runs": 0, "ioc5": 0.95}
+    sig = tooling.snapshot_signature(snap)
+    assert sig["program_runs"] == 0
+
+
+def test_g5_program_runs_absent_returns_none():
+    snap = {"clip_table": {"BTC": 0.1}, "clip_notionals": {"BTC": 1000.0}, "ioc5": 0.95}
+    sig = tooling.snapshot_signature(snap)
+    assert sig["program_runs"] is None

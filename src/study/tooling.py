@@ -102,13 +102,18 @@ def t1_style(candidate: dict | None, his_recent: dict | None, his_all: dict | No
     """Same style and flags as his recent ones? And which traits he never shows
     (under 0.1% of his recorded orders) dominate the candidate?"""
     n = (candidate or {}).get("orders_seen", 0)
+    # Check all candidate conditions first
     if not candidate or n < MIN_ORDERS:
         return _test("T1", "insufficient", n=n, detail={"short": "candidate"})
+    mine = style(candidate)
+    if mine is None:
+        return _test("T1", "insufficient", n=n, detail={"short": "candidate"})
+    # Then check his_recent conditions
     if not his_recent or his_recent["orders_seen"] < MIN_ORDERS:
         return _test("T1", "insufficient", n=n, detail={"short": "his"})
-    mine, his = style(candidate), style(his_recent)
-    if mine is None or his is None:
-        return _test("T1", "insufficient", n=n, detail={"short": "candidate" if mine is None else "his"})
+    his = style(his_recent)
+    if his is None:
+        return _test("T1", "insufficient", n=n, detail={"short": "his"})
     # Require 1000 orders in his_all to say "he never does this"
     against = []
     if his_all and his_all.get("orders_seen", 0) >= round(1 / NEVER_SHARE):
@@ -180,7 +185,7 @@ def measure_snapshot(fills: list, entries: list) -> dict:
     sig = ep.signature(fills, entries)
     hist = records.cadence_histogram(orders)
     measurable = prof is not None and prof["orders_seen"] >= MIN_ORDERS
-    prof_style = style(prof) if measurable else None if prof else None
+    prof_style = style(prof) if measurable else None
     return {"orders_seen": counts["orders_seen"],
             "shares": {k: (round(prof[k], 4) if prof[k] is not None else None) for k in SHARE_KEYS} if prof else None,
             "ioc5": prof.get("ioc5") if prof else None,
