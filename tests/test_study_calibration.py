@@ -186,7 +186,6 @@ def test_upper_bound_at_additional_points():
     assert cal.upper_bound(10, 1000) == pytest.approx(0.0169, abs=2e-4)
 
 
-# B1: only NaN is dropped; ±inf stays as non-match
 def test_inf_strangers_stay_non_matches_and_count():
     got = cal.judge_continuous(0.1, strangers=[1.0] * 150 + [float("inf")] * 100,
                                same_op={"self": SELF_T2}, higher_is_better=False)
@@ -196,7 +195,6 @@ def test_inf_strangers_stay_non_matches_and_count():
     assert got["status"] == "for" and got["stranger_n"] == 250
 
 
-# B2: LR = 1.0 boundary does not count
 def test_against_lr_exactly_one_does_not_count():
     rate = cal.upper_bound(0, 41)
     got = cal.judge_against(["t"], family_mismatch={"t": (0, 41)},
@@ -204,7 +202,6 @@ def test_against_lr_exactly_one_does_not_count():
     assert got["status"] == "neutral"
 
 
-# B3: Surviving A3 mutants
 def test_higher_is_better_candidate_looser_than_median_sets_the_level():
     got = cal.judge_continuous(0.5, strangers=[0.7] * 5 + [0.1] * 295,
                                same_op={"family": [0.9] * 40}, higher_is_better=True)
@@ -241,7 +238,6 @@ def test_binary_exact_half():
     assert got["status"] == "for"
 
 
-# B4: judge_against edges
 def test_against_inf_rate_is_unmeasured():
     got = cal.judge_against(["t"], family_mismatch={"t": (0, 41)},
                             stranger_trait_rate={"t": float("inf")})
@@ -274,3 +270,33 @@ def test_against_forty_pair_rule():
     got = cal.judge_against(["t"], family_mismatch={"t": (0, 39)},
                             stranger_trait_rate={"t": 0.54})
     assert got["status"] == "uncalibrated"
+
+
+# C1: ±inf in same-operator lists is kept and counts
+def test_inf_in_same_operator_values_is_kept_and_counts_higher_is_better():
+    got = cal.judge_continuous(0.95, strangers=[0.2] * 300, same_op={"family": [0.9] * 39 + [float("-inf")]},
+                               higher_is_better=True)
+    assert got["status"] == "for" and got["same_op_rate"] == pytest.approx(39 / 40)
+
+
+def test_inf_in_same_operator_values_is_kept_and_counts_lower_is_better():
+    got = cal.judge_continuous(0.1, strangers=[1.0] * 300, same_op={"self": SELF_T2[:5] + [float("inf")]},
+                               higher_is_better=False)
+    assert got["status"] == "for" and got["same_op_rate"] == 0.5
+
+
+def test_non_finite_x_is_insufficient():
+    for x in (float("inf"), float("-inf"), float("nan")):
+        assert cal.judge_continuous(x, strangers=[1.0] * 300, same_op={"self": SELF_T2},
+                                    higher_is_better=False)["status"] == "insufficient"
+
+
+# C2: uncalibrated reports the cleaned same-operator count for every basis
+def test_uncalibrated_reports_the_cleaned_same_operator_count_that_decided_it():
+    nan = float("nan")
+    got = cal.judge_continuous(0.1, strangers=[1.0] * 300,
+                               same_op={"self": [nan, nan, nan, 0.22, 0.25, 0.04]}, higher_is_better=False)
+    assert got["status"] == "uncalibrated" and got["same_op"] == {"self": 3}
+    got = cal.judge_continuous(0.1, strangers=[1.0] * 300, same_op={"self": SELF_T2[:5]},
+                               higher_is_better=False)
+    assert got["status"] == "uncalibrated" and got["same_op"] == {"self": 5}

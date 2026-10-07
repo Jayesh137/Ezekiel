@@ -75,7 +75,8 @@ def judge_continuous(x, *, strangers: list[float], same_op: dict[str, list[float
     usable = _usable(same_op)
     if len(clean_strangers) < min_strangers or not usable:
         return {"status": "uncalibrated", "strangers": len(clean_strangers),
-                "same_op": {k: len(v) for k, v in usable.items()}}
+                "same_op": {k: sum(1 for v in values if not math.isnan(v))
+                            for k, values in (same_op or {}).items()}}
     medians = [median(values) for values in usable.values()]
     level = min([x, *medians]) if higher_is_better else max([x, *medians])
 
