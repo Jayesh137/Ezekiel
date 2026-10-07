@@ -41,12 +41,38 @@ def test_a_calibrated_tooling_for_casts_the_execution_vote(tmp_path, monkeypatch
     assert T not in rows
 
 
+def test_a_mixed_tooling_verdict_keeps_the_vote(tmp_path, monkeypatch):
+    # `mixed` is a calibrated FOR beside a T1 AGAINST. The operator ruled that evidence
+    # against never changes a vector, so the vote stays and the wallet does not fall.
+    previous = [{"wallet": A, "tier": "POSSIBLE", "peak_tier": "POSSIBLE"}]
+    rows = build(tmp_path, monkeypatch, [study_row(A, "mixed")], previous=previous)
+    assert "execution_program" in rows[A]["vectors"]
+    assert rows[A]["tier"] == "POSSIBLE" and rows[A]["tier_dropped_from"] is None
+    assert rows[A]["evidence"]["study"]["families"]["tooling"]["verdict"] == "mixed"
+
+
 def test_against_is_annotation_only(tmp_path, monkeypatch):
+    # B already carries an independent vector (a shared agent) and a POSSIBLE history.
+    # An AGAINST in the study changes none of it: not the vector, not the tier, not the peak.
+    (tmp_path / "agent_links").mkdir()
+    (tmp_path / "agent_links" / "latest.json").write_text(json.dumps(
+        {"linked_to_target": {B: ["0xagent"]}}))
     previous = [{"wallet": B, "tier": "POSSIBLE", "peak_tier": "POSSIBLE"}]
+    before = build(tmp_path, monkeypatch, [], previous=previous)[B]
     rows = build(tmp_path, monkeypatch, [study_row(B, "against")], previous=previous)
-    assert rows[B]["vectors"] == []
+    assert before["vectors"] == ["shared_agent"] and before["tier"] == "POSSIBLE"
+    assert rows[B]["vectors"] == ["shared_agent"]     # survives, and no execution vote beside it
+    assert rows[B]["tier"] == before["tier"]
+    assert rows[B]["peak_tier"] == "POSSIBLE" and rows[B]["tier_dropped_from"] is None
     assert rows[B]["evidence"]["study"]["families"]["tooling"]["verdict"] == "against"
-    assert rows[B]["peak_tier"] == "POSSIBLE"
+
+
+@pytest.mark.parametrize("verdict", ["against", "neutral", "uncalibrated", "insufficient",
+                                     "unreadable"])
+def test_every_other_verdict_casts_no_vote(tmp_path, monkeypatch, verdict):
+    rows = build(tmp_path, monkeypatch, [study_row(A, verdict)])
+    assert rows[A]["vectors"] == []
+    assert rows[A]["evidence"]["study"]["families"]["tooling"]["verdict"] == verdict
 
 
 def test_an_unreadable_archive_is_annotation_only(tmp_path, monkeypatch):

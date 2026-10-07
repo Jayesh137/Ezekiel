@@ -871,9 +871,12 @@ def build_roster(config: dict | None = None) -> dict:
             e["reasons"].append(reason)
 
     # The candidate study (scripts/run_study.py, spec 2026-10-06 §9): every studied
-    # wallet carries its verdicts as `evidence.study`. Only a calibrated tooling FOR
-    # casts a vote, the existing execution_program one; AGAINST is annotation only
-    # and never changes a tier or a vector (the operator's decision, 2026-10-06).
+    # wallet carries its verdicts as `evidence.study`. A calibrated tooling FOR casts
+    # the vote, the existing execution_program one, and so does `mixed` (a calibrated
+    # FOR beside a T1 AGAINST). Evidence against is annotation only and never changes a
+    # tier or a vector (the operator's decision, 2026-10-06), so it cannot take back a
+    # vote a calibrated test gave. Every other verdict (against, neutral, uncalibrated,
+    # insufficient, unreadable) casts nothing.
     # This function is shared by every vector, so a malformed file never raises here:
     # a row is skipped, or annotated with what reads, and casts no vote.
     try:
@@ -897,7 +900,7 @@ def build_roster(config: dict | None = None) -> dict:
             "families": {name: {k: fam.get(k) for k in ("verdict", "lr", "by", "key", "basis")}
                          for name, fam in families.items() if isinstance(fam, dict)}}
         tooling = families.get("tooling")
-        if isinstance(tooling, dict) and tooling.get("verdict") == "for":
+        if isinstance(tooling, dict) and tooling.get("verdict") in ("for", "mixed"):
             e["vectors"].add(VECTOR_EXECUTION)
             reason = "Makes orders the way he does (candidate study, calibrated)"
             if reason not in e["reasons"]:
