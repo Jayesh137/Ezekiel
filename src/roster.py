@@ -874,23 +874,30 @@ def build_roster(config: dict | None = None) -> dict:
     # wallet carries its verdicts as `evidence.study`. Only a calibrated tooling FOR
     # casts a vote, the existing execution_program one; AGAINST is annotation only
     # and never changes a tier or a vector (the operator's decision, 2026-10-06).
+    # This function is shared by every vector, so a malformed file never raises here:
+    # a row is skipped, or annotated with what reads, and casts no vote.
     try:
         with open(DATA_DIR / "study" / "latest.json") as f:
             study = json.load(f)
     except (OSError, ValueError):
         study = {}
-    for row in (study.get("wallets") if isinstance(study, dict) else None) or []:
-        a = (row.get("wallet") or "").lower() if isinstance(row, dict) else ""
+    studied = study.get("wallets") if isinstance(study, dict) else None
+    for row in studied if isinstance(studied, list) else []:
+        wallet = row.get("wallet") if isinstance(row, dict) else None
+        a = wallet.lower() if isinstance(wallet, str) else ""
         if not a or a == target:
             continue
         e = entry(a)
-        families = row.get("families") or {}
+        families = row.get("families")
+        if not isinstance(families, dict):
+            families = {}
         e["evidence"]["study"] = {
             "as_of": study.get("computed_at"), "rank": row.get("rank"),
             "coverage_days": row.get("coverage_days"),
             "families": {name: {k: fam.get(k) for k in ("verdict", "lr", "by", "key", "basis")}
                          for name, fam in families.items() if isinstance(fam, dict)}}
-        if (families.get("tooling") or {}).get("verdict") == "for":
+        tooling = families.get("tooling")
+        if isinstance(tooling, dict) and tooling.get("verdict") == "for":
             e["vectors"].add(VECTOR_EXECUTION)
             reason = "Makes orders the way he does (candidate study, calibrated)"
             if reason not in e["reasons"]:
