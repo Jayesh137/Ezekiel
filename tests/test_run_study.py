@@ -178,6 +178,8 @@ class LedgerFake(Fake):
         if body["type"] != "userNonFundingLedgerUpdates":
             return super().__call__(body)
         self.calls.append((body["type"], body.get("user")))
+        if (body["type"], body["user"]) in self.errors:
+            return {"ok": False, "error": self.errors[(body["type"], body["user"])]}
         rows = [r for r in self.ledgers.get(body["user"], [])
                 if body["startTime"] <= r["time"] <= body["endTime"]]
         return {"ok": True, "data": rows[:2_000]}
@@ -372,14 +374,19 @@ def test_the_command_line_caps_the_set_and_the_reads(tmp_path, monkeypatch, caps
 
     def fake_run(**kwargs):
         seen.update(kwargs)
-        return {"studied": 1, "read": 1, "unreadable": [], "stopped": False, "panels": {}}
+        return {"studied": 3, "read": 2, "stopped": False, "panels": {},
+                "unreadable": [{"wallet": A, "error": "x"}],
+                "partial": [{"wallet": B, "source": "orders", "error": "e"},
+                            {"wallet": B, "source": "ledger", "error": "e"}]}
 
     monkeypatch.setattr(run_study, "run", fake_run)
     assert run_study.main(["--data-dir", str(tmp_path), "--max-wallets", "5",
                            "--read-seconds", "60"]) == 0
     assert seen["data_dir"] == tmp_path and seen["read_seconds"] == 60
     assert seen["config"]["study"]["max_wallets"] == 5
-    assert "[study] 1 studied, 1 read, 0 unreadable" in capsys.readouterr().out
+    # wallets, not entries: B is partial once although both its sources failed
+    assert "[study] 3 studied, 2 read, 1 unreadable, 1 partial, stopped=False" in (
+        capsys.readouterr().out)
 
 
 def test_a_failed_orders_or_ledger_read_is_retried_and_what_was_folded_stays(tmp_path):
@@ -392,15 +399,79 @@ def test_a_failed_orders_or_ledger_read_is_retried_and_what_was_folded_stays(tmp
     state = archive.load_state(data)["wallets"]
     assert not doc["stopped"] and doc["read"] == 2  # a failure is not a stop
     assert "fills_cursor_ms" in state[A] and "orders_cursor_ms" not in state[A]
+    assert state[A]["ledger_cursor_ms"] == NOW  # A's orders failed, its ledger was still read
     assert "orders_cursor_ms" in state[B] and "ledger_cursor_ms" not in state[B]
     assert "orders_read_ms" not in state[A] and "orders_read_ms" not in state[B]
-    assert reads(broken, "userNonFundingLedgerUpdates") == [B]  # A's was never asked
+    assert reads(broken, "userNonFundingLedgerUpdates") == [A, B]
+    assert {(p["wallet"], p["source"]) for p in doc["partial"]} == {(A, "orders"), (B, "ledger")}
     healthy = Fake(**served)
     run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000, fetch=healthy)
     assert reads(healthy, "historicalOrders") == [A, B]  # both retried at once
     for wallet in (A, B):
         days = archive.load_days(wallet, "2026-09-01", "2026-10-31", data)
         assert sum((d["habits"] or {}).get("orders_seen", 0) for d in days.values()) == 50
+
+
+DEPOSIT = {"time": NOW - records.DAY_MS, "hash": "0x" + "1" * 64,
+           "delta": {"type": "deposit", "usdc": "250000.0"}}
+
+
+def test_a_failed_orders_read_is_partial_and_does_not_block_the_ledger(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    served = {"fills": {A: fills}, "orders": {A: entries(fills)}, "ledgers": {A: [DEPOSIT]}}
+    broken = LedgerFake(**served, errors={("historicalOrders", A): "HTTP 500"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=broken)
+    assert doc["partial"] == [{"wallet": A, "source": "orders", "error": "HTTP 500"}]
+    assert doc["read"] == 1 and doc["unreadable"] == [] and not doc["stopped"]
+    state = archive.load_state(data)["wallets"][A]
+    assert state["ledger_cursor_ms"] == NOW and state["last_read_ms"] == NOW
+    assert "orders_cursor_ms" not in state and "orders_read_ms" not in state
+    day = archive.load_days(A, "2026-10-02", "2026-10-02", data)["2026-10-02"]
+    assert [(r["type"], r["usd"]) for r in day["ledger"]] == [("deposit", 250_000.0)]
+    healthy = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000,
+                            fetch=LedgerFake(**served))  # the failed source is retried
+    assert healthy["partial"] == []
+    assert archive.load_state(data)["wallets"][A]["orders_read_ms"] == NOW + 60_000
+    days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
+    assert sum((d["habits"] or {}).get("orders_seen", 0) for d in days.values()) == 50
+
+
+def test_a_failed_ledger_read_is_partial_and_the_orders_stay_folded(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    broken = LedgerFake(fills={A: fills}, orders={A: entries(fills)}, ledgers={A: [DEPOSIT]},
+                        errors={("userNonFundingLedgerUpdates", A): "HTTP 500"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=broken)
+    assert doc["partial"] == [{"wallet": A, "source": "ledger", "error": "HTTP 500"}]
+    assert doc["read"] == 1 and doc["unreadable"] == [] and not doc["stopped"]
+    state = archive.load_state(data)["wallets"][A]
+    assert state["orders_cursor_ms"] == NOW and state["last_read_ms"] == NOW
+    assert "ledger_cursor_ms" not in state and "orders_read_ms" not in state
+    days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
+    assert sum((d["habits"] or {}).get("orders_seen", 0) for d in days.values()) == 50
+
+
+def test_both_reads_failing_are_both_listed_in_the_order_they_were_tried(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    broken = LedgerFake(errors={("historicalOrders", A): "HTTP 500",
+                                ("userNonFundingLedgerUpdates", A): "Timeout"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=broken)
+    assert doc["partial"] == [{"wallet": A, "source": "orders", "error": "HTTP 500"},
+                              {"wallet": A, "source": "ledger", "error": "Timeout"}]
+    assert doc["read"] == 1 and "orders_read_ms" not in archive.load_state(data)["wallets"][A]
+
+
+def test_a_stop_on_the_ledger_read_still_ends_the_wallet_and_is_not_partial(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    stopped = LedgerFake(fills={A: fills}, orders={A: entries(fills)}, ledgers={A: [DEPOSIT]},
+                         errors={("userNonFundingLedgerUpdates", A): "rate_limited"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=stopped)
+    assert doc["stopped"] and doc["read"] == 0 and doc["partial"] == [] and doc["unreadable"] == []
+    state = archive.load_state(data)["wallets"][A]
+    assert "fills_cursor_ms" in state and state["orders_cursor_ms"] == NOW  # what was folded stays
+    assert "ledger_cursor_ms" not in state and "orders_read_ms" not in state
 
 
 def test_a_foreign_file_of_the_wrong_shape_is_read_as_absent(tmp_path):

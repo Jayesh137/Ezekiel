@@ -410,6 +410,7 @@ def test_the_latest_document_orders_by_rank_and_states_the_bars():
     assert [r["wallet"] for r in doc["wallets"]] == ["0x2", "0x1"]
     assert doc["panels"]["bars"] == {"strangers": 200, "family_pairs": 40, "self_windows": 6}
     assert doc["studied"] == 2 and doc["read"] == 1
+    assert doc["partial"] == []  # no failed daily read reported: an empty list, never absent
 
 
 def test_equal_ranks_order_by_size_then_address_and_the_document_reports_the_read():
@@ -418,14 +419,16 @@ def test_equal_ranks_order_by_size_then_address_and_the_document_reports_the_rea
             {"wallet": "0xc", "rank": 1.0, "account_value": None},
             {"wallet": "0xd", "rank": 1.0, "account_value": 9.0}]
     ref = {"style": HIS_STYLE, "last_day": "2026-09-28", "cadence": [1, 2, 3]}
+    partial = [{"wallet": "0xa", "source": "orders", "error": "HTTP 500"}]
     doc = assemble.latest_doc("2026-10-06T00:00:00+00:00", T, ref, {"strangers": 3}, rows,
-                              {"read": [], "unreadable": ["0x9"], "stopped": True,
-                               "budget": {"used": 1}})
+                              {"read": [], "unreadable": ["0x9"], "partial": partial,
+                               "stopped": True, "budget": {"used": 1}})
     assert [r["wallet"] for r in doc["wallets"]] == ["0xd", "0xa", "0xb", "0xc"]
     assert doc["wallets"][3]["account_value"] is None  # unknown is not zero
     assert doc["reference"] == {"style": HIS_STYLE, "last_day": "2026-09-28", "cadence_gaps": 6,
                                 "cadence": [1, 2, 3], "shares": None}
     assert doc["unreadable"] == ["0x9"] and doc["stopped"] is True and doc["budget"] == {"used": 1}
+    assert doc["partial"] == partial
     assert doc["schema"] == "study/1" and doc["target"] == T and doc["panels"]["strangers"] == 3
 
 

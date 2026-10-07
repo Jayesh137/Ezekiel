@@ -73,33 +73,46 @@ def account_value(row: dict):
     return None
 
 
-def _orders_and_ledger(wallet: str, mstate: dict, days: dict, fills: list, now_ms: int,
+def _orders_and_ledger(wallet: str, ms: dict, days: dict, fills: list, now_ms: int,
                        fetch) -> dict:
-    """The daily reads. A stop or a failure leaves `orders_read_ms` alone so they are
-    retried next run; whatever was folded before it stays folded."""
+    """The daily reads, on the working copy `ms` of the wallet's state.
+
+    A STOP (budget, rate limit) on either read ends the wallet. A FAILURE of one is
+    returned in `errors` and the other is still read (spec 6.1: a failed read records the
+    wallet as unreadable for that source). What a source folded stays folded with its
+    cursor, and `orders_read_ms` is set only when both succeeded, so a failed source is
+    retried next run."""
     default_start = now_ms - FIRST_READ_DAYS * records.DAY_MS
-    ocursor = int(mstate.get("orders_cursor_ms") or default_start)
-    lcursor = int(mstate.get("ledger_cursor_ms") or default_start)
+    ocursor = int(ms.get("orders_cursor_ms") or default_start)
+    lcursor = int(ms.get("ledger_cursor_ms") or default_start)
+    errors = []
     orders = collect.read_orders(wallet, fetch)
-    if not orders["ok"]:
-        return {"stopped": orders["stopped"], "orders_error": orders["error"]}
-    # Counted as soon as read: a busy bot's newest 2,000 orders can all be minutes
-    # old, so waiting for them to age would never record its habits (found by the
-    # 2026-10-06 dry run). An order still open is counted as open.
-    start = max(ocursor, orders["oldest_ms"] or ocursor) if orders["full"] else ocursor
-    if now_ms > start:
-        records.fold_orders(days, orders["orders"], records.first_prices(fills), wallet=wallet,
-                            role="studied", start_ms=start, end_ms=now_ms)
-        mstate["orders_cursor_ms"] = now_ms
+    if orders["ok"]:
+        # Counted as soon as read: a busy bot's newest 2,000 orders can all be minutes
+        # old, so waiting for them to age would never record its habits (found by the
+        # 2026-10-06 dry run). An order still open is counted as open.
+        start = max(ocursor, orders["oldest_ms"] or ocursor) if orders["full"] else ocursor
+        if now_ms > start:
+            records.fold_orders(days, orders["orders"], records.first_prices(fills),
+                                wallet=wallet, role="studied", start_ms=start, end_ms=now_ms)
+            ms["orders_cursor_ms"] = now_ms
+    elif orders["stopped"]:
+        return {"stopped": True, "errors": errors}
+    else:
+        errors.append({"source": "orders", "error": orders["error"]})
     ledger = collect.read_ledger(wallet, lcursor, now_ms, fetch)
-    if not ledger["ok"]:
-        return {"stopped": ledger["stopped"], "ledger_error": ledger["error"]}
-    if ledger["known_until_ms"] > lcursor:
-        records.fold_ledger(days, ledger["rows"], wallet=wallet, role="studied",
-                            start_ms=lcursor, end_ms=ledger["known_until_ms"])
-        mstate["ledger_cursor_ms"] = ledger["known_until_ms"]
-    mstate["orders_read_ms"] = now_ms
-    return {"stopped": False}
+    if ledger["ok"]:
+        if ledger["known_until_ms"] > lcursor:
+            records.fold_ledger(days, ledger["rows"], wallet=wallet, role="studied",
+                                start_ms=lcursor, end_ms=ledger["known_until_ms"])
+            ms["ledger_cursor_ms"] = ledger["known_until_ms"]
+    elif ledger["stopped"]:
+        return {"stopped": True, "errors": errors}
+    else:
+        errors.append({"source": "ledger", "error": ledger["error"]})
+    if not errors:
+        ms["orders_read_ms"] = now_ms
+    return {"stopped": False, "errors": errors}
 
 
 def study_wallet(wallet: str, mstate: dict, now_ms: int, data_dir: Path, fetch=None) -> dict:
@@ -237,7 +250,7 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
                            census_state.get("habits"), exclude=exclude)
     panel_path = archive.root(data_dir) / "panel" / "families.json"
     panel = read_json(panel_path, {})
-    collection = {"read": [], "unreadable": [], "stopped": False}
+    collection = {"read": [], "unreadable": [], "partial": [], "stopped": False}
     with ReadBudget(seconds=read_seconds, weight_per_minute=WEIGHT_PER_MINUTE) as budget:
         order = sorted(members, key=lambda m: (
             wallets_state.get(m["wallet"], {}).get("last_read_ms") or 0, m["wallet"]))
@@ -247,6 +260,10 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
                 break
             mstate = wallets_state.setdefault(member["wallet"], {})
             result = study_wallet(member["wallet"], mstate, now_ms, data_dir, fetch)
+            # Its fills were read, so the wallet counts as read; a daily read that failed is
+            # reported beside it, and retried next run.
+            collection["partial"] += [{"wallet": member["wallet"], **e}
+                                      for e in result.get("errors") or []]
             if result["status"] == "unreadable":
                 collection["unreadable"].append({"wallet": member["wallet"],
                                                  "error": result.get("error")})
@@ -310,8 +327,9 @@ def main(argv=None) -> int:
         config = {**config, "study": {**(config.get("study") or {}),
                                       "max_wallets": args.max_wallets}}
     doc = run(data_dir=args.data_dir, config=config, read_seconds=args.read_seconds)
+    partial = len({p["wallet"] for p in doc["partial"]})
     print(f"[study] {doc['studied']} studied, {doc['read']} read, "
-          f"{len(doc['unreadable'])} unreadable, stopped={doc['stopped']}; "
+          f"{len(doc['unreadable'])} unreadable, {partial} partial, stopped={doc['stopped']}; "
           f"panels {doc['panels']}")
     return 0
 

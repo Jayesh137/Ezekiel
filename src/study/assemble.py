@@ -182,6 +182,7 @@ def latest_doc(computed_at: str, target: str, ref: dict, ctx_status: dict, rows:
                                 "self_windows": calibration.MIN_SAME_OP["self"]}},
             "studied": len(rows), "read": len(collection.get("read") or []),
             "unreadable": collection.get("unreadable") or [],
+            "partial": collection.get("partial") or [],
             "stopped": bool(collection.get("stopped")), "budget": collection.get("budget"),
             "wallets": sorted(rows, key=lambda r: (-r["rank"], -(r.get("account_value") or 0),
                                                    r["wallet"]))}
