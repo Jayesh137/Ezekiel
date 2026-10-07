@@ -47,6 +47,15 @@ def _dumps(doc) -> str:
     return json.dumps(doc, sort_keys=True, separators=(",", ":"))
 
 
+def _same(doc, existing) -> bool:
+    """Compare doc and existing by normalised serialised content.
+    Handles tuples (stored as lists) and int keys (stored as strings)."""
+    if existing is None:
+        return False
+    # Normalise both: serialise then re-parse to lose python-specific types
+    return _dumps(json.loads(_dumps(doc))) == _dumps(existing)
+
+
 def _read_strict(path: Path):
     """Read a file of the study's own archive: (False, None) when absent;
     (True, doc) when it parses; Unreadable when present but unreadable."""
@@ -128,18 +137,22 @@ def load_days(wallet: str, first_day: str, last_day: str, data_dir=None) -> dict
 
 
 def save_days(days: dict[str, dict], data_dir=None) -> int:
-    """Write each changed day; an unchanged one is not rewritten."""
-    written = 0
+    """Write each changed day; an unchanged one is not rewritten.
+    Validates all records before writing any (all-or-nothing)."""
+    # Pass 1: validate and read all files (raises before anything is written)
+    items: list[tuple[str, dict, Path, bool, dict]] = []
     for day, record in sorted(days.items()):
         if record.get("day") != day:
             raise ValueError(f"record day {record.get('day')!r} != key {day!r}")
         path = wallet_dir(record["wallet"], data_dir) / f"{day}{DAILY}"
         exists, existing = _read_strict(path)
-        if exists:
-            # Compare serialized content
-            if _dumps(existing) == _dumps(record):
-                continue
-        # File is absent or content differs
+        items.append((day, record, path, exists, existing))
+
+    # Pass 2: write changed days
+    written = 0
+    for _day, record, path, exists, existing in items:
+        if exists and _same(record, existing):
+            continue
         write_compact(path, record)
         written += 1
     return written
@@ -220,7 +233,7 @@ def write_if_changed(path: Path, doc) -> bool:
     comparison, so tuples and int keys in stored JSON read as lists and strings
     (spec §10: rewritten only when content hash changes)."""
     existing = read_json(path, None)
-    if existing is not None and _dumps(existing) == _dumps(doc):
+    if _same(doc, existing):
         return False
     write_compact(path, doc)
     return True
