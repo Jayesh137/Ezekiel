@@ -1960,3 +1960,17 @@ test through the roster's real shape. No discriminating match existed in that
 window (the census measured 1 account of the 20 it needs), so no alert was
 lost. **A reader of another writer's file is tested through that writer's real
 shape, never a hand-built stand-in.**
+
+The same fix made the next hole reachable, and the final review of the branch
+found it (2026-10-07): `roster.detector_candidates` puts `known_self_wallets` in
+the candidate set and a config wallet carries transfer and linkage vectors by
+construction, so once the census becomes discriminating the treasury or
+`0xf078969e...` reproducing his clip table would have paged CRITICAL "two vectors
+agree", a false identification of a wallet already known. `build_report` now
+marks a config wallet's match `known_self` and `decide_alerts` caps it at HIGH;
+the alert says it is a KNOWN wallet of his now running his program, not a new
+identification, and keeps the `execprog_<wallet>` cooldown key. The independence
+filter is pinned too (a `bool(vectors)` mutant survived every test): a match
+whose roster vectors are only `execution_program` and/or `behavioural` is HIGH,
+never CRITICAL, so the study's own vote cannot corroborate itself. **When a fix
+revives a dead path, audit what the path now permits, not only that it fires.**
