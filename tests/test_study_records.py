@@ -4,6 +4,7 @@ import copy
 import random
 
 from src.study import records as rec
+from src.study import tooling
 
 W = "0x" + "a" * 40
 DAY0 = 1_790_899_200_000  # 2026-10-02 00:00:00 UTC
@@ -477,3 +478,29 @@ def test_the_other_bucket_is_not_a_size_when_bounding():
     clips = clips_of(days)
     assert set(clips) == kept
     assert (clips["0.1"], clips[rec.OTHER_SIZE]) == (55, 281)
+
+
+def test_the_bound_costs_a_borderline_clip_per_fold_and_never_adds_one():
+    """The loss is per FOLD, not per day. His size sits outside the top 20 in the day's first
+    fold (45 orders against thirty sizes of 48), so its 45 go under OTHER_SIZE and it restarts
+    from zero in the second. Over the whole day it holds 8,022 of 10,000 taker orders (0.8022:
+    a clip); the two-fold record names 7,977 (0.7977: none). The total stays exact, and the
+    same day folded in one piece, bounded once at the end, still has the clip."""
+    first = sized_fills({"0.1": 45, **dict.fromkeys(many_sizes(0.5, 30), 48)})
+    second = sized_fills({"0.1": 7_977, **dict.fromkeys(many_sizes(5.0, 538), 1)},
+                         start=DAY0 + 13 * HOUR, seed=2)
+    mid = DAY0 + 12 * HOUR
+
+    split = fold_day(first, end=mid)
+    assert "0.1" not in clips_of(split)                      # outside the top 20 at fold one
+    fold_day(second, split, start=mid)
+    in_one_piece = fold_day(first + second)
+
+    def table(days):
+        return tooling.clip_signature(tooling.summarise([days["2026-10-02"]]))["clip_table"]
+
+    assert sum(clips_of(split).values()) == sum(clips_of(in_one_piece).values()) == 10_000
+    assert clips_of(split)["0.1"] == 7_977 and clips_of(in_one_piece)["0.1"] == 8_022
+    assert table(in_one_piece)["BTC"]["size"] == 0.1
+    assert table(in_one_piece)["BTC"]["share"] == 0.8022
+    assert table(split) == {}                                # dropped, never added

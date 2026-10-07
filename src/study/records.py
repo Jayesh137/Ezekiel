@@ -39,12 +39,15 @@ MAX_LEDGER = 50
 OTHER = "_other"
 # A coin's `taker_clips` maps each taker order size to a count, so a bot quoting random sizes
 # grows it without limit (1,045 distinct BTC sizes in one day: a 42 KB day file against the
-# 15 KB the spec budgets). Each fold keeps the MAX_CLIP_SIZES commonest sizes and counts the
-# rest under OTHER_SIZE (a key of that map, not the coin-level OTHER). `ep.clip_table` reads only
-# the dominant size's count and the coin's total. The total stays exact, and a size holding 80%
-# of a day's orders is always kept that day. Summed over days a size's count can only fall short
-# (a day it sat outside the top 20), so the bound can cost a window's clip table a borderline
-# clip and can never add one.
+# 15 KB the spec budgets). Each fold keeps the MAX_CLIP_SIZES commonest sizes of the day's
+# record so far and counts the rest under OTHER_SIZE (a key of that map, not the coin-level
+# OTHER). `ep.clip_table` reads only the dominant size's count and the coin's total. The total
+# stays exact. The loss is per FOLD, not per day (a day is folded once per run, four times at
+# the 6-hour cadence): a size holding 80% of the orders recorded so far is always kept at that
+# fold, but a size outside the top 20 at one fold has the count it held moved into OTHER_SIZE
+# and restarts from zero at the next, even if it dominates by the end of the day. A size's count
+# can only fall short, never rise, so the bound can cost a window's clip table a borderline clip
+# and can never add one (test_the_bound_costs_a_borderline_clip_per_fold_and_never_adds_one).
 MAX_CLIP_SIZES = 20
 OTHER_SIZE = "_other"
 TIFS = ("Ioc", "Gtc", "Alo", "FrontendMarket")

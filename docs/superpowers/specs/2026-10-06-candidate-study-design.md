@@ -91,6 +91,13 @@ the incident in `docs/incident-log.md` with the rule it teaches (**when a fix mo
 a path, test the path**). Success: `measured` grows across two consecutive
 `analyze.yml` runs.
 
+> **As implemented (Phase 1, 2026-10-07):** `census_state.json` is read strictly. Only a
+> missing file is a first run; invalid JSON, any other read error, or a top level or part
+> (`processed`, `hits`, `habits`) that is not an object fails the analyze step (its failure
+> issue and ntfy carry it) instead of being read as "nothing measured yet" and overwritten,
+> which would have restarted weeks of accumulated population silently. Phase 0 did not ship
+> alone: see the note in §15.
+
 ## 4. Architecture
 
 ```
@@ -168,6 +175,33 @@ hash order) only if its account is emptied. References are read for fills only,
 question for the timing tests: how often does a stranger line up with *him* this
 well over these same days? 160 leaves margin over the 150 the bars need (§8.2).
 
+> **As implemented (Phase 1, 2026-10-07):**
+> - **HL-present** is `hl_role` of `user` or `subAccount` **and** (30-day volume > 0 **or**
+>   total value ≥ $10,000), read from `portfolio` by the identity probe (the roster's
+>   `hl_total_value` and `hl_month_volume`). webData2's `accountValue` is perp margin only and
+>   reads 0 for an account whose money sits in spot: a POSSIBLE lead holding $9.37M in spot
+>   USDC and trading $80.0M in 30 days read $0 (measured 2026-10-07). A row probed before the
+>   two fields existed falls back to perp margin ≥ $10,000 until it is probed again, and the
+>   row's size reads total value the same way.
+> - **Config wallets that do not trade are blocked.** A balance alone proves nothing for them
+>   (`0x1419e753…` holds about $57M and traded nothing), so they need 30-day volume > 0 (perp
+>   margin ≥ $10,000 for a row probed before the two fields existed). **Pinned wallets**
+>   (`watch_wallets` and `study_wallets`, whose entries are `{"address": …}` objects as well
+>   as strings) are studied whatever Hyperliquid knows of them; only a blocked wallet is refused.
+> - **Detector finds** carry no value test: the detector measured the account itself, fresher
+>   than the roster's weekly read. One is dropped only for a role the roster MEASURED as not a
+>   trading account (a vault, an agent…); no role yet, an unread role and a stale `missing` all
+>   keep it. Detector order: census hits, tape program hits, provenance findings, dormancy
+>   handoffs (by score), newborns ≥ $1M (by value); the evidence-strength sort then applies
+>   over them, stable.
+> - **The 60-day clock for decayed leads** starts the first run the study sees a lead decayed,
+>   because the roster stores no time for `tier_dropped_from`. Every lead decayed today
+>   therefore gets 60 days from the first run: "four today" above is about 27 on day one, and
+>   they take slots ahead of newborns until their clocks run out.
+> - **Not in Phase 1:** referral and operator-group twins as a source of their own (0
+>   additions measured; the roster's group and referral votes already carry them into the lead
+>   tiers), and shared-agent pairs in the family panel (§8.1).
+
 ## 6. Collection and the daily record
 
 ### 6.1 Reads
@@ -183,6 +217,14 @@ Reads go through a strict reader (shape-checked; `utils.hl_read`'s `ok` flag, ne
 `hl_post`). A failed read records the wallet as unreadable for that source, does
 **not** move its cursor, and writes **no** record for the uncovered span. A
 budget refusal is not a failure: the wallet goes first next run.
+
+> **As implemented (Phase 1, 2026-10-07):** orders and ledger are read together once 23 hours
+> have passed since the START of the last such read, which lands on every 4th run (a bar of 24
+> hours slipped to the 5th run and then the 9th under cron jitter). A failed orders read does not
+> block the ledger read, and `orders_read_ms` is set only when both succeed, so the failed source
+> is retried next run. Each per-wallet, per-source failure is listed in `latest.json` under
+> `partial`, beside `unreadable` (a wallet whose fills or archive could not be read); a wallet
+> whose fills were read still counts as read.
 
 ### 6.2 Committing behind a quiet boundary
 
@@ -203,6 +245,12 @@ are all minutes old, so its habits would never have been recorded, and only the
 cancel share — which no verdict uses — needed the wait.) If more than 10,000 fills
 or 2,000 orders arrived since the cursor, the unreachable span is recorded as
 `saturated`.
+
+> **As implemented (Phase 1, 2026-10-07):** a wallet's state (its cursors and the time of its
+> last fill) is saved right after its day files, not once at the end of the run. A crash or a
+> step timeout between the two writes would leave the archive ahead of its state, and the
+> recovery run would classify the first uncovered order against a stale last-fill time: a
+> spurious session decision.
 
 ### 6.3 The daily record — `data/study/archive/<wallet>/<YYYY-MM-DD>.json`
 
@@ -245,11 +293,15 @@ added across batches. A coin's `taker_clips` keeps its 20 commonest sizes and co
 the rest under `_other` (a maker bot quoting random sizes put 1,045 distinct BTC sizes
 in one day's record, 42 KB against the budget below); the map's total is still the
 coin's taker order count, and the clip rule, which needs only the dominant size and
-that total, reads it unchanged (`_other` is in the total, never the clip). A size
-holding 80% of a day's orders is always kept that day, and a size's count summed over
-days can only fall short, so over a window the bound can cost the table a borderline
-clip and never add one. `habits`, `manual_minutes` and `ledger` stay `null` for a day
-no read of that kind covered.
+that total, reads it unchanged (`_other` is in the total, never the clip). The bound
+is applied at every fold (a day is folded once per run, four times at the 6-hour
+cadence), so the loss is per FOLD, not per day: a size holding 80% of the orders
+recorded so far is always kept at that fold, but a size outside the top 20 at one fold
+has the count it held moved into `_other` and restarts from zero at the next, even if
+it dominates by the end of the day. A size's count can only fall short, never rise, so
+over a window the bound can cost the table a borderline clip and never add one.
+`habits`, `manual_minutes` and `ledger` stay `null` for a day no read of that kind
+covered.
 
 Rules: a field the reads did not cover is absent or `null`, never 0; minutes
 outside `coverage.fills` are *unknown*, never quiet; a **covered day** has ≥ 20
@@ -274,6 +326,18 @@ verified; an archive that will not read is never overwritten; readers accept bot
 forms — grep for readers before changing the format). The archive is
 irreplaceable and `scripts/compact_data.py` never touches it. Estimate:
 10–15 MB a year compressed for 40 studied + 160 references.
+
+> **As implemented (Phase 1, 2026-10-07):** the archive is read strictly. A day file, a month
+> archive or `state.json` that is present but unreadable raises `archive.Unreadable` instead of
+> reading as empty: that wallet is stopped for the run (reported as unreadable; its tests are
+> never computed from a partial archive; no dossier, no roll), the file is never overwritten or
+> rebuilt from empty, and the run goes on to the next wallet. An unreadable `state.json` fails
+> the run. The monthly roll leaves an unreadable day file or month archive alone, and deletes a
+> sealed month's day files only after its archive reads back identical, and only the ones it
+> merged. A busy bot's day measures about 22 KB, not ≤ 15 KB: 14.5 KB of it is the `runs` list,
+> kept at 100 a day because it is the per-run detail Phase 2 analyses and it binds only on busy
+> bots (a slicer like him makes far fewer runs); the compressed month archive and git deltas
+> absorb it, and `scripts/check_repo_size.py` watches the growth.
 
 ### 6.4 Budget
 
@@ -300,6 +364,15 @@ no triggers, no maker). This is the only test that can say **against**: a
 candidate showing, on > 50% of ≥ 100 orders, a trait that makes up **under 0.1%
 of his recorded orders** — client IDs (0 of 56,672), triggers (0), maker posting
 (6 GTC of 56,672).
+
+> **As implemented (Phase 1, 2026-10-07):** an IOC-dominant wallet (IOC ≥ 50% of orders) with
+> fewer than 50 measured IOC offsets has an undecidable style: T1 reads `insufficient` for it,
+> and an undecidable stranger is left out of T1's n. Offsets are measured only where an order's
+> first fill was read, so unmeasured has to stay unknown, or a new wallet of his and the
+> stranger rate behind the 2% bar would both be misread; 50 is a measurement-validity floor
+> fixed before any result, not a calibration bar. A trait he never shows counts toward `against`
+> only when his own recorded history holds at least 1,000 orders ("under 0.1%" means nothing
+> on fewer).
 
 **T2 Slicing rhythm** (≥ 200 in-run gaps). Wasserstein-1 between the candidate's
 cadence histogram and his own over the most recent window holding ≥ 200 gaps
@@ -375,6 +448,15 @@ was all market makers. Where families cannot measure a test (e.g. cadence, when 
 family member runs programs), his self-splits are used alone with ≥ 6 windows, and
 the verdict carries `same_op_basis: "self_only"`.
 
+> **As implemented (Phase 1, 2026-10-07):** same-operator pairs are a STAR per family, the first
+> measured member against each other measured member (k−1 pairs for k members), not all pairs.
+> On the real surface one 35-member family supplied 595 of the 1,268 all-pairs (47%), enough for
+> one operator to meet the 40-pair bar alone; the rule was fixed before any result and the bar's
+> value is unchanged (139 star pairs from 22 operators when it was measured). The family panel
+> is built from sub-account sources only: shared-agent pairs join it with Phase 2's family work
+> (today they would add none: 0 shared among 457 agents over 120 wallets). His self-splits are
+> written to `panel/self.json` and the family panel to `panel/families.json`.
+
 ### 8.2 The bars — fixed now, not tuned after results
 
 | Status | Condition |
@@ -392,6 +474,16 @@ reference distribution by the bar **and** (its cross-coin co-activity is also ab
 it by the bar **or** it leads/moves with him on ≥ 10 pairs) **and** family pairs
 reach the same reference percentile ≥ 50% of the time. T5, T6, T7 and T8 never
 reach **for**; T5 and T6 can be `notable` (above 98% of references) as evidence.
+
+> **As implemented (Phase 1, 2026-10-07):** `against` counts a trait only when its stranger rate
+> was measured, is finite and above 0, and the likelihood ratio (the same-operator mismatch upper
+> bound over that rate) is below 1: a ratio at or above 1 is no evidence against, and a holding
+> trait with no measured stranger rate leaves the judgement `uncalibrated`. NaN readings are
+> dropped as unmeasurable (they neither match nor count toward the 200 strangers); ±inf is the
+> panels' encoding of a stranger that cannot produce the statistic and counts as a non-match.
+> Panel status is reported per test, T1, T2 and T3 each with its strangers, family pairs and
+> self windows (`latest.json` `panels.by_test`); the header's `strangers` is the number T1 judges
+> on (decided style), not every measurable stranger.
 
 ### 8.3 Likelihood ratio and study rank
 
@@ -424,6 +516,15 @@ PROBABLE without a financial or protocol vector. `evidence.VECTOR_CATEGORY` gain
 `check_execution_program.py` keeps its wider fills-only watch; the roster takes the
 vote from either file.
 
+> **As implemented (Phase 1, 2026-10-07):** `mixed` (a calibrated FOR beside a T1 AGAINST) casts
+> the `execution_program` vote like `for`: evidence against never removes a vote, so a for → mixed
+> flip must not take one back. The consequence is that a wallet tagging its orders with client
+> IDs, which T1 reads as against, keeps the vote while its rhythm or clip table (T2/T3) is
+> calibrated FOR; its roster reason says "Some of his tooling matches, some contradicts
+> (candidate study, calibrated)". Phase 1 produces the tooling family only, and
+> `evidence.study` is `{as_of, rank, coverage_days, families: {name: {verdict, lr, by, key,
+> basis}}}`; the `calibrated` flag has no producer yet.
+
 ## 10. Outputs
 
 - **`data/study/latest.json`** — `computed_at`, `schema`, his reference summary
@@ -440,6 +541,12 @@ vote from either file.
   stickiness clocks, reference panel.
 - **`data/study/panel/families.json`, `self.json`** — panel summaries.
 - **`data/study/archive/…`** — §6.3.
+
+> **As implemented (Phase 1, 2026-10-07):** his cadence histogram and habit shares live once, in
+> `latest.json`'s `reference` (with his style, last day and gap count); a dossier holds only the
+> wallet's own series (its cadence and shares) and its test outputs, so the ~40 dossiers are not
+> rewritten every run as his window slides. `latest.json` also carries `panels` (the status and
+> bars, with `by_test`), `studied`, `read`, `unreadable`, `partial`, `stopped` and `budget`.
 
 ## 11. Alerts and feed health
 
@@ -551,6 +658,11 @@ checked in headless Chrome against live data.
 | **3** | phone row + Studied tab; alerts; feed health; CLAUDE.md vector-table row and rules |
 
 Each phase is merged and run in production before the next starts.
+
+> **As implemented (Phase 1, 2026-10-07):** Phases 0 and 1 ship in one PR, not two: a push and a
+> merge are the operator's to approve, and Phase 1's tasks build on Phase 0's file. Acceptance 1
+> (census `measured` growing across two consecutive daily runs, §14) is therefore verified after
+> the merge, not before Phase 1 starts.
 
 ## 16. Risks and open questions
 
