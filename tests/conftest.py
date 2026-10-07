@@ -68,6 +68,10 @@ _PROBES = {
     # linkage.FIRST_FUNDER_PATH: permanent facts, cached forever once written.
     "the first-funder cache": REAL_DATA_DIR / "labels" / "first_funders.json",
     'the discovery database': REAL_DATA_DIR / '.local' / 'discovery.sqlite3',
+    # src/study/archive.py: the candidate study's irreplaceable daily records,
+    # state and dossiers. Its modules read utils.DATA_DIR at call time, so the
+    # sandbox covers them; this probe proves it stays that way.
+    "the candidate study tree": REAL_DATA_DIR / "study",
 }
 
 
