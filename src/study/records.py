@@ -41,7 +41,10 @@ OTHER = "_other"
 # grows it without limit (1,045 distinct BTC sizes in one day: a 42 KB day file against the
 # 15 KB the spec budgets). Each fold keeps the MAX_CLIP_SIZES commonest sizes and counts the
 # rest under OTHER_SIZE (a key of that map, not the coin-level OTHER). `ep.clip_table` reads only
-# the dominant size's count and the coin's total, both of which stay exact.
+# the dominant size's count and the coin's total. The total stays exact, and a size holding 80%
+# of a day's orders is always kept that day. Summed over days a size's count can only fall short
+# (a day it sat outside the top 20), so the bound can cost a window's clip table a borderline
+# clip and can never add one.
 MAX_CLIP_SIZES = 20
 OTHER_SIZE = "_other"
 TIFS = ("Ioc", "Gtc", "Alo", "FrontendMarket")
@@ -224,7 +227,8 @@ def _cap_coins(record: dict) -> None:
 def _bound_clip_sizes(record: dict) -> None:
     """Bound every coin's `taker_clips` to its MAX_CLIP_SIZES commonest sizes. The rest are
     added to OTHER_SIZE (not counted as a size, so the bound is idempotent), which keeps the
-    map's total, the coin's taker order count, exact. Equal counts keep the smaller key."""
+    map's total, the coin's taker order count, exact. Equal counts keep the smaller key
+    (string order, as `_cap_coins` orders coin names)."""
     for stats in record["coins"].values():
         clips = stats.get("taker_clips")  # the coin-level OTHER has none
         sizes = [(size, n) for size, n in (clips or {}).items() if size != OTHER_SIZE]

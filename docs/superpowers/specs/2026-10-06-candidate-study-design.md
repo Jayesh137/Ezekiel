@@ -245,8 +245,11 @@ added across batches. A coin's `taker_clips` keeps its 20 commonest sizes and co
 the rest under `_other` (a maker bot quoting random sizes put 1,045 distinct BTC sizes
 in one day's record, 42 KB against the budget below); the map's total is still the
 coin's taker order count, and the clip rule, which needs only the dominant size and
-that total, reads it unchanged (`_other` is in the total, never the clip). `habits`,
-`manual_minutes` and `ledger` stay `null` for a day no read of that kind covered.
+that total, reads it unchanged (`_other` is in the total, never the clip). A size
+holding 80% of a day's orders is always kept that day, and a size's count summed over
+days can only fall short, so over a window the bound can cost the table a borderline
+clip and never add one. `habits`, `manual_minutes` and `ledger` stay `null` for a day
+no read of that kind covered.
 
 Rules: a field the reads did not cover is absent or `null`, never 0; minutes
 outside `coverage.fills` are *unknown*, never quiet; a **covered day** has ≥ 20
