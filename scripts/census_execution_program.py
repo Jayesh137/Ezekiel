@@ -41,6 +41,10 @@ CENSUS_FILE = OUT_DIR / "census.json"
 # repo without bound.
 STATE = OUT_DIR / "census_state.json"
 MAX_STATE_ROWS = 20_000
+# The habit census (candidate study, spec 2026-10-06 §8.1): one row per measured
+# stranger, the newest kept. Each row carries a 50-bin rhythm histogram only when
+# the account runs programs, so the committed file stays a few MB.
+MAX_HABIT_ROWS = 5_000
 # A wallet reproducing this many of his exact per-coin clip sizes is a lead worth
 # recording in the output whatever the population distribution turns out to be.
 HIT_MIN_CLIPS = 4
@@ -89,9 +93,11 @@ def fetch_leaderboard():
 def load_state():
     try:
         with open(STATE) as handle:
-            return json.load(handle)
+            state = json.load(handle)
     except (OSError, ValueError):
-        return {"processed": {}, "hits": {}}
+        state = {}
+    return {"processed": state.get("processed", {}), "hits": state.get("hits", {}),
+            "habits": state.get("habits", {})}
 
 
 def target_signature():
@@ -100,7 +106,8 @@ def target_signature():
 
 
 def cap_state(state):
-    """Keep the state bounded: the newest MAX_STATE_ROWS processed rows, all hits.
+    """Keep the state bounded: the newest MAX_STATE_ROWS processed rows and
+    MAX_HABIT_ROWS habit rows, all hits.
 
     Hits are few and precious (accounts reproducing his table), so they are never
     evicted; ordinary measured/insufficient rows are trimmed oldest-first by their
@@ -110,7 +117,11 @@ def cap_state(state):
     if len(processed) > MAX_STATE_ROWS:
         keep = sorted(processed.items(), key=lambda kv: kv[1].get("at", 0))[-MAX_STATE_ROWS:]
         processed = dict(keep)
-    return {"processed": processed, "hits": state.get("hits", {})}
+    habits = state.get("habits", {})
+    if len(habits) > MAX_HABIT_ROWS:
+        keep = sorted(habits.items(), key=lambda kv: kv[1].get("at", 0))[-MAX_HABIT_ROWS:]
+        habits = dict(keep)
+    return {"processed": processed, "hits": state.get("hits", {}), "habits": habits}
 
 
 def register_hits(hits, data_dir=None):
@@ -139,12 +150,32 @@ def register_hits(hits, data_dir=None):
     return registered
 
 
+def measure_habits(fetch, addr: str, fills: list) -> dict | None:
+    """The habit-census row for one stranger: style, flags, rhythm and clips from
+    its newest orders, plus its sub-accounts (the same-operator families). None
+    when the order read fails — a failed read is never an empty row (rule 5); a
+    failed sub-account read leaves `subaccounts` None, unknown rather than none."""
+    from src.hl_surface import parse_subaccounts
+    from src.study import tooling
+
+    orders = fetch({"type": "historicalOrders", "user": addr})
+    if not orders.get("ok") or not isinstance(orders.get("data"), list):
+        return None
+    row = tooling.measure_snapshot(fills, orders["data"])
+    subs = fetch({"type": "subAccounts", "user": addr})
+    parsed = parse_subaccounts(subs.get("data"), addr) if subs.get("ok") else None
+    row["subaccounts"] = None if parsed is None else sorted({r["address"] for r in parsed})
+    row["at"] = int(time.time())
+    return row
+
+
 def write_census(state):
     ratios = [v["ratio"] for v in state["processed"].values() if v.get("ratio") is not None]
     rhos = [v["rho"] for v in state["processed"].values() if v.get("rho") is not None]
     census = ep.summarise_census(ratios, rhos)
     census.update(computed_at=datetime.now(UTC).isoformat(),
                   measured=len(ratios), attempted=len(state["processed"]),
+                  habit_measured=len(state.get("habits") or {}),
                   hits=sorted(state["hits"].values(), key=lambda h: -h.get("clips_matched", 0))[:50])
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     atomic_write_json(CENSUS_FILE, census)
@@ -181,6 +212,9 @@ def run(*, limit, budget_seconds, fetch=None, leaderboard=None):
             state["processed"][addr] = {"ratio": ratio, "rho": rho,
                                         "clips_compared": match.get("clips_compared"),
                                         "at": int(time.time())}
+            habits = measure_habits(fetch, addr, result["data"])
+            if habits is not None:
+                state["habits"][addr] = habits
             # A hit is a strong reproduction of his program by EITHER path: his
             # exact clip sizes, or (rescale-robust) his per-coin rank structure.
             strong_structure = (match.get("notional_structure_rho") or 0) >= 0.9 \
