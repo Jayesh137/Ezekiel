@@ -485,6 +485,16 @@ reach **for**; T5 and T6 can be `notable` (above 98% of references) as evidence.
 > self windows (`latest.json` `panels.by_test`); the header's `strangers` is the number T1 judges
 > on (decided style), not every measurable stranger.
 
+> **Changed 2026-10-07 (operator decision, before any T2/T3 result):** a stranger that cannot
+> produce T2's rhythm or T3's clip strength is **unmeasured** for that test — neither a match nor
+> a non-match, and not counted toward the 200 — exactly as an undecidable style is for T1. This
+> supersedes "a stranger that runs no programs counts as a non-match for T2" above. Measured at
+> the first production runs, 73 of 74 census strangers ran no slicer; counted as non-matches they
+> made T2 measure only "runs a slicer", and on the real panel scaled past 200 a client-id bot read
+> tooling FOR at LR 65 (`docs/incident-log.md`). T2 and T3 therefore stay `uncalibrated` until 200
+> strangers produce their statistic, and `panels.by_test` counts only those. ±inf in same-operator
+> lists stays a non-match, which only makes FOR harder.
+
 ### 8.3 Likelihood ratio and study rank
 
 For a calibrated test, `LR = same-operator rate / stranger upper bound` at the
@@ -663,6 +673,16 @@ Each phase is merged and run in production before the next starts.
 > merge are the operator's to approve, and Phase 1's tasks build on Phase 0's file. Acceptance 1
 > (census `measured` growing across two consecutive daily runs, §14) is therefore verified after
 > the merge, not before Phase 1 starts.
+
+> **Phase 2 starts by itself (operator decision, 2026-10-07).** `scripts/check_phase2_ready.py`
+> (`src/study/readiness.py`) is the gate, read-only: the study fresh and live at least 5 days,
+> acceptance 2, T1's stranger panel at 200, acceptance 4 (his two most recent whole months, each
+> judged leave-one-out against the rest of him, read tooling FOR) and acceptance 3's negative
+> half (no wallet showing a trait he never shows reads FOR or MIXED). Acceptance 1 and the family
+> bar are reported and not required — neither measures whether Phase 1 recognises him. A daily
+> cloud routine runs the gate and, once it exits 0, builds Phase 2 from this spec and merges it
+> when CI, the full suite and a live dry run pass, every new vote shipping non-voting until its
+> own panels are calibrated.
 
 ## 16. Risks and open questions
 

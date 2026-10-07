@@ -255,6 +255,13 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   before pushing.
 - **A number measured under one access pattern does not size another**, and
   check a commit landed with `merge-base --is-ancestor`, not a log window.
+- **A reference that cannot produce a statistic is unmeasured, never a
+  non-match.** The candidate study counted strangers with no rhythm as
+  non-matches; 73 of 74 ran no slicer, so T2 measured only "runs a slicer" and
+  would have read FOR for a client-id bot (2026-10-07). A test calibrates only
+  on references that produce its statistic, as T1 already did for undecidable
+  styles; `scripts/check_phase2_ready.py` gates Phase 2 on his own months reading
+  FOR and no such bot reading FOR.
 
 ## Vectors collected but NOT wired into detection — pursue these
 
