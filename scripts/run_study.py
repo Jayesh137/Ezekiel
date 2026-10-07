@@ -335,6 +335,9 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
     his = his_days(data_dir, target)
     ref = assemble.his_reference(his)
     splits = assemble.self_splits(his, ref)
+    # His months against the rest of his history, kept as the spec's panel/self.json (the
+    # tuples become lists on disk); it only changes when his history does.
+    archive.write_if_changed(archive.root(data_dir) / "panel" / "self.json", splits)
     strangers = panels.strangers(census_state.get("habits"), exclude=exclude)
     snapshots = {w: v for w, v in (panel.get("members") or {}).items() if isinstance(v, dict)}
     ctx = assemble.panel_context(ref, splits, strangers, panels.member_pairs(fams, snapshots))

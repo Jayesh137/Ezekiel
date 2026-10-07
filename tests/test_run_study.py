@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts import run_study
-from src.study import archive, records
+from src.study import archive, assemble, records
 
 T = "0x45d26f28196d226497130c4bac709d808fed4029"
 A, B = "0x" + "a" * 40, "0x" + "b" * 40
@@ -382,6 +382,20 @@ def test_sealed_months_are_rolled_and_an_unchanged_dossier_is_not_rewritten(tmp_
                         lambda path, doc: (written.append(Path(path).name), real(path, doc))[1])
     run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000, fetch=fake)
     assert f"{A}.json" not in written
+
+
+def test_his_months_against_his_history_are_written_to_the_self_panel(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    august = program(NOW - 35 * records.DAY_MS, 300)  # a second month of his, beside September's
+    (data / "fills" / "2026-08-29.json").write_text(json.dumps(august))
+    (data / "orders" / "2026-08-29.json").write_text(json.dumps(entries(august)))
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    written = archive.read_json(data / "study" / "panel" / "self.json", None)
+    his = run_study.his_days(data, T)
+    splits = assemble.self_splits(his, assemble.his_reference(his))
+    assert set(written) == {"t1", "t2", "t3"}
+    assert written == json.loads(json.dumps(splits))  # tuples are lists on disk
+    assert written["t1"] == [2, 2]  # two months, each judged against the other
 
 
 def test_the_study_clocks_are_kept_between_runs(tmp_path):
