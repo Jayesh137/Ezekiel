@@ -14,6 +14,10 @@ rule 9), so it corroborates and never confirms alone, and only after the census
 4). Until `data/execution_program/census.json` exists, matches are recorded as
 context and route nothing. A match already carrying an independent financial or
 protocol vector is two vectors agreeing → CRITICAL; a rare match alone → HIGH.
+A wallet the config already names as his (`known_self_wallets`) never reaches
+CRITICAL: its vectors are ground truth, so "two vectors agree" would announce a
+new identification of a wallet already known. It routes HIGH (he is trading from
+a known wallet, worth knowing) and says so.
 
 The pure policy (`build_report`, `decide_alerts`) is unit-tested; `main` is the
 network/alert shell.
@@ -154,6 +158,22 @@ def carry_forward(previous, wallets, read_wallets, census):
     return out
 
 
+def known_self_wallets(config):
+    """Lower-cased addresses of `config.known_self_wallets` (ground truth: his own).
+
+    Entries are bare strings in config.json today; a `{"address": ...}` entry is read
+    too, as `roster.pinned_wallets` does. Not `pinned_wallets` itself: that also holds
+    `watch_wallets`, which are questions under observation and not known to be his.
+    """
+    out = set()
+    for entry in (config or {}).get("known_self_wallets") or []:
+        if isinstance(entry, dict):
+            entry = entry.get("address")
+        if isinstance(entry, str) and entry.strip():
+            out.add(entry.strip().lower())
+    return out
+
+
 def roster_vector_map(roster):
     """Each roster wallet's vectors. Roster rows are keyed `wallet`; `address` is the
     older spelling, still read."""
@@ -165,9 +185,17 @@ def roster_vector_map(roster):
     return out
 
 
-def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_wallet=None):
-    """Rank candidates against the target and annotate each match's disposition."""
+def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_wallet=None,
+                 known_self=None):
+    """Rank candidates against the target and annotate each match's disposition.
+
+    `known_self` is the set of config wallets known to be his (`known_self_wallets`).
+    Its matches stay in the report, marked `known_self`, and `decide_alerts` caps them
+    at HIGH. A wallet outside the set is annotated `known_self: False` and routed as
+    before.
+    """
     target_wallet = (target_wallet or "").lower()
+    known_self = {str(w).strip().lower() for w in (known_self or ())}
     rows = [r for r in candidate_rows if (r.get("wallet") or "").lower() != target_wallet]
     ranked = ep.rank_matches(target_sig, rows)
     matches = []
@@ -178,6 +206,7 @@ def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_w
             **match,
             "discriminating": ep.is_discriminating(match, census),
             "has_independent_vector": bool(vectors & INDEPENDENT_VECTORS),
+            "known_self": wallet in known_self,
         })
     return {
         "computed_at": datetime.now(UTC).isoformat(),
@@ -189,12 +218,19 @@ def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_w
 
 
 def decide_alerts(report):
-    """Route only measured-rare matches. Two vectors → CRITICAL, one → HIGH."""
+    """Route only measured-rare matches. Two vectors → CRITICAL, one → HIGH.
+
+    A `known_self` match is capped at HIGH however many vectors it carries: a config
+    wallet has transfer and linkage vectors by construction, so "two vectors agree"
+    would be a false identification of a wallet already known. Still routed, because
+    him trading from a known wallet is worth knowing.
+    """
     out = []
     for match in report.get("matches", []):
         if not match.get("discriminating") or match.get("carried_forward"):
             continue
-        out.append((("CRITICAL" if match.get("has_independent_vector") else "HIGH"), match))
+        critical = match.get("has_independent_vector") and not match.get("known_self")
+        out.append((("CRITICAL" if critical else "HIGH"), match))
     return out
 
 
@@ -240,7 +276,7 @@ def main():
             last_checked[wallet] = datetime.now(UTC).isoformat()
         budget_report = budget.report()
     report = build_report(target_sig, rows, census, roster_vector_map(roster),
-                          target_wallet=target_wallet)
+                          target_wallet=target_wallet, known_self=known_self_wallets(config))
     read_wallets = {r["wallet"] for r in rows}
     report["matches"].extend(carry_forward(previous, wallets, read_wallets, census))
     report["errors"] = errors

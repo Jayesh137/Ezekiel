@@ -683,20 +683,40 @@ def alert_execution_program_match(wallet: str, match: dict, severity: str) -> bo
         vector, so this is two independent vectors agreeing on the same wallet.
       * HIGH — a census-rare match on its own: a strong lead, but our inference,
         not proof about him.
+
+    A match flagged `known_self` is a wallet the config already names as his, so it
+    is never a new identification and the caller never routes it CRITICAL: the text
+    says it is a known wallet of his now running his program. Same cooldown key.
     """
     severity = severity if severity in ESCALATING_SEVERITIES else "HIGH"
     ratio = match.get("clip_match_ratio")
     matched = match.get("clips_matched")
     compared = match.get("clips_compared")
+    reading = (
+        f"Reproduces {matched} of {compared} of the target's per-coin clip sizes "
+        f"(match ratio {ratio}).\n"
+        f"Cadence agreement: {match.get('cadence_agreement')}; "
+        f"5% IOC offset agreement: {match.get('offset_agreement')}.\n"
+    )
+    if match.get("known_self"):
+        subject = (f"[EZEKIEL] {severity}: Execution Program on a KNOWN Wallet of His "
+                   f"({matched}/{compared} clip sizes)")
+        body = (
+            f"{address_line(wallet, 'Known Wallet')}\n"
+            f"{reading}\n"
+            f"This wallet is already known to be his (config known_self_wallets): a KNOWN "
+            f"wallet of his now running his execution program, not a new identification.\n"
+            f"Worth knowing because the owner copies the target wallet, and orders placed "
+            f"from this one are not in that feed.\n"
+            f"Action: look at what this wallet is trading now.\n"
+        )
+        return _send_with_cooldown(f"execprog_{wallet.lower()}", 72, subject, body)
     subject = f"[EZEKIEL] {severity}: Execution Program Match ({matched}/{compared} clip sizes)"
     combined = ("\nThis wallet ALSO carries an independent fund-flow or protocol "
                 "vector — two vectors agree.\n") if severity == "CRITICAL" else ""
     body = (
         f"{address_line(wallet, 'Candidate Wallet')}\n"
-        f"Reproduces {matched} of {compared} of the target's per-coin clip sizes "
-        f"(match ratio {ratio}).\n"
-        f"Cadence agreement: {match.get('cadence_agreement')}; "
-        f"5% IOC offset agreement: {match.get('offset_agreement')}.\n"
+        f"{reading}"
         f"{combined}\n"
         f"The clip table is the base order size he runs per coin through the SDK "
         f"slicer; reproducing it\nmeans the same program. A shared bot or frontend "
