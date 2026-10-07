@@ -239,14 +239,33 @@ def test_a_full_orders_page_vouches_only_from_its_oldest_order(tmp_path):
         [NOW - 14 * records.DAY_MS, records.day_start_ms(first) + records.DAY_MS]]
 
 
+def earlier_run(data, wallet=A, *, cursor, last_fill):
+    """What an earlier run left in state.json for a wallet."""
+    archive.save_state({"wallets": {wallet: {"fills_cursor_ms": cursor, "last_fill_ms": last_fill}}},
+                       data)
+
+
 def test_a_saturated_read_with_nothing_old_enough_moves_the_cursor_and_folds_nothing(tmp_path):
     data = data_dir(tmp_path, [lead(A)])
+    earlier_run(data, cursor=NOW - 6 * records.HOUR_MS, last_fill=NOW - 7 * records.HOUR_MS)
     fills = program(NOW - 130_000, 12_000, step=10)  # 100 a second, all inside five minutes
     run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake(fills={A: fills}))
     state = archive.load_state(data)["wallets"][A]
+    # the last fill of the earlier run is in the span the API no longer serves: forgotten
     assert state["fills_cursor_ms"] == fills[2_000]["time"] and state["last_fill_ms"] is None
     days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
     assert all(d["coverage"]["fills"] == [] and d["fills"] == 0 for d in days.values())
+
+
+def test_a_saturated_read_does_not_claim_a_session_start_it_cannot_see(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    earlier_run(data, cursor=NOW - 6 * records.HOUR_MS, last_fill=NOW - 7 * records.HOUR_MS)
+    fills = program(NOW - 4 * records.HOUR_MS, 12_000, step=1_000)  # a fill a second
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake(fills={A: fills}))
+    day = archive.load_days(A, "2026-10-03", "2026-10-03", data)["2026-10-03"]
+    # the first fill read (00:33:20) follows hours of unread time, so whether it opened a
+    # session is unknown, and no later fill is 30 minutes after the one before it
+    assert [d for d in day["decisions"] if d[3] == "session"] == []
 
 
 def test_a_spent_budget_ends_the_run_before_any_read_and_the_rows_still_come(tmp_path):
@@ -414,6 +433,49 @@ def test_a_failed_orders_or_ledger_read_is_retried_and_what_was_folded_stays(tmp
 
 DEPOSIT = {"time": NOW - records.DAY_MS, "hash": "0x" + "1" * 64,
            "delta": {"type": "deposit", "usdc": "250000.0"}}
+
+
+def test_the_last_fill_carries_between_runs_so_a_session_is_decided_once(tmp_path):
+    a1, a2 = NOW - 100 * records.MINUTE_MS, NOW - 30 * records.MINUTE_MS
+    spell1, spell2 = program(a1, 61, step=10_000), program(a2, 61, step=10_000)  # 10 minutes each
+    stream = {A: spell1 + spell2}  # an hour of silence between them
+    two = data_dir(tmp_path / "two", [lead(A)])
+    # the first run reads while the second spell is on: its boundary is where that spell began
+    run_study.run(data_dir=two, config=CONFIG, now_ms=a2 + 8 * records.MINUTE_MS,
+                  fetch=Fake(fills=stream))
+    assert archive.load_state(two)["wallets"][A]["last_fill_ms"] == spell1[-1]["time"]
+    run_study.run(data_dir=two, config=CONFIG, now_ms=NOW, fetch=Fake(fills=stream))
+    one = data_dir(tmp_path / "one", [lead(A)])
+    run_study.run(data_dir=one, config=CONFIG, now_ms=NOW, fetch=Fake(fills=stream))
+
+    def decisions(data):
+        return archive.load_days(A, "2026-10-03", "2026-10-03", data)["2026-10-03"]["decisions"]
+
+    assert [d for d in decisions(one) if d[3] == "session"] == [
+        [a1, "BTC", "A", "session"], [a2, "BTC", "A", "session"]]
+    assert decisions(two) == decisions(one)  # none decided twice, none missed
+    assert archive.load_state(two)["wallets"][A]["last_fill_ms"] == spell2[-1]["time"]
+
+
+def test_a_ledger_longer_than_three_pages_moves_its_cursor_only_to_what_was_read(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    rows = [{"time": NOW - 3 * records.DAY_MS + i * 1_000, "hash": f"0x{i:064x}",
+             "delta": {"type": "deposit", "usdc": "10.0"}} for i in range(6_001)]
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=LedgerFake(ledgers={A: rows}))
+    read_to = rows[5_997]["time"]  # three pages of 2,000, each starting on the last row before
+    assert archive.load_state(data)["wallets"][A]["ledger_cursor_ms"] == read_to != NOW
+    days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
+    assert max(hi for d in days.values() for _lo, hi in d["coverage"]["ledger"]) == read_to
+
+
+def test_the_standard_programs_ioc_offsets_are_measured_from_the_fills_read_with_them(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 2 * records.DAY_MS, 150)  # limit 95 on a first fill at 100: 5.0%
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW,
+                  fetch=Fake(fills={A: fills}, orders={A: entries(fills)}))
+    day = archive.load_days(A, "2026-10-01", "2026-10-01", data)["2026-10-01"]
+    habits = day["habits"]
+    assert habits["ioc_offset_5pct"] == habits["ioc_offset_seen"] > 0
 
 
 def test_a_failed_orders_read_is_partial_and_does_not_block_the_ledger(tmp_path):

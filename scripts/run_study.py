@@ -93,6 +93,9 @@ def _orders_and_ledger(wallet: str, ms: dict, days: dict, fills: list, now_ms: i
         # 2026-10-06 dry run). An order still open is counted as open.
         start = max(ocursor, orders["oldest_ms"] or ocursor) if orders["full"] else ocursor
         if now_ms > start:
+            # An IOC offset is measurable only for an order whose FIRST FILL was read in this
+            # same run (`fills` are this run's): an older order is counted in the habits but
+            # adds nothing to `ioc_offset_seen`, so that share is unknown, never zero.
             records.fold_orders(days, orders["orders"], records.first_prices(fills),
                                 wallet=wallet, role="studied", start_ms=start, end_ms=now_ms)
             ms["orders_cursor_ms"] = now_ms
