@@ -93,6 +93,14 @@ JOBS: dict[str, dict] = {
             (["python", "-c", "from src.utils import update_index; update_index()"], 120),
         ],
     },
+    # study.yml: six-hourly, the only writer of data/study/. 1500 s is the
+    # workflow step's 25 minutes; the script's own reads stop at 900 s.
+    "study": {
+        "interval_seconds": 21600,
+        "steps": [
+            (["python", "scripts/run_study.py"], 1500),
+        ],
+    },
 }
 
 # Commands intentionally NOT mirrored on the VM, with why. The drift test allows

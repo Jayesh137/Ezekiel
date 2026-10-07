@@ -826,3 +826,15 @@ export function provenanceRows(provenance) {
 		verdictLabel: VERDICT_LABEL[r.verdict] || r.verdict, reason: r.reason, routes: r.routes || [],
 		usd: r.usd, hop1: r.hop1 || [], when: r.resolved_at ? new Date(r.resolved_at * 1000) : null }));
 }
+
+/** The candidate study's summary (data/study/latest.json), or null. */
+export async function fetchStudy() {
+	return fetchJSON('data/study/latest.json');
+}
+
+/** One studied wallet's dossier, or null for anything that is not an address. */
+export async function fetchStudyDossier(wallet) {
+	const w = String(wallet || '').toLowerCase();
+	if (!/^0x[0-9a-f]{40}$/.test(w)) return null;
+	return fetchJSON(`data/study/wallets/${w}.json`);
+}

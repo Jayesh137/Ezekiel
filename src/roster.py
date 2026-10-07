@@ -870,6 +870,47 @@ def build_roster(config: dict | None = None) -> dict:
         if reason not in e["reasons"]:
             e["reasons"].append(reason)
 
+    # The candidate study (scripts/run_study.py, spec 2026-10-06 §9): every studied
+    # wallet carries its verdicts as `evidence.study`. A calibrated tooling FOR casts
+    # the vote, the existing execution_program one, and so does `mixed` (a calibrated
+    # FOR beside a T1 AGAINST). Evidence against is annotation only and never changes a
+    # tier or a vector (the operator's decision, 2026-10-06), so it cannot take back a
+    # vote a calibrated test gave. Every other verdict (against, neutral, uncalibrated,
+    # insufficient, unreadable) casts nothing.
+    # This function is shared by every vector, so a malformed file never raises here:
+    # a row is skipped, or annotated with what reads, and casts no vote.
+    try:
+        with open(DATA_DIR / "study" / "latest.json") as f:
+            study = json.load(f)
+    except (OSError, ValueError):
+        study = {}
+    studied = study.get("wallets") if isinstance(study, dict) else None
+    for row in studied if isinstance(studied, list) else []:
+        wallet = row.get("wallet") if isinstance(row, dict) else None
+        a = wallet.lower() if isinstance(wallet, str) else ""
+        if not a or a == target:
+            continue
+        e = entry(a)
+        families = row.get("families")
+        if not isinstance(families, dict):
+            families = {}
+        e["evidence"]["study"] = {
+            "as_of": study.get("computed_at"), "rank": row.get("rank"),
+            "coverage_days": row.get("coverage_days"),
+            "families": {name: {k: fam.get(k) for k in ("verdict", "lr", "by", "key", "basis")}
+                         for name, fam in families.items() if isinstance(fam, dict)}}
+        tooling = families.get("tooling")
+        if isinstance(tooling, dict) and tooling.get("verdict") in ("for", "mixed"):
+            e["vectors"].add(VECTOR_EXECUTION)
+            # Same vote either way; the reason says which verdict cast it. `mixed` is a
+            # calibrated FOR beside a T1 AGAINST, and "makes orders the way he does" would
+            # state only the half that favours the wallet.
+            reason = ("Makes orders the way he does (candidate study, calibrated)"
+                      if tooling["verdict"] == "for" else
+                      "Some of his tooling matches, some contradicts (candidate study, calibrated)")
+            if reason not in e["reasons"]:
+                e["reasons"].append(reason)
+
     # Portfolio overlap is recorded but is NOT a vector. A copy-trader holds the
     # same basket in the same direction at the same time by definition, and this
     # project exists because its owner copies this trader by hand — so a high
@@ -914,6 +955,8 @@ def build_roster(config: dict | None = None) -> dict:
         e = entry(a)
         e["evidence"]["hl_role"] = ident.get("role")
         e["evidence"]["hl_account_value"] = ident.get("account_value")
+        e["evidence"]["hl_total_value"] = ident.get("total_value")
+        e["evidence"]["hl_month_volume"] = ident.get("month_volume")
         e["evidence"]["hl_birth_ms"] = ident.get("birth_ms")
         if ident.get("agent_address"):
             e["evidence"]["frontend_agent"] = ident["agent_address"]

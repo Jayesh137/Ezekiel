@@ -46,6 +46,7 @@ COMMIT_MESSAGES = {
     "trace": "data: trace fund flows [automated]",
     "scan": "data: scanner results [automated]",
     "analyze": "data: daily analysis [automated]",
+    "study": "data: study candidates [automated]",
 }
 
 

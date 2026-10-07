@@ -179,7 +179,7 @@
 	<section class="card">
 		<h2>Measured, and no</h2>
 		<ul>
-			<li>All 412 large L1 counterparties of his three wallets asked of Hyperliquid (2026-10-06): 16 exist there, none trades.</li>
+			<li>All 412 large L1 counterparties of his three wallets asked of Hyperliquid (2026-10-06): 16 exist there. The first reading said none trades, but it judged perp margin only and is retracted: <span class="mono">0x84abc08c0e…</span> trades about $80M a month there, as a client-ID maker bot, not his program.</li>
 			<li>All 146 Bridge2 payouts to the target and all 4 to the treasury were their own withdrawals.</li>
 			<li>Unit: no operations for his wallets, his Solana wallet or his Binance deposit address.</li>
 		</ul>

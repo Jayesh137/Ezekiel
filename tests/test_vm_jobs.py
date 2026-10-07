@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from deploy.vm import jobs
+from scripts.keep_schedule import SCHEDULE
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github" / "workflows"
@@ -68,6 +69,20 @@ def test_vm_jobs_mirror_the_workflow_detector_sequences():
         vm = [_primary(argv) for argv, _ in job["steps"]]
         assert vm == workflow, (f"{name}: VM job drifted from the workflow.\n"
                                 f"  workflow: {workflow}\n  vm:       {vm}")
+
+
+def test_the_study_runs_on_the_vm_as_the_workflow_and_the_keeper_have_it():
+    """A cutover replaces the keeper, the PC dispatcher and the relay, so a
+    scheduled workflow with no VM job simply stops. The mirror test above walks
+    JOBS and never the workflows, so it could not notice the study missing."""
+    job = jobs.JOBS["study"]
+    keeper = next(j for j in SCHEDULE if j["file"] == "study.yml")
+    assert job["interval_seconds"] == keeper["minutes"] * 60
+    workflow = (WORKFLOWS / "study.yml").read_text(encoding="utf-8")
+    step = workflow.split("name: Study the candidates", 1)[1].split("- name:", 1)[0]
+    budget = int(re.search(r"timeout-minutes:\s*(\d+)", step).group(1)) * 60
+    assert [(_primary(argv), timeout) for argv, timeout in job["steps"]] == [
+        ("scripts/run_study.py", budget)]
 
 
 def test_intervals_are_present_and_ordered_fastest_first():

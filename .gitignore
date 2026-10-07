@@ -12,6 +12,11 @@ dashboard/.svelte-kit/
 .ruff_cache/
 data/.local/
 
+# The candidate study's atomic writes put `.<name>.<pid>.tmp` beside their target before
+# replacing it (src/study/archive.py). A hard kill in between strands one, and study.yml
+# runs `git add data/study/`, which would commit it into an archive that cannot be rebuilt.
+data/study/**/.*.tmp
+
 # Local working-tree backups. This repository is public — it has to be, for
 # raw.githubusercontent.com and Pages — so a stray `git add -A` would publish a
 # full snapshot. Keep backups out of the index; better still, keep them outside

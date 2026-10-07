@@ -16,6 +16,7 @@
 			{ href: `${base}/trace`, label: 'Trace', icon: 'trace' },
 			{ href: `${base}/transfers`, label: 'Transfers', icon: 'transfers' },
 			{ href: `${base}/roster`, label: 'Roster', icon: 'users' },
+			{ href: `${base}/study`, label: 'Study', icon: 'study' },
 			{ href: `${base}/tripwires`, label: 'Tripwires', icon: 'tripwire' },
 		] },
 		{ label: 'Target', items: [

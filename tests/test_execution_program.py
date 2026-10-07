@@ -276,3 +276,12 @@ def test_a_large_population_lets_a_rare_match_vote():
     census = {"population": 50, "ratio_p99": 0.34, "min_clips": 3}
     match = {"clip_match_ratio": 1.0, "clips_compared": 6, "clips_matched": 6}
     assert ep.is_discriminating(match, census) is True
+
+
+def test_reconstructed_orders_carry_their_oid():
+    fills = [{"coin": "BTC", "side": "B", "sz": "1", "px": "10", "time": 1, "oid": 7, "tid": 1,
+              "crossed": True},
+             {"coin": "BTC", "side": "B", "sz": "1", "px": "10", "time": 1, "oid": 7, "tid": 2,
+              "crossed": True}]
+    [order] = ep.reconstruct_orders(fills)
+    assert order["oid"] == 7 and order["base_size"] == 2.0

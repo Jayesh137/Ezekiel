@@ -63,6 +63,86 @@ def test_birth_is_the_first_nonzero_alltime_point_never_zero():
     assert hi.parse_birth("nope") is None
 
 
+def test_birth_skips_a_point_that_overflows_a_float():
+    """float(10**400) and int(float("inf")) raise OverflowError, which was not caught."""
+    huge, inf = 10**400, float("inf")
+    payload = [["allTime", {"accountValueHistory": [[1704321900064, huge], [inf, "5.0"],
+                                                    [1709233340241, "10000.0"]]}]]
+    assert hi.parse_birth(payload) == 1709233340241
+    assert hi.parse_birth([["allTime", {"accountValueHistory": [[1, huge], [inf, "5.0"]]}]]) is None
+
+
+UNKNOWN_ACTIVITY = {"total_value": None, "month_volume": None}
+
+
+def test_activity_is_the_newest_total_value_across_windows_and_the_month_volume():
+    """Measured 2026-10-07: a lead with $0 perp margin held $9.37M in spot USDC."""
+    payload = [
+        ["day", {"accountValueHistory": [[3000, "11.0"], [4000, "12.0"]], "vlm": "1.0"}],
+        ["week", {"accountValueHistory": [[2000, "9.0"]], "vlm": "2.0"}],
+        ["month", {"accountValueHistory": [[1000, "8.0"]], "vlm": "80039479.12"}],
+        ["allTime", {"accountValueHistory": [[5000, "9370000.5"]], "vlm": "99.0"}],
+        # The perp-only windows are never read, however new their points are.
+        ["perpDay", {"accountValueHistory": [[9000, "0.0"]], "vlm": "7.0"}],
+        ["perpMonth", {"accountValueHistory": [[9500, "3.0"]], "vlm": "8.0"}],
+        ["perpAllTime", {"accountValueHistory": [[9900, "4.0"]], "vlm": "9.0"}],
+    ]
+    assert hi.parse_activity(payload) == {"total_value": 9370000.5, "month_volume": 80039479.12}
+
+
+def test_the_newest_point_wins_whichever_window_or_position_holds_it():
+    """Newest by timestamp: not the largest value, not one window, not the last listed."""
+    in_the_day_window = [["allTime", {"accountValueHistory": [[5000, "2.5"]]}],
+                         ["day", {"accountValueHistory": [[6000, "1.5"], [1000, "9.0"]]}]]
+    assert hi.parse_activity(in_the_day_window)["total_value"] == 1.5
+    in_the_all_time_window = [["day", {"accountValueHistory": [[6000, "1.5"]]}],
+                              ["allTime", {"accountValueHistory": [[7000, "0.5"], [1000, "8.0"]]}]]
+    assert hi.parse_activity(in_the_all_time_window)["total_value"] == 0.5
+
+
+def test_a_month_volume_of_zero_is_a_reading_and_a_missing_one_is_not():
+    got = hi.parse_activity([["month", {"accountValueHistory": [], "vlm": "0.0"}]])
+    assert got == {"total_value": None, "month_volume": 0.0}
+    assert got["month_volume"] is not None
+    # No vlm field, an unparseable one, and a window that is not the last 30 days.
+    assert hi.parse_activity([["month", {"accountValueHistory": [[1, "5.0"]]}]]) == {
+        "total_value": 5.0, "month_volume": None}
+    assert hi.parse_activity([["month", {"vlm": "oops"}]])["month_volume"] is None
+    assert hi.parse_activity([["allTime", {"vlm": "9.0"}], ["perpMonth", {"vlm": "9.0"}]]
+                             )["month_volume"] is None
+
+
+def test_activity_is_unknown_not_zero_when_the_payload_does_not_say():
+    malformed_points = [[None, "1"], [1], "p", {"a": 1}, [2, "bad"], [3, None]]
+    for payload in ({}, None, "nope", [], [["day", "x"]], ["day"], [["day", {}]],
+                    [["day", {"accountValueHistory": malformed_points}]]):
+        assert hi.parse_activity(payload) == UNKNOWN_ACTIVITY
+    # A malformed entry is skipped like parse_birth skips one; the good ones still read.
+    mixed = [["day", "x"], ["week", {"accountValueHistory": malformed_points + [[8, "3.0"]]}]]
+    assert hi.parse_activity(mixed) == {"total_value": 3.0, "month_volume": None}
+
+
+def test_a_value_that_is_not_a_finite_number_is_not_a_reading():
+    """float("nan") parses, and json.dump would write a bare NaN that JSON.parse rejects."""
+    for junk in ("nan", "inf", "-inf", "1e999", float("nan"), float("inf"), True):
+        payload = [["month", {"accountValueHistory": [[9, junk]], "vlm": junk}]]
+        assert hi.parse_activity(payload) == UNKNOWN_ACTIVITY
+    # An older valid point still reads when the newest one is not a number.
+    older = [["day", {"accountValueHistory": [[1, "4.0"], [9, "nan"]]}]]
+    assert hi.parse_activity(older)["total_value"] == 4.0
+
+
+def test_a_number_too_large_for_a_float_is_no_reading_and_never_raises():
+    """float(10**400) raises OverflowError, which escaped parse_activity and so probe."""
+    huge = 10**400
+    payload = [["month", {"accountValueHistory": [[9, huge]], "vlm": huge}]]
+    assert hi.parse_activity(payload) == UNKNOWN_ACTIVITY
+    # Skipped like any malformed point: the older readable one still reads, as does a point
+    # whose timestamp is infinite (int(float("inf")) overflows too).
+    older = [["day", {"accountValueHistory": [[1, "4.0"], [9, huge], [float("inf"), "7.0"]]}]]
+    assert hi.parse_activity(older)["total_value"] == 4.0
+
+
 def _fake_fetch(answers, failing=()):
     def fetch(body):
         kind = body["type"]
@@ -92,6 +172,40 @@ def test_probe_asks_every_endpoint_and_names_failures():
     assert partial["errors"] == ["portfolio: RuntimeError: boom"]
     assert partial["role"] == "user"            # the other answers survive
     assert hi.present(partial) is None          # a failed read is not an answer
+
+
+def test_probe_stores_the_total_value_and_month_volume_and_a_failed_read_leaves_none():
+    answers = {
+        "userRole": {"role": "user"},
+        # webData2's accountValue is perp margin only: a spot account reads 0 here.
+        "webData2": {"clearinghouseState": {"marginSummary": {"accountValue": "0.0"}}},
+        "userFees": {"stakingLink": None},
+        "delegations": [],
+        "portfolio": [["day", {"accountValueHistory": [[7, "9370000.5"]], "vlm": "1.0"}],
+                      ["month", {"accountValueHistory": [[6, "9.0"]], "vlm": "80039479.12"}],
+                      ["allTime", {"accountValueHistory": [[3, "0.0"], [4, "3.0"]]}]],
+    }
+    got = hi.probe(T, _fake_fetch(answers))
+    assert got["account_value"] == 0.0
+    assert got["total_value"] == 9370000.5 and got["month_volume"] == 80039479.12
+    assert got["birth_ms"] == 4                 # the existing reading is untouched
+
+    failed = hi.probe(T, _fake_fetch(answers, failing={"portfolio"}))
+    assert failed["read_ok"] is False
+    assert failed["total_value"] is None and failed["month_volume"] is None
+    assert failed["account_value"] == 0.0       # the other answers survive
+
+    # utils.hl_post answers {} for a failed portfolio read: still unknown, never zero.
+    blank = hi.probe(T, _fake_fetch({**answers, "portfolio": {}}))
+    assert blank["total_value"] is None and blank["month_volume"] is None
+
+
+def test_probe_survives_a_portfolio_answer_that_overflows_a_float():
+    huge = 10**400
+    portfolio = [["month", {"accountValueHistory": [[9, huge]], "vlm": huge}],
+                 ["allTime", {"accountValueHistory": [[9, huge]]}]]
+    got = hi.probe(T, _fake_fetch({"portfolio": portfolio}))     # must not raise
+    assert got["total_value"] is None and got["month_volume"] is None and got["birth_ms"] is None
 
 
 def test_presence_distinguishes_missing_from_unread():

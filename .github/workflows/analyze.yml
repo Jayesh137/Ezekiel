@@ -168,9 +168,12 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python scripts/check_gcr_wallets.py
       # Measures how rare his execution program is across the leaderboard, a
-      # bounded slice per run accumulating in a gitignored state file. Produces
+      # bounded slice per run accumulating in the COMMITTED state file
+      # data/execution_program/census_state.json (the commit step below adds
+      # data/), so the population survives the ephemeral runner. Produces
       # the false-positive threshold (rule 4) that lets the execution-program
       # vector vote, and surfaces any account already reproducing his clip table.
+      # A damaged state file fails this step rather than restarting the census.
       - name: Census the execution program
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 20

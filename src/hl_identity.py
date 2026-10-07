@@ -12,20 +12,25 @@ target alone — and never the questions that resolve IDENTITY outright:
   webData2       the account's CURRENT frontend agent (`agentAddress`), which
                  `extraAgents` never lists — measured 2026-09-10 the target's
                  baseline said "no agents" while webData2 showed one approved
-                 four days earlier.
+                 four days earlier. Its `accountValue` is PERP MARGIN ONLY: an
+                 account whose money sits in spot reads 0 there.
   userFees       `stakingLink`, an explicit link between a staking wallet and
                  a trading wallet: an act of control, like an agent.
   delegations    which validators an account stakes with, and how much.
   portfolio      the all-time value series, whose first non-zero point is the
                  account's real birth. Fills cannot give this: the API keeps
                  only the last ~10,000, so a busy wallet's "first fill" is
-                 last week.
+                 last week. It also gives the newest TOTAL value (spot + perp)
+                 and the 30-day volume, which `webData2` cannot (measured
+                 2026-10-07: a lead with $0 perp margin held $9.37M in spot
+                 and traded $80.0M in 30 days).
 
 `probe` is I/O with an injectable fetch; everything else is pure so the
 readings can be tested and re-interpreted offline. A failed read is recorded
 as a failed read — `read_ok: False` — never as "nothing here".
 """
 
+import math
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -126,11 +131,67 @@ def parse_birth(payload) -> int | None:
         for point in series.get("accountValueHistory") or []:
             try:
                 ts, value = int(point[0]), float(point[1])
-            except (TypeError, ValueError, IndexError):
+            except (TypeError, ValueError, IndexError, OverflowError):
                 continue
             if value > 0:
                 return ts
     return None
+
+
+# The `portfolio` windows that hold spot AND perp. `perpDay`, `perpWeek`,
+# `perpMonth` and `perpAllTime` hold perp only and are never read for a total.
+TOTAL_WINDOWS = ("day", "week", "month", "allTime")
+
+
+def _finite(raw) -> float | None:
+    """`raw` as a finite float, else None. "nan" and "inf" parse, but they are no
+    reading, and json.dump would write a bare NaN that a browser's JSON.parse rejects."""
+    if isinstance(raw, bool):
+        return None
+    try:
+        number = float(raw)
+    except (TypeError, ValueError, OverflowError):    # OverflowError: an int past float's range
+        return None
+    return number if math.isfinite(number) else None
+
+
+def parse_activity(payload) -> dict:
+    """The account's newest total value (spot + perp) and its 30-day volume
+    from `portfolio`. Either is None when the payload does not say; never 0
+    for a missing reading (rule 6). A `vlm` of "0.0" is a real zero.
+
+    `webData2`'s `accountValue` is perp margin only, so an account whose money
+    sits in spot reads 0 there while holding millions. The total is the value of
+    the point with the largest timestamp across `TOTAL_WINDOWS`; the volume is
+    the `month` window's, which is the last 30 days. A malformed entry is
+    skipped, as `parse_birth` skips one.
+    """
+    out = {"total_value": None, "month_volume": None}
+    if not isinstance(payload, list):
+        return out
+    newest = None                                  # (timestamp ms, value)
+    for item in payload:
+        if not (isinstance(item, (list, tuple)) and len(item) == 2):
+            continue
+        name, series = item
+        if not isinstance(series, dict):
+            continue
+        if name == "month" and out["month_volume"] is None:
+            out["month_volume"] = _finite(series.get("vlm"))
+        if name not in TOTAL_WINDOWS:
+            continue
+        history = series.get("accountValueHistory")
+        for point in history if isinstance(history, list) else []:
+            try:
+                ts, raw = int(point[0]), point[1]
+            except (TypeError, ValueError, IndexError, KeyError, OverflowError):
+                continue
+            value = _finite(raw)
+            if value is not None and (newest is None or ts > newest[0]):
+                newest = (ts, value)
+    if newest is not None:
+        out["total_value"] = newest[1]
+    return out
 
 
 def probe(address: str, fetch, *, sleep=None) -> dict:
@@ -144,7 +205,8 @@ def probe(address: str, fetch, *, sleep=None) -> dict:
            "master": None, "owner": None, "agent_address": None,
            "agent_valid_until": None, "leading_vaults": [], "is_vault": None,
            "account_value": None, "staking_link": None, "delegations": {},
-           "birth_ms": None, "checked_at": datetime.now(UTC).isoformat()}
+           "birth_ms": None, "total_value": None, "month_volume": None,
+           "checked_at": datetime.now(UTC).isoformat()}
 
     def ask(kind, body):
         try:
@@ -172,6 +234,7 @@ def probe(address: str, fetch, *, sleep=None) -> dict:
     pf = ask("portfolio", {"type": "portfolio", "user": a})
     if pf is not None:
         out["birth_ms"] = parse_birth(pf)
+        out.update(parse_activity(pf))
     return out
 
 

@@ -30,7 +30,7 @@ Rules inherited from the PC dispatcher, each paid for once already:
 
 Tick policy: when a run is in flight, look again in POLL_SECONDS; when nothing
 is, sleep until the next workflow falls due (never longer than
-MAX_SLEEP_SECONDS). Each tick is ~8 API calls, well inside GITHUB_TOKEN's
+MAX_SLEEP_SECONDS). Each tick is ~9 API calls, well inside GITHUB_TOKEN's
 1,000 requests an hour. keeper.yml re-dispatches the keeper in an `always()`
 step, so a crash re-arms it too; its hourly cron restarts a broken chain.
 """
@@ -56,6 +56,7 @@ SCHEDULE = [
     {"file": "trace.yml", "minutes": 30, "group": "data-commit"},
     {"file": "scan.yml", "minutes": 60, "group": "data-commit"},
     {"file": "analyze.yml", "minutes": 1440, "group": "data-commit"},
+    {"file": "study.yml", "minutes": 360, "group": "study"},
 ]
 
 # Every workflow in each concurrency group, including ones never dispatched here.
@@ -66,6 +67,7 @@ GROUP_MEMBERS = {
         "collect.yml", "trace.yml", "scan.yml", "analyze.yml",
         "backfill.yml", "substrate-backfill.yml",
     ],
+    "study": ["study.yml"],
 }
 
 # The keeper's own group, for the cron gate only: tick() never dispatches it.

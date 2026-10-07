@@ -96,13 +96,14 @@ def reconstruct_orders(fills: list[dict]) -> list[dict]:
         groups[key].append({"t": ts, "sz": size, "px": price, "crossed": row.get("crossed"),
                             "coin": row.get("coin"), "side": row["side"]})
     orders = []
-    for rows in groups.values():
+    for key, rows in groups.items():
         first = min(rows, key=lambda r: r["t"])
         crossed = [r["crossed"] for r in rows if isinstance(r["crossed"], bool)]
         orders.append({"t": first["t"], "coin": first["coin"], "side": first["side"],
                        "base_size": round(sum(r["sz"] for r in rows), 10),
                        "notional": sum(r["sz"] * r["px"] for r in rows),
-                       "taker": bool(crossed) and all(crossed), "first_px": first["px"]})
+                       "taker": bool(crossed) and all(crossed), "first_px": first["px"],
+                       "oid": None if isinstance(key, tuple) else key})
     orders.sort(key=lambda o: o["t"])
     return orders
 

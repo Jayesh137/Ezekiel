@@ -57,6 +57,18 @@ export function hlPresent(w) {
 	return role !== 'missing';
 }
 
+/** The number the card's "HL value" shows, from a roster row's `evidence`.
+ *  `hl_account_value` is webData2's perp margin, which reads 0 for an account whose
+ *  collateral sits in spot; `hl_total_value` is portfolio's spot + perp, whose newest
+ *  point can lag the margin of a wallet funded a moment ago. Neither is safe alone, so:
+ *  the larger when both are numbers, else whichever is, else null (the card draws "—").
+ *  A missing reading is null, never 0 (rule 6): a string, bool, NaN or Infinity is none. */
+export function hlValue(ev) {
+	const readings = [ev?.hl_total_value, ev?.hl_account_value]
+		.filter((x) => typeof x === 'number' && Number.isFinite(x));
+	return readings.length ? Math.max(...readings) : null;
+}
+
 /** Wallets the app may show at all: no services, no infrastructure, not him,
  *  and nothing Hyperliquid has never heard of.
  *

@@ -56,7 +56,7 @@ reissue any that were lost (Etherscan key, ntfy topic are cheap to rotate).
 
 ## Cutover — one job at a time, no gap, no double-write
 
-For each job in `watch, collect, trace, scan, analyze`:
+For each job in `watch, collect, trace, scan, analyze, study`:
 
 1. Run it once by hand and confirm it writes fresh data and commits:
    `sudo -u $USER /opt/ezekiel/.venv/bin/python /opt/ezekiel/deploy/vm/run.py <job>`
@@ -68,7 +68,7 @@ The VM's single global lock (`run.py`) serialises whole runs, so during the brie
 window where both a VM timer and a not-yet-removed Actions cron could fire, the
 `-X theirs` rebase in `commit_data` settles the race exactly as the workflows do.
 
-After all five run cleanly on the VM for 24 h:
+After all six run cleanly on the VM for 24 h:
 
 4. Delete `keeper.yml` and its cron. Remove the PC scheduled task:
    `schtasks /Delete /F /TN "Ezekiel workflow dispatcher"`. The Apps Script relay,

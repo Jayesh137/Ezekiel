@@ -4,8 +4,14 @@ A clip-table match is a BEHAVIOUR signal. On its own, once measured rare, it is 
 lead worth investigating (HIGH — our inference). Reproducing his program AND
 already carrying an independent financial or protocol vector is two independent
 vectors agreeing, which is the strongest thing this project produces (CRITICAL).
-An unmeasured or common match is recorded, never routed (rules 4, 9).
+An unmeasured or common match is recorded, never routed (rules 4, 9). A wallet
+the config already names as his is the exception: its vectors are ground truth,
+so it never pages CRITICAL (HIGH, and says it is a known wallet).
 """
+
+import json
+
+import pytest
 
 from scripts import check_execution_program as chk
 
@@ -31,6 +37,26 @@ def test_build_report_flags_discriminating_and_independent():
     assert m["clip_match_ratio"] == 1.0
     assert m["discriminating"] is True
     assert m["has_independent_vector"] is True
+
+
+def test_a_roster_documents_wallet_key_reaches_the_independent_vector_check():
+    # Every row of data/roster/latest.json is keyed `wallet` (2,635 of 2,635 when
+    # measured, none `address`). The map read `address`, so it was always empty and a
+    # match beside an independent vector could never be CRITICAL. The other tests hand
+    # build_report a ready-made map; this one goes through the roster document's shape.
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3}
+    target = _target(6)
+    roster = {"wallets": [{"wallet": "0xHit", "tier": "POSSIBLE", "vectors": ["transfer"]}]}
+    report = chk.build_report(target, [{"wallet": "0xhit", "signature": target}], census,
+                              chk.roster_vector_map(roster))
+    assert report["matches"][0]["has_independent_vector"] is True
+    assert [severity for severity, _ in chk.decide_alerts(report)] == ["CRITICAL"]
+
+
+def test_a_roster_row_keyed_address_is_still_read():
+    roster = {"wallets": [{"address": "0xABC", "vectors": ["linkage"]},
+                          {"vectors": ["transfer"]}]}
+    assert chk.roster_vector_map(roster) == {"0xabc": {"linkage"}}
 
 
 def test_no_census_records_the_match_but_flags_it_undiscriminating():
@@ -156,3 +182,132 @@ def test_the_read_budget_fits_inside_the_step_timeout():
     step = workflow.split("name: Match execution program", 1)[1].split("- name:", 1)[0]
     minutes = int(re.search(r"timeout-minutes:\s*(\d+)", step).group(1))
     assert chk.READ_BUDGET_SECONDS + 60 < minutes * 60
+
+
+# --- a wallet the config already names as his never pages "two vectors agree" -------------
+#
+# `roster.detector_candidates` puts config.known_self_wallets in the candidate set, and a
+# config wallet carries transfer/linkage vectors by construction. Once the census becomes
+# discriminating, the treasury (or 0xf078969e…) reproducing his clip table would have paged
+# "CRITICAL: two vectors agree" about a wallet already known: a false identification. It is
+# still worth knowing that he trades from a known wallet, so it stays in the report at HIGH.
+
+TARGET = "0x45d26f28196d226497130c4bac709d808fed4029"
+KNOWN = "0x" + "1" * 40
+STRANGER = "0x" + "2" * 40
+CENSUS = {"population": 300, "ratio_p99": 0.34, "min_clips": 3}
+
+
+def _roster_with(wallet, vectors):
+    """data/roster/latest.json's real shape: rows keyed `wallet`, vectors a list."""
+    return {"wallets": [{"wallet": wallet, "tier": "CONFIRMED", "vectors": list(vectors)}]}
+
+
+def _report_for(wallet, vectors, **kwargs):
+    target = _target(6)
+    return chk.build_report(target, [{"wallet": wallet, "signature": target}], CENSUS,
+                            chk.roster_vector_map(_roster_with(wallet, vectors)), **kwargs)
+
+
+def _severities(report):
+    return [severity for severity, _ in chk.decide_alerts(report)]
+
+
+def test_a_known_wallet_of_his_reproducing_his_table_pages_high_never_critical():
+    report = _report_for(KNOWN, ["transfer", "linkage"], known_self={KNOWN})
+    match = report["matches"][0]
+    assert match["known_self"] is True
+    assert match["has_independent_vector"] is True      # still recorded as it is
+    assert _severities(report) == ["HIGH"]
+    assert [m["wallet"] for _, m in chk.decide_alerts(report)] == [KNOWN]   # kept, not dropped
+
+
+def test_the_same_wallet_outside_the_cluster_still_pages_critical():
+    # Without the set (the default) and with a set naming somebody else, nothing changes.
+    for kwargs in ({}, {"known_self": {KNOWN}}):
+        report = _report_for(STRANGER, ["transfer"], **kwargs)
+        assert report["matches"][0]["known_self"] is False
+        assert _severities(report) == ["CRITICAL"]
+
+
+def test_the_known_set_is_matched_by_lower_case_address():
+    report = _report_for("0x" + "A" * 40, ["transfer"], known_self={"0x" + "A" * 40})
+    assert report["matches"][0]["known_self"] is True
+    assert _severities(report) == ["HIGH"]
+
+
+@pytest.mark.parametrize("vectors, expected", [
+    (["execution_program"], "HIGH"),                      # the study's own vote
+    (["behavioural"], "HIGH"),
+    (["execution_program", "behavioural"], "HIGH"),       # two behaviours are still no money
+    ([], "HIGH"),
+    (["execution_program", "transfer"], "CRITICAL"),      # one independent vector is enough
+    (["behavioural", "linkage"], "CRITICAL"),
+], ids=["study-vote", "behavioural", "both-behaviours", "none", "study+transfer", "behaviour+linkage"])
+def test_only_a_financial_or_protocol_vector_corroborates_a_match(vectors, expected):
+    # `bool(vectors)` would let the study's own execution_program vote, or a behavioural
+    # score, corroborate itself into "two vectors agree".
+    report = _report_for(STRANGER, vectors)
+    assert report["matches"][0]["has_independent_vector"] is (expected == "CRITICAL")
+    assert _severities(report) == [expected]
+
+
+def test_known_self_wallets_reads_strings_and_address_entries():
+    config = {"known_self_wallets": ["0x" + "A" * 40, {"address": " 0x" + "B" * 40 + " ", "why": "x"},
+                                     {"why": "no address"}, None, 7, ""]}
+    assert chk.known_self_wallets(config) == {"0x" + "a" * 40, "0x" + "b" * 40}
+    assert chk.known_self_wallets({}) == set()
+    assert chk.known_self_wallets({"known_self_wallets": None}) == set()
+
+
+def test_a_known_wallet_alert_says_it_is_not_a_new_identification(monkeypatch):
+    from src import alerts
+    sent = []
+    monkeypatch.setattr(alerts, "_send_with_cooldown",
+                        lambda key, hours, subject, body: sent.append((key, subject, body)) or True)
+    base = {"clip_match_ratio": 1.0, "clips_matched": 6, "clips_compared": 6,
+            "cadence_agreement": True, "offset_agreement": True}
+    alerts.alert_execution_program_match(KNOWN, {**base, "known_self": True}, "HIGH")
+    alerts.alert_execution_program_match(STRANGER, base, "HIGH")
+    (key, subject, body), (other_key, other_subject, other_body) = sent
+    assert key == f"execprog_{KNOWN}" and other_key == f"execprog_{STRANGER}"   # cooldown keys kept
+    assert alerts._severity_of(subject) == "HIGH"       # the routing token survives the new text
+    assert "KNOWN" in subject and "KNOWN" not in other_subject
+    assert "already known" in body and "not a new identification" in body
+    assert "not a new identification" not in other_body
+    assert "6 of 6" in body                             # the match itself is still reported
+
+
+def test_main_marks_the_configured_cluster_from_config_not_from_the_roster(tmp_path, monkeypatch):
+    # The tests above hand build_report its set. This runs main(): the set has to come
+    # from config.known_self_wallets, in either entry shape and whatever the case, or the
+    # cap would exist only in the unit tests.
+    import src.alerts
+    import src.utils
+    target = _target(6)
+    known_str, known_dict = "0x" + "C" * 40, "0x" + "d" * 40
+    config = {"target_wallet": TARGET,
+              "known_self_wallets": [known_str, {"address": known_dict, "why": "x"}]}
+    wallets = [known_str.lower(), known_dict, STRANGER]
+    (tmp_path / "roster").mkdir()
+    (tmp_path / "roster" / "latest.json").write_text(json.dumps(
+        {"wallets": [{"wallet": w, "tier": "CONFIRMED", "vectors": ["transfer"]} for w in wallets]}))
+    monkeypatch.setattr(chk, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(chk, "OUT_DIR", tmp_path / "execution_program")
+    monkeypatch.setattr(chk, "load_config", lambda: config)
+    monkeypatch.setattr(chk, "load_target_signature", lambda: target)
+    monkeypatch.setattr(chk, "load_census", lambda: CENSUS)
+    monkeypatch.setattr(chk, "candidate_wallets", lambda cfg, roster, clip_coins: wallets)
+    monkeypatch.setattr(src.utils, "hl_read", lambda body, **kwargs: {"ok": True, "data": []})
+    monkeypatch.setattr(chk.ep, "signature", lambda fills, orders=None: target)
+    routed = []
+    monkeypatch.setattr(src.alerts, "alert_execution_program_match",
+                        lambda wallet, match, severity: routed.append((wallet, severity)))
+
+    chk.main()
+
+    assert sorted(routed) == sorted([(known_str.lower(), "HIGH"), (known_dict, "HIGH"),
+                                     (STRANGER, "CRITICAL")])
+    stored = json.loads((tmp_path / "execution_program" / "latest.json").read_text())
+    assert {m["wallet"]: m["known_self"] for m in stored["matches"]} == {
+        known_str.lower(): True, known_dict: True, STRANGER: False}

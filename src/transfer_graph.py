@@ -1497,6 +1497,44 @@ def fire_alerts(graph: dict, alerts: list[dict]) -> tuple[int, list[str], int]:
 
 # --- I/O wrapper ----------------------------------------------------------------
 
+HL_TRADING_ROLES = ("user", "subAccount")
+
+
+def _number(x) -> bool:
+    """True for a finite int or float: not a bool, a string, NaN or infinity, and not
+    an int past float's range (`math.isfinite` raises OverflowError on one)."""
+    if isinstance(x, bool) or not isinstance(x, (int, float)):
+        return False
+    try:
+        return math.isfinite(x)
+    except OverflowError:
+        return False
+
+
+def trades_on_hl(identity: dict) -> bool:
+    """A Hyperliquid trading account that is trading: it traded in the 30 days
+    before the identity row was read (`checked_at`; `portfolio`'s month volume) or
+    held perp margin when it was read.
+
+    A snapshot of that reading, not of now: a row can be days old, and the month it
+    carries ended when it was read.
+
+    Perp margin alone (webData2's `accountValue`) misses every account whose
+    collateral sits in spot — measured 2026-10-07: five accounts in the target's
+    graph traded $2K-$111M in 30 days while their perp margin read 0. Holding value
+    without trading is not trading: the CONFIRMED config wallet 0x1419e75330... holds
+    $56.7M with no volume. Perp margin is kept in the union so no account the old
+    rule called active stops being protected from the conduit pass."""
+    if not isinstance(identity, dict) or not identity.get("read_ok"):
+        return False
+    if identity.get("role") not in HL_TRADING_ROLES:
+        return False
+    volume, perp = identity.get("month_volume"), identity.get("account_value")
+    traded = _number(volume) and volume > 0
+    margin = _number(perp) and perp > 0
+    return traded or margin
+
+
 def _load_behavioural_scores() -> tuple[dict, set]:
     """Behavioural similarity per wallet, and which wallets are actively trading."""
     scores: dict[str, float] = {}
@@ -1529,15 +1567,16 @@ def _load_behavioural_scores() -> tuple[dict, set]:
             print(f"[graph] could not read candidates: {e}")
     # Wallets the graph found itself were never leaderboard candidates, so
     # `trades_on_hl` could not be true for them. The identity pass asks
-    # Hyperliquid directly; an account holding value there is a participant.
+    # Hyperliquid directly, and `trades_on_hl()` judges the answer on TRADING (volume in
+    # the 30 days before the row was read, or perp margin when it was read), never on
+    # holding value and never on perp margin alone, which reads 0 for an account whose
+    # collateral sits in spot.
     ident = DATA_DIR / "identity" / "latest.json"
     if ident.exists():
         try:
             with open(ident) as f:
                 for w, i in (json.load(f).get("identities") or {}).items():
-                    if not isinstance(i, dict) or not i.get("read_ok"):
-                        continue
-                    if i.get("role") == "user" and (i.get("account_value") or 0) > 0:
+                    if trades_on_hl(i):
                         active.add((w or "").lower())
         except (OSError, ValueError, AttributeError) as e:
             print(f"[graph] could not read identities: {e}")

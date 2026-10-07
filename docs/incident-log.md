@@ -1890,3 +1890,87 @@ all 22,199 authority snapshots kept. Found on the way: an empty protected list
 made `wallet NOT IN (NULL)` - never true - so the first version trimmed no fill
 at all. **A cap in rows does not bound bytes; a budget in bytes needs a byte
 check before it is enforced.**
+
+---
+
+**The execution census never accumulated (2026-09-29 to 2026-10-06).** Commit
+`bb21cb3092` moved the census state from gitignored `data/.local/` into the
+committed tree so the population would build across ephemeral Actions runs. It
+added the new `STATE = …/census_state.json` line above the old one and left
+`STATE = DATA_DIR / ".local" / "execution_census.json"` in place, and the second
+assignment won. Every run started from an empty state, walked the same
+hash-ordered accounts and wrote `measured 1 / attempted 83` (2026-10-05), so
+`is_discriminating`, which needs 20, never passed and the `execution_program`
+vector could not vote. No test pinned the path; CI stayed green. Found while
+designing the candidate study (spec 2026-10-06). **When a fix moves a path, test
+the path.**
+
+---
+
+**Hyperliquid presence was judged on perp margin (found 2026-10-07).** The
+identity row's `account_value` is `webData2`'s perp margin, and it reads 0 for
+an account whose collateral sits in spot. The candidate study's plan used it as
+"Hyperliquid-present" and would have excluded the POSSIBLE lead `0x84abc08c0e…`
+($9.37M in spot, $80.0M of volume in 30 days, $0 of margin). The transfer graph
+did the same: it marked 19 Hyperliquid users in the target's graph as not
+trading, and five of them traded in the last 30 days (volume from $2K to $111M).
+`0x84abc08c0e…` received $999,999.80 straight from the target on 2026-09-10
+(UTC). Measured on their orders, three tag every order with a client ID (maker
+bots: `0x84abc08c0e…`, `0x4c78a97cef…`, `0x07ae8551be…`) and two are web-UI
+traders with no client IDs - `0xb663c9b86c…` (2,000 of 2,000 orders
+FrontendMarket, in his markets xyz:SP500 and ZEC, account since emptied) and
+`0x4a89709691…` (about 80% FrontendMarket) - and he clicks the web UI himself
+(about 8% FrontendMarket), so their order habits do not exclude them. A new
+wallet of his that kept its collateral in spot would never have read as trading
+in his graph, nor been protected from the conduit pass, and the 2026-10-06
+reading that "16 exist on HL, 0 trade" among his 412 depth-1 counterparties was
+wrong for at least `0x84abc08c0e…`. Fixed by storing `portfolio`'s total value
+and 30-day volume on every identity row (`hl_identity.parse_activity`, copied
+into the roster as `hl_total_value` and `hl_month_volume`), and by judging graph
+presence with `transfer_graph.trades_on_hl`: role `user` or `subAccount`, and
+volume in the 30 days before the row was read or perp margin when it was read.
+Holding value is not trading - the CONFIRMED config wallet `0x1419e75330…` holds
+$56.7M and traded nothing in 30 days - and a row probed before the fields
+existed is still judged on perp margin until it is probed again. That is the
+reach limit: the conduit-pass protection sees only addresses the identity probe
+refreshes, and the graph's conduits were not in the probe rota (one was), so
+none carried `month_volume` (9 of its 145 traded $196.5M on Hyperliquid in 30
+days): the first fix did not reach the case the exemption exists for. Fixed by
+queueing the graph's conduits for the identity probe right after the roster's
+leads (`scripts/check_identity.py`, 15 a run), and then by queueing the graph's
+nodes ahead of the conduits, in the graph's own order: 182 of its 299 nodes had
+never been probed either, so whether a wallet the target funded now trades on
+Hyperliquid could not be known for them. At 15 a run, the nodes and then the
+conduits (7 of the 145 are also nodes) take about 30 runs to read once.
+**Perp margin is not presence: "trades there" is 30-day volume, "holds value
+there" is total value - both live in `portfolio`, not `marginSummary`.**
+
+---
+
+**The execution-program CRITICAL path could never fire (2026-09-29 to
+2026-10-07).** `scripts/check_execution_program.py`'s `roster_vector_map` read
+each roster row's `address`, but every roster row is keyed `wallet` (measured
+2026-10-07: 2,635 of 2,635), so the map was always empty,
+`has_independent_vector` was always False, and "a match plus an independent
+vector -> CRITICAL" (CLAUDE.md's execution-program row) could only ever page
+HIGH. Its tests passed a hand-built map and never went through the function.
+Found while the candidate study wired its tooling vote into the same vector;
+fixed in commit `4d3b1bea9c` (reads `wallet`, falls back to `address`), with a
+test through the roster's real shape. No discriminating match existed in that
+window (the census measured 1 account of the 20 it needs), so no alert was
+lost. **A reader of another writer's file is tested through that writer's real
+shape, never a hand-built stand-in.**
+
+The same fix made the next hole reachable, and the final review of the branch
+found it (2026-10-07): `roster.detector_candidates` puts `known_self_wallets` in
+the candidate set and a config wallet carries transfer and linkage vectors by
+construction, so once the census becomes discriminating the treasury or
+`0xf078969e...` reproducing his clip table would have paged CRITICAL "two vectors
+agree", a false identification of a wallet already known. `build_report` now
+marks a config wallet's match `known_self` and `decide_alerts` caps it at HIGH;
+the alert says it is a KNOWN wallet of his now running his program, not a new
+identification, and keeps the `execprog_<wallet>` cooldown key. The independence
+filter is pinned too (a `bool(vectors)` mutant survived every test): a match
+whose roster vectors are only `execution_program` and/or `behavioural` is HIGH,
+never CRITICAL, so the study's own vote cannot corroborate itself. **When a fix
+revives a dead path, audit what the path now permits, not only that it fires.**
