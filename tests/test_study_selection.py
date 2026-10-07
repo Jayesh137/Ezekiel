@@ -191,15 +191,17 @@ def test_a_detector_find_is_dropped_only_when_the_roster_says_it_is_not_a_tradin
     assert sources["detector"] == [A, D, Y]
 
 
-def test_a_detector_find_whose_roster_row_never_read_a_role_is_not_yet_hl_present():
-    # Spec §5: HL-present is the roster's hl_role. A row exists but names no role (the
-    # identity probe has not reached it, or its userRole read failed), so it waits.
-    unread = row(A, role=None)
-    never_probed = row(B)
-    del never_probed["evidence"]["hl_role"]
+def test_a_detector_find_whose_roster_row_has_no_measured_role_is_kept():
+    # An unread role is unknown, and unknown is not no: kept exactly like a find with no
+    # roster row. Only a role the roster MEASURED as not a trading account drops a find.
+    unread = row(A, value=None, role=None)             # hl_role: None, the userRole read failed
+    never_probed = {"wallet": B, "tier": "WATCH", "tier_dropped_from": None,
+                    "is_service": False, "evidence": {}}   # no hl_role key: not probed yet
+    measured_no = [row(C, role="missing"), row(Y, role="vault")]
     sources, _ = sel.by_source({"target_wallet": T},
-                               {"wallets": [unread, never_probed]}, [A, B, C], {}, NOW)
-    assert sources["detector"] == [C]
+                               {"wallets": [unread, never_probed, *measured_no]},
+                               [A, B, C, D, Y], {}, NOW)
+    assert sources["detector"] == [A, B, D]
 
 
 def test_detector_finds_are_ordered_by_evidence_strength_and_ties_keep_the_callers_order():

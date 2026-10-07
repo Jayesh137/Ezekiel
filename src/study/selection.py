@@ -124,14 +124,18 @@ def by_source(config: dict, roster: dict | None, detectors: list, decayed_seen: 
     decayed = [w for w, r in decayed_rows
                if hl_trader(r) and now_ms - seen[w] <= DECAYED_KEEP_MS]
     # A detector measured the account itself, fresher than the roster's weekly read,
-    # so there is no value test. The roster's role still gates a find it has a row
-    # for; a wallet it has no row for is unknown, which is not no.
+    # so there is no value test. Only a role the roster MEASURED as not a trading
+    # account (missing, vault, agent...) drops a find. A row with no role yet (never
+    # probed, or its userRole read failed) is unknown, exactly like no row at all,
+    # and unknown is not no.
     by_wallet = {address(r.get("wallet")): r for r in rows}
     found = []
     for wallet in detectors or []:
         w = address(wallet)
         known = by_wallet.get(w)
-        if w and (known is None or (known.get("evidence") or {}).get("hl_role") in HL_ROLES):
+        role = ((known or {}).get("evidence") or {}).get("hl_role")
+        measured_no = isinstance(role, str) and role not in HL_ROLES
+        if w and not measured_no:
             found.append((w, known))
     found.sort(key=lambda pair: -evidence_strength(pair[1] or {}))   # stable: caller's order ties
     sources = {"pinned": pinned, "roster_lead": leads, "decayed_lead": decayed,
