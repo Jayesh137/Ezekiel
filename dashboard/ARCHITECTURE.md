@@ -432,8 +432,10 @@ The app reads only these fields. Renaming or removing one breaks the phone.
 **`data/roster/latest.json`**: `computed_at`, `target`, and for each of
 `wallets[]`: `.wallet`, `.tier`, `.tier_dropped_from`, `.vectors[]`,
 `.vector_count`, `.rank_strength`, `.is_service`, `.known_self`, `.reasons[]`,
-and the `.evidence` fields `hl_account_value`, `totals.received_from_target_usd`,
-`totals.sent_to_target_usd`, `chains[]` and `hl_birth_ms`.
+and the `.evidence` fields `hl_total_value` (total account value, spot + perp;
+preferred), `hl_account_value` (perp margin only; the fallback while the total is
+unread), `totals.received_from_target_usd`, `totals.sent_to_target_usd`,
+`chains[]` and `hl_birth_ms`.
 
 **`data/watchlist/latest.json`**: `computed_at` (with each wallet's
 `checked_at` as fallback), and for each of `wallets[]`: `.address`,

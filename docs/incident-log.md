@@ -1904,3 +1904,44 @@ hash-ordered accounts and wrote `measured 1 / attempted 83` (2026-10-05), so
 vector could not vote. No test pinned the path; CI stayed green. Found while
 designing the candidate study (spec 2026-10-06). **When a fix moves a path, test
 the path.**
+
+---
+
+**Hyperliquid presence was judged on perp margin (found 2026-10-07).** The
+identity row's `account_value` is `webData2`'s perp margin, and it reads 0 for
+an account whose collateral sits in spot. The candidate study's plan used it as
+"Hyperliquid-present" and would have excluded the POSSIBLE lead `0x84abc08c0e…`
+($9.37M in spot, $80.0M of volume in 30 days, $0 of margin). The transfer graph
+did the same: it marked 19 Hyperliquid users in the target's graph as not
+trading, and five of them traded in the last 30 days (volume from $2K to $111M).
+`0x84abc08c0e…` received $999,999.80 straight from the target on 2026-09-09.
+None of the five makes orders his way - four tag every order with a client ID
+and one is a web-UI trader - so no lead was lost. But a new wallet of his that
+kept its collateral in spot would never have read as trading in his graph, nor
+been protected from the conduit pass, and the 2026-10-06 reading that "16 exist
+on HL, 0 trade" among his 412 depth-1 counterparties was wrong for at least
+`0x84abc08c0e…`. Fixed by storing `portfolio`'s total value and 30-day volume
+on every identity row (`hl_identity.parse_activity`, copied into the roster as
+`hl_total_value` and `hl_month_volume`), and by judging graph presence with
+`transfer_graph.trades_on_hl`: role `user` or `subAccount`, and 30-day volume or
+perp margin held now. Holding value is not trading - the CONFIRMED config wallet
+`0x1419e75330…` holds $56.7M and traded nothing in 30 days - and a row probed
+before the fields existed is still judged on perp margin until it is probed
+again. **Perp margin is not presence: "trades there" is 30-day volume, "holds
+value there" is total value - both live in `portfolio`, not `marginSummary`.**
+
+---
+
+**The execution-program CRITICAL path could never fire (2026-09-29 to
+2026-10-07).** `scripts/check_execution_program.py`'s `roster_vector_map` read
+each roster row's `address`, but every roster row is keyed `wallet` (measured
+2026-10-07: 2,635 of 2,635), so the map was always empty,
+`has_independent_vector` was always False, and "a match plus an independent
+vector -> CRITICAL" (CLAUDE.md's execution-program row) could only ever page
+HIGH. Its tests passed a hand-built map and never went through the function.
+Found while the candidate study wired its tooling vote into the same vector;
+fixed in commit `4d3b1bea9c` (reads `wallet`, falls back to `address`), with a
+test through the roster's real shape. No discriminating match existed in that
+window (the census measured 1 account of the 20 it needs), so no alert was
+lost. **A reader of another writer's file is tested through that writer's real
+shape, never a hand-built stand-in.**

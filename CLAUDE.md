@@ -130,7 +130,10 @@ standing state and the rule each incident taught.
   (`sendToEvmWithData`) minted at his own Arbitrum address.
 - **Walking his money forward is exhausted (measured 2026-10-06).** All 412
   L1 counterparties of the three config wallets (≥$50K) were put to HL: 16
-  exist there and **none trades**, `0x160f6ef9…` ($180M two-way) included.
+  exist there; that reading said none trades, but it judged trading on perp
+  state — `0x84abc08c0e…` ($1M straight from the target, 2026-09-09) trades
+  $80M a month there as a client-ID maker bot (2026-10-07,
+  `docs/incident-log.md`), and `0x160f6ef9…` ($180M two-way) does not trade.
   The 72 newborn ≥$1M HL accounts were funded mostly by Circle (35), an
   account→account send (16), Unit (9), HyperEVM (6) and Bridge2 (6) — so
   another account of his sits behind a custody gap or has no flow link. That

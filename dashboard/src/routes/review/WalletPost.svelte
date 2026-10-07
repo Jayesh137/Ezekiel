@@ -59,7 +59,7 @@
 	{/if}
 
 	<dl class="stats">
-		<div><dt>HL value</dt><dd>{formatUSD(ev.hl_account_value)}</dd></div>
+		<div><dt>HL value</dt><dd>{formatUSD(ev.hl_total_value ?? ev.hl_account_value)}</dd></div>
 		<div><dt>From him</dt><dd>{formatUSD(totals.received_from_target_usd)}</dd></div>
 		<div><dt>To him</dt><dd>{formatUSD(totals.sent_to_target_usd)}</dd></div>
 		<div><dt>Chains</dt><dd>{chains ?? '—'}</dd></div>
