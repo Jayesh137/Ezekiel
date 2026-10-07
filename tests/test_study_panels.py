@@ -31,9 +31,38 @@ def test_panels_never_contain_the_target():
 def test_family_pairs_count_style_agreement_and_trait_disagreement():
     fams = {M: [M, S1, S2]}
     snaps = {M: snap(MAKER), S1: snap(MAKER), S2: snap(HIS_STYLE)}
+    # The star is (M, S1) and (M, S2): S1 agrees with M, S2 does not.
     stats = panels.family_t1(panels.member_pairs(fams, snaps))
-    assert stats["agree"] == (1, 3)
-    assert stats["mismatch"]["client_ids"] == (2, 3)
+    assert stats["agree"] == (1, 2)
+    assert stats["mismatch"]["client_ids"] == (1, 2)
+
+
+def test_a_large_family_contributes_one_pair_per_extra_member():
+    # k measured members give k-1 pairs, not k(k-1)/2: one big operator cannot supply
+    # the whole same-operator panel (spec 8.2's 40-pair bar).
+    members = [f"0x{i:040x}" for i in range(10)]
+    snaps = {m: snap(MAKER) for m in members}
+    pairs = panels.member_pairs({members[0]: members}, snaps)
+    assert len(pairs) == 9
+    # Equal snapshots compare equal, so identity is what shows who was paired with whom.
+    assert all(a is snaps[members[0]] and b is snaps[m]
+               for (a, b), m in zip(pairs, members[1:], strict=True))
+
+
+def test_the_star_centres_on_the_first_measured_member():
+    members = [f"0x{i:040x}" for i in range(4)]
+    snaps = {members[1]: snap(MAKER), members[2]: snap(HIS_STYLE), members[3]: snap(MAKER)}
+    pairs = panels.member_pairs({"a": members}, snaps)
+    # members[0] has no snapshot, so members[1] is the centre.
+    assert pairs == [(snaps[members[1]], snaps[members[2]]), (snaps[members[1]], snaps[members[3]])]
+
+
+def test_every_family_is_its_own_star_and_one_measured_member_forms_no_pair():
+    a, b, c = ([f"0x{x}{i:039x}" for i in range(n)] for x, n in (("a", 3), ("b", 4), ("c", 2)))
+    snaps = {m: snap(MAKER) for m in a + b + c[:1]}  # c's second member was never measured
+    pairs = panels.member_pairs({"a": a, "b": b, "c": c}, snaps)
+    assert len(pairs) == 2 + 3 + 0
+    assert panels.member_pairs({"d": [S1, S2]}, {}) == []
 
 
 def test_unmeasurable_members_are_left_out_not_counted_as_disagreeing():

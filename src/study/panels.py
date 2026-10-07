@@ -35,10 +35,13 @@ def families(surface: dict | None, census_habits: dict | None, *, exclude=()) ->
 
 
 def member_pairs(fams: dict, snapshots: dict) -> list[tuple[dict, dict]]:
+    """Same-operator pairs: within each family, its first measured member against each
+    other measured member — k-1 pairs for k measured members, so one large family
+    cannot supply the whole panel (k(k-1)/2 pairs would)."""
     pairs = []
     for members in fams.values():
         measured = [snapshots[m] for m in members if snapshots.get(m)]
-        pairs.extend((a, b) for i, a in enumerate(measured) for b in measured[i + 1:])
+        pairs.extend((measured[0], other) for other in measured[1:])
     return pairs
 
 

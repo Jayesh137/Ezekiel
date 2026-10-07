@@ -115,18 +115,20 @@ def judge_binary(match: bool | None, *, stranger_k: int, stranger_n: int,
 
 
 def judge_against(traits: list[str], *, family_mismatch: dict[str, tuple[int, int]],
-                  stranger_trait_rate: dict[str, float]) -> dict:
+                  stranger_trait_rate: dict[str, float], stranger_n: int,
+                  min_strangers: int = MIN_STRANGERS) -> dict:
     """T1 only: a trait he never shows dominates the candidate, and same-operator
-    pairs disagree on it at most 10% of the time over at least 40 pairs. `traits` are
-    already filtered by tooling.t1_style (dominant in the candidate, <0.1% of his orders).
+    pairs disagree on it at most 10% of the time over at least 40 pairs. Needs the
+    same 200 strangers as every T1 judgement. `traits` are already filtered by
+    tooling.t1_style (dominant in the candidate, <0.1% of his orders).
     `family_mismatch` maps a trait to (mismatching pairs, total pairs). The LR numerator
     is the one-sided upper bound of the same-operator mismatch rate."""
     if not traits:
         return {"status": "none"}
     measured = {t: tuple(family_mismatch.get(t, (0, 0))) for t in traits}
     ready = {t: v for t, v in measured.items() if v[1] >= MIN_SAME_OP["family"]}
-    if not ready:
-        return {"status": "uncalibrated", "traits": list(traits),
+    if not ready or stranger_n < min_strangers:
+        return {"status": "uncalibrated", "traits": list(traits), "strangers": stranger_n,
                 "pairs": {t: v[1] for t, v in measured.items()}}
     holding = {t: v for t, v in ready.items() if v[0] / v[1] <= AGAINST_MISMATCH}
     if not holding:

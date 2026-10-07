@@ -54,37 +54,43 @@ def test_binary_for_neutral_and_uncalibrated():
     assert cal.judge_binary(None, stranger_k=0, stranger_n=200, same_op=fam)["status"] == "insufficient"
 
 
-def test_against_needs_forty_family_pairs_that_rarely_disagree():
-    got = cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
-                            stranger_trait_rate={"client_ids": 0.54})
+def test_against_needs_forty_family_pairs_that_rarely_disagree_and_two_hundred_strangers():
+    kw = {"stranger_trait_rate": {"client_ids": 0.54}, "stranger_n": 300}
+    got = cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)}, **kw)
     assert got["status"] == "against" and got["lr"] == pytest.approx(0.0705 / 0.54, rel=0.02)
     assert cal.judge_against(["client_ids"], family_mismatch={"client_ids": (6, 41)},
-                             stranger_trait_rate={"client_ids": 0.54})["status"] == "neutral"
+                             **kw)["status"] == "neutral"
     assert cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 20)},
-                             stranger_trait_rate={})["status"] == "uncalibrated"
-    assert cal.judge_against([], family_mismatch={}, stranger_trait_rate={})["status"] == "none"
+                             **kw)["status"] == "uncalibrated"
+    assert cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
+                             stranger_trait_rate={"client_ids": 0.54},
+                             stranger_n=150)["status"] == "uncalibrated"
+    assert cal.judge_against([], family_mismatch={}, stranger_trait_rate={},
+                             stranger_n=300)["status"] == "none"
 
 
 def test_against_lr_under_one():
     # rate 0.54 → LR = 0.0705 / 0.54 ≈ 0.1305 → against
     got = cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
-                            stranger_trait_rate={"client_ids": 0.54})
+                            stranger_trait_rate={"client_ids": 0.54}, stranger_n=300)
     assert got["status"] == "against"
     # rate 0.05 → LR = 0.0705 / 0.05 = 1.41 → neutral
     assert cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
-                             stranger_trait_rate={"client_ids": 0.05})["status"] == "neutral"
+                             stranger_trait_rate={"client_ids": 0.05},
+                             stranger_n=300)["status"] == "neutral"
 
 
 def test_against_handles_zero_rate():
     # rate 0.0 → division by zero, treat as no evidence, neutral
     assert cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
-                             stranger_trait_rate={"client_ids": 0.0})["status"] == "neutral"
+                             stranger_trait_rate={"client_ids": 0.0},
+                             stranger_n=300)["status"] == "neutral"
 
 
 def test_against_missing_rate_is_uncalibrated():
     # rate key missing → uncalibrated
     assert cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
-                             stranger_trait_rate={})["status"] == "uncalibrated"
+                             stranger_trait_rate={}, stranger_n=300)["status"] == "uncalibrated"
 
 
 def test_against_filters_traits_by_lr():
@@ -92,7 +98,8 @@ def test_against_filters_traits_by_lr():
     # Only the first should be in "against"
     got = cal.judge_against(["client_ids", "cancels"],
                             family_mismatch={"client_ids": (0, 41), "cancels": (0, 41)},
-                            stranger_trait_rate={"client_ids": 0.54, "cancels": 0.05})
+                            stranger_trait_rate={"client_ids": 0.54, "cancels": 0.05},
+                            stranger_n=300)
     assert got["status"] == "against"
     assert got["traits"] == ["client_ids"]
 
@@ -198,7 +205,7 @@ def test_inf_strangers_stay_non_matches_and_count():
 def test_against_lr_exactly_one_does_not_count():
     rate = cal.upper_bound(0, 41)
     got = cal.judge_against(["t"], family_mismatch={"t": (0, 41)},
-                            stranger_trait_rate={"t": rate})
+                            stranger_trait_rate={"t": rate}, stranger_n=300)
     assert got["status"] == "neutral"
 
 
@@ -240,14 +247,14 @@ def test_binary_exact_half():
 
 def test_against_inf_rate_is_unmeasured():
     got = cal.judge_against(["t"], family_mismatch={"t": (0, 41)},
-                            stranger_trait_rate={"t": float("inf")})
+                            stranger_trait_rate={"t": float("inf")}, stranger_n=300)
     assert got["status"] == "uncalibrated"
 
 
 def test_against_multiple_counting_traits_min_lr():
     # Two traits both with LR < 1, should use min
     got = cal.judge_against(["t1", "t2"], family_mismatch={"t1": (0, 41), "t2": (1, 41)},
-                            stranger_trait_rate={"t1": 0.54, "t2": 0.54})
+                            stranger_trait_rate={"t1": 0.54, "t2": 0.54}, stranger_n=300)
     assert got["status"] == "against"
     lr1 = cal.upper_bound(0, 41) / 0.54
     lr2 = cal.upper_bound(1, 41) / 0.54
@@ -257,19 +264,29 @@ def test_against_multiple_counting_traits_min_lr():
 def test_against_ten_percent_edge():
     # 4/40 = 10% exactly, should be "against"
     got = cal.judge_against(["t"], family_mismatch={"t": (4, 40)},
-                            stranger_trait_rate={"t": 0.54})
+                            stranger_trait_rate={"t": 0.54}, stranger_n=300)
     assert got["status"] == "against"
     # 5/40 = 12.5% > 10%, should be "neutral"
     got = cal.judge_against(["t"], family_mismatch={"t": (5, 40)},
-                            stranger_trait_rate={"t": 0.54})
+                            stranger_trait_rate={"t": 0.54}, stranger_n=300)
     assert got["status"] == "neutral"
 
 
 def test_against_forty_pair_rule():
     # 39 pairs with measured rate → uncalibrated
     got = cal.judge_against(["t"], family_mismatch={"t": (0, 39)},
-                            stranger_trait_rate={"t": 0.54})
+                            stranger_trait_rate={"t": 0.54}, stranger_n=300)
     assert got["status"] == "uncalibrated"
+
+
+def test_against_stranger_bar_is_exactly_two_hundred_and_says_how_many_it_had():
+    kw = {"family_mismatch": {"t": (0, 41)}, "stranger_trait_rate": {"t": 0.54}}
+    short = cal.judge_against(["t"], stranger_n=199, **kw)
+    assert short["status"] == "uncalibrated" and short["strangers"] == 199
+    assert cal.judge_against(["t"], stranger_n=200, **kw)["status"] == "against"
+    # The bar is a parameter, like judge_continuous's and judge_binary's.
+    assert cal.judge_against(["t"], stranger_n=50, min_strangers=50, **kw)["status"] == "against"
+    assert cal.judge_against(["t"], stranger_n=49, min_strangers=50, **kw)["status"] == "uncalibrated"
 
 
 # C1: ±inf in same-operator lists is kept and counts
