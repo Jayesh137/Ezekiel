@@ -165,18 +165,293 @@ def test_the_study_step_is_bounded_inside_its_job():
     assert run_study.READ_SECONDS + 60 < minutes * 60 < job * 60
 
 
+# --- What the brief specifies and the tests above leave open --------------------------
+
+class LedgerFake(Fake):
+    """Fake, plus the ledger: `ledgers[wallet]` rows are served by time."""
+
+    def __init__(self, *args, ledgers=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ledgers = ledgers or {}
+
+    def __call__(self, body):
+        if body["type"] != "userNonFundingLedgerUpdates":
+            return super().__call__(body)
+        self.calls.append((body["type"], body.get("user")))
+        rows = [r for r in self.ledgers.get(body["user"], [])
+                if body["startTime"] <= r["time"] <= body["endTime"]]
+        return {"ok": True, "data": rows[:2_000]}
+
+
+def reads(fake, kind):
+    return [user for k, user in fake.calls if k == kind]
+
+
+class Budget:
+    """A ReadBudget stand-in that allows `n` more questions."""
+
+    def __init__(self, n=10 ** 9):
+        self.n = n
+
+    def can_continue(self):
+        self.n -= 1
+        return self.n >= 0
+
+
+def test_orders_and_ledger_are_read_once_a_day_and_the_ledger_is_folded(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    deposit = {"time": NOW - records.DAY_MS, "hash": "0x" + "1" * 64,
+               "delta": {"type": "deposit", "usdc": "250000.0"}}
+
+    def fake():
+        return LedgerFake(fills={A: fills}, orders={A: entries(fills)}, ledgers={A: [deposit]})
+
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake())
+    state = archive.load_state(data)["wallets"][A]
+    assert state["orders_cursor_ms"] == state["ledger_cursor_ms"] == state["orders_read_ms"] == NOW
+    day = archive.load_days(A, "2026-10-02", "2026-10-02", data)["2026-10-02"]
+    assert [(r["type"], r["usd"]) for r in day["ledger"]] == [("deposit", 250_000.0)]
+    hourly = fake()  # an hour later: the new fills again, the orders and the ledger not yet
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + records.HOUR_MS, fetch=hourly)
+    assert reads(hourly, "userFillsByTime") == [A]
+    assert reads(hourly, "historicalOrders") == []
+    assert reads(hourly, "userNonFundingLedgerUpdates") == []
+    daily = fake()
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 25 * records.HOUR_MS, fetch=daily)
+    assert reads(daily, "historicalOrders") == [A]
+    assert reads(daily, "userNonFundingLedgerUpdates") == [A]
+
+
+def test_a_full_orders_page_vouches_only_from_its_oldest_order(tmp_path):
+    data = data_dir(tmp_path, [lead(A), lead(B)])
+    busy = program(NOW - 50 * 60_000, 2_500, step=1_000)  # the page holds the newest 2,000
+    quiet = program(NOW - 2 * records.DAY_MS, 50)  # the page holds all of them
+    fake = Fake(fills={A: busy, B: quiet}, orders={A: entries(busy), B: entries(quiet)})
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake)
+    full = archive.load_days(A, "2026-10-03", "2026-10-03", data)["2026-10-03"]
+    assert full["coverage"]["orders"] == [[busy[500]["time"], NOW]]
+    first = records.day_of(NOW - 14 * records.DAY_MS)
+    whole = archive.load_days(B, first, first, data)[first]
+    assert whole["coverage"]["orders"] == [
+        [NOW - 14 * records.DAY_MS, records.day_start_ms(first) + records.DAY_MS]]
+
+
+def test_a_saturated_read_with_nothing_old_enough_moves_the_cursor_and_folds_nothing(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 130_000, 12_000, step=10)  # 100 a second, all inside five minutes
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake(fills={A: fills}))
+    state = archive.load_state(data)["wallets"][A]
+    assert state["fills_cursor_ms"] == fills[2_000]["time"] and state["last_fill_ms"] is None
+    days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
+    assert all(d["coverage"]["fills"] == [] and d["fills"] == 0 for d in days.values())
+
+
+def test_a_spent_budget_ends_the_run_before_any_read_and_the_rows_still_come(tmp_path):
+    data = data_dir(tmp_path, [lead(A), lead(B)])
+    fake = Fake()
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake, read_seconds=0)
+    assert doc["stopped"] and doc["read"] == 0 and doc["unreadable"] == [] and fake.calls == []
+    assert doc["budget"]["stopped_reason"] == "time_budget"
+    assert [r["wallet"] for r in doc["wallets"]] == [A, B]
+
+
+def test_a_stop_ends_the_family_reads_too_and_the_wallet_it_left_goes_first(tmp_path):
+    surface = {"subaccounts": {B: {"master": A}}}
+    data = data_dir(tmp_path, [lead(A), lead(B)], surface=surface)
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    served = {"fills": {A: fills, B: fills}, "orders": {A: entries(fills), B: entries(fills)}}
+    stopped = Fake(**served, errors={("userFillsByTime", B): "rate_limited"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=stopped)
+    assert doc["stopped"] and doc["read"] == 1
+    assert reads(stopped, "userFillsByTime") == [A, B] and reads(stopped, "userFills") == []
+    resumed = Fake(**served)
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000, fetch=resumed)
+    assert reads(resumed, "userFillsByTime") == [B, A]
+
+
+def test_measure_families_takes_a_few_stale_members_and_never_records_a_failed_read():
+    fills = program(NOW - 2 * records.DAY_MS, 150)
+    w = ["0x" + c * 40 for c in "123456"]
+    served = {"fills": {x: fills for x in w}, "orders": {x: entries(fills) for x in w}}
+    fams = {w[0]: w[:3], w[3]: w[3:]}
+    fresh, stale = {"at_ms": NOW - 29 * records.DAY_MS}, {"at_ms": NOW - 31 * records.DAY_MS}
+    panel = {"members": {w[1]: dict(fresh), w[4]: dict(stale)}}
+    assert run_study.measure_families(fams, panel, NOW, Budget(), Fake(**served), limit=3) == 3
+    assert {x: panel["members"][x]["at_ms"] for x in panel["members"]} == {
+        w[0]: NOW, w[1]: fresh["at_ms"], w[2]: NOW, w[3]: NOW, w[4]: stale["at_ms"]}
+    failing = Fake(**served, errors={("userFills", w[0]): "HTTP 500"})
+    panel = {}
+    assert run_study.measure_families(fams, panel, NOW, Budget(), failing) == 5
+    assert set(panel["members"]) == set(w[1:])  # the failed one is simply not recorded
+    refused = Fake(**served, errors={("userFills", w[1]): "rate_limited"})
+    panel = {}
+    assert run_study.measure_families(fams, panel, NOW, Budget(), refused) == 1
+    assert set(panel["members"]) == {w[0]}  # a stop ends the pass
+    panel = {}
+    assert run_study.measure_families(fams, panel, NOW, Budget(2), Fake(**served)) == 2
+
+
+def test_his_days_are_built_by_the_candidates_code_and_marked_as_his(tmp_path):
+    data = data_dir(tmp_path, [])
+    withdrawal = {"time": NOW - 3 * records.DAY_MS + 60_000, "hash": "0x" + "2" * 64,
+                  "delta": {"type": "withdraw", "usdc": "5000.0"}}
+    (data / "ledger").mkdir()
+    (data / "ledger" / "2026-09-30.json").write_text(json.dumps([withdrawal]))
+    (data / "fills" / "2026-09-29.json").write_text(json.dumps([{"coin": "BTC"}, "x", {"time": "?"}]))
+    (data / "orders" / "2026-09-29.json").write_text(json.dumps([{"oid": 1}, 5]))
+    days = run_study.his_days(data, T)  # rows with no time, or no order, are not his
+    assert {(d["role"], d["wallet"]) for d in days.values()} == {("target", T)}
+    assert sum(d["orders"] for d in days.values()) == 300
+    assert sum((d["habits"] or {}).get("orders_seen", 0) for d in days.values()) == 300
+    assert [(r["type"], r["usd"]) for d in days.values() for r in d["ledger"] or []] == [
+        ("withdraw", 5_000.0)]
+    assert run_study.his_days(tmp_path / "nowhere", T) == {}
+
+
+def test_the_study_set_is_capped_by_the_configs_max_wallets(tmp_path):
+    wallets = ["0x" + c * 40 for c in "123"]
+    data = data_dir(tmp_path, [lead(w) for w in wallets])
+    fake = Fake()
+    doc = run_study.run(data_dir=data, config={**CONFIG, "study": {"max_wallets": 2}},
+                        now_ms=NOW, fetch=fake)
+    assert doc["studied"] == 2 and doc["read"] == 2 and len(set(reads(fake, "userFillsByTime"))) == 2
+
+
+def test_the_target_and_his_cluster_never_enter_a_panel(tmp_path):
+    other = "0x" + "c" * 40
+    data = data_dir(tmp_path, [], surface={"subaccounts": {B: {"master": A}}})
+    habits = {T: {"orders_seen": 500}, A: {"orders_seen": 500}, other: {"orders_seen": 500}}
+    (data / "execution_program").mkdir()
+    (data / "execution_program" / "census_state.json").write_text(json.dumps({"habits": habits}))
+    fake = Fake()
+    config = {**CONFIG, "target_wallet": "0x" + T[2:].upper(),  # however the config spells them
+              "known_self_wallets": ["0x" + A[2:].upper()]}
+    doc = run_study.run(data_dir=data, config=config, now_ms=NOW, fetch=fake)
+    assert doc["target"] == T
+    assert doc["panels"]["measurable_strangers"] == 1  # `other` only
+    assert archive.read_json(data / "study" / "panel" / "families.json", {})["families"] == {}
+    assert fake.calls == []
+
+
+def test_sealed_months_are_rolled_and_an_unchanged_dossier_is_not_rewritten(tmp_path, monkeypatch):
+    data = data_dir(tmp_path, [lead(A)])
+    archive.save_days({"2026-09-20": records.empty_day(A, "2026-09-20", "studied")}, data)
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    fake = Fake(fills={A: fills}, orders={A: entries(fills)})
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake)
+    folder = archive.wallet_dir(A, data)
+    assert (folder / "2026-09.jsonl.gz").exists() and not (folder / "2026-09-20.json").exists()
+    assert archive.load_days(A, "2026-09-20", "2026-09-20", data)["2026-09-20"]["wallet"] == A
+    written, real = [], archive.write_compact
+    monkeypatch.setattr(archive, "write_compact",
+                        lambda path, doc: (written.append(Path(path).name), real(path, doc))[1])
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000, fetch=fake)
+    assert f"{A}.json" not in written
+
+
+def test_the_study_clocks_are_kept_between_runs(tmp_path):
+    decayed = lead(A)
+    decayed.update(tier="WATCH", tier_dropped_from="POSSIBLE")
+    data = data_dir(tmp_path, [decayed])
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    state = archive.load_state(data)
+    assert state["decayed_seen"] == {A: NOW}
+    assert state["members"] == {A: {"source": "decayed_lead", "since_ms": NOW}}
+    month = NOW + 30 * records.DAY_MS
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=month, fetch=Fake())
+    assert doc["wallets"][0]["studied_since_ms"] == NOW
+    assert archive.load_state(data)["members"][A]["since_ms"] == NOW
+    over = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 61 * records.DAY_MS,
+                         fetch=Fake())
+    assert over["studied"] == 0  # 60 days from first seen decayed
+
+
+def test_the_command_line_caps_the_set_and_the_reads(tmp_path, monkeypatch, capsys):
+    seen = {}
+
+    def fake_run(**kwargs):
+        seen.update(kwargs)
+        return {"studied": 1, "read": 1, "unreadable": [], "stopped": False, "panels": {}}
+
+    monkeypatch.setattr(run_study, "run", fake_run)
+    assert run_study.main(["--data-dir", str(tmp_path), "--max-wallets", "5",
+                           "--read-seconds", "60"]) == 0
+    assert seen["data_dir"] == tmp_path and seen["read_seconds"] == 60
+    assert seen["config"]["study"]["max_wallets"] == 5
+    assert "[study] 1 studied, 1 read, 0 unreadable" in capsys.readouterr().out
+
+
+def test_a_failed_orders_or_ledger_read_is_retried_and_what_was_folded_stays(tmp_path):
+    data = data_dir(tmp_path, [lead(A), lead(B)])
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    served = {"fills": {A: fills, B: fills}, "orders": {A: entries(fills), B: entries(fills)}}
+    broken = Fake(**served, errors={("historicalOrders", A): "HTTP 500",
+                                    ("userNonFundingLedgerUpdates", B): "HTTP 500"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=broken)
+    state = archive.load_state(data)["wallets"]
+    assert not doc["stopped"] and doc["read"] == 2  # a failure is not a stop
+    assert "fills_cursor_ms" in state[A] and "orders_cursor_ms" not in state[A]
+    assert "orders_cursor_ms" in state[B] and "ledger_cursor_ms" not in state[B]
+    assert "orders_read_ms" not in state[A] and "orders_read_ms" not in state[B]
+    assert reads(broken, "userNonFundingLedgerUpdates") == [B]  # A's was never asked
+    healthy = Fake(**served)
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000, fetch=healthy)
+    assert reads(healthy, "historicalOrders") == [A, B]  # both retried at once
+    for wallet in (A, B):
+        days = archive.load_days(wallet, "2026-09-01", "2026-10-31", data)
+        assert sum((d["habits"] or {}).get("orders_seen", 0) for d in days.values()) == 50
+
+
+def test_a_foreign_file_of_the_wrong_shape_is_read_as_absent(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    for name, body in (("dormancy/latest.json", "[1, 2]"), ("newborn/latest.json", "{"),
+                       ("execution_program/census.json", '{"hits": [null, "x", {"wallet": 7}]}'),
+                       ("tape/latest.json", "[1, 2]"),
+                       ("execution_program/census_state.json", "{"),
+                       ("provenance/latest.json", "null"), ("hl_surface/latest.json", "[1, 2]")):
+        (data / name).parent.mkdir(parents=True, exist_ok=True)
+        (data / name).write_text(body)
+    assert run_study.detector_wallets(data) == []
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    assert doc["studied"] == 1 and doc["unreadable"] == []
+
+
+def test_a_first_read_reaches_back_fourteen_days(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    inside, outside = program(NOW - 13 * records.DAY_MS, 20), program(NOW - 15 * records.DAY_MS, 20)
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake(fills={A: outside + inside}))
+    days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
+    assert sum(d["orders"] for d in days.values()) == 20
+
+
+def test_the_rows_read_the_last_120_days_counting_today(tmp_path):
+    data = data_dir(tmp_path, [lead(A), lead(B)])
+    inside = records.day_of(NOW - 119 * records.DAY_MS)
+    corrupt_day(data, A, inside)
+    corrupt_day(data, B, records.day_of(NOW - 120 * records.DAY_MS))
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    assert [u["wallet"] for u in doc["unreadable"]] == [A]
+
+
 def test_a_wallet_that_leaves_the_set_keeps_its_archive_and_its_dossier_says_since_when(tmp_path):
     data = data_dir(tmp_path, [lead(A)])
     fills = program(NOW - 2 * records.DAY_MS, 50)
     fake = Fake(fills={A: fills}, orders={A: entries(fills)})
     run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake)
+    before = archive.load_state(data)  # A still a member
     (data / "roster" / "latest.json").write_text(json.dumps({"wallets": []}))
     later = NOW + 15 * records.DAY_MS  # past the 14 days a new member keeps its place
     doc = run_study.run(data_dir=data, config=CONFIG, now_ms=later, fetch=fake)
-    dossier = archive.read_json(data / "study" / "wallets" / f"{A}.json", {})
-    assert doc["studied"] == 0 and dossier["left_ms"] == later
+    dossier_path = data / "study" / "wallets" / f"{A}.json"
+    assert doc["studied"] == 0 and archive.read_json(dossier_path, {})["left_ms"] == later
     days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
     assert sum(d["orders"] for d in days.values()) == 50
+    # a run that died after dating the dossier and before saving its state meets the
+    # wallet leaving again: the date it was first given stands
+    archive.save_state(before, data)
+    run_study.run(data_dir=data, config=CONFIG, now_ms=later + records.HOUR_MS, fetch=fake)
+    assert archive.read_json(dossier_path, {})["left_ms"] == later
 
 
 # --- Change A: the order of detector finds -------------------------------------------
@@ -299,7 +574,9 @@ def test_a_bad_file_only_the_assembly_window_reaches_is_reported_there(tmp_path)
     assert doc["read"] == 1  # its new fills were read and folded
     assert [u["wallet"] for u in doc["unreadable"]] == [A]
     assert doc["unreadable"][0]["error"].startswith("archive: ")
-    assert doc["wallets"][0]["families"]["tooling"]["verdict"] == "unreadable"
+    row = doc["wallets"][0]
+    assert row["families"]["tooling"]["verdict"] == "unreadable"
+    assert row["account_value"] == 2e6 and row["last_read_ms"] == NOW  # what is known stays known
     assert old.read_bytes() == b"{" and not (data / "study" / "wallets" / f"{A}.json").exists()
 
 
