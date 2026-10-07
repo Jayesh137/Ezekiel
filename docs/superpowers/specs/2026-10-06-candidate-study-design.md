@@ -241,8 +241,12 @@ the day's five busiest coins plus `_other`, which the cross-coin reading of T4
 needs); `decisions` are `[t_ms, coin, side, kind]` with kind `session`, `run` or
 `manual`; `habits` come from orders only (taker share comes from fills); and each
 coin carries `px_sum`/`px_n` instead of `px_median`, because a median cannot be
-added across batches. `habits`, `manual_minutes` and `ledger` stay `null` for a
-day no read of that kind covered.
+added across batches. A coin's `taker_clips` keeps its 20 commonest sizes and counts
+the rest under `_other` (a maker bot quoting random sizes put 1,045 distinct BTC sizes
+in one day's record, 42 KB against the budget below); the map's total is still the
+coin's taker order count, and the clip rule, which needs only the dominant size and
+that total, reads it unchanged (`_other` is in the total, never the clip). `habits`,
+`manual_minutes` and `ledger` stay `null` for a day no read of that kind covered.
 
 Rules: a field the reads did not cover is absent or `null`, never 0; minutes
 outside `coverage.fills` are *unknown*, never quiet; a **covered day** has ≥ 20

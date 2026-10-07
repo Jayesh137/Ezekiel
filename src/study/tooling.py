@@ -155,9 +155,12 @@ def clip_signature(summary: dict, prof: dict | None = None) -> dict:
             continue
         sizes = stats.get("taker_clips") or {}
         total = sum(sizes.values())
-        if not total:
+        # OTHER_SIZE holds the orders of sizes the daily records stopped naming: they belong in
+        # the total, but it is never the clip (and a coin with nothing else has none).
+        named = {size: n for size, n in sizes.items() if size != records.OTHER_SIZE}
+        if not total or not named:
             continue
-        key, count = max(sizes.items(), key=lambda kv: (kv[1], kv[0]))
+        key, count = max(named.items(), key=lambda kv: (kv[1], kv[0]))
         share = count / total
         if total >= ep.MIN_CLIP_ORDERS and share >= ep.MIN_CLIP_SHARE:
             size = float(key)

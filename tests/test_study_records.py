@@ -1,6 +1,7 @@
 """Daily records: additive, never counting a fill twice, never claiming what was not read."""
 
 import copy
+import random
 
 from src.study import records as rec
 
@@ -30,6 +31,31 @@ def ledger_row(i, usd=None, kind="send"):
     carries no value field at all (a spotGenesis, say), which is ordinary in a real ledger."""
     delta = {"type": kind} if usd is None else {"type": kind, "usd": str(usd)}
     return {"time": DAY0 + i, "hash": f"0x{i:040x}", "delta": delta}
+
+
+def sized_fills(counts, coin="BTC", start=DAY0 + HOUR, gap_ms=1_000, seed=1):
+    """One taker fill per order, `gap_ms` apart from `start`, shuffled so no size comes in a
+    block. `counts` maps a size string to the number of orders that carry it. Order ids are the
+    times, so two coins read in one test need starts that keep their times apart."""
+    sizes = [size for size, n in counts.items() for _ in range(n)]
+    random.Random(seed).shuffle(sizes)
+    return [fill(start + i * gap_ms, coin, sz=size) for i, size in enumerate(sizes)]
+
+
+def many_sizes(first, n):
+    """`n` distinct sizes, 0.001 apart, from `first`, spelled as the records key them."""
+    return [rec.size_key(round(first + k / 1000, 3)) for k in range(n)]
+
+
+def fold_day(fills, days=None, start=DAY0, end=DAY0 + rec.DAY_MS):
+    days = {} if days is None else days
+    rec.fold_fills(days, fills, wallet=W, role="studied", start_ms=start, end_ms=end,
+                   last_fill_ms=None)
+    return days
+
+
+def clips_of(days, coin="BTC", day="2026-10-02"):
+    return days[day]["coins"][coin]["taker_clips"]
 
 
 def test_minutes_round_trip():
@@ -369,3 +395,85 @@ def test_folding_a_covered_ledger_span_again_changes_nothing():
     rec.fold_ledger(days, rows, wallet=W, role="studied",
                     start_ms=DAY0, end_ms=DAY0 + rec.DAY_MS)
     assert days == once
+
+
+# --- the taker-size bound -----------------------------------------------------------------
+
+def test_a_coins_taker_sizes_are_bounded_and_the_clip_stays_exact():
+    """A bot quoting random sizes put 1,045 distinct BTC sizes in one day's record. Each fold
+    keeps the 20 commonest sizes and counts the rest under OTHER_SIZE, so the two numbers the
+    clip rule reads, the dominant size's count and the coin's taker total, stay exact."""
+    first = sized_fills({"0.1": 9_000, **dict.fromkeys(many_sizes(0.5, 1_000), 1)})
+    second = sized_fills({"0.1": 900, **dict.fromkeys(many_sizes(2.0, 100), 1)},
+                         start=DAY0 + 13 * HOUR, seed=2)
+    mid = DAY0 + 12 * HOUR
+    days = fold_day(first, end=mid)
+    coin, clips = days["2026-10-02"]["coins"]["BTC"], clips_of(days)
+    assert len(clips) == rec.MAX_CLIP_SIZES + 1
+    assert clips["0.1"] == 9_000
+    assert sum(clips.values()) == coin["px_n"] == days["2026-10-02"]["taker_orders"] == 10_000
+    # More fills into the same day: the bound still holds and nothing is lost on the way.
+    fold_day(second, days, start=mid)
+    coin, clips = days["2026-10-02"]["coins"]["BTC"], clips_of(days)
+    assert len(clips) == rec.MAX_CLIP_SIZES + 1
+    assert clips["0.1"] == 9_900
+    assert sum(clips.values()) == coin["px_n"] == days["2026-10-02"]["taker_orders"] == 11_000
+    # Folding either span again adds nothing: coverage, not the bound, keeps the counts exact.
+    folded = copy.deepcopy(days)
+    fold_day(first, days, end=mid)
+    fold_day(second, days, start=mid)
+    assert days == folded
+
+
+def test_twenty_sizes_are_kept_whole_and_a_twenty_first_is_counted_under_other():
+    counts = {size: k + 1 for k, size in enumerate(many_sizes(0.2, rec.MAX_CLIP_SIZES))}
+    clips = clips_of(fold_day(sized_fills(counts)))
+    assert clips == counts and rec.OTHER_SIZE not in clips
+    sizes = many_sizes(0.2, rec.MAX_CLIP_SIZES + 1)
+    counts = {size: k + 1 for k, size in enumerate(sizes)}  # sizes[0] is used once: the rarest
+    clips = clips_of(fold_day(sized_fills(counts)))
+    assert set(clips) == set(sizes[1:]) | {rec.OTHER_SIZE}
+    assert clips[rec.OTHER_SIZE] == 1
+
+
+def test_only_a_coin_over_the_bound_is_bounded():
+    calm = dict.fromkeys(many_sizes(0.2, rec.MAX_CLIP_SIZES), 3)
+    busy = {"0.1": 90, **dict.fromkeys(many_sizes(0.5, 100), 1)}
+    days = fold_day(sized_fills(busy, coin="BTC")
+                    + sized_fills(calm, coin="ETH", start=DAY0 + 5 * HOUR))
+    assert clips_of(days, "ETH") == calm
+    btc = clips_of(days, "BTC")
+    assert len(btc) == rec.MAX_CLIP_SIZES + 1 and btc["0.1"] == 90 and sum(btc.values()) == 190
+
+
+def test_the_commonest_sizes_are_the_ones_kept():
+    """Ranked by count, not by arrival or by key: of 30 sizes used 1 to 30 times each, the 20
+    used most stay and the 10 rarest are counted under OTHER_SIZE."""
+    counts = {size: (k * 7) % 30 + 1 for k, size in enumerate(many_sizes(0.2, 30))}  # 1..30
+    clips = clips_of(fold_day(sized_fills(counts)))
+    rarest = sorted(counts, key=counts.get)[:10]
+    assert set(clips) == (set(counts) - set(rarest)) | {rec.OTHER_SIZE}
+    assert all(clips[size] == counts[size] for size in counts if size not in rarest)
+    assert clips[rec.OTHER_SIZE] == sum(counts[size] for size in rarest) == 55
+
+
+def test_sizes_of_equal_count_keep_the_smaller_key_whatever_the_arrival_order():
+    sizes = many_sizes(0.101, 25)
+    forward = clips_of(fold_day(sized_fills(dict.fromkeys(sizes, 1), seed=1)))
+    backward = clips_of(fold_day(sized_fills(dict.fromkeys(reversed(sizes), 1), seed=2)))
+    assert forward == backward
+    assert set(forward) == set(sizes[:rec.MAX_CLIP_SIZES]) | {rec.OTHER_SIZE}
+    assert forward[rec.OTHER_SIZE] == 5
+
+
+def test_the_other_bucket_is_not_a_size_when_bounding():
+    """After a fold the map holds 20 sizes and OTHER_SIZE. A later fold that brings no new size
+    has nothing to bound: OTHER_SIZE is not a 21st size, however large its count."""
+    days = fold_day(sized_fills({"0.1": 50, **dict.fromkeys(many_sizes(0.5, 300), 1)}),
+                    end=DAY0 + 6 * HOUR)
+    kept = set(clips_of(days))
+    assert len(kept) == rec.MAX_CLIP_SIZES + 1 and clips_of(days)[rec.OTHER_SIZE] == 281
+    fold_day(sized_fills({"0.1": 5}, start=DAY0 + 7 * HOUR), days, start=DAY0 + 6 * HOUR)
+    clips = clips_of(days)
+    assert set(clips) == kept
+    assert (clips["0.1"], clips[rec.OTHER_SIZE]) == (55, 281)

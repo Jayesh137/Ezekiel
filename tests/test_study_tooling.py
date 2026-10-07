@@ -1,5 +1,8 @@
 """Tooling tests: how a wallet's orders are made, compared with his."""
 
+import random
+
+from src import execution_program as ep
 from src.study import records, tooling
 
 W = "0x" + "d" * 40
@@ -343,3 +346,71 @@ def test_g5_program_runs_absent_returns_none():
     snap = {"clip_table": {"BTC": 0.1}, "clip_notionals": {"BTC": 1000.0}, "ioc5": 0.95}
     sig = tooling.snapshot_signature(snap)
     assert sig["program_runs"] is None
+
+
+# The bounded size map (spec 6.3): the clip rule reads only the dominant size and the total.
+
+DAY1 = 1_790_899_200_000  # 2026-10-02 00:00:00 UTC
+
+
+def mixed_fills(start, coin, clip, n_clip, n_other, other_from=0.5, seed=1):
+    """`n_clip` taker orders of size `clip` and one order at each of `n_other` other sizes,
+    shuffled, one every second from `start`."""
+    sizes = [clip] * n_clip + [f"{other_from + k / 1000:.3f}" for k in range(n_other)]
+    random.Random(seed).shuffle(sizes)
+    return [{"coin": coin, "side": "A", "sz": size, "px": "100.0", "time": start + i * 1_000,
+             "crossed": True, "oid": start + i * 1_000, "tid": start + i * 1_000}
+            for i, size in enumerate(sizes)]
+
+
+def bounded_tables(fills):
+    """(days, the clip table rebuilt from the daily records, the one read from the raw fills)."""
+    days = {}
+    times = [f["time"] for f in fills]
+    records.fold_fills(days, fills, wallet=W, role="studied", start_ms=min(times),
+                       end_ms=max(times) + 1, last_fill_ms=None)
+    summary = tooling.summarise(list(days.values()))
+    return days, tooling.clip_signature(summary)["clip_table"], ep.signature(fills)["clip_table"]
+
+
+def clip_table_of(clips):
+    return tooling.clip_signature({"coins": {"BTC": {"taker_clips": clips, "px_sum": 0.0,
+                                                     "px_n": 0}}})["clip_table"]
+
+
+def test_a_bounded_size_map_still_gives_a_dominant_clip():
+    """A clip of 90% of a coin's orders beside 1,000 other sizes, over two days (22:30 to 01:17
+    UTC): each day's map is bounded and the table is still the one execution_program reads."""
+    start = DAY1 + 22 * records.HOUR_MS + 30 * records.MINUTE_MS
+    days, mine, direct = bounded_tables(mixed_fills(start, "BTC", "0.1", 9_000, 1_000))
+    assert sorted(days) == ["2026-10-02", "2026-10-03"]
+    assert all(len(day["coins"]["BTC"]["taker_clips"]) == records.MAX_CLIP_SIZES + 1
+               for day in days.values())
+    assert direct == {"BTC": {"size": 0.1, "share": 0.9, "count": 9_000}}
+    assert mine == direct
+
+
+def test_a_bounded_size_map_still_gives_a_seventy_percent_coin_no_clip():
+    """A top size of 70% beside 500 other sizes is no clip. The orders counted under `_other`
+    are part of the total: left out of it the share would read 97% and invent one."""
+    days, mine, direct = bounded_tables(
+        mixed_fills(DAY1 + 23 * records.HOUR_MS + 55 * records.MINUTE_MS, "ETH", "0.05", 1_167, 500,
+                    other_from=2.0, seed=2))
+    assert sorted(days) == ["2026-10-02", "2026-10-03"]
+    assert all(records.OTHER_SIZE in day["coins"]["ETH"]["taker_clips"] for day in days.values())
+    assert direct == {} and mine == {}
+
+
+def test_orders_counted_under_other_are_in_the_total_the_clip_share_is_taken_of():
+    other = records.OTHER_SIZE
+    # 80 of 100 is MIN_CLIP_SHARE, and the 20 counted under `_other` are taker orders too.
+    assert clip_table_of({"0.1": 80, other: 20}) == {
+        "BTC": {"size": 0.1, "share": 0.8, "count": 80}}
+    assert clip_table_of({"0.1": 79, other: 21}) == {}
+
+
+def test_a_coin_where_other_out_counts_every_size_has_no_clip_and_does_not_raise():
+    other = records.OTHER_SIZE
+    # `_other` is not a size: picking it as the dominant one meant float("_other") raised.
+    assert clip_table_of({"0.1": 4, other: 40}) == {}
+    assert clip_table_of({other: 50}) == {}

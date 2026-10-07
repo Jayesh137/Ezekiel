@@ -37,6 +37,13 @@ MAX_COINS = 20
 MAX_COIN_MINUTE_MAPS = 5
 MAX_LEDGER = 50
 OTHER = "_other"
+# A coin's `taker_clips` maps each taker order size to a count, so a bot quoting random sizes
+# grows it without limit (1,045 distinct BTC sizes in one day: a 42 KB day file against the
+# 15 KB the spec budgets). Each fold keeps the MAX_CLIP_SIZES commonest sizes and counts the
+# rest under OTHER_SIZE (a key of that map, not the coin-level OTHER). `ep.clip_table` reads only
+# the dominant size's count and the coin's total, both of which stay exact.
+MAX_CLIP_SIZES = 20
+OTHER_SIZE = "_other"
 TIFS = ("Ioc", "Gtc", "Alo", "FrontendMarket")
 
 
@@ -214,6 +221,21 @@ def _cap_coins(record: dict) -> None:
     record["coins"] = kept
 
 
+def _bound_clip_sizes(record: dict) -> None:
+    """Bound every coin's `taker_clips` to its MAX_CLIP_SIZES commonest sizes. The rest are
+    added to OTHER_SIZE (not counted as a size, so the bound is idempotent), which keeps the
+    map's total, the coin's taker order count, exact. Equal counts keep the smaller key."""
+    for stats in record["coins"].values():
+        clips = stats.get("taker_clips")  # the coin-level OTHER has none
+        sizes = [(size, n) for size, n in (clips or {}).items() if size != OTHER_SIZE]
+        if len(sizes) <= MAX_CLIP_SIZES:
+            continue
+        sizes.sort(key=lambda item: (-item[1], item[0]))
+        kept = dict(sizes[:MAX_CLIP_SIZES])
+        kept[OTHER_SIZE] = clips.get(OTHER_SIZE, 0) + sum(n for _size, n in sizes[MAX_CLIP_SIZES:])
+        stats["taker_clips"] = kept
+
+
 def _add_coin(record: dict, order: dict) -> None:
     """Add an order's stats to a coin (does not cap; capping is done per fold)."""
     stats = record["coins"].setdefault(str(order["coin"]), {
@@ -307,6 +329,7 @@ def fold_fills(days: dict, fills: list, *, wallet: str, role: str, start_ms: int
         previous = t
     for day in {day_of(int(o["t"])) for o in orders}:
         _cap_coins(days[day])
+        _bound_clip_sizes(days[day])
     for run in taker_runs(orders):
         summary = run_summary(run)
         record = days[day_of(summary["start_ms"])]
