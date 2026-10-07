@@ -130,6 +130,14 @@ def test_rank_sums_families_and_skips_a_family_with_no_lr():
                          "lifecycle": {"lr": None}}) == 4.0
 
 
+def test_rank_sums_tooling_and_timing_only():
+    # Spec 8.3: a lifecycle or strategy family that ever carries an lr adds nothing.
+    assert verdict.rank({"tooling": {"lr": 100.0}, "strategy": {"lr": 1e6}}) == 2.0
+    assert verdict.rank({"tooling": {"lr": 100.0}, "lifecycle": {"lr": 0.001}}) == 2.0
+    assert verdict.rank({"lifecycle": {"lr": 1e6}, "strategy": {"lr": 1e6}}) == 0.0
+    assert verdict.rank({}) == 0.0
+
+
 def test_newly_reports_only_transitions():
     def row(wallet, v):
         return {"wallet": wallet, "families": {"tooling": {"verdict": v}}}

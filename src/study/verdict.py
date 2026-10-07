@@ -15,6 +15,7 @@ import math
 FOR, AGAINST, MIXED = "for", "against", "mixed"
 NEUTRAL, UNCALIBRATED, INSUFFICIENT = "neutral", "uncalibrated", "insufficient"
 TOOLING = ("T1", "T2", "T3")
+RANKED = ("tooling", "timing")  # spec §8.3: only these families add to the study rank
 FAMILY_BASIS = "family"  # T1's against is judged on same-operator family pairs only
 
 
@@ -73,9 +74,11 @@ def family_verdict(tests: dict, names: tuple[str, ...]) -> dict:
 
 
 def rank(families: dict) -> float:
+    """Σ log10 LR over tooling and timing, each clipped to [-2, +2] (spec §8.3). A
+    lifecycle or strategy family adds nothing, whatever it carries."""
     total = 0.0
-    for family in families.values():
-        lr = family.get("lr")
+    for name in RANKED:
+        lr = (families.get(name) or {}).get("lr")
         if isinstance(lr, (int, float)) and lr > 0:
             total += max(-2.0, min(2.0, math.log10(lr)))
     return round(total, 3)
