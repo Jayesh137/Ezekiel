@@ -50,19 +50,28 @@ def upper_bound(k: int, n: int, confidence: float = CONFIDENCE) -> float:
 
 
 def _usable(same_op: dict) -> dict:
-    return {name: values for name, values in (same_op or {}).items()
-            if len(values) >= MIN_SAME_OP.get(name, math.inf)}
+    """Filter same_op lists to those with enough values, dropping NaN entries."""
+    result = {}
+    for name, values in (same_op or {}).items():
+        # Drop NaN values before counting
+        clean = [v for v in values if math.isfinite(v)]
+        if len(clean) >= MIN_SAME_OP.get(name, math.inf):
+            result[name] = clean
+    return result
 
 
 def judge_continuous(x, *, strangers: list[float], same_op: dict[str, list[float]],
                      higher_is_better: bool, min_strangers: int = MIN_STRANGERS) -> dict:
     """T2/T3. `strangers` holds one value per measurable stranger; one that cannot
-    produce the statistic carries -inf (higher is better) or inf (lower is better)."""
-    if x is None:
+    produce the statistic carries -inf (higher is better) or inf (lower is better).
+    NaN values in strangers or same_op lists are dropped before any count."""
+    if x is None or not math.isfinite(x):
         return {"status": "insufficient"}
+    # Drop NaN from strangers before counting
+    clean_strangers = [s for s in strangers if math.isfinite(s)]
     usable = _usable(same_op)
-    if len(strangers) < min_strangers or not usable:
-        return {"status": "uncalibrated", "strangers": len(strangers),
+    if len(clean_strangers) < min_strangers or not usable:
+        return {"status": "uncalibrated", "strangers": len(clean_strangers),
                 "same_op": {k: len(v) for k, v in (same_op or {}).items()}}
     medians = [median(values) for values in usable.values()]
     level = min([x, *medians]) if higher_is_better else max([x, *medians])
@@ -70,11 +79,12 @@ def judge_continuous(x, *, strangers: list[float], same_op: dict[str, list[float
     def reaches(value) -> bool:
         return value >= level if higher_is_better else value <= level
 
-    k = sum(1 for s in strangers if reaches(s))
-    ub = upper_bound(k, len(strangers))
+    k = sum(1 for s in clean_strangers if reaches(s))
+    ub = upper_bound(k, len(clean_strangers))
     rate = min(sum(1 for v in values if reaches(v)) / len(values) for values in usable.values())
-    return {"status": "for" if ub <= FOR_UPPER else "neutral", "level": round(level, 4),
-            "stranger_k": k, "stranger_n": len(strangers), "stranger_upper": round(ub, 5),
+    return {"status": "for" if ub <= FOR_UPPER and rate >= 0.5 else "neutral",
+            "level": round(level, 4),
+            "stranger_k": k, "stranger_n": len(clean_strangers), "stranger_upper": round(ub, 5),
             "same_op_rate": round(rate, 4), "basis": "+".join(sorted(usable)),
             "lr": round(rate / ub, 2)}
 
@@ -82,7 +92,7 @@ def judge_continuous(x, *, strangers: list[float], same_op: dict[str, list[float
 def judge_binary(match: bool | None, *, stranger_k: int, stranger_n: int,
                  same_op: dict[str, tuple[int, int]],
                  min_strangers: int = MIN_STRANGERS) -> dict:
-    """T1. `same_op` maps a basis to (agreeing pairs or windows, total)."""
+    """T1. `same_op` maps a basis to (agreeing, total) pairs or windows."""
     if match is None:
         return {"status": "insufficient"}
     usable = {name: v for name, v in (same_op or {}).items()
@@ -103,7 +113,9 @@ def judge_binary(match: bool | None, *, stranger_k: int, stranger_n: int,
 def judge_against(traits: list[str], *, family_mismatch: dict[str, tuple[int, int]],
                   stranger_trait_rate: dict[str, float]) -> dict:
     """T1 only: a trait he never shows dominates the candidate, and same-operator
-    pairs disagree on it at most 10% of the time over at least 40 pairs."""
+    pairs disagree on it at most 10% of the time over at least 40 pairs. `family_mismatch`
+    maps a trait to (mismatching pairs, total pairs). The LR numerator is the one-sided
+    upper bound of the same-operator mismatch rate."""
     if not traits:
         return {"status": "none"}
     measured = {t: tuple(family_mismatch.get(t, (0, 0))) for t in traits}
@@ -114,8 +126,32 @@ def judge_against(traits: list[str], *, family_mismatch: dict[str, tuple[int, in
     holding = {t: v for t, v in ready.items() if v[0] / v[1] <= AGAINST_MISMATCH}
     if not holding:
         return {"status": "neutral", "traits": list(traits)}
-    ratios = [upper_bound(k, n) / stranger_trait_rate[t]
-              for t, (k, n) in holding.items() if stranger_trait_rate.get(t)]
-    return {"status": "against", "traits": sorted(holding),
-            "same_op_mismatch": {t: f"{k}/{n}" for t, (k, n) in holding.items()},
-            "lr": round(min(ratios), 4) if ratios else None}
+
+    # A holding trait counts only when stranger rate is finite > 0 AND LR < 1
+    counting = {}
+    all_measured = True
+    for t, (k, n) in holding.items():
+        rate = stranger_trait_rate.get(t)
+        # Check if rate is measured (not None or non-finite)
+        if rate is None or not math.isfinite(rate):
+            all_measured = False
+        # Check if trait counts: rate > 0 and LR < 1
+        elif rate > 0:
+            lr = upper_bound(k, n) / rate
+            if lr < 1:
+                counting[t] = (k, n)
+
+    if counting:
+        # Some traits count as evidence against
+        lrs = [upper_bound(k, n) / stranger_trait_rate[t]
+               for t, (k, n) in counting.items()]
+        return {"status": "against", "traits": sorted(counting),
+                "same_op_mismatch": {t: f"{k}/{n}" for t, (k, n) in counting.items()},
+                "lr": round(min(lrs), 4)}
+    elif all_measured:
+        # Holding traits exist, none count, all have measured rates → neutral
+        return {"status": "neutral", "traits": list(traits)}
+    else:
+        # Some holding trait lacks measured rate → uncalibrated
+        return {"status": "uncalibrated", "traits": list(traits),
+                "pairs": {t: v[1] for t, v in holding.items()}}
