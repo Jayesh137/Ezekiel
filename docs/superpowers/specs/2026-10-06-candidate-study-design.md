@@ -682,7 +682,7 @@ Each phase is merged and run in production before the next starts.
 > bar are reported and not required — neither measures whether Phase 1 recognises him. A daily
 > cloud routine runs the gate and, once it exits 0, builds Phase 2 from this spec and merges it
 > when CI, the full suite and a live dry run pass, every new vote shipping non-voting until its
-> own panels are calibrated.
+> own panels are calibrated. Its settings and prompt: `docs/superpowers/plans/2026-10-07-phase-2-routine.md`.
 
 ## 16. Risks and open questions
 
