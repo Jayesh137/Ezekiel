@@ -37,7 +37,8 @@ from src.utils import DATA_DIR, hl_post, load_config
 # times over inside the seven-day recheck window; the cluster is read on
 # every run regardless, which is where a new agent or sub-account appears.
 MAX_OTHERS = 15
-# Re-probe a non-cluster address this many days after its last reading.
+# Re-probe a non-cluster address this many days after its last reading, or at once
+# when its row predates the `total_value` field (see _stale).
 RECHECK_DAYS = 7
 
 
@@ -78,6 +79,16 @@ def _previous() -> dict:
 
 
 def _stale(ident: dict, now: datetime) -> bool:
+    """Due a re-read: the reading is RECHECK_DAYS old, or it predates the portfolio fields.
+
+    `total_value` arrived with `parse_activity`. A row probed before that carries only
+    perp margin, which reads 0 for a wallet holding its money in spot, so it is read
+    again on the next pass (candidates come strongest tier first, MAX_OTHERS a run)
+    rather than up to a week later. The KEY marks a probe that has run since: one whose
+    portfolio read failed stored None under it, and is not read again early.
+    """
+    if not isinstance(ident, dict) or "total_value" not in ident:
+        return True
     try:
         checked = datetime.fromisoformat(ident["checked_at"])
     except (KeyError, TypeError, ValueError):
