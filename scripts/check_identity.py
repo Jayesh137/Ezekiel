@@ -2,7 +2,8 @@
 """Ask Hyperliquid who every address of interest IS, not just what it holds.
 
 Five identity-resolving endpoints (src/hl_identity.py) applied to the target,
-his known wallets, and every roster candidate. What comes out:
+his known wallets, every roster candidate and the transfer graph's conduits.
+What comes out:
 
   * explicit links — an address that is a cluster wallet's agent, sub-account
     or staking partner. Each is a deliberate act of control by the account
@@ -10,9 +11,9 @@ his known wallets, and every roster candidate. What comes out:
   * the CURRENT frontend agent of every account, which `extraAgents` never
     lists, so the shared-agent check can actually see agents.
   * real birth dates (from the all-time value series) for the dormancy handoff.
-  * presence and value on Hyperliquid for every graph wallet, so "trades on
-    HL" is measured for wallets the graph found rather than only for
-    leaderboard candidates.
+  * presence, value and 30-day volume on Hyperliquid for the roster's wallets
+    and the graph's conduits, so "trades on HL" is measured for the wallets the
+    graph's conduit pass would otherwise write off as infrastructure.
 
 Five free calls per address; the cluster is re-read every run, everything
 else on a rota so a run stays small.
@@ -28,8 +29,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.alerts import alert_explicit_link
 from src.hl_identity import IDENTITY_DIR, explicit_links, probe, save
+from src.roster import TIER_CONFIRMED, TIER_INFRASTRUCTURE, TIER_POSSIBLE, TIER_PROBABLE
 from src.utils import DATA_DIR, hl_post, load_config
 
+# The roster's lead tiers: read before anything else outside the cluster.
+LEAD_TIERS = (TIER_CONFIRMED, TIER_PROBABLE, TIER_POSSIBLE)
 # Addresses probed per run beyond the cluster. Five calls each, and measured
 # at 109s for 42 addresses — the largest single step in the trace job, which
 # has a hard timeout and loses its commit if it is cancelled. Fifteen a run
@@ -51,21 +55,63 @@ def cluster(config: dict) -> list[str]:
     return out
 
 
+def graph_conduits() -> list[str]:
+    """Addresses the transfer graph classified as conduits, lower-cased and sorted.
+
+    The graph's `services` map names every address it will not follow and why, and a
+    conduit's reason starts "conduit: forwards ...". A missing, unparseable or oddly
+    shaped file gives [] and one line saying so: the sweep carries on without the
+    conduits, and never raises over them.
+    """
+    path = DATA_DIR / "transfer_graph" / "latest.json"
+    try:
+        with open(path) as f:
+            services = json.load(f).get("services")
+        if not isinstance(services, dict):
+            raise ValueError("no `services` map")
+    except (OSError, ValueError, AttributeError) as exc:
+        print(f"[identity] could not read the graph's conduits from {path.name}: {exc}")
+        return []
+    return sorted({address.lower() for address, reason in services.items()
+                   if isinstance(address, str) and isinstance(reason, str)
+                   and reason.lower().startswith("conduit")})
+
+
 def candidates(config: dict) -> list[str]:
-    """Every non-infrastructure roster wallet, strongest tier first."""
+    """Who the sweep reads after the cluster, in the order it reads them.
+
+    1. The roster's leads (CONFIRMED, PROBABLE, POSSIBLE), in roster order.
+    2. The transfer graph's conduits not already listed, whatever the roster says of
+       them. The roster files a conduit as INFRASTRUCTURE or does not hold it at all,
+       yet a conduit that trades on Hyperliquid is the migration the conduit pass's
+       exemption exists to keep, and that exemption sees only an address this sweep
+       has read (measured 2026-10-07: 9 of 145 conduits traded $196.1M in 30 days).
+    3. Every other non-INFRASTRUCTURE roster wallet, in roster order.
+
+    The cluster is never listed: it is read on every run.
+    """
     seen = set(cluster(config))
-    out = []
+    out: list[str] = []
+
+    def queue(wallet) -> None:
+        a = (wallet or "").lower()
+        if a and a not in seen:
+            seen.add(a)
+            out.append(a)
+
     try:
         with open(DATA_DIR / "roster" / "latest.json") as f:
             rows = json.load(f).get("wallets", [])
     except (OSError, ValueError, AttributeError):
         rows = []
     for row in rows:
-        a = (row.get("wallet") or "").lower()
-        if not a or a in seen or row.get("tier") == "INFRASTRUCTURE":
-            continue
-        seen.add(a)
-        out.append(a)
+        if row.get("tier") in LEAD_TIERS:
+            queue(row.get("wallet"))
+    for address in graph_conduits():
+        queue(address)
+    for row in rows:
+        if row.get("tier") != TIER_INFRASTRUCTURE:
+            queue(row.get("wallet"))
     return out
 
 

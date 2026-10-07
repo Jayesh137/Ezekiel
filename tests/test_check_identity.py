@@ -5,7 +5,11 @@ reading, and the study set judges Hyperliquid presence on the total, so such a r
 the next pass instead of up to RECHECK_DAYS later (a lead holding $9.37M in spot read as empty).
 """
 
+import json
+import types
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 import scripts.check_identity as ci
 
@@ -40,3 +44,149 @@ def test_a_row_with_no_usable_reading_time_is_stale():
     assert ci._stale({"total_value": 5.0, "checked_at": "not a date"}, NOW) is True
     assert ci._stale({"total_value": 5.0, "checked_at": None}, NOW) is True
     assert ci._stale(None, NOW) is True
+
+
+# --- the graph's conduits are read too ------------------------------------------------
+#
+# `transfer_graph` exempts a wallet that trades on Hyperliquid from the conduit pass, and
+# it judges that from this sweep's identity rows. The sweep used to read only the roster's
+# non-INFRASTRUCTURE rows, and a conduit is INFRASTRUCTURE in the roster or absent from it,
+# so none was ever read: measured 2026-10-07, 9 of the graph's 145 conduits were
+# Hyperliquid accounts that traded $196.1M in 30 days, and one sat in the rota.
+
+
+def addr(n: int) -> str:
+    return "0x" + f"{n:040x}"
+
+
+TARGET, SELF_WALLET = addr(0xF0), addr(0xF1)
+CONFIG = {"target_wallet": TARGET, "known_self_wallets": [SELF_WALLET]}
+LEAD, WATCHED, WATCHED_TOO = addr(0x10), addr(0x20), addr(0x21)
+INFRA_CONDUIT, ABSENT_CONDUIT = addr(0xC1), addr(0xC2)         # sorted: the first is smaller
+EXCHANGE = addr(0xE0)
+CONDUIT = "conduit: forwards 99% of the $2,349,224 it receives straight to infrastructure"
+CONFIGURED = "configured service address (exchange/bridge/contract)"
+
+
+def tiered(wallet, tier):
+    return {"wallet": wallet, "tier": tier}
+
+
+def serve(tmp_path, monkeypatch, *, roster=None, services=None, graph=None):
+    """Point the script at a tmp data dir. `roster` is a list of rows and `services` the graph's
+    map; `graph` is raw file text for a malformed one. Nothing given means no such file."""
+    monkeypatch.setattr(ci, "DATA_DIR", tmp_path)
+    if roster is not None:
+        (tmp_path / "roster").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "roster" / "latest.json").write_text(json.dumps({"wallets": roster}))
+    if services is not None or graph is not None:
+        (tmp_path / "transfer_graph").mkdir(parents=True, exist_ok=True)
+        text = graph if graph is not None else json.dumps({"services": services})
+        (tmp_path / "transfer_graph" / "latest.json").write_text(text)
+
+
+def test_graph_conduits_are_the_services_whose_reason_starts_with_conduit(tmp_path, monkeypatch):
+    services = {
+        "0x" + ABSENT_CONDUIT[2:].upper(): CONDUIT,                # an upper-case key is lower-cased
+        INFRA_CONDUIT: "Conduit: forwards 96% of the $1,414,553 it receives",   # case-insensitive
+        EXCHANGE: CONFIGURED,
+        addr(0xE1): "inferred exchange deposit address: forwards 96% to 0xca077a2654...",
+        addr(0xE2): "global activity: 1,200,000 transactions, a busy conduit",   # contains, not starts
+        addr(0xE3): None,                                           # not a reason at all
+        addr(0xE4): {"reason": CONDUIT},                            # not the shape the graph writes
+    }
+    serve(tmp_path, monkeypatch, services=services)
+
+    assert ci.graph_conduits() == [INFRA_CONDUIT, ABSENT_CONDUIT]   # lower-cased and sorted
+
+
+def test_an_empty_services_map_is_no_conduits_and_says_nothing(tmp_path, monkeypatch, capsys):
+    serve(tmp_path, monkeypatch, services={})
+
+    assert ci.graph_conduits() == []
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("graph", [
+    None,                                  # no file at all
+    "", "{not json", "[1, 2]", "null", '"text"',
+    "{}", '{"services": null}', '{"services": []}', '{"services": "x"}',
+], ids=["missing", "empty", "not-json", "list", "null", "string",
+        "no-services", "services-null", "services-list", "services-string"])
+def test_a_missing_or_malformed_graph_file_is_no_conduits_and_one_logged_line(
+        tmp_path, monkeypatch, capsys, graph):
+    serve(tmp_path, monkeypatch, graph=graph)
+
+    assert ci.graph_conduits() == []
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert len(lines) == 1 and lines[0].startswith("[identity]")
+
+
+def test_conduits_are_queued_right_after_the_leads(tmp_path, monkeypatch):
+    # The roster lists the WATCH row BEFORE the lead, so a queue that merely kept roster
+    # order and slotted the conduits in would put them behind it.
+    serve(tmp_path, monkeypatch,
+          roster=[tiered(WATCHED, "WATCH"), tiered(LEAD, "POSSIBLE"),
+                  tiered(INFRA_CONDUIT, "INFRASTRUCTURE"), tiered(EXCHANGE, "INFRASTRUCTURE")],
+          services={ABSENT_CONDUIT: CONDUIT, INFRA_CONDUIT: CONDUIT, EXCHANGE: CONFIGURED})
+
+    assert ci.candidates(CONFIG) == [LEAD, INFRA_CONDUIT, ABSENT_CONDUIT, WATCHED]
+
+
+def test_leads_keep_roster_order_and_a_conduit_is_listed_once(tmp_path, monkeypatch):
+    lead_b, lead_a = addr(0x12), addr(0x11)
+    serve(tmp_path, monkeypatch,
+          roster=[tiered(WATCHED, "WATCH"), tiered(lead_b, "PROBABLE"), tiered(WATCHED_TOO, "WATCH"),
+                  tiered(lead_a, "CONFIRMED"), tiered(addr(0x13), "POSSIBLE")],
+          # one conduit is also a lead, one is also a WATCH row
+          services={addr(0x13): CONDUIT, WATCHED_TOO: CONDUIT})
+
+    assert ci.candidates(CONFIG) == [lead_b, lead_a, addr(0x13), WATCHED_TOO, WATCHED]
+
+
+def test_without_a_usable_graph_the_queue_is_the_roster_without_infrastructure(
+        tmp_path, monkeypatch):
+    roster = [tiered(LEAD, "POSSIBLE"), tiered(WATCHED, "WATCH"), tiered(EXCHANGE, "INFRASTRUCTURE")]
+    for graph in (None, "{not json", "{}"):
+        serve(tmp_path, monkeypatch, roster=roster, graph=graph)
+        assert ci.candidates(CONFIG) == [LEAD, WATCHED]
+
+
+def test_without_a_roster_the_conduits_are_still_queued(tmp_path, monkeypatch):
+    serve(tmp_path, monkeypatch, services={ABSENT_CONDUIT: CONDUIT})
+
+    assert ci.candidates(CONFIG) == [ABSENT_CONDUIT]
+
+
+def test_the_cluster_never_appears_whatever_the_roster_and_graph_say_of_it(tmp_path, monkeypatch):
+    serve(tmp_path, monkeypatch,
+          roster=[tiered(TARGET, "CONFIRMED"), tiered("0x" + SELF_WALLET[2:].upper(), "POSSIBLE"),
+                  tiered(LEAD, "POSSIBLE"), tiered(TARGET, "INFRASTRUCTURE")],
+          services={TARGET: CONDUIT, SELF_WALLET: CONDUIT, ABSENT_CONDUIT: CONDUIT})
+
+    assert ci.candidates(CONFIG) == [LEAD, ABSENT_CONDUIT]
+
+
+def test_main_probes_the_conduits_right_after_the_cluster_and_the_leads(tmp_path, monkeypatch):
+    conduits = [addr(0x1000 + i) for i in range(20)]               # more than one run can read
+    serve(tmp_path, monkeypatch,
+          roster=[tiered(WATCHED, "WATCH"), tiered(LEAD, "POSSIBLE")],
+          services={a: CONDUIT for a in conduits})
+    monkeypatch.setattr(ci, "IDENTITY_DIR", tmp_path / "identity")
+    monkeypatch.setattr(ci, "load_config", lambda: CONFIG)
+    monkeypatch.setattr(ci, "time", types.SimpleNamespace(sleep=lambda seconds: None))
+    monkeypatch.setattr(ci, "alert_explicit_link", lambda *args, **kwargs: None)
+    probed, saved = [], []
+
+    def fake_probe(address, fetch, *, sleep=None):
+        probed.append(address)
+        return {"address": address, "read_ok": True, "role": "user", "total_value": 1.0,
+                "month_volume": 0.0, "checked_at": datetime.now(UTC).isoformat()}
+
+    monkeypatch.setattr(ci, "probe", fake_probe)
+    monkeypatch.setattr(ci, "save", saved.append)
+
+    assert ci.main() == 0
+
+    assert probed == [TARGET, SELF_WALLET, LEAD, *conduits[:ci.MAX_OTHERS - 1]]
+    assert saved[0]["probed_this_run"] == 2 + ci.MAX_OTHERS
