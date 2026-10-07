@@ -15,7 +15,8 @@ or on a HIP-3 dex. Measured 2026-10-07, a POSSIBLE lead held $9.37M in spot USDC
 and traded $80.0M in 30 days against $0 of perp margin. A roster row whose
 identity probe predates `hl_total_value` and `hl_month_volume` carries neither,
 and is judged on perp margin until it is probed again, which
-`scripts/check_identity.py` does on its next pass, strongest tier first.
+`scripts/check_identity.py` does on its next pass: the roster's leads first, then the
+transfer graph's nodes and conduits, then the other roster rows, a bounded number a run.
 """
 
 from __future__ import annotations

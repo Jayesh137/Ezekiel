@@ -2,7 +2,8 @@
 """Ask Hyperliquid who every address of interest IS, not just what it holds.
 
 Five identity-resolving endpoints (src/hl_identity.py) applied to the target,
-his known wallets, every roster candidate and the transfer graph's conduits.
+his known wallets, every roster candidate and the transfer graph's nodes and
+conduits.
 What comes out:
 
   * explicit links — an address that is a cluster wallet's agent, sub-account
@@ -12,8 +13,9 @@ What comes out:
     lists, so the shared-agent check can actually see agents.
   * real birth dates (from the all-time value series) for the dormancy handoff.
   * presence, value and 30-day volume on Hyperliquid for the roster's wallets
-    and the graph's conduits, so "trades on HL" is measured for the wallets the
-    graph's conduit pass would otherwise write off as infrastructure.
+    and the graph's nodes and conduits, so "trades on HL" is measured for the
+    wallets the target funded and for the ones the graph's conduit pass would
+    otherwise write off as infrastructure.
 
 Five free calls per address; the cluster is re-read every run, everything
 else on a rota so a run stays small.
@@ -55,22 +57,65 @@ def cluster(config: dict) -> list[str]:
     return out
 
 
-def graph_conduits() -> list[str]:
-    """Addresses the transfer graph classified as conduits, lower-cased and sorted.
+def load_graph() -> dict | None:
+    """The stored transfer graph document, or None with one logged line.
 
-    The graph's `services` map names every address it will not follow and why, and a
-    conduit's reason starts "conduit: forwards ...". A missing, unparseable or oddly
-    shaped file gives [] and one line saying so: the sweep carries on without the
-    conduits, and never raises over them.
+    A missing, unparseable or non-object file gives None: the sweep carries on without
+    the graph's wallets and never raises over them. The file is ~35 MB and parses in over
+    a second, so `candidates` reads it once and hands it to both readers below.
     """
     path = DATA_DIR / "transfer_graph" / "latest.json"
     try:
         with open(path) as f:
-            services = json.load(f).get("services")
-        if not isinstance(services, dict):
-            raise ValueError("no `services` map")
-    except (OSError, ValueError, AttributeError) as exc:
-        print(f"[identity] could not read the graph's conduits from {path.name}: {exc}")
+            doc = json.load(f)
+        if not isinstance(doc, dict):
+            raise ValueError("not a JSON object")
+    except (OSError, ValueError) as exc:
+        print(f"[identity] could not read the transfer graph {path.parent.name}/{path.name}: {exc}")
+        return None
+    return doc
+
+
+def graph_nodes(graph: dict | None = None) -> list[str]:
+    """Wallets of the transfer graph's `nodes`, lower-cased, in the file's order.
+
+    The graph sorts its nodes most promising first (classification rank, a migration
+    candidate before an operational counterparty before a service, then confidence), so
+    the file's order is kept. A row that is not an object or has no string `wallet` is
+    skipped. An unreadable graph, or one with no `nodes` list, gives [] and one logged
+    line. Pass the document `load_graph` returned to avoid parsing the file again.
+    """
+    if graph is None:
+        graph = load_graph()
+        if graph is None:
+            return []
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        print("[identity] the transfer graph has no `nodes` list; no nodes queued")
+        return []
+    out = []
+    for row in nodes:
+        wallet = row.get("wallet") if isinstance(row, dict) else None
+        if isinstance(wallet, str) and wallet.strip():
+            out.append(wallet.strip().lower())
+    return out
+
+
+def graph_conduits(graph: dict | None = None) -> list[str]:
+    """Addresses the transfer graph classified as conduits, lower-cased and sorted.
+
+    The graph's `services` map names every address it will not follow and why, and a
+    conduit's reason starts "conduit: forwards ...". An unreadable graph, or one with no
+    `services` map, gives [] and one logged line. Pass the document `load_graph`
+    returned to avoid parsing the file again.
+    """
+    if graph is None:
+        graph = load_graph()
+        if graph is None:
+            return []
+    services = graph.get("services")
+    if not isinstance(services, dict):
+        print("[identity] the transfer graph has no `services` map; no conduits queued")
         return []
     return sorted({address.lower() for address, reason in services.items()
                    if isinstance(address, str) and isinstance(reason, str)
@@ -81,14 +126,21 @@ def candidates(config: dict) -> list[str]:
     """Who the sweep reads after the cluster, in the order it reads them.
 
     1. The roster's leads (CONFIRMED, PROBABLE, POSSIBLE), in roster order.
-    2. The transfer graph's conduits not already listed, whatever the roster says of
-       them. The roster files a conduit as INFRASTRUCTURE or does not hold it at all,
-       yet a conduit that trades on Hyperliquid is the migration the conduit pass's
-       exemption exists to keep, and that exemption sees only an address this sweep
-       has read (measured 2026-10-07: 9 of 145 conduits traded $196.1M in 30 days).
-    3. Every other non-INFRASTRUCTURE roster wallet, in roster order.
+    2. The transfer graph's nodes not already listed, in the graph's order, whatever the
+       roster says of them. Whether a wallet the target funded now trades on Hyperliquid
+       is `transfer_graph`'s `trades_on_hl`, and it can only be judged on an address this
+       sweep has read (measured 2026-10-07: 182 of the graph's 299 nodes had never been
+       probed).
+    3. The graph's conduits not already listed, likewise whatever the roster says of
+       them. The roster files a conduit as INFRASTRUCTURE or does not hold it at all, yet
+       a conduit that trades on Hyperliquid is the migration the conduit pass's exemption
+       exists to keep, and that exemption sees only an address this sweep has read
+       (measured 2026-10-07: 9 of 145 conduits traded $196.5M in 30 days).
+    4. Every other non-INFRASTRUCTURE roster wallet, in roster order.
 
-    The cluster is never listed: it is read on every run.
+    The cluster is never listed: it is read on every run. An address qualifying under
+    several headings is listed once, at the first. Only the order is decided here:
+    `main` skips what a fresh reading already covers and probes `MAX_OTHERS` a run.
     """
     seen = set(cluster(config))
     out: list[str] = []
@@ -107,8 +159,12 @@ def candidates(config: dict) -> list[str]:
     for row in rows:
         if row.get("tier") in LEAD_TIERS:
             queue(row.get("wallet"))
-    for address in graph_conduits():
-        queue(address)
+    graph = load_graph()
+    if graph is not None:
+        for address in graph_nodes(graph):
+            queue(address)
+        for address in graph_conduits(graph):
+            queue(address)
     for row in rows:
         if row.get("tier") != TIER_INFRASTRUCTURE:
             queue(row.get("wallet"))
@@ -129,8 +185,9 @@ def _stale(ident: dict, now: datetime) -> bool:
 
     `total_value` arrived with `parse_activity`. A row probed before that carries only
     perp margin, which reads 0 for a wallet holding its money in spot, so it is read
-    again on the next pass (candidates come strongest tier first, MAX_OTHERS a run)
-    rather than up to a week later. The KEY marks a probe that has run since: one whose
+    again on the next pass (candidates come the roster's leads first, then the transfer
+    graph's nodes and conduits, then the other roster rows; MAX_OTHERS a run) rather than
+    up to a week later. The KEY marks a probe that has run since: one whose
     portfolio read failed stored None under it, and is not read again early.
     """
     if not isinstance(ident, dict) or "total_value" not in ident:
