@@ -19,11 +19,12 @@ STYLE_MANUAL = "MANUAL_UI"
 STYLE_MIXED = "MIXED"
 MIN_ORDERS = 100
 MIN_GAPS = 200
+MIN_IOC_OFFSETS = 50  # IOC-dominant wallet's style decided only with ≥50 measured offsets
 FLAG_SHARES = {"client_ids": 0.05, "triggers": 0.01, "maker": 0.10}
 AGAINST_TRAITS = ("client_ids", "triggers", "maker")
 NEVER_SHARE = 0.001
 DOMINANT_SHARE = 0.5
-SHARE_KEYS = ("ioc", "gtc", "alo", "frontend", "client_ids", "triggers", "maker", "canceled")
+SHARE_KEYS = ("ioc", "gtc", "alo", "frontend", "client_ids", "triggers", "maker", "canceled", "taker")
 
 
 def _empty_coin() -> dict:
@@ -69,14 +70,18 @@ def profile(habits: dict | None, taker_orders: int = 0, orders: int = 0) -> dict
             "canceled": habits.get("canceled", 0) / n,
             "maker": (tif.get("Alo", 0) + tif.get("Gtc", 0)) / n,
             "ioc5": habits.get("ioc_offset_5pct", 0) / seen if seen else None,
-            "taker": taker_orders / orders if orders else None}
+            "taker": taker_orders / orders if orders else None,
+            "ioc_offsets_seen": habits.get("ioc_offset_seen") or 0}
 
 
 def summary_profile(summary: dict) -> dict | None:
     return profile(summary.get("habits"), summary.get("taker_orders", 0), summary.get("orders", 0))
 
 
-def style(prof: dict) -> dict:
+def style(prof: dict) -> dict | None:
+    # Undecidable: IOC-dominant but offsets not measured
+    if prof["ioc"] >= DOMINANT_SHARE and prof.get("ioc_offsets_seen", 0) < MIN_IOC_OFFSETS:
+        return None
     ioc5 = prof["ioc"] * prof["ioc5"] if prof.get("ioc5") is not None else None
     if ioc5 is not None and ioc5 >= 0.5:
         kind = STYLE_PROGRAM
@@ -97,16 +102,22 @@ def t1_style(candidate: dict | None, his_recent: dict | None, his_all: dict | No
     """Same style and flags as his recent ones? And which traits he never shows
     (under 0.1% of his recorded orders) dominate the candidate?"""
     n = (candidate or {}).get("orders_seen", 0)
-    if (not candidate or n < MIN_ORDERS or not his_recent
-            or his_recent["orders_seen"] < MIN_ORDERS):
-        return _test("T1", "insufficient", n=n)
+    if not candidate or n < MIN_ORDERS:
+        return _test("T1", "insufficient", n=n, detail={"short": "candidate"})
+    if not his_recent or his_recent["orders_seen"] < MIN_ORDERS:
+        return _test("T1", "insufficient", n=n, detail={"short": "his"})
     mine, his = style(candidate), style(his_recent)
-    against = [t for t in AGAINST_TRAITS
-               if his_all and his_all[t] < NEVER_SHARE and candidate[t] > DOMINANT_SHARE]
+    if mine is None or his is None:
+        return _test("T1", "insufficient", n=n, detail={"short": "candidate" if mine is None else "his"})
+    # Require 1000 orders in his_all to say "he never does this"
+    against = []
+    if his_all and his_all.get("orders_seen", 0) >= round(1 / NEVER_SHARE):
+        against = [t for t in AGAINST_TRAITS
+                   if his_all[t] < NEVER_SHARE and candidate[t] > DOMINANT_SHARE]
     return _test("T1", "measured", mine == his, n, {
         "candidate": mine, "his": his, "against_traits": against,
-        "shares": {k: round(candidate[k], 4) for k in SHARE_KEYS},
-        "his_shares": {k: round(his_recent[k], 4) for k in SHARE_KEYS}})
+        "shares": {k: (round(candidate[k], 4) if candidate[k] is not None else None) for k in SHARE_KEYS},
+        "his_shares": {k: (round(his_recent[k], 4) if his_recent[k] is not None else None) for k in SHARE_KEYS}})
 
 
 def wasserstein(a: list[int], b: list[int]) -> float | None:
@@ -169,20 +180,23 @@ def measure_snapshot(fills: list, entries: list) -> dict:
     sig = ep.signature(fills, entries)
     hist = records.cadence_histogram(orders)
     measurable = prof is not None and prof["orders_seen"] >= MIN_ORDERS
+    prof_style = style(prof) if measurable else None if prof else None
     return {"orders_seen": counts["orders_seen"],
-            "shares": {k: round(prof[k], 4) for k in SHARE_KEYS} if prof else None,
+            "shares": {k: (round(prof[k], 4) if prof[k] is not None else None) for k in SHARE_KEYS} if prof else None,
             "ioc5": prof.get("ioc5") if prof else None,
-            "style": style(prof) if measurable else None,
+            "style": prof_style,
             "cadence": hist if sum(hist) else None,
             "clip_table": {c: v["size"] for c, v in sig["clip_table"].items()} or None,
             "clip_notionals": {c: round(v, 6) for c, v in sig["clip_notionals"].items()} or None,
             "program_runs": sig["program_runs"]}
 
 
-def snapshot_signature(snapshot: dict) -> dict:
+def snapshot_signature(snapshot: dict | None) -> dict:
     """execution_program's signature shape rebuilt from a stored snapshot."""
-    return {"clip_table": {c: {"size": s, "share": 1.0, "count": ep.MIN_CLIP_ORDERS}
+    if not snapshot:
+        return {"clip_table": {}, "clip_notionals": {}, "program_runs": None, "ioc_5pct_share": None}
+    return {"clip_table": {c: {"size": s, "share": None, "count": None}
                            for c, s in (snapshot.get("clip_table") or {}).items()},
             "clip_notionals": dict(snapshot.get("clip_notionals") or {}),
-            "program_runs": snapshot.get("program_runs") or 0,
+            "program_runs": snapshot.get("program_runs"),
             "ioc_5pct_share": snapshot.get("ioc5")}
