@@ -1,6 +1,6 @@
 """What Hyperliquid declares about an account, read into the roster.
 
-Three rules, each from a measured case on 2026-09-16:
+Three rules, each from a measured case on 2026-09-16, and a fourth from 2026-10-07:
 
   * A sub-account exists only because its master created it, so the two are one
     operator. Between a cluster wallet and anyone else that CONFIRMs alone, and
@@ -12,6 +12,11 @@ Three rules, each from a measured case on 2026-09-16:
   * A referral between two strangers on a code nobody else uses is a private
     link to a Hyperliquid address nothing reads, so the other side gets a row —
     evidence only, so every per-wallet detector starts asking about it.
+  * `hl_account_value` is `webData2`'s PERP margin only, so a wallet whose money
+    sits in spot reads 0 there. The identity probe's `portfolio` read also gives
+    the total value (spot + perp) and the 30-day volume, and the roster carries
+    both as `hl_total_value` and `hl_month_volume` (measured 2026-10-07: a lead
+    with $0 perp margin held $9.37M in spot and traded $80.0M in 30 days).
 """
 
 import json
@@ -147,3 +152,22 @@ def test_the_roster_builds_without_the_file(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch,
            correlations={"matches": [{"wallet": MASTER, "confidence": 0.7}]})
     assert _rows()[MASTER]["vectors"] == [roster.VECTOR_CORRELATION]
+
+
+def test_the_roster_carries_the_total_value_and_month_volume_the_identity_probe_read(
+        tmp_path, monkeypatch):
+    """Perp margin alone calls a spot trader empty; an old probe lacks the new fields."""
+    _setup(tmp_path, monkeypatch,
+           correlations={"matches": [{"wallet": MASTER, "confidence": 0.7},
+                                     {"wallet": SUB, "confidence": 0.7}]},
+           identity={"identities": {
+               MASTER: {"role": "user", "account_value": 0.0, "total_value": 9_370_000.5,
+                        "month_volume": 80_039_479.12},
+               # A row probed before the probe read them: unknown, not zero.
+               SUB: {"role": "user", "account_value": 5.0}}})
+    rows = _rows()
+    assert rows[MASTER]["evidence"]["hl_account_value"] == 0.0
+    assert rows[MASTER]["evidence"]["hl_total_value"] == 9_370_000.5
+    assert rows[MASTER]["evidence"]["hl_month_volume"] == 80_039_479.12
+    assert rows[SUB]["evidence"]["hl_total_value"] is None
+    assert rows[SUB]["evidence"]["hl_month_volume"] is None

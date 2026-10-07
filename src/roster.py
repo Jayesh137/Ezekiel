@@ -914,6 +914,8 @@ def build_roster(config: dict | None = None) -> dict:
         e = entry(a)
         e["evidence"]["hl_role"] = ident.get("role")
         e["evidence"]["hl_account_value"] = ident.get("account_value")
+        e["evidence"]["hl_total_value"] = ident.get("total_value")
+        e["evidence"]["hl_month_volume"] = ident.get("month_volume")
         e["evidence"]["hl_birth_ms"] = ident.get("birth_ms")
         if ident.get("agent_address"):
             e["evidence"]["frontend_agent"] = ident["agent_address"]
