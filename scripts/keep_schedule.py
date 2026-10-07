@@ -30,7 +30,7 @@ Rules inherited from the PC dispatcher, each paid for once already:
 
 Tick policy: when a run is in flight, look again in POLL_SECONDS; when nothing
 is, sleep until the next workflow falls due (never longer than
-MAX_SLEEP_SECONDS). Each tick is ~8 API calls, well inside GITHUB_TOKEN's
+MAX_SLEEP_SECONDS). Each tick is ~9 API calls, well inside GITHUB_TOKEN's
 1,000 requests an hour. keeper.yml re-dispatches the keeper in an `always()`
 step, so a crash re-arms it too; its hourly cron restarts a broken chain.
 """

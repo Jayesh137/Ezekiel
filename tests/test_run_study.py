@@ -166,6 +166,21 @@ def test_the_study_step_is_bounded_inside_its_job():
     assert run_study.READ_SECONDS + 60 < minutes * 60 < job * 60
 
 
+def test_the_study_workflow_writes_only_its_own_directory_in_its_own_group():
+    # run_study.py is the ONLY writer of data/study/ and writes nothing else under
+    # data/, which is what lets study.yml sit outside data-commit. Committing more,
+    # or joining that group, reopens the lost-update race the separation avoids.
+    path = Path(__file__).parent.parent / ".github/workflows/study.yml"
+    workflow = path.read_text(encoding="utf-8")
+    job_text = workflow.split("\n  study:\n", 1)[1]
+    commit = job_text.split("name: Commit and push", 1)[1].split("- name:", 1)[0]
+    assert re.findall(r"^\s*git add (\S.*?)\s*$", commit, re.MULTILINE) == ["data/study/"]
+    # On the JOB, so a cron run the gate steps aside never enters the group.
+    assert re.search(r"^    concurrency:\n      group: study\n      cancel-in-progress: false$",
+                     job_text, re.MULTILINE)
+    assert not re.search(r"^concurrency:", workflow, re.MULTILINE)
+
+
 # --- What the brief specifies and the tests above leave open --------------------------
 
 class LedgerFake(Fake):

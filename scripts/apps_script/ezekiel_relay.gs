@@ -5,7 +5,8 @@
  * Every 5 minutes it does two things:
  *
  *  1. dispatchDue() keeps the GitHub workflows on cadence — watch every 10 min,
- *     collect 15, trace 30, scan 60, analyze daily — exactly as
+ *     collect 15, trace 30, scan 60, analyze daily, and the study every 6 hours
+ *     (its own group, so never held up by data-commit) — exactly as
  *     scripts/dispatch_workflows.ps1 does from a PC: never while that
  *     workflow's newest run is still queued or running, and never into the busy
  *     `data-commit` group (a group keeps one PENDING run, so queueing behind a

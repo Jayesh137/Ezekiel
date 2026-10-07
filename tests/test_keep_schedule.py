@@ -232,6 +232,13 @@ def test_a_running_run_counts_and_the_gate_excludes_its_own():
 
 
 def test_the_study_runs_every_six_hours_in_its_own_group():
-    from scripts.keep_schedule import GROUP_MEMBERS
     assert {"file": "study.yml", "minutes": 360, "group": "study"} in SCHEDULE
-    assert GROUP_MEMBERS["study"] == ["study.yml"]
+    assert ks.GROUP_MEMBERS["study"] == ["study.yml"]
+
+
+def test_the_study_is_dispatched_on_its_own_clock_while_data_commit_is_busy():
+    # Its own group: a running collect (data-commit busy) neither holds it back
+    # nor is the study ever sent before its six hours are up.
+    busy = {"collect.yml": run(2, "in_progress")}
+    assert plan(fresh(**busy, **{"study.yml": run(361)}), NOW).dispatch == ["study.yml"]
+    assert plan(fresh(**busy, **{"study.yml": run(359)}), NOW).dispatch == []

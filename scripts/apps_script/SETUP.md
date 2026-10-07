@@ -5,8 +5,9 @@ Every 5 minutes it:
 
 1. **keeps the GitHub workflows on schedule** — GitHub's own timers arrive a
    median of 198 minutes apart on this repo; the relay dispatches watch every
-   10 min, collect 15, trace 30, scan 60, analyze daily, never into a busy queue
-   (queueing into a busy queue is what gets runs cancelled);
+   10 min, collect 15, trace 30, scan 60, analyze daily and the study every 6
+   hours (its own group, so it never waits on the others), never into a busy
+   queue (queueing into a busy queue is what gets runs cancelled);
 2. **watches his wallets** — the target, the treasury and `0xf078969e…` — and
    pushes an **urgent** ntfy within ~5 minutes of a withdrawal or send to an
    address that is not his, a new agent, a sub-account, a vault or a multi-sig
