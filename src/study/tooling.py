@@ -100,7 +100,9 @@ def _test(name: str, status: str, statistic=None, n: int = 0, detail: dict | Non
 
 def t1_style(candidate: dict | None, his_recent: dict | None, his_all: dict | None) -> dict:
     """Same style and flags as his recent ones? And which traits he never shows
-    (under 0.1% of his recorded orders) dominate the candidate?"""
+    (under 0.1% of his recorded orders) dominate the candidate? The detail holds his
+    style but not his shares: those live once, in the study's latest document, so a
+    candidate's dossier does not change each time his recent window slides."""
     n = (candidate or {}).get("orders_seen", 0)
     # Check all candidate conditions first
     if not candidate or n < MIN_ORDERS:
@@ -121,8 +123,7 @@ def t1_style(candidate: dict | None, his_recent: dict | None, his_all: dict | No
                    if his_all[t] < NEVER_SHARE and candidate[t] > DOMINANT_SHARE]
     return _test("T1", "measured", mine == his, n, {
         "candidate": mine, "his": his, "against_traits": against,
-        "shares": {k: (round(candidate[k], 4) if candidate[k] is not None else None) for k in SHARE_KEYS},
-        "his_shares": {k: (round(his_recent[k], 4) if his_recent[k] is not None else None) for k in SHARE_KEYS}})
+        "shares": {k: (round(candidate[k], 4) if candidate[k] is not None else None) for k in SHARE_KEYS}})
 
 
 def wasserstein(a: list[int], b: list[int]) -> float | None:

@@ -42,6 +42,15 @@ def test_t1_he_matches_himself():
     assert tooling.t1_style(HIS, HIS, HIS)["statistic"] is True
 
 
+def test_t1_detail_carries_his_style_but_not_his_shares():
+    # His shares live once, in the study's latest document. A copy in every candidate's T1
+    # detail would change every dossier each time his recent window slides.
+    t1 = tooling.t1_style(MAKER_BOT, HIS, HIS)
+    assert t1["status"] == "measured"
+    assert set(t1["detail"]) == {"candidate", "his", "against_traits", "shares"}
+    assert t1["detail"]["his"] == tooling.style(HIS)
+
+
 def test_t1_needs_a_hundred_orders():
     few = tooling.profile(habits(99, ioc=99, seen=99, hit=99), 99, 99)
     assert tooling.t1_style(few, HIS, HIS)["status"] == "insufficient"

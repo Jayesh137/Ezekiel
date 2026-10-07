@@ -463,6 +463,26 @@ def test_two_dossiers_for_one_wallet_do_not_move_with_his_reference():
     assert assemble.dossier(member, tests, ref_a) == assemble.dossier(member, tests, ref_b)
 
 
+def test_a_maker_bots_dossier_does_not_move_when_only_his_recent_shares_do():
+    # His style is PROGRAM_IOC5 in both references, but in the second 7 of his last 90 days are
+    # web-UI clicks, so his recent IOC and frontend shares differ. A maker bot has no slicer
+    # rhythm and no clip table (T2 and T3 insufficient), so his shares must not reach its dossier.
+    his_a = history(T, JUNE, 120)
+    his_b = {**history(T, JUNE, 113),
+             **history(T, JUNE + 113 * records.DAY_MS, 7, tif="FrontendMarket")}
+    ref_a, ref_b = assemble.his_reference(his_a), assemble.his_reference(his_b)
+    assert ref_a["style"] == ref_b["style"] == HIS_STYLE
+    assert ref_a["recent_profile"]["frontend"] != ref_b["recent_profile"]["frontend"]
+    bot = history(BOT, JUNE + 120 * records.DAY_MS, 20, tif="Alo", cloid="0x01", crossed=False)
+    days = [bot[d] for d in sorted(bot)]
+    tests_a = assemble.tooling_tests(days, ref_a, context(his_a, ref_a))
+    tests_b = assemble.tooling_tests(days, ref_b, context(his_b, ref_b))
+    assert tests_a["T2"]["status"] == tests_a["T3"]["status"] == "insufficient"
+    assert tests_a["T1"]["against"]["status"] == "against"
+    member = {"wallet": BOT, "source": "roster_lead", "since_ms": 1}
+    assert assemble.dossier(member, tests_a, ref_a) == assemble.dossier(member, tests_b, ref_b)
+
+
 def test_his_style_is_not_published_from_a_sparse_recent_window():
     # Under 100 orders in the recent window there is no style to publish (tooling.MIN_ORDERS).
     assert assemble.his_reference(history(T, JUNE, 1, n=50))["style"] is None
