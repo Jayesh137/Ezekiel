@@ -962,6 +962,10 @@ def test_a_temp_file_stranded_by_a_hard_kill_is_never_committed():
     if git is None:
         pytest.skip("git is not installed")
     root = Path(__file__).parent.parent
+    inside = subprocess.run([git, "rev-parse", "--is-inside-work-tree"], cwd=root,
+                            capture_output=True, text=True)
+    if inside.returncode != 0:
+        pytest.skip("not a git work tree")
 
     def ignored(path):
         return subprocess.run([git, "check-ignore", "-q", path], cwd=root).returncode == 0

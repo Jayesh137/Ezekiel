@@ -209,7 +209,7 @@ def test_main_probes_the_conduits_right_after_the_cluster_and_the_leads(tmp_path
 #
 # A wallet the target funded can start trading on Hyperliquid, and `transfer_graph`'s
 # `trades_on_hl` can only say so for an address this sweep has read. Measured 2026-10-07:
-# 182 of the graph's 299 nodes (all classified SERVICE) had never been probed, so whether a
+# 182 of the graph's 299 nodes had never been probed, so whether a
 # wallet funded by the target now trades could not be known for them. They are queued after
 # the roster's leads and before the conduits, in the graph's own order (it sorts its most
 # promising nodes first: classification rank, then confidence), and each address once.
