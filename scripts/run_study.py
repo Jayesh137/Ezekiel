@@ -268,11 +268,19 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
                 collection["unreadable"].append({"wallet": member["wallet"],
                                                  "error": result.get("error")})
                 continue
+            if result["status"] == "ok":
+                mstate["last_read_ms"] = now_ms
+                collection["read"].append(member["wallet"])
+            # The cursors and last fill go to disk with the wallet's days, not at the end of
+            # the run: a crash or a step timeout in the hundreds of seconds after would leave
+            # the archive ahead of its state, and the recovery run would classify the first
+            # uncovered order against a stale last_fill_ms (a spurious session decision).
+            # A stopped wallet folded its fills too. (measure_families changes the family
+            # panel, a cache that is measured again, not this state.)
+            archive.save_state(state, data_dir)
             if result["status"] != "ok":
                 collection["stopped"] = True
                 break
-            mstate["last_read_ms"] = now_ms
-            collection["read"].append(member["wallet"])
         if not collection["stopped"]:
             measure_families(fams, panel, now_ms, budget, fetch)
         collection["budget"] = budget.report()

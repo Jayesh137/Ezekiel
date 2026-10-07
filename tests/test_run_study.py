@@ -474,6 +474,66 @@ def test_a_stop_on_the_ledger_read_still_ends_the_wallet_and_is_not_partial(tmp_
     assert "ledger_cursor_ms" not in state and "orders_read_ms" not in state
 
 
+def bursts(start, n, burst_s=300, silence_s=40, step_s=2):
+    """A bot that works in `burst_s` bursts a `silence_s` apart: no quiet gap of 30 s inside a
+    burst, one between bursts, and never 30 minutes of silence, so it is one session."""
+    out, t = [], start
+    for _ in range(n):
+        out += program(t, burst_s // step_s, step=step_s * 1_000)
+        t += (burst_s + silence_s) * 1_000
+    return out
+
+
+def dies_once(monkeypatch):
+    """Make the first his_days of the run raise, as a crash or a step timeout after the
+    wallets were read would; later calls work."""
+    real, state = run_study.his_days, {"dead": False}
+
+    def his_days(*args, **kwargs):
+        if not state["dead"]:
+            state["dead"] = True
+            raise RuntimeError("the run died after reading its wallets")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(run_study, "his_days", his_days)
+
+
+@pytest.mark.parametrize("errors", [{}, {("historicalOrders", A): "time_budget"}],
+                         ids=["read", "stopped"])
+def test_state_is_saved_with_each_wallets_days_not_only_at_the_end(tmp_path, monkeypatch, errors):
+    data = data_dir(tmp_path, [lead(A)])
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    dies_once(monkeypatch)
+    fake = Fake(fills={A: fills}, orders={A: entries(fills)}, errors=errors)
+    with pytest.raises(RuntimeError, match="the run died"):
+        run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake)
+    saved = archive.load_state(data)
+    days = archive.load_days(A, "2026-09-01", "2026-10-31", data)
+    covered_to = max(hi for d in days.values() for _lo, hi in d["coverage"]["fills"])
+    assert saved["wallets"][A]["fills_cursor_ms"] == covered_to == NOW - 5 * records.MINUTE_MS
+    assert saved["wallets"][A]["last_fill_ms"] == fills[-1]["time"] and A in saved["members"]
+
+
+def test_a_run_that_died_leaves_no_spurious_session_for_the_recovery_run(tmp_path, monkeypatch):
+    start = NOW - records.HOUR_MS
+    stream = bursts(start, 8)  # eight bursts of five minutes: one session, opened at `start`
+    died_at = NOW - 35 * records.MINUTE_MS  # mid-burst: the run folds up to the burst's start
+
+    def sessions(data):
+        day = archive.load_days(A, "2026-10-03", "2026-10-03", data)["2026-10-03"]
+        return [d for d in day["decisions"] if d[3] == "session"]
+
+    one = data_dir(tmp_path / "one", [lead(A)])
+    run_study.run(data_dir=one, config=CONFIG, now_ms=NOW, fetch=Fake(fills={A: stream}))
+    dies_once(monkeypatch)
+    two = data_dir(tmp_path / "two", [lead(A)])
+    with pytest.raises(RuntimeError, match="the run died"):
+        run_study.run(data_dir=two, config=CONFIG, now_ms=died_at, fetch=Fake(fills={A: stream}))
+    run_study.run(data_dir=two, config=CONFIG, now_ms=NOW, fetch=Fake(fills={A: stream}))
+    assert sessions(one) == [[start, "BTC", "A", "session"]]  # what one read decides
+    assert sessions(two) == sessions(one)  # and what a read, a death and a recovery decide
+
+
 def test_a_foreign_file_of_the_wrong_shape_is_read_as_absent(tmp_path):
     data = data_dir(tmp_path, [lead(A)])
     for name, body in (("dormancy/latest.json", "[1, 2]"), ("newborn/latest.json", "{"),
