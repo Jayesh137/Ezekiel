@@ -47,19 +47,50 @@ def detector_wallets(data_dir: Path) -> list[str]:
     program's reproductions, then money traced from his world, then births in his
     silences, then large newborns. `selection.by_source` re-sorts them by roster
     evidence with a stable sort, so this order breaks the ties."""
-    found: list = []
+    # Other writers' files are read without trusting their shape: a container of the wrong
+    # kind, an entry that is not a dict, or a score that is not a finite number is skipped.
     census = read_json(data_dir / "execution_program" / "census.json", {})
-    found += [h.get("wallet") for h in census.get("hits") or [] if isinstance(h, dict)]
     tape = read_json(data_dir / "tape" / "latest.json", {})
-    found += [h.get("wallet") for h in tape.get("program_hits") or [] if isinstance(h, dict)]
     provenance = read_json(data_dir / "provenance" / "latest.json", {})
-    found += [f.get("account") for f in provenance.get("findings") or [] if isinstance(f, dict)]
-    handoffs = read_json(data_dir / "dormancy" / "latest.json", {}).get("handoffs") or {}
-    found += sorted(handoffs, key=lambda a: -float((handoffs[a] or {}).get("score") or 0))
-    newborn = read_json(data_dir / "newborn" / "latest.json", {}).get("newborn") or []
-    found += [r.get("wallet") for r in sorted(newborn, key=lambda r: -float(r.get("account_value") or 0))
-              if float(r.get("account_value") or 0) >= 1_000_000]
+    found: list = [h.get("wallet") for h in _entries(census, "hits")]
+    found += [h.get("wallet") for h in _entries(tape, "program_hits")]
+    found += [f.get("account") for f in _entries(provenance, "findings")]
+    handoffs = read_json(data_dir / "dormancy" / "latest.json", {}).get("handoffs")
+    scored = [(wallet, records.num(row.get("score")))
+              for wallet, row in (handoffs.items() if isinstance(handoffs, dict) else [])
+              if isinstance(row, dict)]
+    found += [w for w, score in sorted((p for p in scored if p[1] is not None),
+                                       key=lambda p: -p[1])]
+    newborn = read_json(data_dir / "newborn" / "latest.json", {})
+    sized = [(r.get("wallet"), records.num(r.get("account_value")))
+             for r in _entries(newborn, "newborn")]
+    found += [w for w, value in sorted((p for p in sized if p[1] is not None and p[1] >= 1_000_000),
+                                       key=lambda p: -p[1])]
     return [w for w in found if isinstance(w, str)]
+
+
+def _entries(doc: dict, key: str) -> list[dict]:
+    """The dict entries of a list another detector wrote; anything else is no entries."""
+    rows = doc.get(key)
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def _address(entry) -> str:
+    """The address in a config entry, spelled as a string or as {"address": ...} (the two
+    forms `selection` accepts); "" when it is neither."""
+    return selection.address(entry.get("address") if isinstance(entry, dict) else entry)
+
+
+def _kept_members(previous, blocked: set) -> list[dict]:
+    """The last run's study set, as state.json holds it, for a run that cannot read the
+    roster. The target is never studied, whatever the file says."""
+    kept = []
+    for wallet, row in (previous if isinstance(previous, dict) else {}).items():
+        address = selection.address(wallet)
+        if (address and address not in blocked and isinstance(row, dict)
+                and row.get("source") in selection.SOURCES and isinstance(row.get("since_ms"), int)):
+            kept.append({"wallet": address, "source": row["source"], "since_ms": row["since_ms"]})
+    return kept
 
 
 def account_value(row: dict):
@@ -234,19 +265,28 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
     config = config or utils.load_config()
     now_ms = int(now_ms or time.time() * 1000)
     target = config["target_wallet"].lower()
-    exclude = {target, *(w.lower() for w in config.get("known_self_wallets") or [])}
+    exclude = {target, *filter(None, map(_address, config.get("known_self_wallets") or []))}
     roster = read_json(data_dir / "roster" / "latest.json", {})
+    roster_rows = roster.get("wallets") if isinstance(roster.get("wallets"), list) else None
     state = archive.load_state(data_dir)
     wallets_state = state.setdefault("wallets", {})
-    sources, state["decayed_seen"] = selection.by_source(
-        config, roster, detector_wallets(data_dir), state.get("decayed_seen") or {}, now_ms)
-    max_wallets = int((config.get("study") or {}).get("max_wallets") or selection.MAX_WALLETS)
-    members = selection.choose(sources, state.get("members"), now_ms,
-                               blocked=selection.blocked_wallets(config, roster),
-                               max_wallets=max_wallets)
-    _mark_departed(state.get("members"), members, now_ms, data_dir)
-    state["members"] = {m["wallet"]: {"source": m["source"], "since_ms": m["since_ms"]}
-                        for m in members}
+    if roster_rows is not None:
+        sources, state["decayed_seen"] = selection.by_source(
+            config, roster, detector_wallets(data_dir), state.get("decayed_seen") or {}, now_ms)
+        max_wallets = int((config.get("study") or {}).get("max_wallets") or selection.MAX_WALLETS)
+        members = selection.choose(sources, state.get("members"), now_ms,
+                                   blocked=selection.blocked_wallets(config, roster),
+                                   max_wallets=max_wallets)
+        _mark_departed(state.get("members"), members, now_ms, data_dir)
+        state["members"] = {m["wallet"]: {"source": m["source"], "since_ms": m["since_ms"]}
+                            for m in members}
+    else:
+        # A roster that cannot be read is not a roster with no leads: choosing from nothing
+        # would drop every member older than its 14 days and forget the decay clocks, so a
+        # lead that decayed out would be admitted again for a fresh 60 days. Keep both.
+        print("[study] the roster could not be read: keeping the previous study set "
+              "and decay clocks for this run")
+        members = _kept_members(state.get("members"), {target})
 
     census_state = read_json(data_dir / "execution_program" / "census_state.json", {})
     fams = panels.families(read_json(data_dir / "hl_surface" / "latest.json", {}),
@@ -296,7 +336,7 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
     snapshots = {w: v for w, v in (panel.get("members") or {}).items() if isinstance(v, dict)}
     ctx = assemble.panel_context(ref, splits, strangers, panels.member_pairs(fams, snapshots))
     values = {selection.address(r.get("wallet")): account_value(r)
-              for r in roster.get("wallets") or [] if isinstance(r, dict)}
+              for r in roster_rows or [] if isinstance(r, dict)}
     first_day = records.day_of(now_ms - (WINDOW_DAYS - 1) * records.DAY_MS)
     today = records.day_of(now_ms)
     rows = []

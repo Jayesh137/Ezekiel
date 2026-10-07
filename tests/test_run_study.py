@@ -610,6 +610,76 @@ def test_a_foreign_file_of_the_wrong_shape_is_read_as_absent(tmp_path):
     assert doc["studied"] == 1 and doc["unreadable"] == []
 
 
+def test_malformed_dormancy_and_newborn_entries_are_skipped_and_the_run_completes(tmp_path):
+    good, good_nb = "0x" + "1" * 40, "0x" + "2" * 40
+    data = data_dir(tmp_path, [lead(A)])
+    write_detector_files(data, {
+        "dormancy/latest.json": {"handoffs": {
+            good: {"score": 0.9}, "0x" + "3" * 40: 5, "0x" + "4" * 40: {"score": "high"},
+            "0x" + "5" * 40: {"score": float("nan")}, "0x" + "6" * 40: {"score": float("inf")},
+            "0x" + "7" * 40: {}, "0x" + "8" * 40: None}},
+        "newborn/latest.json": {"newborn": [
+            None, 5, "x", {"wallet": "0x" + "9" * 40, "account_value": "lots"},
+            {"wallet": "0x" + "a" * 40, "account_value": float("nan")},
+            {"wallet": "0x" + "b" * 40, "account_value": float("inf")},
+            {"wallet": "0x" + "c" * 40, "account_value": None},
+            {"wallet": good_nb, "account_value": 5e6}]}})
+    assert run_study.detector_wallets(data) == [good, good_nb]
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    assert doc["studied"] == 3 and doc["unreadable"] == []  # A, and the two good finds
+    write_detector_files(data, {"dormancy/latest.json": {"handoffs": [good, 5]},
+                                "newborn/latest.json": {"newborn": {"wallet": good_nb}}})
+    assert run_study.detector_wallets(data) == []  # a container of the wrong kind is no finds
+
+
+def test_a_known_self_wallet_written_as_a_dict_is_excluded_like_a_string(tmp_path):
+    other = "0x" + "c" * 40
+    data = data_dir(tmp_path, [], surface={"subaccounts": {B: {"master": A}}})
+    habits = {A: {"orders_seen": 500}, other: {"orders_seen": 500}}
+    (data / "execution_program").mkdir()
+    (data / "execution_program" / "census_state.json").write_text(json.dumps({"habits": habits}))
+    fake = Fake()
+    config = {**CONFIG, "known_self_wallets": [{"address": "0x" + A[2:].upper(), "why": "his"},
+                                               None, 5, "not an address"]}
+    doc = run_study.run(data_dir=data, config=config, now_ms=NOW, fetch=fake)
+    assert doc["panels"]["measurable_strangers"] == 1  # `other` only
+    assert archive.read_json(data / "study" / "panel" / "families.json", {})["families"] == {}
+    assert fake.calls == []
+
+
+@pytest.mark.parametrize("roster", [None, "[]", "{}", '{"wallets": null}', "{"],
+                         ids=["missing", "a-list", "empty", "no-wallets", "not-json"])
+def test_an_unreadable_roster_keeps_the_study_set_and_the_decay_clocks(tmp_path, capsys, roster):
+    decayed = lead(B)
+    decayed.update(tier="WATCH", tier_dropped_from="POSSIBLE")
+    data = data_dir(tmp_path, [lead(A), decayed])
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    before = archive.load_state(data)
+    assert set(before["members"]) == {A, B} and before["decayed_seen"] == {B: NOW}
+    path = data / "roster" / "latest.json"
+    path.unlink() if roster is None else path.write_text(roster)
+    later = NOW + 20 * records.DAY_MS  # past the 14 days a member would be kept anyway
+    fake = Fake()
+    capsys.readouterr()
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=later, fetch=fake)
+    after = archive.load_state(data)
+    assert after["members"] == before["members"] and after["decayed_seen"] == before["decayed_seen"]
+    assert doc["studied"] == 2 and doc["read"] == 2 and set(reads(fake, "userFillsByTime")) == {A, B}
+    assert capsys.readouterr().out.count("the roster could not be read") == 1  # one line says so
+
+
+def test_an_unreadable_roster_never_brings_the_target_back_into_the_set(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=Fake())
+    state = archive.load_state(data)
+    state["members"][T] = {"source": "pinned", "since_ms": NOW}  # however it got there
+    archive.save_state(state, data)
+    (data / "roster" / "latest.json").write_text("{")
+    fake = Fake()
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW + 60_000, fetch=fake)
+    assert [r["wallet"] for r in doc["wallets"]] == [A] and T not in reads(fake, "userFillsByTime")
+
+
 def test_a_first_read_reaches_back_fourteen_days(tmp_path):
     data = data_dir(tmp_path, [lead(A)])
     inside, outside = program(NOW - 13 * records.DAY_MS, 20), program(NOW - 15 * records.DAY_MS, 20)
