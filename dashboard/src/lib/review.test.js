@@ -12,9 +12,10 @@ import {
 	freshness, ago, ratio, bornLabel,
 	markReviewed, dropped, dismissDropped, progress, localDay, checkIn,
 	storyKey, storyRing, markStorySeen, watchFreshIso, readState, writeState, STORAGE_KEY,
-	hlPresent, hiddenCounts,
+	hlPresent, hiddenCounts, hlValue,
 	sessionFeed
 } from './review.js';
+import { formatUSD } from './api.js';
 
 const T = '0x45d26f28196d226497130c4bac709d808fed4029';
 const A = '0x' + 'a'.repeat(40);
@@ -305,4 +306,35 @@ test('counts say how many are hidden and why', () => {
 	] };
 	assert.deepEqual(tabCounts(roster, emptyState()),
 		{ likely: 1, leads: 1, hidden: 1, offHl: 1 });
+});
+
+// The card's "HL value". webData2's margin (hl_account_value) is perp only and reads 0
+// for an account whose collateral sits in spot; portfolio's total (hl_total_value) is
+// spot + perp but its newest point can lag the margin of a wallet funded a moment ago.
+// Neither is safe alone, so the card shows the larger.
+
+test('hlValue: the larger of total value and perp margin, else whichever is a number', () => {
+	assert.equal(hlValue({ hl_total_value: 9_370_000, hl_account_value: 0 }), 9_370_000);
+	assert.equal(hlValue({ hl_total_value: 0, hl_account_value: 5_000 }), 5_000);
+	assert.equal(hlValue({ hl_total_value: 100, hl_account_value: 100 }), 100);
+	// A row probed before the total existed, or whose portfolio / webData2 read failed.
+	assert.equal(hlValue({ hl_account_value: 5_000 }), 5_000);
+	assert.equal(hlValue({ hl_total_value: null, hl_account_value: 5_000 }), 5_000);
+	assert.equal(hlValue({ hl_total_value: 7, hl_account_value: null }), 7);
+	// A measured zero is a reading, not an absence.
+	assert.equal(hlValue({ hl_total_value: 0, hl_account_value: null }), 0);
+	assert.equal(hlValue({ hl_total_value: 0, hl_account_value: 0 }), 0);
+});
+
+test('hlValue never invents a number, and the card draws a dash for none', () => {
+	assert.equal(hlValue({}), null);
+	assert.equal(hlValue({ hl_total_value: null, hl_account_value: null }), null);
+	assert.equal(hlValue(null), null);
+	assert.equal(hlValue(undefined), null);
+	// A string, a bool, NaN and Infinity are not readings.
+	assert.equal(hlValue({ hl_total_value: '9370000', hl_account_value: NaN }), null);
+	assert.equal(hlValue({ hl_total_value: true, hl_account_value: Infinity }), null);
+	assert.equal(hlValue({ hl_total_value: Infinity, hl_account_value: 3 }), 3);
+	assert.equal(formatUSD(hlValue({})), '—');
+	assert.equal(formatUSD(hlValue({ hl_total_value: 9_370_000, hl_account_value: 0 })), '$9.37M');
 });
