@@ -116,7 +116,8 @@ $Schedule = @(
     @{ File = "collect.yml"; Minutes = 15;   Group = "data-commit" },
     @{ File = "trace.yml";   Minutes = 30;   Group = "data-commit" },
     @{ File = "scan.yml";    Minutes = 60;   Group = "data-commit" },
-    @{ File = "analyze.yml"; Minutes = 1440; Group = "data-commit" }
+    @{ File = "analyze.yml"; Minutes = 1440; Group = "data-commit" },
+    @{ File = "study.yml";   Minutes = 360;  Group = "study" }
 )
 
 # Every workflow sharing the `data-commit` group, including the ones this

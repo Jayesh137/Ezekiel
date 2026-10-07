@@ -255,3 +255,15 @@ test('multi-sig names the outside signer or co-signed account, never hiding it b
   ]);
   assert.deepEqual([...got[0].parties], [TREASURY, SIGNER]);
 });
+
+test('the study runs every six hours in its own group, never behind data-commit', () => {
+  const { sandbox } = load();
+  const job = sandbox.SCHEDULE.find((j) => j.file === 'study.yml');
+  assert.deepEqual({ ...job }, { file: 'study.yml', minutes: 360, group: 'study' });
+  const newest = {
+    'study.yml': { status: 'completed', created_at: ago(400) },
+    'collect.yml': { status: 'in_progress', created_at: ago(5) }
+  };
+  const d = Object.fromEntries(sandbox.decideDispatch(sandbox.SCHEDULE, newest, NOW).map((x) => [x.file, x]));
+  assert.equal(d['study.yml'].dispatch, true);
+});

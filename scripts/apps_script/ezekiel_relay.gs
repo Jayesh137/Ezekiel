@@ -38,7 +38,8 @@ var SCHEDULE = [
   { file: 'collect.yml', minutes: 15, group: 'data-commit' },
   { file: 'trace.yml', minutes: 30, group: 'data-commit' },
   { file: 'scan.yml', minutes: 60, group: 'data-commit' },
-  { file: 'analyze.yml', minutes: 1440, group: 'data-commit' }
+  { file: 'analyze.yml', minutes: 1440, group: 'data-commit' },
+  { file: 'study.yml', minutes: 360, group: 'study' }
 ];
 var DATA_COMMIT = ['collect.yml', 'trace.yml', 'scan.yml', 'analyze.yml',
                    'backfill.yml', 'substrate-backfill.yml'];

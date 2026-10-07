@@ -229,3 +229,9 @@ def test_a_running_run_counts_and_the_gate_excludes_its_own():
     s = _Session([_row(32, 0, status="in_progress", conclusion=None), _row(31, 50)])
     assert ks.newest_run(s, "o/r", "trace.yml")["status"] == "in_progress"
     assert ks.newest_run(s, "o/r", "trace.yml", exclude_run_id=32)["status"] == "completed"
+
+
+def test_the_study_runs_every_six_hours_in_its_own_group():
+    from scripts.keep_schedule import GROUP_MEMBERS
+    assert {"file": "study.yml", "minutes": 360, "group": "study"} in SCHEDULE
+    assert GROUP_MEMBERS["study"] == ["study.yml"]

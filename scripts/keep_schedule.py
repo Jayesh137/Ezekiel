@@ -56,6 +56,7 @@ SCHEDULE = [
     {"file": "trace.yml", "minutes": 30, "group": "data-commit"},
     {"file": "scan.yml", "minutes": 60, "group": "data-commit"},
     {"file": "analyze.yml", "minutes": 1440, "group": "data-commit"},
+    {"file": "study.yml", "minutes": 360, "group": "study"},
 ]
 
 # Every workflow in each concurrency group, including ones never dispatched here.
@@ -66,6 +67,7 @@ GROUP_MEMBERS = {
         "collect.yml", "trace.yml", "scan.yml", "analyze.yml",
         "backfill.yml", "substrate-backfill.yml",
     ],
+    "study": ["study.yml"],
 }
 
 # The keeper's own group, for the cron gate only: tick() never dispatches it.
