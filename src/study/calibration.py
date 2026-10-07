@@ -6,8 +6,9 @@ the one-sided 95% Clopper–Pearson upper bound — where the level is the LOOSE
 the candidate's own and each usable same-operator median. Judging at the looser
 level means a closer match can never fare worse than a looser one, and the
 same-operator rate at that level is at least one half by construction. Only T1
-can say **against**, and only for a trait he never shows that same-operator
-pairs almost never disagree on. Never tune these numbers to a result (rule 4).
+can say **against** when a measured stranger rate is finite and its LR < 1, and only
+for a trait he never shows that same-operator pairs almost never disagree on. Never
+tune these numbers to a result (rule 4).
 """
 
 from __future__ import annotations
@@ -50,11 +51,12 @@ def upper_bound(k: int, n: int, confidence: float = CONFIDENCE) -> float:
 
 
 def _usable(same_op: dict) -> dict:
-    """Filter same_op lists to those with enough values, dropping NaN entries."""
+    """Filter same_op lists to those with enough values, dropping NaN entries.
+    ±inf entries are kept (they represent non-matches that count toward minimum panels)."""
     result = {}
     for name, values in (same_op or {}).items():
-        # Drop NaN values before counting
-        clean = [v for v in values if math.isfinite(v)]
+        # Drop NaN values; ±inf are non-matches that count
+        clean = [v for v in values if not math.isnan(v)]
         if len(clean) >= MIN_SAME_OP.get(name, math.inf):
             result[name] = clean
     return result
@@ -63,16 +65,17 @@ def _usable(same_op: dict) -> dict:
 def judge_continuous(x, *, strangers: list[float], same_op: dict[str, list[float]],
                      higher_is_better: bool, min_strangers: int = MIN_STRANGERS) -> dict:
     """T2/T3. `strangers` holds one value per measurable stranger; one that cannot
-    produce the statistic carries -inf (higher is better) or inf (lower is better).
-    NaN values in strangers or same_op lists are dropped before any count."""
+    produce the statistic carries -inf (higher is better) or inf (lower is better), which
+    are non-matches that count toward the 200 minimum. NaN values in strangers or same_op
+    lists are dropped as unmeasurable before any count."""
     if x is None or not math.isfinite(x):
         return {"status": "insufficient"}
-    # Drop NaN from strangers before counting
-    clean_strangers = [s for s in strangers if math.isfinite(s)]
+    # Drop NaN from strangers before counting; ±inf count as non-matches
+    clean_strangers = [s for s in strangers if not math.isnan(s)]
     usable = _usable(same_op)
     if len(clean_strangers) < min_strangers or not usable:
         return {"status": "uncalibrated", "strangers": len(clean_strangers),
-                "same_op": {k: len(v) for k, v in (same_op or {}).items()}}
+                "same_op": {k: len(v) for k, v in usable.items()}}
     medians = [median(values) for values in usable.values()]
     level = min([x, *medians]) if higher_is_better else max([x, *medians])
 
@@ -113,9 +116,10 @@ def judge_binary(match: bool | None, *, stranger_k: int, stranger_n: int,
 def judge_against(traits: list[str], *, family_mismatch: dict[str, tuple[int, int]],
                   stranger_trait_rate: dict[str, float]) -> dict:
     """T1 only: a trait he never shows dominates the candidate, and same-operator
-    pairs disagree on it at most 10% of the time over at least 40 pairs. `family_mismatch`
-    maps a trait to (mismatching pairs, total pairs). The LR numerator is the one-sided
-    upper bound of the same-operator mismatch rate."""
+    pairs disagree on it at most 10% of the time over at least 40 pairs. `traits` are
+    already filtered by tooling.t1_style (dominant in the candidate, <0.1% of his orders).
+    `family_mismatch` maps a trait to (mismatching pairs, total pairs). The LR numerator
+    is the one-sided upper bound of the same-operator mismatch rate."""
     if not traits:
         return {"status": "none"}
     measured = {t: tuple(family_mismatch.get(t, (0, 0))) for t in traits}
@@ -153,5 +157,4 @@ def judge_against(traits: list[str], *, family_mismatch: dict[str, tuple[int, in
         return {"status": "neutral", "traits": list(traits)}
     else:
         # Some holding trait lacks measured rate → uncalibrated
-        return {"status": "uncalibrated", "traits": list(traits),
-                "pairs": {t: v[1] for t, v in holding.items()}}
+        return {"status": "uncalibrated", "traits": list(traits)}

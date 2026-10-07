@@ -65,7 +65,6 @@ def test_against_needs_forty_family_pairs_that_rarely_disagree():
     assert cal.judge_against([], family_mismatch={}, stranger_trait_rate={})["status"] == "none"
 
 
-# A1: against must be evidence against (LR < 1)
 def test_against_lr_under_one():
     # rate 0.54 → LR = 0.0705 / 0.54 ≈ 0.1305 → against
     got = cal.judge_against(["client_ids"], family_mismatch={"client_ids": (0, 41)},
@@ -98,7 +97,6 @@ def test_against_filters_traits_by_lr():
     assert got["traits"] == ["client_ids"]
 
 
-# A2: NaN handling
 def test_continuous_nan_input_insufficient():
     # x is NaN → insufficient
     assert cal.judge_continuous(float("nan"), strangers=[1.0] * 300, same_op={"self": SELF_T2},
@@ -127,7 +125,6 @@ def test_continuous_nan_in_same_op():
     assert got["status"] == "uncalibrated"
 
 
-# A3: Tests that pin the bars
 def test_constants_pinned():
     assert cal.MIN_STRANGERS == 200
     assert cal.MIN_REFERENCES == 150
@@ -156,7 +153,7 @@ def test_candidates_level_counts_when_looser():
 
 
 def test_two_bases_smaller_rate():
-    # Two bases: family rate at level is 40/40=1.0, self rate at level is 1/6≈0.167
+    # Two bases: family rate at level is 40/40=1.0, self rate at level is 3/6=0.5
     # Should use the smaller (self)
     got = cal.judge_continuous(0.05, strangers=[1.0]*300,
                                same_op={"family": [0.1]*40, "self": SELF_T2},
@@ -187,3 +184,93 @@ def test_binary_needs_fifty_percent_agreement():
 def test_upper_bound_at_additional_points():
     assert cal.upper_bound(5, 300) == pytest.approx(0.0347, abs=2e-4)
     assert cal.upper_bound(10, 1000) == pytest.approx(0.0169, abs=2e-4)
+
+
+# B1: only NaN is dropped; ±inf stays as non-match
+def test_inf_strangers_stay_non_matches_and_count():
+    got = cal.judge_continuous(0.1, strangers=[1.0] * 150 + [float("inf")] * 100,
+                               same_op={"self": SELF_T2}, higher_is_better=False)
+    assert got["status"] == "for" and got["stranger_n"] == 250
+    got = cal.judge_continuous(0.95, strangers=[0.2] * 150 + [float("-inf")] * 100,
+                               same_op={"family": [0.9] * 40}, higher_is_better=True)
+    assert got["status"] == "for" and got["stranger_n"] == 250
+
+
+# B2: LR = 1.0 boundary does not count
+def test_against_lr_exactly_one_does_not_count():
+    rate = cal.upper_bound(0, 41)
+    got = cal.judge_against(["t"], family_mismatch={"t": (0, 41)},
+                            stranger_trait_rate={"t": rate})
+    assert got["status"] == "neutral"
+
+
+# B3: Surviving A3 mutants
+def test_higher_is_better_candidate_looser_than_median_sets_the_level():
+    got = cal.judge_continuous(0.5, strangers=[0.7] * 5 + [0.1] * 295,
+                               same_op={"family": [0.9] * 40}, higher_is_better=True)
+    assert got["level"] == 0.5 and got["stranger_k"] == 5 and got["status"] == "neutral"
+
+
+def test_binary_two_bases_use_the_smaller_rate():
+    got = cal.judge_binary(True, stranger_k=0, stranger_n=200,
+                           same_op={"family": (41, 41), "self": (2, 6)})
+    assert got["status"] == "neutral"
+
+
+def test_strangers_tying_the_level_reach_it_lower_is_better():
+    got = cal.judge_continuous(0.1, strangers=[0.14] * 5 + [1.0] * 295,
+                               same_op={"self": SELF_T2}, higher_is_better=False)
+    assert got["stranger_k"] == 5 and got["status"] == "neutral"
+
+
+def test_strangers_tying_the_level_reach_it_higher_is_better():
+    got = cal.judge_continuous(0.95, strangers=[0.9] * 5 + [0.2] * 295,
+                               same_op={"family": [0.9] * 40}, higher_is_better=True)
+    assert got["stranger_k"] == 5 and got["status"] == "neutral"
+
+
+def test_binary_lr_value():
+    got = cal.judge_binary(True, stranger_k=0, stranger_n=200,
+                           same_op={"family": (41, 41)})
+    assert got["lr"] == pytest.approx(got["same_op_rate"] / got["stranger_upper"], rel=0.01)
+
+
+def test_binary_exact_half():
+    got = cal.judge_binary(True, stranger_k=0, stranger_n=200,
+                           same_op={"family": (20, 40)})
+    assert got["status"] == "for"
+
+
+# B4: judge_against edges
+def test_against_inf_rate_is_unmeasured():
+    got = cal.judge_against(["t"], family_mismatch={"t": (0, 41)},
+                            stranger_trait_rate={"t": float("inf")})
+    assert got["status"] == "uncalibrated"
+
+
+def test_against_multiple_counting_traits_min_lr():
+    # Two traits both with LR < 1, should use min
+    got = cal.judge_against(["t1", "t2"], family_mismatch={"t1": (0, 41), "t2": (1, 41)},
+                            stranger_trait_rate={"t1": 0.54, "t2": 0.54})
+    assert got["status"] == "against"
+    lr1 = cal.upper_bound(0, 41) / 0.54
+    lr2 = cal.upper_bound(1, 41) / 0.54
+    assert got["lr"] == pytest.approx(min(lr1, lr2), rel=0.01)
+
+
+def test_against_ten_percent_edge():
+    # 4/40 = 10% exactly, should be "against"
+    got = cal.judge_against(["t"], family_mismatch={"t": (4, 40)},
+                            stranger_trait_rate={"t": 0.54})
+    assert got["status"] == "against"
+    # 5/40 = 12.5% > 10%, should be "neutral"
+    got = cal.judge_against(["t"], family_mismatch={"t": (5, 40)},
+                            stranger_trait_rate={"t": 0.54})
+    assert got["status"] == "neutral"
+
+
+def test_against_forty_pair_rule():
+    # 39 pairs with measured rate → uncalibrated
+    got = cal.judge_against(["t"], family_mismatch={"t": (0, 39)},
+                            stranger_trait_rate={"t": 0.54})
+    assert got["status"] == "uncalibrated"
