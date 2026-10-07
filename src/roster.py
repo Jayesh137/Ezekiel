@@ -870,6 +870,32 @@ def build_roster(config: dict | None = None) -> dict:
         if reason not in e["reasons"]:
             e["reasons"].append(reason)
 
+    # The candidate study (scripts/run_study.py, spec 2026-10-06 §9): every studied
+    # wallet carries its verdicts as `evidence.study`. Only a calibrated tooling FOR
+    # casts a vote, the existing execution_program one; AGAINST is annotation only
+    # and never changes a tier or a vector (the operator's decision, 2026-10-06).
+    try:
+        with open(DATA_DIR / "study" / "latest.json") as f:
+            study = json.load(f)
+    except (OSError, ValueError):
+        study = {}
+    for row in (study.get("wallets") if isinstance(study, dict) else None) or []:
+        a = (row.get("wallet") or "").lower() if isinstance(row, dict) else ""
+        if not a or a == target:
+            continue
+        e = entry(a)
+        families = row.get("families") or {}
+        e["evidence"]["study"] = {
+            "as_of": study.get("computed_at"), "rank": row.get("rank"),
+            "coverage_days": row.get("coverage_days"),
+            "families": {name: {k: fam.get(k) for k in ("verdict", "lr", "by", "key", "basis")}
+                         for name, fam in families.items() if isinstance(fam, dict)}}
+        if (families.get("tooling") or {}).get("verdict") == "for":
+            e["vectors"].add(VECTOR_EXECUTION)
+            reason = "Makes orders the way he does (candidate study, calibrated)"
+            if reason not in e["reasons"]:
+                e["reasons"].append(reason)
+
     # Portfolio overlap is recorded but is NOT a vector. A copy-trader holds the
     # same basket in the same direction at the same time by definition, and this
     # project exists because its owner copies this trader by hand — so a high
