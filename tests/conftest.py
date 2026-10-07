@@ -24,6 +24,7 @@ Tests that need their own data dir still patch it themselves; an explicit
 monkeypatch inside a test applies after this fixture and wins.
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,17 @@ _PROBES = {
     # linkage.FIRST_FUNDER_PATH: permanent facts, cached forever once written.
     "the first-funder cache": REAL_DATA_DIR / "labels" / "first_funders.json",
     'the discovery database': REAL_DATA_DIR / '.local' / 'discovery.sqlite3',
+}
+
+# Trees whose every writer writes atomically — a temp file in the target's own
+# directory, then os.replace — or deletes. Each such write changes that
+# directory's mtime, so a signature over the directories alone catches it, at a
+# fraction of a full file walk's cost. Measured 2026-10-07: walking every file of
+# the candidate study tree took 164 ms, twice per test (~15 of the local suite's
+# 30 minutes, +3 minutes in CI), and it grows with every study run; its
+# directories grow only with its wallets. A tree written in place (the transfer
+# records, see _signature) must stay in _PROBES.
+_DIR_PROBES = {
     # src/study/archive.py: the candidate study's irreplaceable daily records,
     # state and dossiers. Its modules read utils.DATA_DIR at call time, so the
     # sandbox covers them; this probe proves it stays that way.
@@ -91,6 +103,15 @@ def _signature(path: Path):
         return path.stat().st_mtime_ns
     return {str(child.relative_to(path)): child.stat().st_mtime_ns
            for child in path.rglob("*")}
+
+
+def _dir_signature(path: Path):
+    """Existence + mtime of `path` and of every directory beneath it — enough for a
+    tree written only atomically or by deletion (see _DIR_PROBES)."""
+    if not path.exists():
+        return None
+    dirs = [path, *(Path(root) / name for root, names, _ in os.walk(path) for name in names)]
+    return {str(d.relative_to(path)): d.stat().st_mtime_ns for d in dirs}
 
 
 @pytest.fixture(autouse=True)
@@ -138,10 +159,12 @@ def _fail_if_the_real_data_dir_was_touched():
     path this suite has been caught writing to, or is positioned to write to.
     Fails loudly rather than leaving state to be discovered in a diff later.
     """
-    before = {label: _signature(p) for label, p in _PROBES.items()}
+    probes = {**{label: (p, _signature) for label, p in _PROBES.items()},
+              **{label: (p, _dir_signature) for label, p in _DIR_PROBES.items()}}
+    before = {label: sign(p) for label, (p, sign) in probes.items()}
     yield
-    for label, p in _PROBES.items():
-        assert before[label] == _signature(p), (
+    for label, (p, sign) in probes.items():
+        assert before[label] == sign(p), (
             f"a test wrote to the real {p} — redirect DATA_DIR instead. "
             f"Production {label} must never come from a test run."
         )
