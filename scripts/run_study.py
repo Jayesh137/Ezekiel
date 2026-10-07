@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import UTC, datetime
@@ -35,6 +36,8 @@ FIRST_READ_DAYS = 14
 ORDERS_EVERY_MS = 23 * records.HOUR_MS
 WINDOW_DAYS = 120
 FAMILY_REMEASURE_MS = 30 * records.DAY_MS
+# Eight members at about 240 weight each (userFills 120, historicalOrders 120) stay under the
+# 2,000 weight a run that the spec allows the families (§8.1).
 FAMILY_MEMBERS_PER_RUN = 8
 READ_SECONDS = 900
 WEIGHT_PER_MINUTE = 900
@@ -70,6 +73,16 @@ def detector_wallets(data_dir: Path) -> list[str]:
     found += [w for w, value in sorted((p for p in sized if p[1] is not None and p[1] >= 1_000_000),
                                        key=lambda p: -p[1])]
     return [w for w in found if isinstance(w, str)]
+
+
+def _relative(text, data_dir: Path):
+    """An error text with the data dir's absolute path cut off. latest.json is public and the
+    data dir is wherever the job checked the repository out, so a file is named as the study
+    knows it (study/archive/<wallet>/<day>.json) and nothing of the runner shows."""
+    if not isinstance(text, str):
+        return text
+    base = str(data_dir)
+    return text.replace(base + os.sep, "").replace(base + "/", "")
 
 
 def _entries(doc: dict, key: str) -> list[dict]:
@@ -308,11 +321,12 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
             result = study_wallet(member["wallet"], mstate, now_ms, data_dir, fetch)
             # Its fills were read, so the wallet counts as read; a daily read that failed is
             # reported beside it, and retried next run.
-            collection["partial"] += [{"wallet": member["wallet"], **e}
-                                      for e in result.get("errors") or []]
+            collection["partial"] += [
+                {"wallet": member["wallet"], "source": e["source"],
+                 "error": _relative(e["error"], data_dir)} for e in result.get("errors") or []]
             if result["status"] == "unreadable":
                 collection["unreadable"].append({"wallet": member["wallet"],
-                                                 "error": result.get("error")})
+                                                 "error": _relative(result.get("error"), data_dir)})
                 continue
             if result["status"] == "ok":
                 mstate["last_read_ms"] = now_ms
@@ -355,7 +369,8 @@ def run(*, data_dir: Path | None = None, config: dict | None = None, now_ms: int
             # Tests are never computed from a partial archive (rule 5): the wallet is
             # reported, gets no dossier and no roll, and the run goes on to the next.
             if not any(u["wallet"] == wallet for u in collection["unreadable"]):
-                collection["unreadable"].append({"wallet": wallet, "error": f"archive: {exc}"})
+                collection["unreadable"].append(
+                    {"wallet": wallet, "error": _relative(f"archive: {exc}", data_dir)})
             rows.append(unreadable_row(member, values.get(wallet), last_read, ref, ctx))
             continue
         tests = assemble.tooling_tests([days[d] for d in sorted(days)], ref, ctx)

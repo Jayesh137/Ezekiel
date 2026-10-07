@@ -1,6 +1,7 @@
 """scripts/run_study.py end to end, network-free."""
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -868,6 +869,25 @@ def test_a_bad_file_only_the_assembly_window_reaches_is_reported_there(tmp_path)
     assert row["families"]["tooling"]["verdict"] == "unreadable"
     assert row["account_value"] == 2e6 and row["last_read_ms"] == NOW  # what is known stays known
     assert old.read_bytes() == b"{" and not (data / "study" / "wallets" / f"{A}.json").exists()
+
+
+def test_the_error_texts_in_the_document_name_files_relative_to_the_data_dir(tmp_path):
+    # latest.json is public and the data dir is wherever the job checked the repository out
+    data = data_dir(tmp_path, [lead(A), lead(B)])
+    corrupt_day(data, A)  # found by the fold of A's own days
+    old = archive.wallet_dir(B, data) / "2026-08-01.json"  # found only by the rows
+    old.parent.mkdir(parents=True)
+    old.write_bytes(b"{")
+    fills = program(NOW - 2 * records.DAY_MS, 50)
+    fake = Fake(fills={A: fills, B: fills}, orders={A: entries(fills), B: entries(fills)},
+                errors={("userNonFundingLedgerUpdates", B): f"cannot reach {data}{os.sep}x"})
+    doc = run_study.run(data_dir=data, config=CONFIG, now_ms=NOW, fetch=fake)
+    errors = {u["wallet"]: u["error"] for u in doc["unreadable"]}
+    assert set(errors) == {A, B}
+    for error in errors.values():
+        assert str(data) not in error and error.startswith("archive: study")
+    assert "2026-10-01.json" in errors[A] and "2026-08-01.json" in errors[B]
+    assert doc["partial"] == [{"wallet": B, "source": "ledger", "error": "cannot reach x"}]
 
 
 def test_a_repaired_archive_is_read_again_from_the_same_cursor(tmp_path):
