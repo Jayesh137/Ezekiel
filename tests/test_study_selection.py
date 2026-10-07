@@ -181,13 +181,14 @@ def test_a_config_wallet_with_no_roster_row_is_not_known_to_trade_and_is_not_stu
 
 # --- detector finds: the roster's role gates them, the caller's measurement does not -------
 
-def test_a_detector_find_is_dropped_only_when_the_roster_says_it_is_not_a_trading_account():
+def test_a_detector_find_is_dropped_only_when_the_roster_measured_a_non_trading_role():
     roster = {"wallets": [row(A, value=0.0, role="user"),       # perp 0, no total or volume
-                          row(B, role="vault"), row(C, role="missing"),
+                          row(B, role="vault"), row(X, role="newRole"),
                           row(Y, value=0.0, role="subAccount"), row(Z, role="agent")]}
-    sources, _ = sel.by_source({"target_wallet": T}, roster, [A, B, C, D, Y, Z], {}, NOW)
+    sources, _ = sel.by_source({"target_wallet": T}, roster, [A, B, D, X, Y, Z], {}, NOW)
     # D has no roster row at all: unknown is not no. No value test either: the detector
-    # measured the account itself, fresher than the roster's weekly perp read.
+    # measured the account itself, fresher than the roster's weekly perp read. A vault, an
+    # agent and a role this code has never seen are measured roles that are not trading.
     assert sources["detector"] == [A, D, Y]
 
 
@@ -197,11 +198,25 @@ def test_a_detector_find_whose_roster_row_has_no_measured_role_is_kept():
     unread = row(A, value=None, role=None)             # hl_role: None, the userRole read failed
     never_probed = {"wallet": B, "tier": "WATCH", "tier_dropped_from": None,
                     "is_service": False, "evidence": {}}   # no hl_role key: not probed yet
-    measured_no = [row(C, role="missing"), row(Y, role="vault")]
     sources, _ = sel.by_source({"target_wallet": T},
-                               {"wallets": [unread, never_probed, *measured_no]},
-                               [A, B, C, D, Y], {}, NOW)
+                               {"wallets": [unread, never_probed, row(Y, role="vault")]},
+                               [A, B, D, Y], {}, NOW)
     assert sources["detector"] == [A, B, D]
+
+
+def test_a_stale_missing_role_never_drops_a_detector_find():
+    """A roster `missing` can be a week old (RECHECK_DAYS) and predate the account's birth, and
+    every detector names an account it saw active on Hyperliquid, so for a detector find it can
+    only be a stale read. A vault or an agent is a measured role that does not age out that way."""
+    roster = {"wallets": [row(C, role="missing"), row(Y, role="vault"), row(Z, role="agent")]}
+    sources, _ = sel.by_source({"target_wallet": T}, roster, [C, Y, Z, D], {}, NOW)
+    assert sources["detector"] == [C, D]
+    # The exemption stops at detector finds: a lead still needs a measured user/subAccount role.
+    leads = {"wallets": [row(A, "POSSIBLE", role="missing"),
+                         row(B, "WATCH", dropped="POSSIBLE", role="missing")]}
+    sources, _ = sel.by_source({"target_wallet": T}, leads, [A, B], {}, NOW)
+    assert sources["roster_lead"] == [] and sources["decayed_lead"] == []
+    assert sources["detector"] == [A, B]       # the same wallets, named by a detector, are kept
 
 
 def test_detector_finds_are_ordered_by_evidence_strength_and_ties_keep_the_callers_order():
@@ -232,6 +247,14 @@ def test_roster_leads_are_ordered_by_strength_then_value_with_total_before_perp_
     twins = {"wallets": [row(B, "POSSIBLE", value=1e6), row(A, "POSSIBLE", value=1e6)]}
     sources, _ = sel.by_source({"target_wallet": T}, twins, [], {}, NOW)
     assert sources["roster_lead"] == [A, B]
+
+
+def test_legacy_roster_leads_fall_back_to_perp_margin_when_no_total_was_read():
+    # Equal strength, no total: the LARGER perp margin sits on the LARGER address, so an order
+    # that lost the fallback would drop to the address and put it second.
+    roster = {"wallets": [row(A, "POSSIBLE", value=1e6), row(B, "POSSIBLE", value=5e6)]}
+    sources, _ = sel.by_source({"target_wallet": T}, roster, [], {}, NOW)
+    assert sources["roster_lead"] == [B, A]
 
 
 # --- the two clocks -------------------------------------------------------------------------

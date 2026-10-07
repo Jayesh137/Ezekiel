@@ -4,9 +4,9 @@ Four sources in priority order: wallets the operator pinned, roster leads that
 Hyperliquid knows as traders, leads that decayed out of their tier (kept 60 days
 from when the study first saw them decayed), and other detectors' finds. A
 member added under 14 days ago keeps its place ahead of newcomers from its own
-or a lower source, so its history can build. The target is never studied: he
-is the reference every test compares against. Neither is a service, nor a config
-wallet that does not trade on Hyperliquid.
+or a lower source, so its history can build. Never studied: the target (he is
+the reference every test compares against), services, and config wallets that do
+not trade on Hyperliquid.
 
 Hyperliquid-present is judged on an account's TOTAL value (spot + perp) and its
 30-day volume, never on perp margin: the roster's `hl_account_value` is
@@ -125,16 +125,17 @@ def by_source(config: dict, roster: dict | None, detectors: list, decayed_seen: 
                if hl_trader(r) and now_ms - seen[w] <= DECAYED_KEEP_MS]
     # A detector measured the account itself, fresher than the roster's weekly read,
     # so there is no value test. Only a role the roster MEASURED as not a trading
-    # account (missing, vault, agent...) drops a find. A row with no role yet (never
-    # probed, or its userRole read failed) is unknown, exactly like no row at all,
-    # and unknown is not no.
+    # account (vault, agent...) drops a find. A row with no role yet (never probed, or
+    # its userRole read failed) is unknown, exactly like no row at all, and unknown is
+    # not no. "missing" counts as unknown too: it can be a week old and predate the
+    # account's birth, while the detector saw the account active on Hyperliquid.
     by_wallet = {address(r.get("wallet")): r for r in rows}
     found = []
     for wallet in detectors or []:
         w = address(wallet)
         known = by_wallet.get(w)
         role = ((known or {}).get("evidence") or {}).get("hl_role")
-        measured_no = isinstance(role, str) and role not in HL_ROLES
+        measured_no = isinstance(role, str) and role not in (*HL_ROLES, "missing")
         if w and not measured_no:
             found.append((w, known))
     found.sort(key=lambda pair: -evidence_strength(pair[1] or {}))   # stable: caller's order ties
