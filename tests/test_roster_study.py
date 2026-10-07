@@ -17,15 +17,17 @@ def study_row(wallet, verdict):
                                      "key": {"style": "PROGRAM_IOC5"}, "basis": "family"}}}
 
 
-def build(tmp_path, monkeypatch, rows, previous=None):
+def build(tmp_path, monkeypatch, rows, previous=None, raw=None):
     # ROSTER_DIR is fixed at import: patch it too, or carry_peak_tier reads the real roster.
+    # `raw` is the study file's exact text, for a document that is not a well-formed one.
     monkeypatch.setattr(roster, "DATA_DIR", tmp_path)
     monkeypatch.setattr(roster, "ROSTER_DIR", tmp_path / "roster")
     (tmp_path.parent / "profile").mkdir(parents=True, exist_ok=True)
     (tmp_path.parent / "profile" / "backtest.json").write_text(json.dumps({"passed": False}))
     (tmp_path / "study").mkdir(exist_ok=True)
-    (tmp_path / "study" / "latest.json").write_text(json.dumps(
-        {"computed_at": "2026-10-06T00:00:00+00:00", "wallets": rows}))
+    (tmp_path / "study" / "latest.json").write_text(
+        raw if raw is not None else json.dumps(
+            {"computed_at": "2026-10-06T00:00:00+00:00", "wallets": rows}))
     if previous:
         (tmp_path / "roster").mkdir(exist_ok=True)
         (tmp_path / "roster" / "latest.json").write_text(json.dumps({"wallets": previous}))
@@ -104,6 +106,19 @@ def test_a_malformed_study_row_never_raises_and_a_good_row_still_votes(tmp_path,
 @pytest.mark.parametrize("wallets", [7, True, "x", {"a": 1}])
 def test_a_study_file_whose_wallets_is_not_a_list_changes_nothing(tmp_path, monkeypatch, wallets):
     assert build(tmp_path, monkeypatch, wallets) == {}
+
+
+@pytest.mark.parametrize("raw", [
+    json.dumps([study_row(A, "for")]),                       # a JSON list, not a document
+    "null",                                                  # a document that is null
+    '"x"',                                                   # a document that is a string
+    '{"computed_at": "2026-10-06T00:00:00+00:00", "wallets": [{"wallet": "0xaaaa',  # truncated
+    '{"wallets": [null, 3, "x"]}',                           # rows that are not dicts
+], ids=["list", "null", "string", "truncated", "rows_not_dicts"])
+def test_a_malformed_study_document_builds_the_roster_and_annotates_nothing(
+        tmp_path, monkeypatch, raw):
+    rows = build(tmp_path, monkeypatch, None, raw=raw)
+    assert not any("study" in w["evidence"] for w in rows.values())
 
 
 def test_no_study_file_changes_nothing(tmp_path, monkeypatch):
