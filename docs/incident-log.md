@@ -1914,21 +1914,32 @@ an account whose collateral sits in spot. The candidate study's plan used it as
 ($9.37M in spot, $80.0M of volume in 30 days, $0 of margin). The transfer graph
 did the same: it marked 19 Hyperliquid users in the target's graph as not
 trading, and five of them traded in the last 30 days (volume from $2K to $111M).
-`0x84abc08c0e…` received $999,999.80 straight from the target on 2026-09-09.
-None of the five makes orders his way - four tag every order with a client ID
-and one is a web-UI trader - so no lead was lost. But a new wallet of his that
-kept its collateral in spot would never have read as trading in his graph, nor
-been protected from the conduit pass, and the 2026-10-06 reading that "16 exist
-on HL, 0 trade" among his 412 depth-1 counterparties was wrong for at least
-`0x84abc08c0e…`. Fixed by storing `portfolio`'s total value and 30-day volume
-on every identity row (`hl_identity.parse_activity`, copied into the roster as
-`hl_total_value` and `hl_month_volume`), and by judging graph presence with
-`transfer_graph.trades_on_hl`: role `user` or `subAccount`, and 30-day volume or
-perp margin held now. Holding value is not trading - the CONFIRMED config wallet
-`0x1419e75330…` holds $56.7M and traded nothing in 30 days - and a row probed
-before the fields existed is still judged on perp margin until it is probed
-again. **Perp margin is not presence: "trades there" is 30-day volume, "holds
-value there" is total value - both live in `portfolio`, not `marginSummary`.**
+`0x84abc08c0e…` received $999,999.80 straight from the target on 2026-09-10
+(UTC). Measured on their orders, three tag every order with a client ID (maker
+bots: `0x84abc08c0e…`, `0x4c78a97cef…`, `0x07ae8551be…`) and two are web-UI
+traders with no client IDs - `0xb663c9b86c…` (2,000 of 2,000 orders
+FrontendMarket, in his markets xyz:SP500 and ZEC, account since emptied) and
+`0x4a89709691…` (about 80% FrontendMarket) - and he clicks the web UI himself
+(about 8% FrontendMarket), so their order habits do not exclude them. A new
+wallet of his that kept its collateral in spot would never have read as trading
+in his graph, nor been protected from the conduit pass, and the 2026-10-06
+reading that "16 exist on HL, 0 trade" among his 412 depth-1 counterparties was
+wrong for at least `0x84abc08c0e…`. Fixed by storing `portfolio`'s total value
+and 30-day volume on every identity row (`hl_identity.parse_activity`, copied
+into the roster as `hl_total_value` and `hl_month_volume`), and by judging graph
+presence with `transfer_graph.trades_on_hl`: role `user` or `subAccount`, and
+volume in the 30 days before the row was read or perp margin when it was read.
+Holding value is not trading - the CONFIRMED config wallet `0x1419e75330…` holds
+$56.7M and traded nothing in 30 days - and a row probed before the fields
+existed is still judged on perp margin until it is probed again. That is the
+reach limit: the conduit-pass protection sees only addresses the identity probe
+refreshes, and the graph's conduits were never probed (9 of its 145 traded
+$196.1M on Hyperliquid in 30 days, and one sat in the probe rota), so the first
+fix did not reach the case the exemption exists for. Fixed by queueing the
+graph's conduits for the identity probe right after the roster's leads
+(`scripts/check_identity.py`, 15 a run, all 145 read within about twelve runs).
+**Perp margin is not presence: "trades there" is 30-day volume, "holds value
+there" is total value - both live in `portfolio`, not `marginSummary`.**
 
 ---
 

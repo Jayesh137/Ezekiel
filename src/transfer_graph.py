@@ -1512,8 +1512,12 @@ def _number(x) -> bool:
 
 
 def trades_on_hl(identity: dict) -> bool:
-    """A Hyperliquid trading account that is trading: it traded in the last 30
-    days (`portfolio`'s month volume) or holds perp margin now.
+    """A Hyperliquid trading account that is trading: it traded in the 30 days
+    before the identity row was read (`checked_at`; `portfolio`'s month volume) or
+    held perp margin when it was read.
+
+    A snapshot of that reading, not of now: a row can be days old, and the month it
+    carries ended when it was read.
 
     Perp margin alone (webData2's `accountValue`) misses every account whose
     collateral sits in spot — measured 2026-10-07: five accounts in the target's
@@ -1563,9 +1567,10 @@ def _load_behavioural_scores() -> tuple[dict, set]:
             print(f"[graph] could not read candidates: {e}")
     # Wallets the graph found itself were never leaderboard candidates, so
     # `trades_on_hl` could not be true for them. The identity pass asks
-    # Hyperliquid directly, and `trades_on_hl()` judges the answer on TRADING (30-day
-    # volume, or perp margin held now), never on holding value and never on perp
-    # margin alone, which reads 0 for an account whose collateral sits in spot.
+    # Hyperliquid directly, and `trades_on_hl()` judges the answer on TRADING (volume in
+    # the 30 days before the row was read, or perp margin when it was read), never on
+    # holding value and never on perp margin alone, which reads 0 for an account whose
+    # collateral sits in spot.
     ident = DATA_DIR / "identity" / "latest.json"
     if ident.exists():
         try:
