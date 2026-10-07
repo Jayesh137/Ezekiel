@@ -8,6 +8,8 @@ sub-account families give same-operator pairs (spec §8.1).
 
 from __future__ import annotations
 
+import math
+
 from src import execution_program as ep
 from src.study import calibration, panels, records, tooling, verdict
 
@@ -76,10 +78,16 @@ def self_splits(his_days: dict, ref: dict) -> dict:
     return out
 
 
+def _measured(values: list[float]) -> int:
+    """Strangers that produced the statistic: the only ones T2 and T3 judge on."""
+    return sum(1 for v in values if math.isfinite(v))
+
+
 def panel_context(ref: dict, splits: dict, stranger_rows: list, family_pairs: list) -> dict:
     """The panels every judgement is made against, and a `status` that counts exactly what
     each judgement used (T1 and `against` judge on the strangers whose style is decidable;
-    T2 and T3 have their own strangers, family pairs and self windows)."""
+    T2 and T3 on the strangers that produce a rhythm or a clip strength, with their own
+    family pairs and self windows)."""
     family = panels.family_t1(family_pairs)
     stranger_k, stranger_n = panels.stranger_t1(stranger_rows, ref.get("style"))
     t2_strangers = panels.stranger_t2(stranger_rows, ref.get("cadence") or [])
@@ -101,9 +109,9 @@ def panel_context(ref: dict, splits: dict, stranger_rows: list, family_pairs: li
             "by_test": {
                 "T1": {"strangers": stranger_n, "family_pairs": family["agree"][1],
                        "self_windows": splits["t1"][1]},
-                "T2": {"strangers": len(t2_strangers), "family_pairs": len(t2_family),
+                "T2": {"strangers": _measured(t2_strangers), "family_pairs": len(t2_family),
                        "self_windows": len(splits["t2"])},
-                "T3": {"strangers": len(t3_strangers), "family_pairs": len(t3_family),
+                "T3": {"strangers": _measured(t3_strangers), "family_pairs": len(t3_family),
                        "self_windows": len(splits["t3"])}}},
     }
 

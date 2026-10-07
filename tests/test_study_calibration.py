@@ -193,13 +193,34 @@ def test_upper_bound_at_additional_points():
     assert cal.upper_bound(10, 1000) == pytest.approx(0.0169, abs=2e-4)
 
 
-def test_inf_strangers_stay_non_matches_and_count():
+def test_a_stranger_that_cannot_produce_the_statistic_is_unmeasured_not_a_non_match():
+    # Spec §8.2, operator decision 2026-10-07: T2 and T3 judge only the strangers that
+    # produce the statistic, as T1 judges only decidable styles. ±inf neither matches
+    # nor counts toward the 200.
     got = cal.judge_continuous(0.1, strangers=[1.0] * 150 + [float("inf")] * 100,
                                same_op={"self": SELF_T2}, higher_is_better=False)
-    assert got["status"] == "for" and got["stranger_n"] == 250
-    got = cal.judge_continuous(0.95, strangers=[0.2] * 150 + [float("-inf")] * 100,
+    assert got == {"status": "uncalibrated", "strangers": 150, "same_op": {"self": 6}}
+    got = cal.judge_continuous(0.1, strangers=[1.0] * 200 + [float("inf")] * 100,
+                               same_op={"self": SELF_T2}, higher_is_better=False)
+    assert got["status"] == "for" and got["stranger_n"] == 200
+    got = cal.judge_continuous(0.95, strangers=[0.2] * 200 + [float("-inf")] * 100,
                                same_op={"family": [0.9] * 40}, higher_is_better=True)
-    assert got["status"] == "for" and got["stranger_n"] == 250
+    assert got["status"] == "for" and got["stranger_n"] == 200
+
+
+def test_strangers_that_run_no_slicer_cannot_make_any_rhythm_his():
+    # Measured at the first production runs: 73 of 74 census strangers ran no slicer.
+    # Counted as non-matches, a client-ID bot's rhythm (0.704 from his, looser than his
+    # median month) read FOR at LR 65 on a panel scaled to 222. Unmeasured, the panel
+    # is three strangers: uncalibrated.
+    strangers = [float("inf")] * 219 + [2.5] * 3
+    got = cal.judge_continuous(0.704, strangers=strangers, same_op={"self": SELF_T2},
+                               higher_is_better=False)
+    assert got["status"] == "uncalibrated" and got["strangers"] == 3
+    clips = [float("-inf")] * 219 + [0.1] * 3
+    got = cal.judge_continuous(0.5, strangers=clips, same_op={"family": [0.9] * 40},
+                               higher_is_better=True)
+    assert got["status"] == "uncalibrated" and got["strangers"] == 3
 
 
 def test_against_lr_exactly_one_does_not_count():

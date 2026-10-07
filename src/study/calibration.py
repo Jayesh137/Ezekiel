@@ -5,7 +5,10 @@ A test says nothing until its panels are big enough (`uncalibrated`). It says
 the one-sided 95% Clopper–Pearson upper bound — where the level is the LOOSER of
 the candidate's own and each usable same-operator median. Judging at the looser
 level means a closer match can never fare worse than a looser one, and the
-same-operator rate at that level is at least one half by construction. Only T1
+same-operator rate at that level is at least one half by construction. A stranger
+counts only on a test it can be measured on: T1 judges strangers whose style is
+decidable, T2 and T3 those that produce a rhythm or a clip strength (operator
+decision 2026-10-07, before any result). Only T1
 can say **against** when a measured stranger rate is finite and its LR < 1, and only
 for a trait he never shows that same-operator pairs almost never disagree on. Never
 tune these numbers to a result (rule 4).
@@ -65,13 +68,16 @@ def _usable(same_op: dict) -> dict:
 def judge_continuous(x, *, strangers: list[float], same_op: dict[str, list[float]],
                      higher_is_better: bool, min_strangers: int = MIN_STRANGERS) -> dict:
     """T2/T3. `strangers` holds one value per measurable stranger; one that cannot
-    produce the statistic carries -inf (higher is better) or inf (lower is better), which
-    are non-matches that count toward the 200 minimum. NaN values in strangers or same_op
-    lists are dropped as unmeasurable before any count."""
+    produce the statistic carries -inf (higher is better) or inf (lower is better). That
+    stranger is unmeasured for this test, as an undecidable style is for T1: it is
+    neither a match nor a non-match, and it does not count toward the 200 (spec §8.2,
+    operator decision 2026-10-07). Counted as non-matches they turned T2 into "runs any
+    slicer": 73 of the first 74 census strangers ran none, so any rhythm at all was
+    "rare", and a client-ID bot read FOR at LR 65. NaN is dropped the same way. In
+    same_op lists ±inf stays a non-match (`_usable`), which only makes FOR harder."""
     if x is None or not math.isfinite(x):
         return {"status": "insufficient"}
-    # Drop NaN from strangers before counting; ±inf count as non-matches
-    clean_strangers = [s for s in strangers if not math.isnan(s)]
+    clean_strangers = [s for s in strangers if math.isfinite(s)]
     usable = _usable(same_op)
     if len(clean_strangers) < min_strangers or not usable:
         return {"status": "uncalibrated", "strangers": len(clean_strangers),
