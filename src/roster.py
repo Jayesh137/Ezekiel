@@ -902,7 +902,12 @@ def build_roster(config: dict | None = None) -> dict:
         tooling = families.get("tooling")
         if isinstance(tooling, dict) and tooling.get("verdict") in ("for", "mixed"):
             e["vectors"].add(VECTOR_EXECUTION)
-            reason = "Makes orders the way he does (candidate study, calibrated)"
+            # Same vote either way; the reason says which verdict cast it. `mixed` is a
+            # calibrated FOR beside a T1 AGAINST, and "makes orders the way he does" would
+            # state only the half that favours the wallet.
+            reason = ("Makes orders the way he does (candidate study, calibrated)"
+                      if tooling["verdict"] == "for" else
+                      "Some of his tooling matches, some contradicts (candidate study, calibrated)")
             if reason not in e["reasons"]:
                 e["reasons"].append(reason)
 

@@ -3,6 +3,8 @@
 import json
 import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -950,3 +952,25 @@ def test_only_the_run_script_writes_the_study():
             if found:
                 offenders[name] = found
     assert offenders == {}, "only scripts/run_study.py may write data/study/"
+
+
+def test_a_temp_file_stranded_by_a_hard_kill_is_never_committed():
+    # study.yml runs `git add data/study/`, and the archive writes `.<name>.<pid>.tmp` beside
+    # its target before replacing it (archive.py): a kill in between strands one. .gitignore has
+    # to keep it out of the history of an archive that cannot be rebuilt.
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git is not installed")
+    root = Path(__file__).parent.parent
+
+    def ignored(path):
+        return subprocess.run([git, "check-ignore", "-q", path], cwd=root).returncode == 0
+
+    stranded = [f"data/study/archive/{A}/.2026-09.jsonl.gz.{os.getpid()}.tmp",
+                f"data/study/archive/{A}/.2026-10-03.json.4242.tmp",
+                "data/study/.state.json.4242.tmp", f"data/study/wallets/.{A}.json.4242.tmp",
+                "data/study/panel/.families.json.4242.tmp", "data/study/.latest.json.4242.tmp"]
+    kept = [f"data/study/archive/{A}/2026-09.jsonl.gz", f"data/study/archive/{A}/2026-10-03.json",
+            "data/study/state.json", "data/study/latest.json", f"data/study/wallets/{A}.json"]
+    assert [path for path in stranded if not ignored(path)] == []
+    assert [path for path in kept if ignored(path)] == []

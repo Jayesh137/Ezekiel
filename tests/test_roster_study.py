@@ -53,6 +53,17 @@ def test_a_mixed_tooling_verdict_keeps_the_vote(tmp_path, monkeypatch):
     assert rows[A]["evidence"]["study"]["families"]["tooling"]["verdict"] == "mixed"
 
 
+def test_the_reason_says_which_tooling_verdict_cast_the_vote(tmp_path, monkeypatch):
+    # `mixed` used to read "Makes orders the way he does", which says the opposite of half
+    # of what the study found. The vote is the same either way; the words are not.
+    rows = build(tmp_path, monkeypatch, [study_row(A, "for"), study_row(B, "mixed")])
+    makes = "Makes orders the way he does (candidate study, calibrated)"
+    mixed = "Some of his tooling matches, some contradicts (candidate study, calibrated)"
+    assert "execution_program" in rows[A]["vectors"] and "execution_program" in rows[B]["vectors"]
+    assert [r for r in rows[A]["reasons"] if "candidate study" in r] == [makes]
+    assert [r for r in rows[B]["reasons"] if "candidate study" in r] == [mixed]
+
+
 def test_against_is_annotation_only(tmp_path, monkeypatch):
     # B already carries an independent vector (a shared agent) and a POSSIBLE history.
     # An AGAINST in the study changes none of it: not the vector, not the tier, not the peak.

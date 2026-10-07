@@ -1933,13 +1933,13 @@ Holding value is not trading - the CONFIRMED config wallet `0x1419e75330…` hol
 $56.7M and traded nothing in 30 days - and a row probed before the fields
 existed is still judged on perp margin until it is probed again. That is the
 reach limit: the conduit-pass protection sees only addresses the identity probe
-refreshes, and the graph's conduits were never probed (9 of its 145 traded
-$196.1M on Hyperliquid in 30 days, and one sat in the probe rota), so the first
-fix did not reach the case the exemption exists for. Fixed by queueing the
-graph's conduits for the identity probe right after the roster's leads
-(`scripts/check_identity.py`, 15 a run), and then by queueing the graph's nodes
-ahead of the conduits, in the graph's own order: 182 of its 299 nodes had never
-been probed either, so whether a wallet the target funded now trades on
+refreshes, and the graph's conduits were not in the probe rota (one was), so
+none carried `month_volume` (9 of its 145 traded $196.5M on Hyperliquid in 30
+days): the first fix did not reach the case the exemption exists for. Fixed by
+queueing the graph's conduits for the identity probe right after the roster's
+leads (`scripts/check_identity.py`, 15 a run), and then by queueing the graph's
+nodes ahead of the conduits, in the graph's own order: 182 of its 299 nodes had
+never been probed either, so whether a wallet the target funded now trades on
 Hyperliquid could not be known for them. At 15 a run, the nodes and then the
 conduits (7 of the 145 are also nodes) take about 30 runs to read once.
 **Perp margin is not presence: "trades there" is 30-day volume, "holds value

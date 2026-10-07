@@ -52,7 +52,7 @@ def test_a_row_with_no_usable_reading_time_is_stale():
 # it judges that from this sweep's identity rows. The sweep used to read only the roster's
 # non-INFRASTRUCTURE rows, and a conduit is INFRASTRUCTURE in the roster or absent from it,
 # so none was ever read: measured 2026-10-07, 9 of the graph's 145 conduits were
-# Hyperliquid accounts that traded $196.1M in 30 days, and one sat in the rota.
+# Hyperliquid accounts that traded $196.5M in 30 days, and one sat in the rota.
 
 
 def addr(n: int) -> str:
