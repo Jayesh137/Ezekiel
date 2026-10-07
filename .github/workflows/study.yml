@@ -55,6 +55,9 @@ jobs:
     timeout-minutes: 35   # backstop: the study step is bounded at 25, its reads at 900 s
     env:
       PYTHONUNBUFFERED: "1"
+      # The failure steps below push to ntfy only when this is set; without it a
+      # dead study would open an issue and tell nobody.
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
