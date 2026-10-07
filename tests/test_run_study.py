@@ -225,6 +225,19 @@ def test_orders_and_ledger_are_read_once_a_day_and_the_ledger_is_folded(tmp_path
     assert reads(daily, "userNonFundingLedgerUpdates") == [A]
 
 
+def test_the_daily_reads_land_on_every_fourth_run_whatever_the_cron_jitter(tmp_path):
+    data = data_dir(tmp_path, [lead(A)])
+    jitter_s = [90, 0, -30, 20, -90, 90, 0, 10, -90, 0]  # run 0 late, run 4 early, run 8 early
+    landed = []
+    for k, jitter in enumerate(jitter_s):
+        fake = Fake()
+        run_study.run(data_dir=data, config=CONFIG, fetch=fake,
+                      now_ms=NOW + k * 6 * records.HOUR_MS + jitter * 1_000)
+        if reads(fake, "historicalOrders"):
+            landed.append(k)
+    assert landed == [0, 4, 8]  # six hours apart, a 24 h bar would slip run 4 to run 5
+
+
 def test_a_full_orders_page_vouches_only_from_its_oldest_order(tmp_path):
     data = data_dir(tmp_path, [lead(A), lead(B)])
     busy = program(NOW - 50 * 60_000, 2_500, step=1_000)  # the page holds the newest 2,000

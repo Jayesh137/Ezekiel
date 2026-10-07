@@ -29,7 +29,10 @@ from src.hl_budget import ReadBudget
 from src.study import archive, assemble, collect, panels, records, selection, tooling
 
 FIRST_READ_DAYS = 14
-ORDERS_EVERY_MS = 24 * records.HOUR_MS
+# Orders and ledger are read on every 4th run (spec 6.1: "4th run (daily)"), the runs being
+# six hours apart. The interval is measured from the START of the last read, so cron jitter of
+# a minute or two would slip a bar of 24 h to the 5th run and then the 9th: 23 h holds the 4th.
+ORDERS_EVERY_MS = 23 * records.HOUR_MS
 WINDOW_DAYS = 120
 FAMILY_REMEASURE_MS = 30 * records.DAY_MS
 FAMILY_MEMBERS_PER_RUN = 8
