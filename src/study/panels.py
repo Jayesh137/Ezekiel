@@ -103,7 +103,8 @@ def stranger_trait_rates(rows: list[dict]) -> dict[str, float]:
 
 
 def stranger_t2(rows: list[dict], his_hist: list[int]) -> list[float]:
-    """Rhythm distance per stranger; one that runs no programs cannot match (inf)."""
+    """Rhythm distance per stranger; one that runs no programs has no rhythm (inf), which
+    the judgement treats as unmeasured, never as a non-match."""
     out = []
     for row in rows:
         hist = row.get("cadence") or []
@@ -113,7 +114,8 @@ def stranger_t2(rows: list[dict], his_hist: list[int]) -> list[float]:
 
 
 def stranger_t3(rows: list[dict], his_sig: dict) -> list[float]:
-    """Clip strength per stranger; one with nothing to compare cannot match (-inf)."""
+    """Clip strength per stranger; one with nothing to compare has no strength (-inf),
+    which the judgement treats as unmeasured, never as a non-match."""
     out = []
     for row in rows:
         match = ep.compare(his_sig or {}, tooling.snapshot_signature(row))

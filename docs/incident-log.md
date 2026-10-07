@@ -1974,3 +1974,29 @@ filter is pinned too (a `bool(vectors)` mutant survived every test): a match
 whose roster vectors are only `execution_program` and/or `behavioural` is HIGH,
 never CRITICAL, so the study's own vote cannot corroborate itself. **When a fix
 revives a dead path, audit what the path now permits, not only that it fires.**
+
+---
+
+**The study's T2 would have called any slicer his (found 2026-10-07, before it could
+vote).** Spec §8.2 counted a stranger that cannot produce T2's rhythm (or T3's clip
+strength) as a non-match toward the 200 strangers, and judged a candidate at the
+looser of its own distance and his median month. The first production runs measured
+the panel: **73 of 74 census strangers ran no slicer at all.** Counted as non-matches,
+they made any rhythm "rare", so T2 measured "runs a slicer" — which T1 already
+measures — while claiming an evidence ratio of ~65. Replayed on the real panel scaled
+past 200, one studied wallet read tooling **FOR** on T2 alone: `0x02745fb27d...`, 100%
+client order ids (he uses none), rhythm 0.70 from his against his median month's 0.39.
+It would have cast an `execution_program` vote on the day the panel calibrated
+(~2026-10-11), and his own months would have "passed" self-recall on T2 instead of on
+his program signature. The operator decided, before any T2/T3 result existed, that a
+stranger which cannot produce a statistic is **unmeasured** for that test, as an
+undecidable style already was for T1: `calibration.judge_continuous` judges only
+finite stranger values and stays `uncalibrated` until 200 produce the statistic, and
+`panel_context` reports that count. On the same scaled panel his months read FOR on
+T1 (LR 74), and the bot reads neutral. T2 now calibrates only once 200 slicers have
+been measured, and T3 once 200 clip-comparable strangers have, so for now only T1 can
+say FOR. **A non-match you could not measure is a non-match you assumed: when most of
+a panel cannot produce a statistic, counting them as non-matches measures only whether
+the statistic exists.** The Phase 2 gate (`scripts/check_phase2_ready.py`) holds
+Phase 2 back on acceptance 3's negative half too: no wallet showing a trait he never
+shows may read FOR or MIXED.

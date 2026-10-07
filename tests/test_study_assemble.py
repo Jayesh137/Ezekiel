@@ -57,6 +57,15 @@ def stranger_rows(n, undecidable=0):
             for i in range(n)]
 
 
+def measured_strangers(n):
+    """`n` strangers T2 and T3 can measure: each slices at a rhythm far from his (4.9 s
+    gaps against his 1.7 s) and carries a clip table on his coins at other sizes."""
+    gaps = [0] * records.CADENCE_BINS
+    gaps[-1] = tooling.MIN_GAPS
+    return [{**row, "cadence": gaps, "clip_table": {"BTC": 0.37, "ETH": 2.9, "SOL": 41.0}}
+            for row in stranger_rows(n)]
+
+
 def family_pairs(size, rhythm=0, clips=0):
     """One family of `size` members paired the way the study pairs it (a star: its first
     member against each other, `size - 1` pairs). The first member and the next `rhythm`
@@ -251,13 +260,17 @@ def test_a_wallet_trading_his_way_reads_for_once_the_panels_are_calibrated():
 
 def test_rhythm_and_clips_read_for_through_the_whole_assembly():
     # Seven months give his own splits the six windows the self basis needs, and three
-    # coins give his clip table something to compare.
+    # coins give his clip table something to compare. T2 and T3 are calibrated only on
+    # strangers that produce a rhythm and a clip strength, so these 200 do.
     his = history(T, JUNE, 210, coins=THREE_COINS, n=20)
     ref = assemble.his_reference(his)
-    ctx = context(his, ref)
+    ctx = assemble.panel_context(ref, assemble.self_splits(his, ref), measured_strangers(200),
+                                 family_pairs(41))
     assert len(assemble.self_splits(his, ref)["t3"]) == 7
-    # The header shows his seven windows for each of the three tests.
+    # The header shows his seven windows for each of the three tests, and the 200
+    # strangers each of them judged on.
     assert [ctx["status"]["by_test"][name]["self_windows"] for name in ("T1", "T2", "T3")] == [7] * 3
+    assert [ctx["status"]["by_test"][name]["strangers"] for name in ("T1", "T2", "T3")] == [200] * 3
     cand = history(W, JUNE + 210 * records.DAY_MS, 20, coins=THREE_COINS, n=20)
     tests = assemble.tooling_tests([cand[d] for d in sorted(cand)], ref, ctx)
     assert [tests[name]["judgement"]["status"] for name in verdict.TOOLING] == ["for"] * 3
@@ -274,13 +287,14 @@ def test_the_panel_context_reports_each_panel_against_its_bar():
     assert ctx["status"] == {
         "strangers": 200, "measurable_strangers": 200, "family_pairs": 40, "self_windows": 4,
         "by_test": {"T1": {"strangers": 200, "family_pairs": 40, "self_windows": 4},
-                    "T2": {"strangers": 200, "family_pairs": 0, "self_windows": 4},
-                    "T3": {"strangers": 200, "family_pairs": 0, "self_windows": 0}}}
+                    "T2": {"strangers": 0, "family_pairs": 0, "self_windows": 4},
+                    "T3": {"strangers": 0, "family_pairs": 0, "self_windows": 0}}}
     assert ctx["t1"]["stranger"] == (0, 200)
     assert ctx["t1"]["same_op"] == {"family": (40, 40), "self": (4, 4)}
     assert ctx["t1"]["mismatch"]["client_ids"] == (0, 40)
     assert ctx["t1"]["trait_rates"] == {"client_ids": 1.0, "triggers": 0.0, "maker": 1.0}
-    # Strangers who run no program cannot match (inf / -inf); his months are the only yardstick.
+    # Strangers who run no program produce no rhythm and no clip (inf / -inf): unmeasured
+    # for T2 and T3, which is why the header above counts none of them for those tests.
     assert ctx["t2"]["strangers"] == [float("inf")] * 200
     assert ctx["t3"]["strangers"] == [float("-inf")] * 200
     assert ctx["t2"]["same_op"] == {"family": [], "self": [0.0] * 4}
@@ -296,8 +310,15 @@ def test_the_header_counts_the_strangers_the_judgement_used():
     status = ctx["status"]
     assert status["strangers"] == 185 and status["measurable_strangers"] == 210
     assert status["by_test"]["T1"]["strangers"] == 185
-    # T2 and T3 need no style: all 210 count for them.
-    assert status["by_test"]["T2"]["strangers"] == status["by_test"]["T3"]["strangers"] == 210
+    # T2 and T3 need no style but a rhythm and a clip strength, which none of these 210
+    # produce: they count none of them.
+    assert status["by_test"]["T2"]["strangers"] == status["by_test"]["T3"]["strangers"] == 0
+    measured = assemble.panel_context(ref, assemble.self_splits(his, ref),
+                                      measured_strangers(210), [])["status"]["by_test"]
+    assert measured["T2"]["strangers"] == 210
+    # His one-coin clip table leaves no two coins to compare a stranger's on, so T3
+    # measures none of them: its panel depends on his signature too.
+    assert measured["T3"]["strangers"] == 0
     days = history(W, JUNE + 90 * records.DAY_MS, 20)
     tests = assemble.tooling_tests([days[d] for d in sorted(days)], ref, ctx)
     assert tests["T1"]["judgement"]["status"] == "uncalibrated"
@@ -317,8 +338,9 @@ def test_each_test_reports_the_panels_it_was_judged_on():
     assert mixed["family_pairs"] == 40 and mixed["by_test"]["T1"]["family_pairs"] == 40
     assert mixed["by_test"]["T2"]["family_pairs"] == 10
     assert mixed["by_test"]["T3"]["family_pairs"] == 5
-    # Strangers who cannot produce a rhythm or a clip are non-matches and still count.
-    assert plain["by_test"]["T2"]["strangers"] == plain["by_test"]["T3"]["strangers"] == 200
+    # Strangers who cannot produce a rhythm or a clip are unmeasured for T2 and T3 and do
+    # not count (spec §8.2, operator decision 2026-10-07).
+    assert plain["by_test"]["T2"]["strangers"] == plain["by_test"]["T3"]["strangers"] == 0
 
 
 def test_each_test_counts_the_months_of_his_it_could_use():
