@@ -155,9 +155,11 @@ def carry_forward(previous, wallets, read_wallets, census):
 
 
 def roster_vector_map(roster):
+    """Each roster wallet's vectors. Roster rows are keyed `wallet`; `address` is the
+    older spelling, still read."""
     out = {}
     for row in (roster or {}).get("wallets", []):
-        addr = (row.get("address") or "").lower()
+        addr = (row.get("wallet") or row.get("address") or "").lower()
         if addr:
             out[addr] = set(row.get("vectors") or [])
     return out

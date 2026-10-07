@@ -33,6 +33,26 @@ def test_build_report_flags_discriminating_and_independent():
     assert m["has_independent_vector"] is True
 
 
+def test_a_roster_documents_wallet_key_reaches_the_independent_vector_check():
+    # Every row of data/roster/latest.json is keyed `wallet` (2,635 of 2,635 when
+    # measured, none `address`). The map read `address`, so it was always empty and a
+    # match beside an independent vector could never be CRITICAL. The other tests hand
+    # build_report a ready-made map; this one goes through the roster document's shape.
+    census = {"population": 300, "ratio_p99": 0.34, "min_clips": 3}
+    target = _target(6)
+    roster = {"wallets": [{"wallet": "0xHit", "tier": "POSSIBLE", "vectors": ["transfer"]}]}
+    report = chk.build_report(target, [{"wallet": "0xhit", "signature": target}], census,
+                              chk.roster_vector_map(roster))
+    assert report["matches"][0]["has_independent_vector"] is True
+    assert [severity for severity, _ in chk.decide_alerts(report)] == ["CRITICAL"]
+
+
+def test_a_roster_row_keyed_address_is_still_read():
+    roster = {"wallets": [{"address": "0xABC", "vectors": ["linkage"]},
+                          {"vectors": ["transfer"]}]}
+    assert chk.roster_vector_map(roster) == {"0xabc": {"linkage"}}
+
+
 def test_no_census_records_the_match_but_flags_it_undiscriminating():
     target = _target(6)
     report = chk.build_report(target, [{"wallet": "0xhit", "signature": target}], None, {})
