@@ -91,11 +91,29 @@ def fetch_leaderboard():
 
 
 def load_state():
+    """The committed census state, or the empty one on the very first run.
+
+    Only a missing file is a first run. The state is the census's only memory
+    between Actions runs (weeks of accumulated population: it gates the
+    execution_program vote and feeds the stranger panel), and `run` rewrites the
+    whole file, so a read that fails or parses to the wrong shape must stop the run
+    (the analyze step fails, its failure issue and ntfy carry it) instead of being
+    read as "nothing measured yet" and overwritten. Rule 5.
+    """
     try:
         with open(STATE) as handle:
             state = json.load(handle)
-    except (OSError, ValueError):
-        state = {}
+    except FileNotFoundError:
+        return {"processed": {}, "hits": {}, "habits": {}}
+    except ValueError as exc:
+        raise ValueError(f"{STATE}: not valid JSON, refusing to restart the census: {exc}") from exc
+    if not isinstance(state, dict):
+        raise ValueError(f"{STATE}: top level is {type(state).__name__}, not an object; "
+                         "refusing to restart the census")
+    for key in ("processed", "hits", "habits"):
+        if not isinstance(state.get(key, {}), dict):
+            raise ValueError(f"{STATE}: `{key}` is {type(state[key]).__name__}, not an object; "
+                             "refusing to restart the census")
     return {"processed": state.get("processed", {}), "hits": state.get("hits", {}),
             "habits": state.get("habits", {})}
 

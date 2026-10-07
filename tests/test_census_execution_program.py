@@ -1,5 +1,7 @@
 """Census population selection and the resumable measurement loop."""
 
+import pytest
+
 from scripts import census_execution_program as census
 
 
@@ -198,3 +200,80 @@ def test_a_habit_row_has_the_fields_the_panels_and_the_cap_read():
     assert row["subaccounts"] == [a, b]
     # `at` is what cap_state evicts by; a row without it would always be oldest.
     assert isinstance(row["at"], int) and row["at"] > 0
+
+
+# --- the committed state is the census's only memory: a damaged one fails loudly ----------
+#
+# load_state used to read any OSError or ValueError as "no state yet", and run() then
+# measured from empty and rewrote the whole file. One corrupt commit of
+# census_state.json would have silently restarted weeks of accumulated population, the
+# store that gates the execution_program vote and feeds the stranger panel.
+
+
+def test_a_missing_state_file_is_a_first_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(census, "STATE", tmp_path / "census_state.json")
+    assert census.load_state() == {"processed": {}, "hits": {}, "habits": {}}
+
+
+def test_a_truncated_state_file_raises_and_names_the_file(tmp_path, monkeypatch):
+    path = tmp_path / "census_state.json"
+    monkeypatch.setattr(census, "STATE", path)
+    path.write_text('{"processed": {"0xa": {"ratio": 0.5, "at": 1}, "0xb": {"ra')
+    with pytest.raises(ValueError, match="census_state.json"):
+        census.load_state()
+
+
+@pytest.mark.parametrize("text", ["[]", '[{"processed": {}}]', "null", '"x"', "3", ""],
+                         ids=["empty-list", "list", "null", "string", "number", "empty-file"])
+def test_a_state_file_that_is_not_an_object_raises(tmp_path, monkeypatch, text):
+    path = tmp_path / "census_state.json"
+    monkeypatch.setattr(census, "STATE", path)
+    path.write_text(text)
+    with pytest.raises(ValueError, match="census_state.json"):
+        census.load_state()
+
+
+@pytest.mark.parametrize("state", [{"processed": []}, {"hits": []}, {"habits": "x"},
+                                   {"processed": None}],
+                         ids=["processed-list", "hits-list", "habits-string", "processed-null"])
+def test_a_state_whose_parts_are_not_objects_raises(tmp_path, monkeypatch, state):
+    import json
+
+    path = tmp_path / "census_state.json"
+    monkeypatch.setattr(census, "STATE", path)
+    path.write_text(json.dumps(state))
+    with pytest.raises(ValueError, match="census_state.json"):
+        census.load_state()
+
+
+def test_a_state_file_that_cannot_be_opened_raises(tmp_path, monkeypatch):
+    # Anything other than "no such file" is a fault, not a first run: here the path is a directory.
+    monkeypatch.setattr(census, "STATE", tmp_path)
+    with pytest.raises(OSError):
+        census.load_state()
+
+
+def test_run_stops_on_a_corrupt_state_and_overwrites_nothing(tmp_path, monkeypatch):
+    # The consequence that mattered: not the raise itself but the full rewrite that
+    # followed it. The damaged file must survive byte for byte, and no census appears.
+    out = tmp_path / "execution_program"
+    out.mkdir()
+    monkeypatch.setattr(census, "OUT_DIR", out)
+    monkeypatch.setattr(census, "STATE", out / "census_state.json")
+    monkeypatch.setattr(census, "CENSUS_FILE", out / "census.json")
+    monkeypatch.setattr(census, "target_signature", lambda: {"clip_table": {"BTC": {"size": 0.1}}})
+    damaged = '{"processed": {"0x' + "a" * 40 + '": {"ratio": 0.5, "at": 1}, "0xb'
+    census.STATE.write_text(damaged)
+    fetched = []
+
+    def fetch(body):
+        fetched.append(body)
+        return {"ok": True, "data": []}
+
+    with pytest.raises(ValueError, match="census_state.json"):
+        census.run(limit=10, budget_seconds=60, fetch=fetch,
+                   leaderboard=[_row("0x" + "b" * 40, 1_000_000, 5_000_000)])
+
+    assert census.STATE.read_text() == damaged
+    assert not census.CENSUS_FILE.exists()
+    assert fetched == []                                  # and nothing was read from Hyperliquid
