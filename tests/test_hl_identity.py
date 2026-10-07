@@ -63,6 +63,15 @@ def test_birth_is_the_first_nonzero_alltime_point_never_zero():
     assert hi.parse_birth("nope") is None
 
 
+def test_birth_skips_a_point_that_overflows_a_float():
+    """float(10**400) and int(float("inf")) raise OverflowError, which was not caught."""
+    huge, inf = 10**400, float("inf")
+    payload = [["allTime", {"accountValueHistory": [[1704321900064, huge], [inf, "5.0"],
+                                                    [1709233340241, "10000.0"]]}]]
+    assert hi.parse_birth(payload) == 1709233340241
+    assert hi.parse_birth([["allTime", {"accountValueHistory": [[1, huge], [inf, "5.0"]]}]]) is None
+
+
 UNKNOWN_ACTIVITY = {"total_value": None, "month_volume": None}
 
 
@@ -123,6 +132,17 @@ def test_a_value_that_is_not_a_finite_number_is_not_a_reading():
     assert hi.parse_activity(older)["total_value"] == 4.0
 
 
+def test_a_number_too_large_for_a_float_is_no_reading_and_never_raises():
+    """float(10**400) raises OverflowError, which escaped parse_activity and so probe."""
+    huge = 10**400
+    payload = [["month", {"accountValueHistory": [[9, huge]], "vlm": huge}]]
+    assert hi.parse_activity(payload) == UNKNOWN_ACTIVITY
+    # Skipped like any malformed point: the older readable one still reads, as does a point
+    # whose timestamp is infinite (int(float("inf")) overflows too).
+    older = [["day", {"accountValueHistory": [[1, "4.0"], [9, huge], [float("inf"), "7.0"]]}]]
+    assert hi.parse_activity(older)["total_value"] == 4.0
+
+
 def _fake_fetch(answers, failing=()):
     def fetch(body):
         kind = body["type"]
@@ -178,6 +198,14 @@ def test_probe_stores_the_total_value_and_month_volume_and_a_failed_read_leaves_
     # utils.hl_post answers {} for a failed portfolio read: still unknown, never zero.
     blank = hi.probe(T, _fake_fetch({**answers, "portfolio": {}}))
     assert blank["total_value"] is None and blank["month_volume"] is None
+
+
+def test_probe_survives_a_portfolio_answer_that_overflows_a_float():
+    huge = 10**400
+    portfolio = [["month", {"accountValueHistory": [[9, huge]], "vlm": huge}],
+                 ["allTime", {"accountValueHistory": [[9, huge]]}]]
+    got = hi.probe(T, _fake_fetch({"portfolio": portfolio}))     # must not raise
+    assert got["total_value"] is None and got["month_volume"] is None and got["birth_ms"] is None
 
 
 def test_presence_distinguishes_missing_from_unread():

@@ -131,7 +131,7 @@ def parse_birth(payload) -> int | None:
         for point in series.get("accountValueHistory") or []:
             try:
                 ts, value = int(point[0]), float(point[1])
-            except (TypeError, ValueError, IndexError):
+            except (TypeError, ValueError, IndexError, OverflowError):
                 continue
             if value > 0:
                 return ts
@@ -150,7 +150,7 @@ def _finite(raw) -> float | None:
         return None
     try:
         number = float(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):    # OverflowError: an int past float's range
         return None
     return number if math.isfinite(number) else None
 
