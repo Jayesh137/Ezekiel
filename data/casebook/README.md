@@ -41,8 +41,10 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
 - `known`: `config:known_self` for his configured wallets (ground truth). They are cases
   too, and serve as the recall check, but are never ranked among the suspects.
 - `ruling`: the operator's ruling from `config.casebook_rulings`, if any.
-- `excluded`: set when today's filters call the address a service or not a wallet. The
-  case is kept and leaves the ranking.
+- `excluded`: set when today's filters call the address a service or not a wallet, or
+  when it is a forgery of one of his declared wallets (the same first four and last four
+  hex characters: address poisoning), checked on every case each run. The case is kept
+  and leaves the ranking.
 - `roster`: the roster's tier by day (`tiers`, changes only), the peak tier, and the
   last non-empty reasons it gave, kept even after the roster stopped giving any.
 - `evidence`: one item per kind, each with `status`, `first_seen`, `last_seen`,

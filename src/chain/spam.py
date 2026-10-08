@@ -81,6 +81,28 @@ def is_lookalike(addr: str, volume, *, prefix: int = 4, suffix: int = 4,
     return None
 
 
+def lookalike_of(addr: str, anchors, *, prefix: int = 4, suffix: int = 4) -> str | None:
+    """The declared wallet `addr` is made to look like, or None: the same first
+    `prefix` and last `suffix` hex characters, and not that wallet.
+
+    Needs no volume, unlike `is_lookalike`: the anchors are the operator's ground
+    truth, so which of the pair is the original is already known. A batch-local
+    volume map cannot answer it when the batch holds the forgery's records and none
+    of the original's — the target's sweep on 2026-10-08 held three spoofed fake-USDC
+    transfers to `0xf078170f…f19e` and nothing with `0xf078969e…f19e`, so they were
+    stored as clean money and voted. A chance match is 1 in 16^8 per address; an
+    engineered one is address poisoning.
+    """
+    a = (addr or "").lower()
+    if not a.startswith("0x") or len(a) != 42:
+        return None
+    for real in sorted(anchors or ()):
+        r = (real or "").lower()
+        if len(r) == 42 and r != a and r[2:2 + prefix] == a[2:2 + prefix] and r[-suffix:] == a[-suffix:]:
+            return r
+    return None
+
+
 def derive_real_counterparties(records: list[dict], wallet: str,
                                dust_usd: float = 1.0) -> set[str]:
     """Addresses that moved priced value >= dust_usd with `wallet`.
@@ -126,7 +148,9 @@ def forged_side(record: dict, volume, *, wallet: str | None = None,
 
     One-sided on purpose: it stops a protected address being called the
     forgery, and does nothing to stop the address forging IT from being caught.
-    These are precisely the addresses worth poisoning, so the net stays up.
+    These are precisely the addresses worth poisoning, so the net stays up — and
+    a protected address is also an ANCHOR in its own right (`lookalike_of`), so
+    its forgeries are caught even when this batch holds none of its money.
     """
     w = (wallet or "").lower()
     safe = {(a or "").lower() for a in (protected or ())}
@@ -134,8 +158,8 @@ def forged_side(record: dict, volume, *, wallet: str | None = None,
         s = side.lower()
         if not s or s == w or s in safe:
             continue
-        mimicked = is_lookalike(s, volume, prefix=prefix, suffix=suffix,
-                                dust_usd=dust_usd)
+        mimicked = (lookalike_of(s, safe, prefix=prefix, suffix=suffix)
+                    or is_lookalike(s, volume, prefix=prefix, suffix=suffix, dust_usd=dust_usd))
         if mimicked:
             return s, mimicked
     return None

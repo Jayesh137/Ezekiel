@@ -126,6 +126,7 @@ def run_backfill(history, config: dict, *, out_dir, rebuild: bool = False, log=N
     events += ingest.rejudge_all(cases, activity, config, at_ms=last_ms, origin="backfill",
                                  tokens=tokens)
     events += ingest.void_pre_fix_all(cases, at_ms=last_ms, origin="backfill")
+    events += ingest.exclude_forgeries_all(cases, config, at_ms=last_ms, origin="backfill")
     scores = score.score_all(cases, extract.cluster_of(config))
     for address, case in cases.items():
         events += casefile.record_score(case, scores[address], at_ms=last_ms, origin="backfill")

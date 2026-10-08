@@ -245,3 +245,15 @@ def test_the_run_voids_what_only_the_2026_09_10_rosters_reported_without_an_acti
     run(tmp_path, probe=False, now=NOW + DAY)          # the same roster: stale, nothing merged
     entry = json.loads(path.read_text())["evidence"]["direct_transfer"]
     assert entry["invalid_reason"].startswith("reported only by the 2026-09-10 rosters")
+
+
+def test_the_run_excludes_a_forgery_case_the_roster_no_longer_lists(tmp_path):
+    forgery = "0xf078170f3993bcbd76c3234724314ae8ba59f19e"     # imitates SELF, 0xf078969e...f19e
+    write_roster(tmp_path, "2026-10-08T00:00:00+00:00", [LEAD])
+    run(tmp_path, probe=False)
+    from src.casebook.cases import new_case
+    case, _ = new_case(forgery, NOW, ["tier:POSSIBLE"], "backfill")
+    store.write_cases({forgery: case}, tmp_path)
+    run(tmp_path, probe=False, now=NOW + DAY)                 # the roster is stale and never lists it
+    row = next(r for r in store.read_index(tmp_path)["cases"] if r["address"] == forgery)
+    assert row["rank"] is None and row["excluded"].startswith("forgery of his wallet 0xf078969e")

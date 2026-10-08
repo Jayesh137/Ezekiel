@@ -229,6 +229,20 @@ def void_pre_fix(case: dict, *, at_ms: int, origin: str) -> list:
     return events
 
 
+def exclude_forgery(case: dict, cluster: set, *, at_ms: int, origin: str) -> list:
+    """A case whose address is made to look like one of his declared wallets is address
+    poisoning, never a suspect. Run on every case each run: the roster only re-grades
+    the wallets it still lists, and five forgeries from its history listed nowhere today
+    still ranked (2026-10-08)."""
+    if case.get("known") or case.get("excluded"):
+        return []
+    reason = extract.forgery_of(case["address"], cluster)
+    if not reason:
+        return []
+    case["excluded"] = {"reason": reason, "since": iso(at_ms)}
+    return [event(at_ms, case["address"], "case_excluded", origin, reason=reason)]
+
+
 def update_roster(case: dict, row: dict, at_ms: int, origin: str) -> list:
     """The roster's own view of the wallet: tier by day, peak, reasons, HL facts, links."""
     events: list = []

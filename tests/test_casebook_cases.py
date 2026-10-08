@@ -260,3 +260,14 @@ def test_the_rule_never_lifts_a_reason_it_did_not_give():
                                                      invalid_reason="not a wallet: token contract")}
     assert cases.void_pre_fix(case, at_ms=T0, origin="live") == []
     assert case["evidence"]["direct_transfer"]["invalid_reason"] == "not a wallet: token contract"
+
+
+def test_a_forgery_of_his_wallet_is_excluded_whether_or_not_the_roster_lists_it():
+    cluster = {"0xf078969e55cabf9ae3f26afeb5ec627b4430f19e"}
+    forgery, _ = cases.new_case("0xf078170f3993bcbd76c3234724314ae8ba59f19e", T0, ["tier:POSSIBLE"], "backfill")
+    events = cases.exclude_forgery(forgery, cluster, at_ms=T0, origin="live")
+    assert forgery["excluded"]["reason"].startswith("forgery of his wallet 0xf078969e")
+    assert [e["kind"] for e in events] == ["case_excluded"]
+    assert cases.exclude_forgery(forgery, cluster, at_ms=T0 + H, origin="live") == []      # once
+    genuine = opened()
+    assert cases.exclude_forgery(genuine, cluster, at_ms=T0, origin="live") == [] and not genuine["excluded"]

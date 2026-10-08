@@ -1094,6 +1094,19 @@ def build_roster(config: dict | None = None) -> dict:
             e["is_service"] = True
             e["evidence"]["service_reason"] = f"not a wallet: {reason}"
 
+    # A look-alike of one of his declared wallets is address poisoning, never a lead:
+    # `0xf078170f…f19e` reached POSSIBLE on 2026-10-08 on spoofed fake-USDC transfers
+    # "from" the target and dust, all $0. Its records stay; it just cannot be a candidate.
+    from src.chain.spam import ground_truth_addresses, lookalike_of
+    ground = ground_truth_addresses(config)
+    for address, e in wallets.items():
+        if e["known_self"] or address in ground or e.get("is_service"):
+            continue
+        forged = lookalike_of(address, ground)
+        if forged:
+            e["is_service"] = True
+            e["evidence"]["service_reason"] = f"forgery of his wallet {forged[:10]}...: address poisoning"
+
     rows = []
     for e in wallets.values():
         e["vectors"] = sorted(e["vectors"])

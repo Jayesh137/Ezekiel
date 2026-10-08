@@ -212,3 +212,11 @@ def test_a_transfer_vote_with_no_valued_flow_with_the_target_says_so():
         "received_from_target_usd": 0, "sent_to_target_usd": 0, "edge_count": 2,
         "unvalued_edge_count": 0}}})
     assert got["direct_transfer"]["summary"] == "Observed transfer with one of his wallets (2 movements)"
+
+
+def test_a_forgery_of_his_wallet_is_rejected_whatever_the_roster_says():
+    forgery = "0xf078170f3993bcbd76c3234724314ae8ba59f19e"      # 0xf078...f19e, like SELF
+    out = extract.classify_row({"wallet": forgery, "tier": "POSSIBLE", "vectors": ["linkage", "transfer"]},
+                               CONFIG)
+    assert out["status"] == "rejected"
+    assert out["reason"].startswith("forgery of his wallet 0xf078969e")

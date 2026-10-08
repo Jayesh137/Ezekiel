@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 
 from src import not_wallets
 from src.casebook import model
+from src.chain.spam import lookalike_of
 
 ADDRESS = re.compile(r"0x[0-9a-f]{40}")
 ADMITTING_TIERS = ("CONFIRMED", "PROBABLE", "POSSIBLE")
@@ -347,6 +348,13 @@ def supporting(item: dict) -> bool:
     return model.band(item["kind"], item.get("strength"), item.get("facts"))[1] > 0
 
 
+def forgery_of(address: str, cluster: set) -> str | None:
+    """Why `address` can never be his, when it is made to look like one of his declared
+    wallets (address poisoning: `chain.spam.lookalike_of`), else None."""
+    forged = lookalike_of(address, cluster)
+    return f"forgery of his wallet {forged[:10]}...: address poisoning" if forged else None
+
+
 def classify_row(row: dict, config: dict, tokens: set | None = None) -> dict:
     """What one roster row means for the casebook (spec §6.1).
 
@@ -379,11 +387,12 @@ def classify_row(row: dict, config: dict, tokens: set | None = None) -> dict:
     out.update(items=items, refutes=refutes, why=list(dict.fromkeys(why)))
     if pin != "config:known_self":
         reason = not_wallets.classify(address, config=config, token_contracts=tokens)
+        forged = forgery_of(address, cluster_of(config))
         service = bool(row.get("is_service")) or tier == "INFRASTRUCTURE"
-        if reason or service:
+        if reason or forged or service:
             evidence = row.get("evidence") if isinstance(row.get("evidence"), dict) else {}
-            out["reason"] = (f"not a wallet: {reason}" if reason
-                             else f"service: {evidence.get('service_reason') or 'measured service'}")
+            out["reason"] = (f"not a wallet: {reason}" if reason else forged
+                             or f"service: {evidence.get('service_reason') or 'measured service'}")
             out["status"] = "rejected" if out["why"] else "ignored"
             return out
     out["status"] = "admitted" if out["why"] else "ignored"

@@ -207,6 +207,7 @@ def run(config: dict, *, data_dir: Path, out_dir: Path, probe: bool = True, fetc
     events += ingest.rejudge_all(cases, activity, config, at_ms=now_ms, origin="live",
                                  tokens=tokens, blocked=blocked)
     events += ingest.void_pre_fix_all(cases, at_ms=now_ms, origin="live", blocked=blocked)
+    events += ingest.exclude_forgeries_all(cases, config, at_ms=now_ms, origin="live", blocked=blocked)
     scores = score.score_all(cases, extract.cluster_of(config))
     if probe and cases:
         found, out["probes"] = probe_cases(cases, scores, now_ms=now_ms, fetch=fetch,
