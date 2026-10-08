@@ -46,7 +46,10 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
   last non-empty reasons it gave, kept even after the roster stopped giving any.
 - `evidence`: one item per kind, each with `status`, `first_seen`, `last_seen`,
   `seen_days`, the latest `facts` and `summary`, and the strongest observation beside
-  them (`peak_*`).
+  them (`peak_*`). An item that rests on another address (a first funder, a quiet payee,
+  a deposit address) gains `invalid_reason` when the whole chain has since measured that
+  address a service, or it has no key: the item keeps its `status` for the record and
+  counts as `invalidated`.
 - `hl`: the last Hyperliquid read (`portfolio`): whether it is an account, birth, value,
   volumes, the value history from birth (`life`) and one row per probe day (`probes`).
 - `score`: the current bands and the family values that made them; `score_days` keeps
@@ -61,7 +64,7 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
 | `lapsed` | seen live, then absent 24 hours or more, cause unknown | no / half / yes |
 | `refuted` | absent after a detector re-checked the wallet and found nothing | no / no / yes |
 | `historical` | from the git-history backfill and not current when the casebook went live | no / no / yes |
-| `invalidated` | rests on something today's filters reject | no / no / no |
+| `invalidated` | not stored as a status: an item with `invalid_reason`, whose address was since measured a service or has no key. Re-judged every run against `data/labels/address_activity.json`; a new measurement that passes the address clears it, and an address with no new measurement keeps its verdict | no / no / no |
 
 ## How the likelihood is computed
 
