@@ -25,7 +25,9 @@ import src.roster as roster
 
 TARGET = "0x" + "11" * 20
 SELF = "0x" + "12" * 20
-MASTER = "0x" + "22" * 20
+# Not "22" * 20: 0x2222...2222 is Hyperliquid's HYPE system address, which the
+# roster grades INFRASTRUCTURE since 2026-10-08 (src/not_wallets.py).
+MASTER = "0x" + "2c" * 20
 SUB = "0x" + "33" * 20
 EMPTY_SUB = "0x" + "34" * 20
 REFERRER = "0x" + "44" * 20

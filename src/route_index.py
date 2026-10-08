@@ -1,5 +1,6 @@
 """Trace exact routes while keeping funder, protocol caller and recipient distinct."""
 
+from src import not_wallets
 from src.candidate_registry import valid_wallet
 from src.movements import event_identity
 from src.route_binding import bound_decode, transfer_binding
@@ -149,12 +150,11 @@ def index_routes(records, bridge_decodes, circle_events, cluster):
     routes, unresolved, discoveries, seen = [], [], {}, set()
 
     def discover(wallet, route):
-        # A mint (the zero address), a chain's native-token system contract or a
-        # HyperCore system address is not a funder: data/candidates/0x000…0000.json
-        # held hundreds of these before 2026-10-06.
-        if (not wallet or wallet in cluster or wallet == "0x" + "0" * 40
-                or wallet == "0x0000000000000000000000000000000000001010"
-                or wallet.startswith(("0x20000000000000000000000000000000000000", "0x2222222222"))):
+        # A mint (the zero address), a precompile, a HyperCore system address or a
+        # token contract is not a funder: data/candidates/0x000…0000.json held
+        # hundreds of these before 2026-10-06, and USDC on Base 65 on 2026-10-08
+        # (src/not_wallets.py).
+        if not wallet or wallet in cluster or not_wallets.classify(wallet) is not None:
             return
         key = (wallet, route["id"])
         discoveries[key] = {"wallet": wallet, "source": "funding_route", "positive": True,

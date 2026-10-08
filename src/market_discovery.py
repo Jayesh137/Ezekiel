@@ -8,9 +8,13 @@ from src.utils import hl_read
 
 
 def exclusions(config):
+    # The configured excluded and service addresses too: the scanner was scoring
+    # the zero address, which appears as a party to venue trades (2026-10-08).
     return [config.get("target_wallet", ""), *config.get("known_self_wallets", []),
             *config.get("hl_shared_destinations", []),
-            *config.get("discovery", {}).get("excluded_wallets", [])]
+            *config.get("discovery", {}).get("excluded_wallets", []),
+            *config.get("excluded_addresses", []),
+            *config.get("known_service_addresses", [])]
 
 
 def select_markets(config, universe, rotation=0):

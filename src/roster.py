@@ -327,7 +327,7 @@ def activity_table() -> dict:
 
 
 def detector_candidates(config: dict | None, roster: dict | None,
-                        limit: int) -> list[str]:
+                        limit: int, casebook: dict | None = None) -> list[str]:
     """The wallets a per-wallet detector should ask about this run.
 
     The roster ranks by how much evidence a wallet ALREADY has, so taking the
@@ -1027,6 +1027,22 @@ def build_roster(config: dict | None = None) -> dict:
             continue
         e["is_service"] = True
         e["evidence"]["service_reason"] = e["evidence"].get("service_reason") or reason
+
+    # An address with no key — a token contract, a precompile, a system address —
+    # can never be the wallet the owner follows, and two of the forty detector
+    # slots went to token contracts on 2026-10-08 (src/not_wallets.py).
+    # Well-formed addresses only: a malformed identifier was never this filter's
+    # question, and grading it here would be a new opinion nobody measured.
+    from src.not_wallets import ADDRESS, token_registry_addresses
+    from src.not_wallets import classify as not_a_wallet
+    tokens = token_registry_addresses(DATA_DIR / "labels" / "token_contracts.json")
+    for address, e in wallets.items():
+        if e["known_self"] or address == target or not ADDRESS.fullmatch(address):
+            continue
+        reason = not_a_wallet(address, config=config, token_contracts=tokens)
+        if reason:
+            e["is_service"] = True
+            e["evidence"]["service_reason"] = f"not a wallet: {reason}"
 
     rows = []
     for e in wallets.values():

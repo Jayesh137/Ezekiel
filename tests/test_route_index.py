@@ -1,7 +1,7 @@
 from src.route_index import index_routes
 
 A = "0x" + "1" * 40
-B = "0x" + "5" * 40   # not 0x2222…2222: that is HyperCore's HYPE system address
+B = "0x" + "56" * 20  # not 0x2222…2222 (HYPE system address) nor 0x5555…5555 (WHYPE)
 ROUTER = "0x" + "3" * 40
 TOKEN = "0x" + "4" * 40
 
@@ -259,5 +259,14 @@ def test_mints_and_system_contracts_never_become_funding_route_candidates():
                  "0x0000000000000000000000000000000000000000",
                  "0x0000000000000000000000000000000000001010",
                  "0x2000000000000000000000000000000000000000"))]
+    out = index_routes(recs, {}, [], {T})
+    assert out["discoveries"] == []
+
+
+def test_a_token_contract_never_becomes_a_funding_route_candidate():
+    from src.route_index import index_routes
+    T = "0x45d26f28196d226497130c4bac709d808fed4029"
+    recs = [{"id": "r1", "src": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", "dst": T,
+             "amount_usd": 1e6, "ts": 1, "chain": "base", "tx_hash": "0x1"}]
     out = index_routes(recs, {}, [], {T})
     assert out["discoveries"] == []
