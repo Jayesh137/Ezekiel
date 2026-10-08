@@ -188,3 +188,19 @@ def test_known_wallets_are_immune_to_the_service_grade():
     got = extract.classify_row({"wallet": SELF, "tier": "CONFIRMED", "is_service": True,
                                 "vectors": ["transfer"]}, CONFIG)
     assert got["status"] == "admitted" and "config:known_self" in got["why"]
+
+
+def test_a_transfer_vote_with_no_valued_flow_with_the_target_says_so():
+    # Measured 2026-10-08: rows voting `transfer` through his config wallets carry
+    # zero totals with the target; "received $0, sent $0" misread them, and $0 is
+    # not the amount of an unpriced movement (rule 6).
+    got = kinds({"wallet": A, "vectors": ["transfer"], "reasons": ["Sent funds to the target wallet"],
+                 "evidence": {"totals": {"received_from_target_usd": 0, "sent_to_target_usd": 0,
+                                         "edge_count": 3, "unvalued_edge_count": 1}}})
+    item = got["direct_transfer"]
+    assert item["strength"] is None
+    assert item["summary"] == "Observed transfer with the target (3 movements, 1 unpriced)"
+    got = kinds({"wallet": A, "vectors": ["transfer"], "evidence": {"totals": {
+        "received_from_target_usd": 0, "sent_to_target_usd": 0, "edge_count": 2,
+        "unvalued_edge_count": 0}}})
+    assert got["direct_transfer"]["summary"] == "Observed transfer with one of his wallets (2 movements)"

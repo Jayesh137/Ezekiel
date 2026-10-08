@@ -172,12 +172,24 @@ def extract_items(row: dict, config: dict) -> tuple[list[dict], set[str]]:
     voting = [b for b in boundary if b.get("vote") == "transfer"]
     deposit_votes = [b for b in boundary if b.get("vote") == "linkage"]
     other_boundary = [b for b in boundary if b.get("vote") not in ("transfer", "linkage")]
-    if "transfer" in own and (any(v >= TWO_WAY_MIN_USD for v in moved) or not (flows or voting)):
-        summary = (f"Moved money with the target (received {usd(received)}, sent {usd(sent)})"
-                   if moved else "Observed transfer with one of his wallets")
+    valued = [v for v in moved if v >= TWO_WAY_MIN_USD]
+    if "transfer" in own and (valued or not (flows or voting)):
+        if valued:
+            summary = f"Moved money with the target (received {usd(received)}, sent {usd(sent)})"
+        else:
+            # The vote came through an unpriced movement or through his config
+            # wallets: $0 with the target is not the amount (rule 6), so say what
+            # was observed instead.
+            edges, unpriced = _num(totals.get("edge_count")), _num(totals.get("unvalued_edge_count"))
+            counted = f"{edges:.0f} movement{'' if edges == 1 else 's'}" if edges else ""
+            if counted and unpriced:
+                counted += f", {unpriced:.0f} unpriced"
+            party = ("the target" if any("target wallet" in r.lower() for r in reasons)
+                     else "one of his wallets")
+            summary = f"Observed transfer with {party}" + (f" ({counted})" if counted else "")
         add("direct_transfer", {"totals": totals, "depth": evidence.get("depth"),
                                 "chains": evidence.get("chains"), "reasons": reasons},
-            summary, max(moved) if moved else None)
+            summary, max(valued) if valued else None)
     if "hl_native" in own or (received is not None and sent is not None
                               and min(received, sent) >= TWO_WAY_MIN_USD):
         add("two_way_flow", {"received_from_target_usd": received, "sent_to_target_usd": sent,
