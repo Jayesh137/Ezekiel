@@ -36,12 +36,13 @@
     "reasons": [
      "Received funds directly from the target wallet",
      "Sent funds to the target wallet",
-     "Repeated transfers (10 separate movements)",
-     "Two-way flow — funds move both to and from this wallet"
+     "Repeated transfers (8 separate movements)",
+     "Two-way flow — funds move both to and from this wallet",
+     "First gas paid by the target wallet"
     ],
     "totals": {
-     "edge_count": 10,
-     "received_from_target_usd": 0,
+     "edge_count": 8,
+     "received_from_target_usd": 0.0,
      "sent_to_target_usd": 0,
      "unvalued_edge_count": 5
     }
@@ -58,7 +59,30 @@
    "seen_days": 1,
    "status": "current",
    "strength": null,
-   "summary": "Observed transfer with the target (10 movements, 5 unpriced)"
+   "summary": "Observed transfer with the target (8 movements, 5 unpriced)"
+  },
+  "funded_by_target": {
+   "absent_since": null,
+   "ended_at": null,
+   "facts": {
+    "funder": "0x45d26f28196d226497130c4bac709d808fed4029",
+    "reasons": [
+     "First gas paid by the target wallet"
+    ]
+   },
+   "first_seen": "2026-10-08T21:46:28Z",
+   "kind": "funded_by_target",
+   "last_seen": "2026-10-08",
+   "live": true,
+   "origin": "live",
+   "peak_at": null,
+   "peak_strength": null,
+   "peak_summary": null,
+   "refuted_seen": false,
+   "seen_days": 1,
+   "status": "current",
+   "strength": null,
+   "summary": "Its first funding or gas came straight from the target wallet"
   }
  },
  "excluded": null,
@@ -136,7 +160,7 @@
   "week_volume": 0.0
  },
  "known": null,
- "last_change": "2026-10-08T20:07:26Z",
+ "last_change": "2026-10-08T21:46:28Z",
  "links": {},
  "opened_at": "2026-10-08T20:07:26Z",
  "opened_by": [
@@ -152,8 +176,10 @@
   "reasons": [
    "Received funds directly from the target wallet",
    "Sent funds to the target wallet",
-   "Repeated transfers (10 separate movements)",
-   "Two-way flow — funds move both to and from this wallet"
+   "Repeated transfers (8 separate movements)",
+   "Two-way flow — funds move both to and from this wallet",
+   "First gas paid by the target wallet",
+   "First funded directly by the target wallet"
   ],
   "reasons_at": "2026-10-08",
   "tier": "POSSIBLE",
@@ -167,31 +193,31 @@
  "ruling": null,
  "schema": "casebook-case/1",
  "score": {
-  "ceiling": -1.7,
-  "central": -2.3,
+  "ceiling": -1.0,
+  "central": -1.7,
   "cluster": null,
   "cluster_size": 1,
   "families": {
    "money": {
-    "ceiling": 1.3,
-    "central": 0.7,
-    "now": 0.3
+    "ceiling": 2.0,
+    "central": 1.3,
+    "now": 0.7
    }
   },
   "model": "casebook-model/2026-10-08.1",
-  "now": -2.7,
-  "p_ceiling": 0.0195623,
-  "p_central": 0.00498688,
-  "p_now": 0.00199129,
-  "solo_central": -2.3
+  "now": -2.3,
+  "p_ceiling": 0.0909091,
+  "p_central": 0.0195623,
+  "p_now": 0.00498688,
+  "solo_central": -1.7
  },
  "score_days": [
   [
    "2026-10-08",
-   -2.7,
    -2.3,
-   -1.7
+   -1.7,
+   -1.0
   ]
  ],
- "score_event_central": -2.3
+ "score_event_central": -1.7
 }
