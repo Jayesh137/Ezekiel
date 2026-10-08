@@ -59,6 +59,7 @@ JOBS: dict[str, dict] = {
             (["python", "scripts/check_execution_program.py"], 240),
             (["python", "scripts/measure_candidates.py"], 240),
             (["python", "src/roster.py"], 180),
+            (["python", "scripts/update_casebook.py"], 360),
             (["python", "scripts/check_feed_health.py", "watch"], 120),
             (["python", "src/accounting.py"], 180),
         ],

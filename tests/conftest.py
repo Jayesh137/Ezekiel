@@ -84,6 +84,9 @@ _DIR_PROBES = {
     # state and dossiers. Its modules read utils.DATA_DIR at call time, so the
     # sandbox covers them; this probe proves it stays that way.
     "the candidate study tree": REAL_DATA_DIR / "study",
+    # src/casebook/store.py: every suspect the project has ever had, kept forever.
+    # Every write there is atomic, so directory mtimes are enough.
+    "the casebook": REAL_DATA_DIR / "casebook",
 }
 
 

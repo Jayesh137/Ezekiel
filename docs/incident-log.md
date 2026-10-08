@@ -2000,3 +2000,78 @@ a panel cannot produce a statistic, counting them as non-matches measures only w
 the statistic exists.** The Phase 2 gate (`scripts/check_phase2_ready.py`) holds
 Phase 2 back on acceptance 3's negative half too: no wallet showing a trait he never
 shows may read FOR or MIXED.
+
+---
+
+**The project found suspects and then forgot them (measured 2026-10-08; the casebook
+fixes it).** The four strongest leads of September — `0xdd53c529...`,
+`0x5b5d5120...`, `0xb83de012...`, `0x12e16e3d...` — all sat at WATCH with **zero
+vectors and zero reasons**, positions 601-902 of 2,735; `peak_tier` was the only
+trace that anything had ever been found, and `0x4aecac3b...` (the trace engine's
+HyperCore deposit address) sat at #1,458. Every detector rewrites its `latest.json`
+whole and the roster is rebuilt from scratch, so a lapse erased the evidence itself.
+One lapse was not even a loss of coverage: `0xdd53c529...`'s dormancy handoff (born
+two days into a six-day silence, score 0.43) disappeared because his p90 gap moved
+from 5 to 6 days as his history grew, so the six-day silence stopped counting as
+anomalous while the detector re-checked the wallet every run. The fact was permanent;
+only the yardstick moved. **A detector's latest.json is a reading, not a memory.**
+`src/casebook/` keeps a case file per suspect, forever: each evidence item with when
+it was first and last seen and whether it is current, standing (a protocol fact),
+lapsed (seen live, gone 24 h, cause unknown), refuted (a detector re-checked and found
+nothing), historical (from git history) or invalidated. `scripts/backfill_casebook.py`
+read all **592 roster versions** (one unreadable, skipped) in 7 minutes at ~63 MB:
+**831 cases, 3,264 events, 5.4 MB**; 697 unknown, 2 known, 132 later graded a service
+or not a wallet, and 301 rejected rows on record.
+
+**The ranking is a Bayesian log-odds over a declared table, and evidence against
+subtracts.** Prior 1:1,000; each kind has a log10 likelihood-ratio band and a basis
+(only the candidate study's tooling LR is measured; direct transfers are estimated from
+"2 of 412 depth-1 counterparties are his"); a family never sums its items, a second
+family in a category counts half, and the three bands (now / central / ceiling) separate
+what stands today from what history could support. Two calibration checks are reported
+and were not tuned to: his known wallets rank **3rd** among 697 unknown cases on their
+evidence alone, and the unknown cases' probabilities sum to **0.78** (a calibrated model
+expects about 0.5-3). The September leads rank ~633 of 697: their positive evidence is
+all historical (counted only in the ceiling, up to ~35% for `0xdd53c529...`) and each
+carries a current style veto (they trade 6-12x more often than he does). The strongest
+current suspects on Hyperliquid were the `0xb2f7374b...` / `0xd4758770...` /
+`0x4196dc4a...` sub-account family ($22.5M; born two days into a 10-day silence of his)
+and `0x3b2d7db2...` (born one day into a 9-day silence). The first live dry run read 30
+of them on Hyperliquid with no failure and raised no event (a first read is a baseline).
+
+**Keyless addresses were taking detector slots.** `roster.detector_candidates` (40
+slots for dormancy, identity, agents and the HL surface) gave two to token contracts —
+USDC on Base (`0x833589fc...`, #12, ranked up by 65 `funding_route` observations) and
+USDC.e on Polygon (`0x2791bca1...`, #17) — and the behavioural scanner was scoring the
+zero address, a party to venue trades. `src/not_wallets.py` now grades system addresses,
+precompiles, canonical tokens (each confirmed on Blockscout or by reading `symbol()`
+on-chain: Blockscout answered 403 for Arbitrum, Base and Polygon) and the pricing
+registry as not wallets; the roster makes them INFRASTRUCTURE, the route index skips
+them, market discovery excludes the configured addresses. Two existing test fixtures had
+used `0x2222...2222` (HYPE's system address) and `0x5555...5555` (WHYPE, confirmed
+on-chain) as ordinary wallets. **An address with no key is never a suspect.**
+
+**What the casebook watches.** Each trace run re-reads due suspects with `portfolio`
+(~70 under a 150 s budget; the dry run measured 2 s a read): never-read first, the top 25
+every 12 h, accounts every 3 days, addresses with no account every 7. A suspect that
+opens an account, starts trading after 30 quiet days or grows past $1M raises an event,
+and for the top 25 or anything at ~1% and up, an alert — CRITICAL while he is in an
+unusual silence (the dormancy-handoff shape), HIGH otherwise. Its best 8 Hyperliquid
+suspects are pinned into every per-wallet detector after the operator's own pins, so a
+lead the roster forgot is still measured. Spec:
+`docs/superpowers/specs/2026-10-08-casebook-design.md`; format: `data/casebook/README.md`.
+
+**A permanent record must be able to say "this no longer counts".** Self-review found
+the `invalidated` status defined and never set: a funder later measured busy kept its
+vote for ever. Every run now re-judges each item that rests on another address against
+the whole-chain readings, whether or not a new roster arrived — the first version did it
+only on a new roster, so a measurement landing on a quiet day changed nothing. It is
+reversible, and only a measurement can reverse it: an address missing from the table,
+or a table that cannot be read, keeps its verdict, because "we could not tell" is not
+"measured quiet" (rule 5). The first replay invalidated four items, all "shares his
+first funder" on the 2.28M-transaction hot wallet `0xf92402bb...` behind the referral
+twins — carried over from roster versions before 2026-09-16, when the roster still
+reported funders nobody had measured — and two of those cases were still explaining
+their rank with the roster's own "Shares the target's original funding source". The
+reason line now says what stopped counting and why, the CLI and its SQLite export carry
+`invalid_reason`, and the funder item no longer claims "measured quiet".

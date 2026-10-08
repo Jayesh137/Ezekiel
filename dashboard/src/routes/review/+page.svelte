@@ -4,7 +4,9 @@
 	// Every rule lives in $lib/review.js; this file wires it to taps.
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
-	import { fetchRoster, fetchWatchlist, shortAddr } from '$lib/api.js';
+	import { fetchRoster, fetchWatchlist, fetchCasebook, shortAddr } from '$lib/api.js';
+	import { rankedFeed, isNew, readSeen, writeSeen } from '$lib/casebook.js';
+	import CasePost from './CasePost.svelte';
 	import {
 		sessionFeed, tabCounts, progress, dropped, dismissDropped, markReviewed, markStorySeen,
 		checkIn, localDay, freshness, watchFreshIso, readState, writeState, emptyState,
@@ -22,6 +24,11 @@
 
 	let roster = null;
 	let watch = null;
+	let casebook = null;
+	// The casebook seen-time at the moment the Ranked tab was first opened this session,
+	// frozen so the dots do not vanish under your finger (the same rule as the feed order).
+	let rankedSeen = null;
+	let rankedSeenFrozen = false;
 	let loading = true;
 	let failed = false;
 	let offline = false;
@@ -49,7 +56,8 @@
 
 	async function load() {
 		loading = true;
-		const [r, wl] = await Promise.all([fetchRoster(), fetchWatchlist()]);
+		// A failed casebook read never fails the roster view: the Ranked tab says so alone.
+		const [r, wl, cb] = await Promise.all([fetchRoster(), fetchWatchlist(), fetchCasebook()]);
 		now = Date.now();
 		loading = false;
 		if (!r) {
@@ -63,6 +71,7 @@
 		offline = false;
 		roster = r;
 		watch = wl;
+		casebook = cb;
 		const read = readState(storage());
 		storageOk = read.ok;
 		state = { ...read.state, streak: checkIn(read.state.streak, localDay(new Date())) };
@@ -121,7 +130,13 @@
 
 	// The queue is whichever tab is open: reviewing the strong wallets and
 	// reviewing the weak leads are two different jobs with their own finish line.
-	$: rows = roster ? sessionFeed(roster, orderState, state, tab) : [];
+	$: rows = roster && tab !== 'ranked' ? sessionFeed(roster, orderState, state, tab) : [];
+	$: ranked = casebook ? rankedFeed(casebook, 25) : [];
+	$: if (tab === 'ranked' && casebook && !rankedSeenFrozen) {
+		rankedSeen = readSeen(storage());
+		writeSeen(storage(), casebook.computed_at);
+		rankedSeenFrozen = true;
+	}
 	$: prog = progress(rows);
 	$: counts = roster ? tabCounts(roster, orderState) : null;
 	// Today the Likely tab holds only his known wallets. Saying so stops two
@@ -133,7 +148,8 @@
 	$: streak = storageOk ? state.streak?.count || 0 : 0;
 	$: tabs = [
 		{ value: 'likely', label: 'Priority', count: counts?.likely ?? null },
-		{ value: 'leads', label: 'Leads', count: counts?.leads ?? null }
+		{ value: 'leads', label: 'Leads', count: counts?.leads ?? null },
+		{ value: 'ranked', label: 'Ranked', count: casebook ? ranked.length : null }
 	];
 	$: sheetTitle = sheet?.kind === 'watch' ? 'Close watch'
 		: sheet?.kind === 'dropped' ? 'Left the list'
@@ -198,6 +214,31 @@
 
 		<Segmented options={tabs} bind:value={tab} label="Wallet list" />
 
+		{#if tab === 'ranked'}
+		<p class="tabnote">
+			Every suspect the casebook keeps, ranked by how likely it is his: a Bayesian estimate
+			over a 1-in-1,000 prior. A lead the roster has forgotten stays here with its history.
+			A ranking, not proof.
+		</p>
+		{#if !casebook}
+			<div class="empty">
+				<p class="title">Casebook unavailable</p>
+				<p class="sub">The ranked list could not be loaded. That is not the same as having no suspects.</p>
+			</div>
+		{:else}
+			<div class="stack">
+				{#each ranked as c (c.address)}
+					<CasePost {c} fresh={isNew(c, rankedSeen)} on:copy={(e) => copy(e.detail)} />
+				{:else}
+					<div class="empty"><p class="sub">No unknown suspect on Hyperliquid in the casebook.</p></div>
+				{/each}
+			</div>
+			<p class="foot">
+				{casebook.counts?.unknown ?? 0} suspects are kept in all; the dashboard's Casebook page
+				lists every one, with its case file.
+			</p>
+		{/if}
+		{:else}
 		<p class="tabnote">
 			{#if tab === 'likely'}
 				Configured seeds and leads supported by different evidence groups.
@@ -266,6 +307,7 @@
 			Read-only. Reviews are stored on this device only. Tiers describe evidence
 			and review priority; they do not establish ownership.
 		</p>
+		{/if}
 	{/if}
 </div>
 

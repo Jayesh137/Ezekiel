@@ -43,7 +43,7 @@ from src.utils import DATA_DIR
 
 # Never compact these — they cannot be re-fetched from the API.
 IRREPLACEABLE = {"fills", "funding", "ledger", "l1_transactions", "state",
-                 "candidates", "calibration"}
+                 "candidates", "calibration", "casebook"}
 
 # Snapshot directories laid out as {type}/YYYY-MM-DD/HH-MM.json
 SNAPSHOT_TYPES = ["positions", "account", "spot", "positions_hip3_xyz", "orders"]

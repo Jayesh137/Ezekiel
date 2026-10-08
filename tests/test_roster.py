@@ -16,7 +16,9 @@ import src.roster as roster
 from src import thresholds as th
 
 TARGET = "0x" + "11" * 20
-W = "0x" + "22" * 20
+# Not "22" * 20: 0x2222...2222 is Hyperliquid's HYPE system address, which the
+# roster grades INFRASTRUCTURE since 2026-10-08 (src/not_wallets.py).
+W = "0x" + "2b" * 20
 
 
 def _write(tmp_path, name, key, items):

@@ -326,8 +326,43 @@ def activity_table() -> dict:
         return {}
 
 
+# Spec 2026-10-08 §12: the casebook's best suspects, pinned into every per-wallet
+# detector after the operator's own pins. A lead whose evidence lapsed from the
+# roster (all four of 2026-09's best did) is still read by dormancy, identity,
+# agents and the HL surface, because the casebook remembers why it mattered.
+CASEBOOK_PINS = 8
+
+
+def casebook_pins(limit: int = CASEBOOK_PINS, index: dict | None = None) -> list[str]:
+    """Unknown suspects Hyperliquid knows, best first, whose central estimate beats the
+    prior. A missing or unreadable index pins nothing (it never blocks a detector)."""
+    from src.casebook.model import PRIOR_LOG10_ODDS
+
+    if index is None:
+        from src.casebook.store import read_index
+        index = read_index()
+    rows = index.get("cases") if isinstance(index, dict) else None
+    out: list[str] = []
+    for row in rows if isinstance(rows, list) else []:
+        if len(out) >= max(0, int(limit)):
+            break
+        if not isinstance(row, dict) or row.get("known") or row.get("excluded") \
+                or row.get("ruling") == "not_him":
+            continue
+        if (row.get("hl") or {}).get("on_hl") is not True:
+            continue
+        central = row.get("central")
+        if isinstance(central, bool) or not isinstance(central, (int, float)) \
+                or central <= PRIOR_LOG10_ODDS:
+            continue
+        address = str(row.get("address") or "").lower()
+        if address and address not in out:
+            out.append(address)
+    return out
+
+
 def detector_candidates(config: dict | None, roster: dict | None,
-                        limit: int) -> list[str]:
+                        limit: int, casebook: dict | None = None) -> list[str]:
     """The wallets a per-wallet detector should ask about this run.
 
     The roster ranks by how much evidence a wallet ALREADY has, so taking the
@@ -351,12 +386,27 @@ def detector_candidates(config: dict | None, roster: dict | None,
     is not a saving. Everything after them keeps roster order, where the ranking
     is doing the job it is good at — spending a bounded budget on the strongest
     of the wallets nobody has vouched for.
+
+    After the operator's pins come up to CASEBOOK_PINS of the casebook's best
+    suspects (spec 2026-10-08 §12), so a lead whose evidence lapsed from the
+    roster is still measured. They count against `limit`; the operator's own
+    pins never do.
     """
     picked = pinned_wallets(config)
     seen = set(picked)
     target = ((config or {}).get("target_wallet") or "").strip().lower()
     if target:
         seen.add(target)
+    room = max(0, int(limit) - len(picked))
+    added = 0
+    for address in casebook_pins(CASEBOOK_PINS + len(picked), casebook):
+        if added >= min(CASEBOOK_PINS, room):
+            break
+        if address in seen:
+            continue
+        seen.add(address)
+        picked.append(address)
+        added += 1
     rows = (roster or {}).get("wallets")
     rows = rows if isinstance(rows, list) else []
     # Wallets Hyperliquid knows go first. The deliverable is an address that
@@ -1027,6 +1077,22 @@ def build_roster(config: dict | None = None) -> dict:
             continue
         e["is_service"] = True
         e["evidence"]["service_reason"] = e["evidence"].get("service_reason") or reason
+
+    # An address with no key — a token contract, a precompile, a system address —
+    # can never be the wallet the owner follows, and two of the forty detector
+    # slots went to token contracts on 2026-10-08 (src/not_wallets.py).
+    # Well-formed addresses only: a malformed identifier was never this filter's
+    # question, and grading it here would be a new opinion nobody measured.
+    from src.not_wallets import ADDRESS, token_registry_addresses
+    from src.not_wallets import classify as not_a_wallet
+    tokens = token_registry_addresses(DATA_DIR / "labels" / "token_contracts.json")
+    for address, e in wallets.items():
+        if e["known_self"] or address == target or not ADDRESS.fullmatch(address):
+            continue
+        reason = not_a_wallet(address, config=config, token_contracts=tokens)
+        if reason:
+            e["is_service"] = True
+            e["evidence"]["service_reason"] = f"not a wallet: {reason}"
 
     rows = []
     for e in wallets.values():
