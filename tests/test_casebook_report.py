@@ -108,3 +108,15 @@ def test_a_case_scored_through_its_cluster_says_whose_evidence_it_is():
     assert rows[B]["headline"].startswith(
         f"One operator with {A[:10]}... (2 accounts): First active 2 day(s) into a 10-day silence")
     assert rows[A]["headline"].startswith("First active 2 day(s) into a 10-day silence")
+
+
+def test_current_cluster_evidence_explains_a_rank_before_own_history():
+    group = {"operator_group": {"master": A, "subaccounts": [B]}}
+    cases = {A: case(A, {"amount_correlation": entry("amount_correlation", "historical", strength=0.7,
+                                                     summary="old match")}, links=group),
+             B: case(B, {"dormancy_handoff": entry("dormancy_handoff", strength=0.49,
+                                                   summary="born in a silence")},
+                     links={**group, "subaccount_of": A})}
+    rows = {r["address"]: r for r in build(cases)["cases"]}
+    assert rows[A]["headline"].startswith(f"One operator with {B[:10]}... (2 accounts): born in a silence")
+    assert rows[B]["headline"].startswith("born in a silence")

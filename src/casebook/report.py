@@ -62,10 +62,11 @@ def _scored(case: dict) -> list[dict]:
             if isinstance(e, dict) and e.get("kind") not in model.CONTEXT_KINDS]
 
 
-def best_item(case: dict) -> dict | None:
-    """The case's own strongest supporting item: what counts now, else what it once had."""
+def best_item(case: dict, bands: tuple = (1, 2)) -> dict | None:
+    """The case's own strongest supporting item: what counts now (central, band 1),
+    else what it once had (ceiling, band 2)."""
     items = _scored(case)
-    for band_index in (1, 2):
+    for band_index in bands:
         ranked = [(score.item_values(e)[band_index], e) for e in items]
         ranked = [(v, e) for v, e in ranked if v > 0]
         if ranked:
@@ -80,35 +81,45 @@ def _why(item: dict) -> str:
     return why
 
 
-def headline(case: dict, cluster_note: str | None = None) -> str:
-    """Why it is a suspect, in one line, and where it stands on Hyperliquid. A case
-    with no evidence of its own says whose evidence in its operator cluster it shares."""
-    best = best_item(case)
-    if best is not None:
-        why = _why(best)
-    elif cluster_note:
-        why = cluster_note
+def headline(case: dict, cluster_note: tuple | None = None) -> str:
+    """Why it ranks where it does, in one line, and where it stands on Hyperliquid:
+    its own current evidence first, then the current evidence of its operator
+    cluster (whose member it names), then its own history, then the roster's words."""
+    current = best_item(case, (1,))
+    note_address, note = cluster_note or (None, None)
+    if current is not None:
+        why = _why(current)
+    elif note and note_address != case.get("address"):
+        why = note
     else:
-        reasons = (case.get("roster") or {}).get("reasons") or []
-        why = reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])
+        past = best_item(case, (2,))
+        if past is not None:
+            why = _why(past)
+        else:
+            reasons = (case.get("roster") or {}).get("reasons") or []
+            why = reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])
     return f"{why} - {hl_text(case)}"
 
 
-def cluster_notes(cases: dict, scores: dict) -> dict[str, str]:
-    """cluster id -> "One operator with <member> (<n> accounts): <its strongest evidence>",
-    from the member whose own evidence is strongest (spec §7.5)."""
+def cluster_notes(cases: dict, scores: dict) -> dict[str, tuple]:
+    """cluster id -> (member, "One operator with <member> (<n> accounts): <its evidence>"),
+    from the member whose own current evidence is strongest, else its strongest history
+    (spec §7.5)."""
     members: dict[str, list] = {}
     for address, s in scores.items():
         if s.get("cluster") and address in cases:
             members.setdefault(s["cluster"], []).append(address)
     notes = {}
     for cid, group in members.items():
-        scored = [(score.item_values(item)[1] or score.item_values(item)[2] * 1e-3, address, item)
-                  for address in sorted(group)
-                  for item in [best_item(cases[address])] if item is not None]
+        scored = []
+        for address in sorted(group):
+            item = best_item(cases[address])
+            if item is not None:
+                values = score.item_values(item)
+                scored.append(((values[1] > 0, values[1] or values[2]), address, item))
         if scored:
             _, address, item = max(scored, key=lambda t: t[0])
-            notes[cid] = f"One operator with {address[:10]}... ({len(group)} accounts): {_why(item)}"
+            notes[cid] = (address, f"One operator with {address[:10]}... ({len(group)} accounts): {_why(item)}")
     return notes
 
 
