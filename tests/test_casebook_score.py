@@ -120,3 +120,9 @@ def test_calibration_reports_recall_and_coherence():
     assert cal["unknown_cases"] == 2
     assert cal["sum_p_central_unknown"] == pytest.approx(
         scores[B]["p_central"] + scores[C]["p_central"], abs=1e-6)
+
+
+def test_an_invalidated_item_counts_nowhere():
+    s = score.score_evidence({"quiet_first_funder": {**entry("quiet_first_funder"),
+                                                     "invalid_reason": "busy"}})
+    assert s["now"] == s["central"] == s["ceiling"] == -3.0

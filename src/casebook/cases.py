@@ -145,6 +145,50 @@ def merge_items(case: dict, items: list, refutes: set, *, at_ms: int, origin: st
     return events
 
 
+# Items that rest on another address: the evidence holds only while that address is
+# what it was taken for (a quiet funder, a quiet payee, a private deposit address).
+COUNTERPART_KEYS = {"quiet_first_funder": "funder", "quiet_payee": "via",
+                    "hl_deposit_address": "via", "private_deposit_address": "sentinel"}
+
+
+def effective_status(entry: dict) -> str | None:
+    """An item resting on an address today's filters reject counts as invalidated,
+    whatever its own status; the status itself is kept for the record."""
+    return "invalidated" if entry.get("invalid_reason") else entry.get("status")
+
+
+def counterpart(entry: dict) -> str | None:
+    key = COUNTERPART_KEYS.get(entry.get("kind"))
+    facts = entry.get("facts") if isinstance(entry.get("facts"), dict) else {}
+    value = facts.get(key) if key else None
+    return value.lower() if isinstance(value, str) else None
+
+
+def rejudge(case: dict, verdicts: dict, *, at_ms: int, origin: str) -> list:
+    """Re-judge the items that rest on another address against today's measurements
+    (spec §6.3 `invalidated`): a quiet funder since measured busy, a payee since shown
+    to be a contract. Reversible, because a measurement can be corrected.
+
+    `verdicts` maps an address to why it cannot be what the item took it for, or to
+    None when it was measured and passes. An address absent from it was not measured
+    today and keeps its stored verdict: "we could not tell" never clears one (rule 5)."""
+    events = []
+    for key, entry in (case.get("evidence") or {}).items():
+        other = counterpart(entry)
+        if other is None or other not in verdicts:
+            continue
+        reason = verdicts[other]
+        if reason and entry.get("invalid_reason") != reason:
+            entry["invalid_reason"] = str(reason)[:200]
+            events.append(event(at_ms, case["address"], "evidence_invalidated", origin, key=key,
+                                counterpart=other, reason=entry["invalid_reason"]))
+        elif not reason and entry.get("invalid_reason"):
+            entry.pop("invalid_reason")
+            events.append(event(at_ms, case["address"], "evidence_revalidated", origin, key=key,
+                                counterpart=other))
+    return events
+
+
 def update_roster(case: dict, row: dict, at_ms: int, origin: str) -> list:
     """The roster's own view of the wallet: tier by day, peak, reasons, HL facts, links."""
     events: list = []

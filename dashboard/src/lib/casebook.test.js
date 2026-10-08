@@ -124,3 +124,11 @@ test('reasonLine prefers the reason alone and falls back to the full headline', 
 	assert.equal(reasonLine({ headline: 'Older index - $6 on Hyperliquid' }), 'Older index - $6 on Hyperliquid');
 	assert.equal(reasonLine({}), '');
 });
+
+test('an item resting on a measured service shows as invalidated, with why', () => {
+	const doc = { evidence: { f: { kind: 'quiet_first_funder', status: 'historical', first_seen: '2026-09-10T00:00:00Z',
+		summary: 'Shares his first funder', invalid_reason: 'global activity: 2,282,986 txs' } } };
+	const [t] = timeline(doc);
+	assert.equal(t.status, 'invalidated');
+	assert.equal(t.invalid, 'global activity: 2,282,986 txs');
+});

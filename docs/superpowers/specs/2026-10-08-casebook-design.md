@@ -516,3 +516,19 @@ row and rules, incident-log entry, `ARCHITECTURE.md` §8).
   60 s probe budget.
 - **The committed casebook** is that backfill plus one live merge of the 2026-10-08 02:31
   roster with those 30 reads, so the first run on `main` consumes the next roster.
+- **`invalidated` is re-judged every run, roster or not, and is not a stored status.** An
+  item resting on another address (a first funder, a quiet payee, a deposit address)
+  keeps its `status` and gains `invalid_reason` when today's whole-chain readings
+  (`labels/address_activity.json`, by the roster's own `services_from_activity`) call
+  that address a service, or `not_wallets` calls it keyless; it then counts as
+  `invalidated` (0 / 0 / 0) everywhere it is shown, and its reason line says what stopped
+  counting and why rather than repeating the roster's words. A new measurement that
+  passes the address clears the reason; an address the table does not hold, or a table
+  that cannot be read, keeps the stored verdict (rule 5). The first live replay (roster
+  2026-10-08 04:27) invalidated **4** items, all "shares his first funder" on the
+  2.28M-transaction exchange hot wallet `0xf92402bb...` that the referral twins share
+  (`0x5b5d5120...`, `0x12e16e3d...` and two others): items from roster versions before
+  2026-09-16, when the roster still reported a funder nobody had measured. So the funder
+  item's summary no longer claims "measured quiet".
+- **One percentage format everywhere** (`report.pct`: >99%, 34%, 3.4%, 0.34%, <0.1%);
+  the wake alert had printed `%.2g`, which reads "1e+02%" above 99.5%.

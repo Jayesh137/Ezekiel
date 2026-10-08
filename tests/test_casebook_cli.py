@@ -66,3 +66,31 @@ def test_show_an_unknown_address(tmp_path, capsys):
 def test_pct_formats_across_the_range():
     assert [cli.pct(p) for p in (0.999, 0.34, 0.034, 0.0034, 0.00001, None)] == \
            [">99%", "34%", "3.4%", "0.34%", "<0.1%", "-"]
+
+
+def test_show_and_sqlite_say_what_no_longer_counts_and_why(tmp_path, capsys):
+    funder = "0x" + "f9" * 20
+    (tmp_path / "roster").mkdir(parents=True)
+    (tmp_path / "roster" / "latest.json").write_text(json.dumps({
+        "computed_at": "2026-10-08T00:00:00+00:00",
+        "wallets": [{"wallet": B, "tier": "POSSIBLE", "vectors": ["linkage"],
+                     "evidence": {"shared_first_funder": funder}}]}))
+    (tmp_path / "labels").mkdir()
+    (tmp_path / "labels" / "address_activity.json").write_text(json.dumps(
+        {f"arbitrum:{funder}": {"txs": 2_282_986, "token_transfers": 1, "is_contract": False}}))
+    update.run({"target_wallet": T, "known_self_wallets": []}, data_dir=tmp_path, out_dir=tmp_path,
+               probe=False, alerts_on=False, now_ms=1_791_419_654_475)
+    args = ["--data-dir", str(tmp_path)]
+    assert cli.main([*args, "show", B]) == 0
+    shown = capsys.readouterr().out
+    assert "[invalidated] quiet_first_funder" in shown
+    assert "no longer counts: global activity: 2,282,986 txs" in shown
+    db = tmp_path / "x.sqlite3"
+    assert cli.main([*args, "sqlite", str(db)]) == 0
+    con = sqlite3.connect(db)
+    try:
+        status, why = con.execute("select status, invalid_reason from evidence where address=? "
+                                  "and kind='quiet_first_funder'", (B,)).fetchone()
+    finally:
+        con.close()
+    assert status == "invalidated" and why.startswith("global activity: 2,282,986 txs")

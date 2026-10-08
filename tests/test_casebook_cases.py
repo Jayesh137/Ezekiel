@@ -166,3 +166,32 @@ def test_long_tier_and_score_histories_are_bounded():
         cases.record_score(case, {"model": "m", "now": -3.0, "central": float(i % 3), "ceiling": 0.0,
                                   "families": {}}, at_ms=T0 + i * 25 * H, origin="live")
     assert len(case["score_days"]) < cases.MAX_SCORE_DAYS + 60
+
+
+def test_an_item_resting_on_a_measured_service_is_invalidated_and_can_recover():
+    # 0x5b5d5120's old "shares his first funder" rested on 0xf92402bb..., an exchange hot
+    # wallet with 2.28M transactions: the fact stays on record and stops counting.
+    case = opened()
+    funder = "0x" + "f9" * 20
+    cases.merge_items(case, [item("quiet_first_funder", funder=funder),
+                             item("direct_transfer")], set(), at_ms=T0, origin="live")
+    events = cases.rejudge(case, {funder: "global activity: 2,282,986 txs"}, at_ms=T0, origin="live")
+    entry = case["evidence"]["quiet_first_funder"]
+    assert entry["invalid_reason"] == "global activity: 2,282,986 txs"
+    assert [e["kind"] for e in events] == ["evidence_invalidated"]
+    assert "invalid_reason" not in case["evidence"]["direct_transfer"]
+    assert cases.rejudge(case, {funder: "global activity: 2,282,986 txs"}, at_ms=T0, origin="live") == []
+    events = cases.rejudge(case, {funder: None}, at_ms=T0 + H, origin="live")
+    assert "invalid_reason" not in entry and [e["kind"] for e in events] == ["evidence_revalidated"]
+    assert cases.effective_status(entry) == "current"
+
+
+def test_an_unmeasured_counterpart_keeps_its_stored_verdict():
+    # Absent from today's readings is "we could not tell", never "measured quiet" (rule 5):
+    # a pruned or unreadable table must not hand a busy funder its vote back.
+    case = opened()
+    funder = "0x" + "f9" * 20
+    cases.merge_items(case, [item("quiet_first_funder", funder=funder)], set(), at_ms=T0, origin="live")
+    cases.rejudge(case, {funder: "global activity: 2,282,986 txs"}, at_ms=T0, origin="live")
+    assert cases.rejudge(case, {}, at_ms=T0 + H, origin="live") == []
+    assert case["evidence"]["quiet_first_funder"]["invalid_reason"].startswith("global activity")

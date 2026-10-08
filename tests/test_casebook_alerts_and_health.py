@@ -39,3 +39,14 @@ def test_the_casebook_is_never_compacted():
 def test_the_test_guard_watches_the_casebook():
     from tests import conftest
     assert conftest._DIR_PROBES["the casebook"] == conftest.REAL_DATA_DIR / "casebook"
+
+
+def test_a_wake_alert_prints_every_likelihood_as_a_plain_percentage(monkeypatch):
+    # Protocol control plus money puts a case past 99.5%: "%.2g" printed that as 1e+02%.
+    sent = []
+    monkeypatch.setattr(alerts, "_send_with_cooldown",
+                        lambda key, hours, subject, body: sent.append(body) or True)
+    row = {**ROW, "p": 0.99684, "p_now": 0.0021, "p_ceiling": 0.99999}
+    alerts.alert_casebook_wake(A, "hl_woke", {}, row, False)
+    assert "likelihood about >99% (range 0.21% to >99%" in sent[0]
+    assert "e+" not in sent[0]

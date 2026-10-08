@@ -173,6 +173,7 @@ def run(config: dict, *, data_dir: Path, out_dir: Path, probe: bool = True, fetc
     out = {"at": casefile.iso(now_ms), "unreadable_cases": unreadable,
            "exit_code": 1 if unreadable else 0, "probes": {}}
     events: list = []
+    tokens = token_registry_addresses(data_dir / "labels" / "token_contracts.json")
     at_ms, consumed = computed_ms(roster), state.get("roster_computed_at_ms")
     if roster is None:
         out.update(roster_status=f"unreadable: {roster_error}", exit_code=1)
@@ -182,13 +183,18 @@ def run(config: dict, *, data_dir: Path, out_dir: Path, probe: bool = True, fetc
         out["roster_status"] = "stale (already consumed)"
     else:
         merged = ingest.apply_roster(
-            cases, roster, config, at_ms=at_ms, origin="live",
-            tokens=token_registry_addresses(data_dir / "labels" / "token_contracts.json"),
+            cases, roster, config, at_ms=at_ms, origin="live", tokens=tokens,
             refuted_by=dormancy_refutes(dormancy, at_ms), blocked=blocked, rejected=rejected)
         events += merged["events"]
         state["roster_computed_at_ms"] = at_ms
         out.update(roster_status="consumed", rows=merged["rows"], opened=merged["opened"],
                    admitted=merged["admitted"], rejected=merged["rejected_count"])
+    activity, activity_error = read_json(data_dir / "labels" / "address_activity.json")
+    if not isinstance(activity, dict):
+        activity = None
+        out["activity"] = f"unreadable: {activity_error or 'not a table'}; nothing re-judged"
+    events += ingest.rejudge_all(cases, activity, config, at_ms=now_ms, origin="live",
+                                 tokens=tokens, blocked=blocked)
     scores = score.score_all(cases, extract.cluster_of(config))
     if probe and cases:
         found, out["probes"] = probe_cases(cases, scores, now_ms=now_ms, fetch=fetch,
@@ -245,6 +251,8 @@ def main(argv=None) -> int:
               f"among {calibration.get('unknown_cases')} unknown cases on its evidence alone")
     print(f"[casebook] coherence: central probabilities over unknown cases sum to "
           f"{calibration.get('sum_p_central_unknown')} ({calibration.get('expected_sum')})")
+    if out.get("activity"):
+        print(f"[casebook] activity table {out['activity']}")
     for bad in out.get("unreadable_cases") or []:
         print(f"[casebook] UNREADABLE case file {bad['address']}: {bad['error']} (left untouched)")
     if out.get("alerts"):

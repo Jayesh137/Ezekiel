@@ -114,7 +114,8 @@ KINDS = {
     "quiet_payee": _k("infrastructure", "Paid a quiet wallet he also paid", (0.3, 0.7, 1.3), "assumed",
                       "Shared quiet infrastructure; rule 9 already applied upstream."),
     "quiet_first_funder": _k("infrastructure", "Shares his first funder", (0.3, 0.7, 1.3), "assumed",
-                             "A first funder measured quiet (rule 9)."),
+                             "A first funder measured quiet (rule 9); invalidated if the "
+                             "whole chain later measures it busy."),
     "linkage_graph": _k("infrastructure", "Shares a deposit address or funder with him",
                         (0.3, 0.7, 1.3), "assumed", "Shared infrastructure in the transfer graph."),
     # Custody gap

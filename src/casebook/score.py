@@ -26,7 +26,8 @@ def item_values(entry: dict) -> tuple[float, float, float]:
     if kind in model.CONTEXT_KINDS:
         return (0.0, 0.0, 0.0)
     low, mid, high = model.band(kind, entry.get("strength"), entry.get("facts"))
-    weights = model.STATUS_WEIGHTS.get(entry.get("status"), (0.0, 0.0, 0.0))
+    status = "invalidated" if entry.get("invalid_reason") else entry.get("status")
+    weights = model.STATUS_WEIGHTS.get(status, (0.0, 0.0, 0.0))
     return (low * weights[0], mid * weights[1], high * weights[2])
 
 

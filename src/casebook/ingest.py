@@ -13,6 +13,56 @@ from src.casebook import extract
 MAX_REJECTED = 500
 
 
+def counterpart_services(cases: dict, activity_table: dict, config: dict,
+                         tokens: set | None = None) -> dict[str, str | None]:
+    """The verdicts `cases.rejudge` reads, for every address the casebook's items rest
+    on: why it cannot be what an item took it for (a measured busy address or contract,
+    by the roster's own rule `services_from_activity`, or an address with no key), or
+    None when the whole chain measured it and it passes. Unmeasured stays absent: not
+    evidence either way."""
+    from src import not_wallets
+    from src.roster import services_from_activity
+
+    wanted = set()
+    for case in cases.values():
+        for entry in (case.get("evidence") or {}).values():
+            other = casefile.counterpart(entry) if isinstance(entry, dict) else None
+            if other:
+                wanted.add(other)
+    if not wanted:
+        return {}
+    table = activity_table if isinstance(activity_table, dict) else {}
+    services = services_from_activity(table, ground_truth=extract.cluster_of(config))
+    measured = {str(k).split(":", 1)[1].strip().lower() for k, v in table.items()
+                if isinstance(v, dict) and ":" in str(k)}
+    out: dict[str, str | None] = {}
+    for address in wanted:
+        keyless = not_wallets.classify(address, config=config, token_contracts=tokens)
+        if keyless and keyless != "not an address":
+            out[address] = f"not a wallet: {keyless}"
+        elif address in services:
+            out[address] = services[address]
+        elif address in measured:
+            out[address] = None
+    return out
+
+
+def rejudge_all(cases: dict, activity_table: dict | None, config: dict, *, at_ms: int,
+                origin: str, tokens: set | None = None, blocked=frozenset()) -> list:
+    """Re-judge every readable case against today's whole-chain readings, listed in the
+    newest roster or not: a measurement can arrive on a day the roster does not move.
+    `activity_table` None (absent or unreadable) re-judges nothing, so a failed read
+    never hands an invalidated item its vote back."""
+    if activity_table is None:
+        return []
+    verdicts = counterpart_services(cases, activity_table, config, tokens)
+    events: list = []
+    for address, case in cases.items():
+        if address not in blocked:
+            events += casefile.rejudge(case, verdicts, at_ms=at_ms, origin=origin)
+    return events
+
+
 def apply_roster(cases: dict, roster: dict, config: dict, *, at_ms: int, origin: str,
                  tokens: set | None = None, refuted_by: dict | None = None,
                  blocked=frozenset(), rejected: dict | None = None) -> dict:
@@ -21,7 +71,9 @@ def apply_roster(cases: dict, roster: dict, config: dict, *, at_ms: int, origin:
     `refuted_by` maps an evidence kind to the addresses a detector re-checked for
     this reading without finding it (dormancy's checked set): their absence is a
     refutation, not a lapse. `blocked` addresses (case files that could not be
-    read) are never touched, so nothing overwrites them.
+    read) are never touched, so nothing overwrites them. Re-judging against the
+    whole-chain readings is `rejudge_all`, run apart because it does not wait for a
+    roster.
     """
     rejected = rejected if rejected is not None else {}
     refuted_by = refuted_by or {}

@@ -130,3 +130,25 @@ def test_a_row_carries_its_reason_apart_from_the_hyperliquid_line():
     row = build({B: c})["cases"][0]
     assert row["why"] == "Paid his deposit"
     assert row["headline"] == "Paid his deposit - $6 on Hyperliquid, no trades in 30 days"
+
+
+def test_an_invalidated_item_is_counted_as_such():
+    c = case(B, {"quiet_first_funder": {**entry("quiet_first_funder", "historical", summary="funder"),
+                                        "invalid_reason": "global activity: 2,282,986 txs"}})
+    row = build({B: c})["cases"][0]
+    assert row["statuses"] == {"invalidated": 1} and row["lapsed_only"] is True
+    # nothing it rests on still counts, and it says what stopped counting and why
+    assert row["headline"].startswith("funder, which no longer counts: global activity")
+
+
+def test_a_case_whose_only_evidence_was_invalidated_says_so_not_the_rosters_claim():
+    # 0x498216a21f on the live replay (2026-10-08): its one item, a "quiet" first funder,
+    # is a 2.28M-transaction exchange hot wallet; the roster's words still claim the link.
+    item = entry("quiet_first_funder", summary="Shares a first funder with the target",
+                 funder="0x" + "f9" * 20)
+    item["invalid_reason"] = "global activity: 2,282,992 txs, 1,031 token transfers"
+    c = case(B, {"quiet_first_funder": item},
+             roster={"tier": "POSSIBLE", "reasons": ["Shares the target's original funding source"]})
+    row = build({B: c})["cases"][0]
+    assert row["why"] == ("Shares a first funder with the target, which no longer counts: "
+                          "global activity: 2,282,992 txs, 1,031 token transfers")

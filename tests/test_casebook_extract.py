@@ -51,6 +51,14 @@ def test_first_funded_by_the_target_is_money_and_a_quiet_funder_is_infrastructur
     assert "linkage_graph" not in got and "funded_by_target" not in got
 
 
+def test_a_shared_funder_summary_claims_no_measurement():
+    # Before 2026-09-16 the roster reported a shared funder nobody had measured (five
+    # wallets shared a 2.28M-transaction hot wallet), so the item says what was observed;
+    # whether the funder is quiet is re-judged apart, as invalid_reason.
+    got = kinds({"wallet": A, "vectors": ["linkage"], "evidence": {"shared_first_funder": B}})
+    assert got["quiet_first_funder"]["summary"] == f"Shares his first funder {B[:10]}..."
+
+
 def test_an_unexplained_linkage_vote_still_counts_once():
     got = kinds({"wallet": A, "vectors": ["linkage"],
                  "reasons": ["Shares a deposit address with the target"]})

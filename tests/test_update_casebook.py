@@ -155,3 +155,48 @@ def test_the_casebook_step_follows_the_roster_in_trace():
     text = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "trace.yml").read_text(
         encoding="utf-8")
     assert text.index("python src/roster.py") < text.index("python scripts/update_casebook.py")
+
+
+def test_items_resting_on_a_measured_service_are_invalidated_by_the_run(tmp_path):
+    funder = "0x" + "f9" * 20
+    write_roster(tmp_path, "2026-10-08T00:00:00+00:00",
+                 [{"wallet": A, "tier": "POSSIBLE", "vectors": ["linkage"],
+                   "evidence": {"shared_first_funder": funder}}])
+    (tmp_path / "labels").mkdir()
+    (tmp_path / "labels" / "address_activity.json").write_text(json.dumps(
+        {f"arbitrum:{funder}": {"txs": 2_282_986, "token_transfers": 1, "is_contract": False}}))
+    run(tmp_path, probe=False)
+    entry = json.loads(store.case_path(A, tmp_path).read_text())["evidence"]["quiet_first_funder"]
+    assert "2,282,986" in entry["invalid_reason"]
+
+
+def test_a_new_measurement_invalidates_even_when_the_roster_is_stale(tmp_path):
+    funder = "0x" + "f9" * 20
+    write_roster(tmp_path, "2026-10-08T00:00:00+00:00",
+                 [{"wallet": A, "tier": "POSSIBLE", "vectors": ["linkage"],
+                   "evidence": {"shared_first_funder": funder}}])
+    run(tmp_path, probe=False)
+    (tmp_path / "labels").mkdir()
+    (tmp_path / "labels" / "address_activity.json").write_text(json.dumps(
+        {f"arbitrum:{funder}": {"txs": 2_282_986, "token_transfers": 1, "is_contract": False}}))
+    out = run(tmp_path, probe=False, now=NOW + DAY)
+    assert out["roster_status"].startswith("stale")
+    entry = json.loads(store.case_path(A, tmp_path).read_text())["evidence"]["quiet_first_funder"]
+    assert "2,282,986" in entry["invalid_reason"]
+
+
+def test_an_unreadable_activity_table_keeps_what_was_measured(tmp_path):
+    funder = "0x" + "f9" * 20
+    write_roster(tmp_path, "2026-10-08T00:00:00+00:00",
+                 [{"wallet": A, "tier": "POSSIBLE", "vectors": ["linkage"],
+                   "evidence": {"shared_first_funder": funder}}])
+    (tmp_path / "labels").mkdir()
+    table = tmp_path / "labels" / "address_activity.json"
+    table.write_text(json.dumps(
+        {f"arbitrum:{funder}": {"txs": 2_282_986, "token_transfers": 1, "is_contract": False}}))
+    run(tmp_path, probe=False)
+    table.write_text("{not json")
+    out = run(tmp_path, probe=False, now=NOW + DAY)
+    assert out["activity"].startswith("unreadable")
+    entry = json.loads(store.case_path(A, tmp_path).read_text())["evidence"]["quiet_first_funder"]
+    assert "2,282,986" in entry["invalid_reason"]

@@ -241,8 +241,9 @@ def extract_items(row: dict, config: dict) -> tuple[list[dict], set[str]]:
             add(kind, value, f"{words} {short(value.get('via'))} {usd(value.get('outsider_usd'))}",
                 value.get("outsider_usd"))
     if funder and funder != target:
-        add("quiet_first_funder", {"funder": funder},
-            f"Shares his first funder {short(funder)} (measured quiet)")
+        # Quiet is the roster's rule since 2026-09-16, not before: whether the funder
+        # is quiet is re-judged against the whole chain (cases.rejudge), never claimed.
+        add("quiet_first_funder", {"funder": funder}, f"Shares his first funder {short(funder)}")
     explained = bool(funder or gas or isinstance(deposit, dict) or deposit_votes or any(
         isinstance(evidence.get(k), dict) for k in ("shared_hl_deposit_address", "shared_quiet_payee")))
     if "linkage" in own and not explained:

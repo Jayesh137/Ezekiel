@@ -144,7 +144,8 @@ export function timeline(caseDoc, kinds = {}) {
 	return Object.entries(ev)
 		.map(([key, e]) => ({
 			key, kind: e?.kind, label: kinds?.[e?.kind]?.label || e?.kind || key,
-			status: e?.status || 'current', first: String(e?.first_seen || '').slice(0, 10),
+			status: e?.invalid_reason ? 'invalidated' : (e?.status || 'current'),
+			invalid: e?.invalid_reason || null, first: String(e?.first_seen || '').slice(0, 10),
 			last: e?.last_seen || null, days: e?.seen_days ?? null, summary: e?.summary || '',
 			peak: e?.peak_summary && e.peak_summary !== e.summary ? e.peak_summary : null
 		}))

@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src import utils
 from src.casebook import cases as casefile
 from src.casebook import model, store
+from src.casebook.report import pct
 from src.links import address_url
 
 SCHEMA_SQL = """
@@ -36,26 +37,12 @@ CREATE TABLE cases (address TEXT PRIMARY KEY, rank INTEGER, known TEXT, ruling T
   month_volume REAL, day_volume REAL, birth_ms INTEGER, headline TEXT);
 CREATE TABLE evidence (address TEXT, key TEXT, kind TEXT, family TEXT, status TEXT, origin TEXT,
   first_seen TEXT, last_seen TEXT, seen_days INTEGER, strength REAL, peak_strength REAL,
-  summary TEXT, facts TEXT, PRIMARY KEY (address, key));
+  summary TEXT, facts TEXT, invalid_reason TEXT, PRIMARY KEY (address, key));
 CREATE TABLE tiers (address TEXT, day TEXT, tier TEXT);
 CREATE TABLE probes (address TEXT, day TEXT, total_value REAL, month_volume REAL, day_volume REAL);
 CREATE TABLE life (address TEXT, ts INTEGER, value REAL);
 CREATE TABLE events (at TEXT, address TEXT, kind TEXT, origin TEXT, detail TEXT);
 """
-
-
-def pct(p) -> str:
-    if isinstance(p, bool) or not isinstance(p, (int, float)):
-        return "-"
-    if p >= 0.995:
-        return ">99%"
-    if p >= 0.1:
-        return f"{p * 100:.0f}%"
-    if p >= 0.01:
-        return f"{p * 100:.1f}%"
-    if p >= 0.001:
-        return f"{p * 100:.2f}%"
-    return "<0.1%"
 
 
 def out(text: str = "") -> None:
@@ -121,7 +108,9 @@ def cmd_show(args) -> int:
     out("  evidence:")
     evidence = case.get("evidence") or {}
     for key, e in sorted(evidence.items(), key=lambda kv: kv[1].get("first_seen") or ""):
-        out(f"    [{e.get('status')}] {key}: {e.get('summary')}")
+        out(f"    [{casefile.effective_status(e)}] {key}: {e.get('summary')}")
+        if e.get("invalid_reason"):
+            out(f"        no longer counts: {e['invalid_reason']} (it was {e.get('status')})")
         out(f"        first {e.get('first_seen')}  last {e.get('last_seen')}  days {e.get('seen_days')}  "
             f"origin {e.get('origin')}" + (f"  strongest: {e['peak_summary']}"
                                           if e.get("peak_summary") and e.get("peak_summary") != e.get("summary")
@@ -199,11 +188,11 @@ def cmd_sqlite(args) -> int:
                 None if hl.get("on_hl") is None else int(bool(hl.get("on_hl"))), hl.get("total_value"),
                 hl.get("month_volume"), hl.get("day_volume"), hl.get("birth_ms"), r.get("headline")))
             for key, e in (case.get("evidence") or {}).items():
-                con.execute("INSERT INTO evidence VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+                con.execute("INSERT INTO evidence VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                     address, key, e.get("kind"), (model.KINDS.get(e.get("kind")) or {}).get("family"),
-                    e.get("status"), e.get("origin"), e.get("first_seen"), e.get("last_seen"),
+                    casefile.effective_status(e), e.get("origin"), e.get("first_seen"), e.get("last_seen"),
                     e.get("seen_days"), e.get("strength"), e.get("peak_strength"), e.get("summary"),
-                    json.dumps(e.get("facts"), sort_keys=True)))
+                    json.dumps(e.get("facts"), sort_keys=True), e.get("invalid_reason")))
             con.executemany("INSERT INTO tiers VALUES (?,?,?)",
                             [(address, d, t) for d, t in roster.get("tiers") or []])
             con.executemany("INSERT INTO probes VALUES (?,?,?,?,?)",

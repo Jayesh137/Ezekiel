@@ -194,6 +194,7 @@
 												<span class="status">{STATUS_LABEL[t.status] || t.status}</span>
 												<strong>{t.label}</strong> — {t.summary}
 												<span class="dates">{t.first} → {t.last ?? '—'}{t.days ? ` · ${t.days} day(s)` : ''}</span>
+												{#if t.invalid}<div class="peak">no longer counts: {t.invalid}</div>{/if}
 												{#if t.peak}<div class="peak">strongest: {t.peak}</div>{/if}
 											</li>
 										{:else}

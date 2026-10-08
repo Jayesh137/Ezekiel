@@ -85,3 +85,57 @@ def test_rejections_are_sticky_and_bounded():
              "vectors": ["linkage"]} for i in range(ingest.MAX_REJECTED + 20)]
     ingest.apply_roster({}, roster(*rows), CONFIG, at_ms=T0, origin="live", rejected=rejected)
     assert len(rejected) == ingest.MAX_REJECTED
+
+
+def test_rejudging_reaches_cases_the_roster_no_longer_lists():
+    cases = {}
+    funder = "0x" + "f9" * 20
+    row = {"wallet": A, "tier": "POSSIBLE", "vectors": ["linkage"], "evidence": {"shared_first_funder": funder}}
+    ingest.apply_roster(cases, roster(row), CONFIG, at_ms=T0, origin="live")
+    table = {f"ethereum:{funder}": {"txs": 35, "token_transfers": 3, "is_contract": True,
+                                    "name": "Disperse"}}
+    ingest.apply_roster(cases, roster(), CONFIG, at_ms=T0 + H, origin="live")
+    events = ingest.rejudge_all(cases, table, CONFIG, at_ms=T0 + H, origin="live")
+    assert cases[A]["evidence"]["quiet_first_funder"]["invalid_reason"] == "contract: Disperse"
+    assert [e["kind"] for e in events] == ["evidence_invalidated"]
+
+
+def test_an_unreadable_activity_table_rejudges_nothing():
+    funder = "0x" + "f9" * 20
+    cases = {A: {"address": A, "evidence": {"quiet_first_funder": {
+        "kind": "quiet_first_funder", "facts": {"funder": funder}, "invalid_reason": "contract: X"}}}}
+    assert ingest.rejudge_all(cases, None, CONFIG, at_ms=T0, origin="live") == []
+    assert cases[A]["evidence"]["quiet_first_funder"]["invalid_reason"] == "contract: X"
+
+
+def test_blocked_cases_are_never_rejudged():
+    funder = "0x" + "f9" * 20
+    cases = {A: {"address": A, "evidence": {"quiet_first_funder": {
+        "kind": "quiet_first_funder", "facts": {"funder": funder}}}}}
+    table = {f"arbitrum:{funder}": {"txs": 2_282_986, "token_transfers": 1, "is_contract": False}}
+    assert ingest.rejudge_all(cases, table, CONFIG, at_ms=T0, origin="live", blocked={A}) == []
+    assert "invalid_reason" not in cases[A]["evidence"]["quiet_first_funder"]
+
+
+def test_counterpart_services_come_from_the_activity_table_and_the_keyless_filter():
+    funder, payee, quiet = "0x" + "f9" * 20, "0x" + "e8" * 20, "0x" + "d7" * 20
+    cases = {A: {"address": A, "evidence": {
+        "quiet_first_funder": {"kind": "quiet_first_funder", "facts": {"funder": funder}},
+        "quiet_payee": {"kind": "quiet_payee", "facts": {"via": payee}},
+        "hl_deposit_address": {"kind": "hl_deposit_address", "facts": {"via": quiet}},
+        "private_deposit_address": {"kind": "private_deposit_address",
+                                    "facts": {"sentinel": USDC_BASE}}}}}
+    table = {f"arbitrum:{funder}": {"txs": 2_282_986, "token_transfers": 10, "is_contract": False},
+             f"ethereum:{payee}": {"txs": 35, "token_transfers": 3, "is_contract": True, "name": "Disperse"},
+             f"arbitrum:{quiet}": {"txs": 12, "token_transfers": 4, "is_contract": False}}
+    got = ingest.counterpart_services(cases, table, CONFIG)
+    assert "2,282,986" in got[funder] and got[payee] == "contract: Disperse"
+    assert got[USDC_BASE].startswith("not a wallet: token contract")
+    assert got[quiet] is None                      # measured, and quiet: a clean bill
+
+
+def test_an_unmeasured_counterpart_is_absent_from_the_verdicts():
+    funder = "0x" + "f9" * 20
+    cases = {A: {"address": A, "evidence": {"quiet_first_funder": {
+        "kind": "quiet_first_funder", "facts": {"funder": funder}}}}}
+    assert ingest.counterpart_services(cases, {}, CONFIG) == {}

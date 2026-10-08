@@ -973,16 +973,16 @@ def alert_casebook_wake(wallet: str, kind: str, detail: dict, row: dict, in_sile
             "hl_grew": "Grew Past $1M"}.get(kind, kind)
     subject = f"[EZEKIEL] {severity}: Casebook Suspect {what}"
 
-    def pct(p):
-        return "unknown" if not isinstance(p, (int, float)) else f"{p * 100:.2g}%"
+    from src.casebook.report import pct
 
     def usd(x):
         return "unknown" if not isinstance(x, (int, float)) else f"${x:,.0f}"
 
     lines = [f"A wallet already in the casebook {what.lower()}.", "",
              address_line(wallet, "Wallet"),
-             f"Casebook rank: {row.get('rank')}; likelihood about {pct(row.get('p'))} "
-             f"(range {pct(row.get('p_now'))} to {pct(row.get('p_ceiling'))}, 1-in-1,000 prior)",
+             f"Casebook rank: {row.get('rank')}; likelihood about {pct(row.get('p'), 'unknown')} "
+             f"(range {pct(row.get('p_now'), 'unknown')} to {pct(row.get('p_ceiling'), 'unknown')}, "
+             "1-in-1,000 prior)",
              f"Why it is a suspect: {row.get('headline')}",
              f"Value now: {usd(detail.get('total_value'))}; 7-day volume {usd(detail.get('week_volume'))}; "
              f"30-day volume {usd(detail.get('month_volume'))}"]

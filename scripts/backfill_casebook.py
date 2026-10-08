@@ -32,6 +32,16 @@ from src.not_wallets import token_registry_addresses
 ROSTER_PATH = "data/roster/latest.json"
 
 
+def _read_activity() -> dict | None:
+    """Today's whole-chain activity readings (the roster's own table), or None when they
+    cannot be read: then nothing is re-judged, rather than everything judged unmeasured."""
+    try:
+        doc = json.loads((utils.DATA_DIR / "labels" / "address_activity.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
 class NotEmpty(RuntimeError):
     """The casebook already holds cases; --rebuild replaces them."""
 
@@ -110,6 +120,11 @@ def run_backfill(history, config: dict, *, out_dir, rebuild: bool = False, log=N
                 f"{casefile.iso(at_ms)} ({label})")
     if last_ms is None:
         return {**stats, "cases": 0, "events": 0}
+    activity = _read_activity()
+    if activity is None and log:
+        log("[backfill] the activity table cannot be read: no item re-judged")
+    events += ingest.rejudge_all(cases, activity, config, at_ms=last_ms, origin="backfill",
+                                 tokens=tokens)
     scores = score.score_all(cases, extract.cluster_of(config))
     for address, case in cases.items():
         events += casefile.record_score(case, scores[address], at_ms=last_ms, origin="backfill")

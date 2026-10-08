@@ -8,6 +8,7 @@ other case ranked by its central estimate, then excluded cases. Generated text i
 from __future__ import annotations
 
 from src.casebook import model, score
+from src.casebook.cases import effective_status
 
 INDEX_SCHEMA = "casebook-index/1"
 MAX_REJECTED_SHOWN = 500
@@ -17,6 +18,22 @@ FOLLOWABLE_MIN_USD = 10_000.0
 
 def _num(x) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def pct(p, missing: str = "-") -> str:
+    """A probability as a short percentage, the same on every surface (CLI, alerts; the
+    dashboard's casebook.js pct mirrors it)."""
+    if isinstance(p, bool) or not isinstance(p, (int, float)):
+        return missing
+    if p >= 0.995:
+        return ">99%"
+    if p >= 0.1:
+        return f"{p * 100:.0f}%"
+    if p >= 0.01:
+        return f"{p * 100:.1f}%"
+    if p >= 0.001:
+        return f"{p * 100:.2f}%"
+    return "<0.1%"
 
 
 def money(x) -> str:
@@ -94,6 +111,11 @@ def reason(case: dict, cluster_note: tuple | None = None) -> str:
     past = best_item(case, (2,))
     if past is not None:
         return _why(past)
+    voided = [e for e in _scored(case) if e.get("invalid_reason")]
+    if voided:    # before the roster's words, which may repeat the claim itself
+        item = max(voided, key=lambda e: model.band(e.get("kind"), e.get("strength"), e.get("facts"))[1])
+        summary = item.get("summary") or model.KINDS.get(item.get("kind"), {}).get("label") or item.get("kind")
+        return f"{summary}, which no longer counts: {item['invalid_reason']}"
     reasons = (case.get("roster") or {}).get("reasons") or []
     return reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])
 
@@ -139,7 +161,7 @@ def next_checks(case: dict) -> list[str]:
         checks.append("Trades on Hyperliquid but was never studied: add it to config.study_wallets "
                       "to read its order habits")
     items = _scored(case)
-    if items and all(e.get("status") not in ("current", "standing") for e in items):
+    if items and all(effective_status(e) not in ("current", "standing") for e in items):
         checks.append("Every piece of its evidence has lapsed or is history: the case rests on its "
                       "record (python scripts/casebook.py show <address>)")
     return checks
@@ -153,7 +175,7 @@ def family_cells(case_score: dict, case: dict) -> dict:
         spec = model.KINDS.get(e.get("kind"))
         if not spec:
             continue
-        status = e.get("status") if e.get("status") in STATUS_ORDER else "invalidated"
+        status = effective_status(e) if effective_status(e) in STATUS_ORDER else "invalidated"
         held = states.get(spec["family"])
         if held is None or STATUS_ORDER.index(status) < STATUS_ORDER.index(held):
             states[spec["family"]] = status
@@ -166,7 +188,7 @@ def index_row(case: dict, case_score: dict, rank: int | None,
               cluster_note: str | None = None) -> dict:
     statuses: dict[str, int] = {}
     for e in _scored(case):
-        status = e.get("status") or "current"
+        status = effective_status(e) or "current"
         statuses[status] = statuses.get(status, 0) + 1
     hl = case.get("hl") or {}
     roster = case.get("roster") or {}

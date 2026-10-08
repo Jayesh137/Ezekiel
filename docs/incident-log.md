@@ -2060,3 +2060,18 @@ unusual silence (the dormancy-handoff shape), HIGH otherwise. Its best 8 Hyperli
 suspects are pinned into every per-wallet detector after the operator's own pins, so a
 lead the roster forgot is still measured. Spec:
 `docs/superpowers/specs/2026-10-08-casebook-design.md`; format: `data/casebook/README.md`.
+
+**A permanent record must be able to say "this no longer counts".** Self-review found
+the `invalidated` status defined and never set: a funder later measured busy kept its
+vote for ever. Every run now re-judges each item that rests on another address against
+the whole-chain readings, whether or not a new roster arrived — the first version did it
+only on a new roster, so a measurement landing on a quiet day changed nothing. It is
+reversible, and only a measurement can reverse it: an address missing from the table,
+or a table that cannot be read, keeps its verdict, because "we could not tell" is not
+"measured quiet" (rule 5). The first replay invalidated four items, all "shares his
+first funder" on the 2.28M-transaction hot wallet `0xf92402bb...` behind the referral
+twins — carried over from roster versions before 2026-09-16, when the roster still
+reported funders nobody had measured — and two of those cases were still explaining
+their rank with the roster's own "Shares the target's original funding source". The
+reason line now says what stopped counting and why, the CLI and its SQLite export carry
+`invalid_reason`, and the funder item no longer claims "measured quiet".
