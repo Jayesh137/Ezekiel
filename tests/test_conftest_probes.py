@@ -56,8 +56,24 @@ def test_an_absent_tree_has_no_signature(tmp_path):
     assert _dir_signature(tmp_path / "nothing") is None
 
 
+def test_the_casebooks_own_writes_are_seen(tmp_path):
+    # src/casebook/store.py rewrites case files and appends to a day's event file
+    # by replacing it whole, so the casebook can be probed by directory too.
+    from src.casebook import store
+    case = {"schema": "casebook-case/1", "address": "0x" + "a" * 40, "evidence": {}}
+    store.write_cases({case["address"]: case}, tmp_path)
+    event = {"at": "2026-10-08T01:00:00Z", "address": case["address"], "kind": "k",
+             "origin": "live", "detail": {}}
+    store.append_events([event], tmp_path)
+    root = store.root(tmp_path)
+    assert changes(root, lambda: store.write_cases({case["address"]: {**case, "x": 1}}, tmp_path))
+    assert changes(root, lambda: store.append_events([event], tmp_path))
+
+
 def test_the_study_tree_is_probed_by_directory_and_nothing_else_moved():
-    assert _DIR_PROBES == {"the candidate study tree": REAL_DATA_DIR / "study"}
+    assert _DIR_PROBES == {"the candidate study tree": REAL_DATA_DIR / "study",
+                           "the casebook": REAL_DATA_DIR / "casebook"}
     assert REAL_DATA_DIR / "study" not in _PROBES.values()
+    assert REAL_DATA_DIR / "casebook" not in _PROBES.values()
     # The transfer records are rewritten in place, which no directory mtime shows.
     assert _PROBES["collected transfer records"] == REAL_DATA_DIR / "transfers"
