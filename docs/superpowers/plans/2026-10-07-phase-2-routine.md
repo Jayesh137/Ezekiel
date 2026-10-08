@@ -33,7 +33,7 @@ The operator decided on 2026-10-07 that Phase 2 of the candidate study starts au
 
 ## Step 1 — find where things stand (every run)
 
-1. `pip install -r requirements.txt pytest ruff`. Use `python -m pytest` and `python -m ruff`. Then `git fetch origin`.
+1. `python -m pip install -r requirements.txt pytest ruff`. Plain `pip` can belong to a different interpreter than `python` in the sandbox, as it did on the first run. Use `python -m pytest` and `python -m ruff`. Then `git fetch origin`. Commands over two minutes, such as the fetch, the full suite or the dry run, go in the background, and you wait for them with an until-loop.
 2. Look for previous Phase 2 work, with git only:
    - **Reverted:** `git log origin/main --oneline --grep "revert/candidate-study-phase-2"` prints something. Reply "Phase 2 was reverted after deploying; it needs the operator", with that commit. Then stop.
    - **Shipped:** `git log origin/main --merges --oneline --grep "feat/candidate-study-phase-2"` prints something. Reply "Phase 2 shipped (<that merge>). This routine can be disabled at https://claude.ai/code/routines." Then stop.
