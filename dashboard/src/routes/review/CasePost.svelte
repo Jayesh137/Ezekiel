@@ -23,7 +23,7 @@
 			{:else}
 				<span class="address mono">{shortAddr(c.address)}</span>
 			{/if}
-			<span class="rank">#{c.rank}{#if c.cluster_size > 1} · one of {c.cluster_size} linked accounts{/if}</span>
+			<span class="rank">#{c.rank}{c.cluster_size > 1 ? ` · one of ${c.cluster_size} linked accounts` : ''}</span>
 		</div>
 		{#if fresh}<span class="dot" role="img" aria-label="Changed since you last looked"></span>{/if}
 		<div class="likely">
