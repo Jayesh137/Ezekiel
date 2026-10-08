@@ -4,7 +4,10 @@
 const OWNER = 'Jayesh137';
 const REPO = 'Ezekiel';
 const BRANCH = 'main';
-const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}`;
+// VITE_RAW_BASE serves the data from elsewhere (a local tree, to verify the
+// dashboard before its data reaches main); the default is the committed main branch.
+const RAW_BASE = (import.meta.env && import.meta.env.VITE_RAW_BASE)
+	|| `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}`;
 
 /**
  * Fetch a JSON file from the repo.
@@ -697,7 +700,8 @@ export const DETECTOR_FEEDS = [
 	{ name: 'Successor investigations', path: 'data/investigations/latest.json', key: 'computed_at_ms', limitMin: 720 },
 	{ name: 'Boundary attribution', path: 'data/boundary/latest.json', key: 'computed_at', limitMin: 360 },
 	{ name: 'His perimeter', path: 'data/perimeter/latest.json', key: 'computed_at', limitMin: 720 },
-	{ name: 'Funding provenance', path: 'data/provenance/latest.json', key: 'computed_at', limitMin: 720 }
+	{ name: 'Funding provenance', path: 'data/provenance/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Casebook', path: 'data/casebook/latest.json', key: 'computed_at', limitMin: 720 }
 ];
 
 /**
@@ -837,4 +841,16 @@ export async function fetchStudyDossier(wallet) {
 	const w = String(wallet || '').toLowerCase();
 	if (!/^0x[0-9a-f]{40}$/.test(w)) return null;
 	return fetchJSON(`data/study/wallets/${w}.json`);
+}
+
+/** The casebook's ranked index (data/casebook/latest.json), or null. */
+export async function fetchCasebook() {
+	return fetchJSON('data/casebook/latest.json');
+}
+
+/** One case file, or null for anything that is not an address. */
+export async function fetchCase(address) {
+	const a = String(address || '').toLowerCase();
+	if (!/^0x[0-9a-f]{40}$/.test(a)) return null;
+	return fetchJSON(`data/casebook/cases/${a}.json`);
 }
