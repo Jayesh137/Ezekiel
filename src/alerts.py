@@ -960,6 +960,40 @@ address.
     return _send_with_cooldown(f"handoff_{wallet.lower()}", 168, subject, body)
 
 
+def alert_casebook_wake(wallet: str, kind: str, detail: dict, row: dict, in_silence: bool) -> bool:
+    """A suspect already in the casebook woke up (spec 2026-10-08 §8): it opened a
+    Hyperliquid account, started trading after 30 quiet days, or grew past $1M.
+
+    CRITICAL while he is in an unusual silence, the dormancy-handoff shape and the
+    severity `alert_dormancy_handoff` uses; HIGH otherwise. Each wallet and kind
+    pages at most once a week.
+    """
+    severity = "CRITICAL" if in_silence else "HIGH"
+    what = {"hl_opened": "Opened a Hyperliquid Account", "hl_woke": "Started Trading Again",
+            "hl_grew": "Grew Past $1M"}.get(kind, kind)
+    subject = f"[EZEKIEL] {severity}: Casebook Suspect {what}"
+
+    def pct(p):
+        return "unknown" if not isinstance(p, (int, float)) else f"{p * 100:.2g}%"
+
+    def usd(x):
+        return "unknown" if not isinstance(x, (int, float)) else f"${x:,.0f}"
+
+    lines = [f"A wallet already in the casebook {what.lower()}.", "",
+             address_line(wallet, "Wallet"),
+             f"Casebook rank: {row.get('rank')}; likelihood about {pct(row.get('p'))} "
+             f"(range {pct(row.get('p_now'))} to {pct(row.get('p_ceiling'))}, 1-in-1,000 prior)",
+             f"Why it is a suspect: {row.get('headline')}",
+             f"Value now: {usd(detail.get('total_value'))}; 7-day volume {usd(detail.get('week_volume'))}; "
+             f"30-day volume {usd(detail.get('month_volume'))}"]
+    if detail.get("from_usd") is not None:
+        lines.append(f"Value before: {usd(detail.get('from_usd'))}")
+    lines += ["", ("He is in an unusual silence right now: this is the dormancy-handoff shape."
+                   if in_silence else "He is trading normally right now."),
+              "", "Next: open it on Hypurrscan and compare it with his recent trades;",
+              f"python scripts/casebook.py show {wallet}"]
+    return _send_with_cooldown(f"casebook_{kind}_{wallet.lower()}", 168, subject, "\n".join(lines))
+
 
 def alert_shared_agent(agent: str, accounts: list) -> bool:
     """Fire when two accounts authorise the same Hyperliquid agent.

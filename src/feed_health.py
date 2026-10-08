@@ -43,6 +43,7 @@ OTHER_FEEDS = {
     "successor investigations": ("investigations/latest.json", "computed_at_ms", 720),
     "his perimeter": ("perimeter/latest.json", "computed_at", 720),
     "funding provenance": ("provenance/latest.json", "computed_at", 720),
+    "casebook": ("casebook/latest.json", "computed_at", 720),
 }
 GROUPS = {"watch": WATCH_FEEDS, "other": OTHER_FEEDS}
 
@@ -171,8 +172,22 @@ def _provenance(doc: dict):
     return None
 
 
+def _casebook(doc: dict):
+    counts, run = doc.get("counts") or {}, doc.get("run") or {}
+    rows = run.get("rows")
+    if counts.get("cases") == 0 and isinstance(rows, int) and rows > 0:
+        return f"0 cases while the roster held {rows} rows"
+    probes = run.get("probes") or {}
+    attempted, failed = probes.get("attempted"), probes.get("failed")
+    if isinstance(attempted, int) and attempted >= MIN_WALLETS and isinstance(failed, int) \
+            and failed * 2 >= attempted:
+        return f"{failed} of {attempted} Hyperliquid probes failed"
+    return None
+
+
 # feed name -> a function answering "is this fresh reading blind?" with a reason.
 BLIND_CHECKS = {
+    "casebook": _casebook,
     "close watch": _watch,
     "Circle flows": _circle,
     "roster": _roster,
