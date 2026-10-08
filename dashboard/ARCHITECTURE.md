@@ -258,6 +258,20 @@ feed(roster, state, tab)
       6. wallet               asc, deterministic last resort
 ```
 
+```
+rankedFeed(casebook)   (src/lib/casebook.js)
+    data/casebook/latest.json cases
+      minus known, excluded, ruling == not_him, rank == null, hl.on_hl != true
+    index order (the casebook's own ranking by central likelihood), first 25
+```
+
+The **Ranked** tab is the casebook's list (docs/superpowers/specs/2026-10-08-casebook-design.md):
+a lead the roster has forgotten still appears there with its history, which is the
+point of the casebook. Its dots mark cases whose `last_change` is newer than the last
+time the tab was opened (`localStorage` key `ezekiel.casebook.seen.v1`, frozen for the
+session like the feed order). It has no review marks and no progress ring: it is a
+ranking to read, not a queue to clear.
+
 **WATCH is never listed.** 151 wallets today carry no vector at all, which was
 the bulk of the list and is evidence of nothing; on a phone that buries the few
 that matter. They are counted in a one-line footnote instead. A wallet demoted
@@ -445,6 +459,12 @@ and the `.evidence` fields `hl_total_value` (total account value, spot + perp),
 `.read_ok`, `.errors[]`, `.account_value`, `.target_value`, `.size_ratio`,
 `.agents[]`, `.subaccounts[]`, `.last_fill_ms`, `.why` and `.source`.
 
+**`data/casebook/latest.json`** (the Ranked tab): `computed_at`, `counts.unknown`, and for
+each of `cases[]`: `.address`, `.rank`, `.known`, `.excluded`, `.ruling`, `.p`, `.p_now`,
+`.p_ceiling`, `.families` (`{family: [now, central, ceiling, state]}`), `.headline`,
+`.cluster_size`, `.last_change`, and `.hl.on_hl`, `.hl.value`, `.hl.month_volume`,
+`.hl.probed_at`. A missing or unreadable file shows "Casebook unavailable" on that tab only.
+
 **Vector labels** cover every name `src/roster.py` defines: `transfer`,
 `linkage`, `correlation`, `behavioural`, `hl_native`, `shared_agent`,
 `explicit_link`, `dormancy_handoff` and `referral`. An unknown name renders
@@ -458,6 +478,7 @@ raw rather than disappearing.
 |---|---|
 | Roster fetch fails | "Couldn't load the roster", plus Retry. State is untouched. |
 | Watchlist fetch fails | The feed still renders, and the stories row says it could not load |
+| Casebook fetch fails | The Ranked tab says "Casebook unavailable"; the other tabs are untouched |
 | Data over 6h old | Red freshness line. The feed still renders, clearly dated. |
 | Watched wallet `read_ok: false` | Red story ring, and the sheet says "could not read" with the errors |
 | Figure absent | `—` |
