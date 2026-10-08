@@ -88,7 +88,7 @@ identity of any kind (the deliverable is a Hyperliquid address — `execution_fi
    6. write changed case files, append events, write index   src/casebook/store.py, report.py
    7. alert on a suspect waking                              src/alerts.py
             │
-            ├──► data/casebook/index.json ──► dashboard /casebook, phone "Ranked" tab
+            ├──► data/casebook/latest.json ──► dashboard /casebook, phone "Ranked" tab
             └──► roster.detector_candidates pins the top suspects (next run)
 
  scripts/backfill_casebook.py  — once, locally: every historical roster version through steps 2-3
@@ -110,7 +110,7 @@ identity of any kind (the deliverable is a Hyperliquid address — `execution_fi
 
 **Single-writer map.** `update_casebook.py` (trace.yml) writes `data/casebook/**` and nothing else;
 `backfill_casebook.py` writes the same tree but refuses a non-empty casebook without `--rebuild`
-and is run by hand only. The roster reads `data/casebook/index.json` (detector pins) and writes only
+and is run by hand only. The roster reads `data/casebook/latest.json` (detector pins) and writes only
 the roster.
 
 ## 5. The case file — `data/casebook/cases/<address>.json`
@@ -374,7 +374,7 @@ is ~593 versions. The first live run then confirms which items are current.
   `evidence_lapsed`, `evidence_refuted`, `evidence_returned`, `tier_changed`, `score_moved` (central
   moved ≥ 0.5), `hl_opened`, `hl_woke`, `hl_grew`, `hl_emptied`. Each line: `at`, `address`, `kind`,
   `detail`, `origin`. Append-only.
-- **`data/casebook/index.json`** — `schema`, `computed_at`, `model` (version, prior, the whole LR
+- **`data/casebook/latest.json`** — `schema`, `computed_at`, `model` (version, prior, the whole LR
   table with bases, categories, clips), `counts`, `calibration` (§7.6), `target` (his dormancy
   state), `cases` (one compact row per case, ranked), `rejected` (≤ 500), `run` (roster consumed,
   items, probes, failures, budget).
@@ -385,7 +385,7 @@ is ~593 versions. The first live run then confirms which items are current.
 ## 12. Alerts, feed health, integration
 
 - `alert_casebook_wake` (§8), routed by its severity token like every other alert.
-- **Feed health:** `OTHER_FEEDS["casebook"] = ("casebook/index.json", "computed_at", 720)`; blind
+- **Feed health:** `OTHER_FEEDS["casebook"] = ("casebook/latest.json", "computed_at", 720)`; blind
   when it holds 0 cases while the roster holds leads, or when ≥ half a run's probes failed.
 - **Detector pins:** `roster.detector_candidates` pins, after the operator's own pins, up to **8**
   unknown, Hyperliquid-present cases from the casebook ranking whose central odds beat the prior —
