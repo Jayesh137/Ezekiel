@@ -148,3 +148,10 @@ def test_main_dry_run_writes_only_under_the_given_directory(tmp_path, monkeypatc
     assert update.main(["--dry-run", str(tmp_path / "scratch"), "--no-probe"]) == 0
     assert (tmp_path / "scratch" / "casebook" / "latest.json").exists()
     assert not (data / "casebook").exists()
+
+
+def test_the_casebook_step_follows_the_roster_in_trace():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "trace.yml").read_text(
+        encoding="utf-8")
+    assert text.index("python src/roster.py") < text.index("python scripts/update_casebook.py")

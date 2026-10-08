@@ -442,6 +442,13 @@ jobs:
       - name: Build wallet roster
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         run: python src/roster.py
+      # Every suspect kept forever and ranked by likelihood (spec 2026-10-08). The
+      # only writer of data/casebook/; its Hyperliquid probes run under a 150s
+      # ReadBudget (lookups 10/30s < budget < this step < the job).
+      - name: Update the casebook
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 6
+        run: python scripts/update_casebook.py
       # Crosswise freshness: this job reports the close watch's feeds (watch.yml
       # reports everyone else's). A dead watch writes the same nothing as a
       # quiet target (src/feed_health.py).
