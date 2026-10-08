@@ -13,13 +13,23 @@ from src.casebook import extract
 MAX_REJECTED = 500
 
 
+def hyperliquid_knows(case: dict) -> bool:
+    """Hyperliquid holds an account at this address: the casebook's own `portfolio`
+    read, or the roster's `userRole` read (anything but missing, the roster's own test)."""
+    hl = case.get("hl") if isinstance(case.get("hl"), dict) else {}
+    roster = hl.get("roster") if isinstance(hl.get("roster"), dict) else {}
+    return hl.get("on_hl") is True or (roster.get("role") or "missing") != "missing"
+
+
 def counterpart_services(cases: dict, activity_table: dict, config: dict,
                          tokens: set | None = None) -> dict[str, str | None]:
     """The verdicts `cases.rejudge` reads, for every address the casebook's items rest
     on: why it cannot be what an item took it for (a measured busy address or contract,
     by the roster's own rule `services_from_activity`, or an address with no key), or
     None when the whole chain measured it and it passes. Unmeasured stays absent: not
-    evidence either way."""
+    evidence either way. As in the roster, an address Hyperliquid knows is exempt from
+    the contract verdict (code on another chain does not unmake an account), never from
+    the busy one."""
     from src import not_wallets
     from src.roster import services_from_activity
 
@@ -32,7 +42,9 @@ def counterpart_services(cases: dict, activity_table: dict, config: dict,
     if not wanted:
         return {}
     table = activity_table if isinstance(activity_table, dict) else {}
-    services = services_from_activity(table, ground_truth=extract.cluster_of(config))
+    trading = {a for a, c in cases.items() if isinstance(c, dict) and hyperliquid_knows(c)}
+    services = services_from_activity(table, ground_truth=extract.cluster_of(config),
+                                      hl_accounts=trading)
     measured = {str(k).split(":", 1)[1].strip().lower() for k, v in table.items()
                 if isinstance(v, dict) and ":" in str(k)}
     out: dict[str, str | None] = {}

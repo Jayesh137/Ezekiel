@@ -328,6 +328,8 @@ flag; a failed read is recorded as `probe_ok: false` and changes nothing else), 
 4. not on Hyperliquid, probed > 7 days ago;
 5. everything else, oldest first.
 
+*As implemented, the due top 25 come first and a failed read is retried after an hour (§18).*
+
 **Events** (each compared with the case's previous probe; on a first probe only the recent past
 counts, so the first sweep is a baseline, not an alert storm):
 
@@ -514,8 +516,9 @@ row and rules, incident-log entry, `ARCHITECTURE.md` §8).
   dry run on the newest roster read 30 suspects on Hyperliquid at ~2 s each (0 failures, no
   events: a first read is a baseline) and wrote 228 case files in ~110 s including the
   60 s probe budget.
-- **The committed casebook** is that backfill plus one live merge of the 2026-10-08 02:31
-  roster with those 30 reads, so the first run on `main` consumes the next roster.
+- **The committed casebook** is that backfill plus live merges of the 2026-10-08 02:31
+  roster (with those 30 reads) and the 04:27 roster (no reads), so the first run on `main`
+  consumes the next roster.
 - **`invalidated` is re-judged every run, roster or not, and is not a stored status.** An
   item resting on another address (a first funder, a quiet payee, a deposit address)
   keeps its `status` and gains `invalid_reason` when today's whole-chain readings
@@ -532,3 +535,21 @@ row and rules, incident-log entry, `ARCHITECTURE.md` §8).
   item's summary no longer claims "measured quiet".
 - **One percentage format everywhere** (`report.pct`: >99%, 34%, 3.4%, 0.34%, <0.1%);
   the wake alert had printed `%.2g`, which reads "1e+02%" above 99.5%.
+- **The due top 25 are probed first,** in rank order (never read, a failed read an hour
+  old, or a read 12 h old), then never-read cases, failed reads, accounts after 3 days and
+  the rest after 7. Never-read first held the top 25 behind a backlog of ~670 at go-live:
+  replayed on the 2026-10-08 15:58 roster, the old order's first 70 reads held no top-25
+  suspect; the new order reads all 25 first.
+- **An unreadable `state.json` is set aside, never read as a first run:** moved whole to
+  `state.unreadable-<UTC time>.json` (its sticky rejections exist nowhere else); the run
+  exits 1 and writes a fresh state (re-reading the roster is harmless), and
+  `casebook.py check` names the kept file until a human deletes it.
+- **A family's state is the best status among the case's own items that carry a value
+  in it,** else `cluster`: an item that no longer counts carries nothing, so it cannot
+  label "invalidated" a chip whose value a linked account supplies.
+- **The next checks say how the evidence ended** (has lapsed, was refuted, is history, no
+  longer counts), naming only what applies.
+- **A counterpart Hyperliquid knows is exempt from the contract verdict, never the busy
+  one,** as in the roster's `services_from_activity`: the casebook's own `portfolio` read
+  or the roster's `userRole` (anything but missing). Code on another chain does not unmake
+  an account. No such counterpart existed when this landed.

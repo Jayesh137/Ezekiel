@@ -149,6 +149,12 @@ def cmd_check(args) -> int:
                 problems.append(f"{address}: {key} has unknown kind {e.get('kind')}")
             if e.get("status") not in model.STATUSES:
                 problems.append(f"{address}: {key} has unknown status {e.get('status')}")
+    _, state_problem = store.load_state(args.data_dir)
+    if state_problem:
+        problems.append(f"state.json is unreadable ({state_problem}): the next run sets it aside")
+    problems.extend(f"{kept.name} was set aside unreadable: recover its rejected list by hand, "
+                    "then delete it"
+                    for kept in sorted(store.root(args.data_dir).glob("state.unreadable-*.json")))
     index = store.read_index(args.data_dir)
     if index is None:
         problems.append("latest.json is absent or unreadable")

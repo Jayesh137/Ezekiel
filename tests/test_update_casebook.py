@@ -200,3 +200,36 @@ def test_an_unreadable_activity_table_keeps_what_was_measured(tmp_path):
     assert out["activity"].startswith("unreadable")
     entry = json.loads(store.case_path(A, tmp_path).read_text())["evidence"]["quiet_first_funder"]
     assert "2,282,986" in entry["invalid_reason"]
+
+
+def test_the_top_25_are_reread_before_the_never_read_backlog():
+    # At deployment about 670 suspects had never been read; queued behind them, the best
+    # suspects would wait a day or two for their twelve-hourly read.
+    from src.casebook.cases import iso
+    best = "0x" + "0" * 39 + "1"
+    cases = {best: {"address": best, "evidence": {}, "hl": {"probed_at": iso(NOW - 13 * 3_600_000),
+                                                            "probe_ok": True, "on_hl": True}}}
+    scores = {best: {"central": 0.0, "now": 0.0, "ceiling": 0.0}}
+    for i in range(30):
+        a = f"0x{i + 16:040x}"
+        cases[a] = {"address": a, "evidence": {}, "hl": {}}
+        scores[a] = {"central": -3.0, "now": -3.0, "ceiling": -3.0}
+    order = update.probe_order(cases, scores, NOW)
+    assert order[0] == best and len(order) == 31
+    fresh = {**cases, best: {**cases[best], "hl": {**cases[best]["hl"],
+                                                    "probed_at": iso(NOW - 2 * 3_600_000)}}}
+    assert best not in update.probe_order(fresh, scores, NOW)       # read 2 h ago: not due
+
+
+def test_an_unreadable_state_is_set_aside_reported_and_replaced(tmp_path):
+    write_roster(tmp_path, "2026-10-08T00:00:00+00:00",
+                 [{"wallet": A, "tier": "POSSIBLE", "vectors": ["transfer"],
+                   "evidence": {"totals": {"received_from_target_usd": 5e4}}}])
+    run(tmp_path, probe=False)
+    state = store.root(tmp_path) / "state.json"
+    state.write_text("{broken", encoding="utf-8")
+    out = run(tmp_path, probe=False, now=NOW + DAY)
+    assert out["exit_code"] == 1 and out["state"].startswith("unreadable")
+    kept = list(store.root(tmp_path).glob("state.unreadable-*.json"))
+    assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == "{broken"
+    assert json.loads(state.read_text(encoding="utf-8"))["roster_computed_at_ms"]

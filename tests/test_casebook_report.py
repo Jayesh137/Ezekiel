@@ -152,3 +152,29 @@ def test_a_case_whose_only_evidence_was_invalidated_says_so_not_the_rosters_clai
     row = build({B: c})["cases"][0]
     assert row["why"] == ("Shares a first funder with the target, which no longer counts: "
                           "global activity: 2,282,992 txs, 1,031 token transfers")
+
+
+def test_a_family_carried_only_by_a_cluster_member_says_cluster():
+    # B's own funder item no longer counts; the family's value is its sub-account's.
+    mine = entry("quiet_first_funder", summary="funder", funder="0x" + "f9" * 20)
+    mine["invalid_reason"] = "global activity: 2,282,986 txs"
+    group = {"operator_group": {"master": B, "subaccounts": [C]}}
+    cases = {B: case(B, {"quiet_first_funder": mine}, links=group),
+             C: case(C, {"quiet_first_funder": entry("quiet_first_funder", funder="0x" + "e8" * 20)},
+                     links=group)}
+    row = next(r for r in build(cases)["cases"] if r["address"] == B)
+    assert row["families"]["infrastructure"][3] == "cluster"
+
+
+def test_next_checks_name_evidence_that_no_longer_counts():
+    item = {**entry("quiet_first_funder", "historical", summary="funder"), "invalid_reason": "busy"}
+    assert any("no longer counts" in check for check in report.next_checks(case(B, {"quiet_first_funder": item})))
+
+
+def test_every_way_evidence_ends_leaves_the_case_resting_on_its_record():
+    for status, words in (("lapsed", "has lapsed"), ("refuted", "was refuted"), ("historical", "is history")):
+        c = case(B, {"amount_correlation": entry("amount_correlation", status, strength=0.9)})
+        assert any(words in check and "rests on its record" in check for check in report.next_checks(c)), status
+    both = case(B, {"amount_correlation": entry("amount_correlation", "lapsed", strength=0.9),
+                    "two_way_flow": entry("two_way_flow")})
+    assert not any("rests on its record" in check for check in report.next_checks(both))

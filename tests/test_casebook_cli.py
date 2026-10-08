@@ -94,3 +94,17 @@ def test_show_and_sqlite_say_what_no_longer_counts_and_why(tmp_path, capsys):
     finally:
         con.close()
     assert status == "invalidated" and why.startswith("global activity: 2,282,986 txs")
+
+
+def test_check_names_a_state_that_was_set_aside_until_a_human_clears_it(tmp_path, capsys):
+    build(tmp_path)
+    args = ["--data-dir", str(tmp_path), "check"]
+    (store.root(tmp_path) / "state.json").write_text("{broken", encoding="utf-8")
+    assert cli.main(args) == 1
+    assert "state.json is unreadable" in capsys.readouterr().out
+    update.run({"target_wallet": T, "known_self_wallets": []}, data_dir=tmp_path, out_dir=tmp_path,
+               probe=False, alerts_on=False, now_ms=1_791_419_654_475 + 86_400_000)
+    assert cli.main(args) == 1                          # the fresh state reads; the kept one is named
+    assert "state.unreadable-20261009T" in capsys.readouterr().out
+    next(store.root(tmp_path).glob("state.unreadable-*.json")).unlink()
+    assert cli.main(args) == 0

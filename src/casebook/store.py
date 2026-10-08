@@ -12,6 +12,7 @@ Layout:
     events/<YYYY-MM-DD>.jsonl  every change, one JSON object a line, append-only
     latest.json                the ranked view (casebook-index/1), derived each run
     state.json                 the last roster consumed, sticky rejections, the last run
+    state.unreadable-<time>.json  a state.json that could not be read, set aside whole
     README.md                  the format, for a reader in a year (written by hand)
 """
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src import utils
@@ -160,9 +162,30 @@ def _read_json(path: Path, default):
         return default
 
 
+def load_state(data_dir=None) -> tuple[dict, str | None]:
+    """(state, None); ({}, None) before the first run; ({}, why) when state.json is
+    present but unreadable, which the writer must never take for a first run (rule 5)."""
+    try:
+        doc = json.loads((root(data_dir) / "state.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}, None
+    except (OSError, ValueError) as exc:
+        return {}, f"{type(exc).__name__}: {exc}"[:200]
+    return (doc, None) if isinstance(doc, dict) else ({}, "not a state object")
+
+
 def read_state(data_dir=None) -> dict:
-    doc = _read_json(root(data_dir) / "state.json", {})
-    return doc if isinstance(doc, dict) else {}
+    return load_state(data_dir)[0]
+
+
+def set_aside_state(data_dir=None, *, now_ms: int) -> Path:
+    """Move an unreadable state.json to state.unreadable-<UTC time>.json, whole, for a
+    human: the sticky rejections it holds exist nowhere else."""
+    path = root(data_dir) / "state.json"
+    stamp = datetime.fromtimestamp(now_ms / 1000, UTC).strftime("%Y%m%dT%H%M%SZ")
+    aside = path.with_name(f"state.unreadable-{stamp}.json")
+    os.replace(path, aside)
+    return aside
 
 
 def write_state(state: dict, data_dir=None) -> None:

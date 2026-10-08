@@ -33,6 +33,7 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
 | `events/<YYYY-MM-DD>.jsonl` | Every change, one JSON object per line: a case opened, evidence new / lapsed / refuted / returned, a tier change, the score moving, a suspect waking on Hyperliquid. Append-only. |
 | `latest.json` | The ranked index (`schema: casebook-index/1`), rebuilt every run. It carries the whole likelihood model (`model`), the calibration checks (`calibration`), counts, the target's dormancy state and what the run read. |
 | `state.json` | The last roster reading consumed, the sticky list of rejected addresses, the last run. |
+| `state.unreadable-<time>.json` | Only after a fault: a `state.json` that could not be read, set aside whole by the run that found it (which exits 1 and writes a fresh one). Its rejected list exists nowhere else, so recover what you need by hand, then delete the file; `python scripts/casebook.py check` names it until then. |
 
 ## A case
 
@@ -64,7 +65,7 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
 | `lapsed` | seen live, then absent 24 hours or more, cause unknown | no / half / yes |
 | `refuted` | absent after a detector re-checked the wallet and found nothing | no / no / yes |
 | `historical` | from the git-history backfill and not current when the casebook went live | no / no / yes |
-| `invalidated` | not stored as a status: an item with `invalid_reason`, whose address was since measured a service or has no key. Re-judged every run against `data/labels/address_activity.json`; a new measurement that passes the address clears it, and an address with no new measurement keeps its verdict | no / no / no |
+| `invalidated` | not stored as a status: an item with `invalid_reason`, whose address was since measured a service (busy, or a contract Hyperliquid does not know as an account) or has no key. Re-judged every run against `data/labels/address_activity.json`; a new measurement that passes the address clears it, and an address with no new measurement keeps its verdict | no / no / no |
 
 ## How the likelihood is computed
 
@@ -100,8 +101,9 @@ recording why in `docs/incident-log.md`, never to move one wallet.
 ## The sleeper watch
 
 Each run re-reads the cases that are due on Hyperliquid (`portfolio`, about 70 per run):
-never-read cases first, then the top 25 every 12 hours, accounts every 3 days, addresses
-with no account every 7 days. A suspect that opens an account, starts trading after 30
+the top 25 first, in rank order, every 12 hours (sooner if never read or a read failed),
+then never-read cases, failed reads after an hour, accounts every 3 days, addresses with
+no account every 7 days. A suspect that opens an account, starts trading after 30
 quiet days, or grows past $1M raises an event; for the top 25, or anything at about 1%
 and up, it also pages: CRITICAL while he is in an unusual silence, HIGH otherwise.
 

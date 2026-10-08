@@ -13,6 +13,8 @@ from src.casebook.cases import effective_status
 INDEX_SCHEMA = "casebook-index/1"
 MAX_REJECTED_SHOWN = 500
 STATUS_ORDER = ("current", "standing", "lapsed", "refuted", "historical", "invalidated")
+ENDED_TEXT = (("lapsed", "has lapsed"), ("refuted", "was refuted"), ("historical", "is history"),
+              ("invalidated", "no longer counts"))
 FOLLOWABLE_MIN_USD = 10_000.0
 
 
@@ -160,20 +162,23 @@ def next_checks(case: dict) -> list[str]:
             and not ({"study_tooling", "study_context"} & set(evidence)):
         checks.append("Trades on Hyperliquid but was never studied: add it to config.study_wallets "
                       "to read its order habits")
-    items = _scored(case)
-    if items and all(effective_status(e) not in ("current", "standing") for e in items):
-        checks.append("Every piece of its evidence has lapsed or is history: the case rests on its "
-                      "record (python scripts/casebook.py show <address>)")
+    ended = {effective_status(e) or "current" for e in _scored(case)}
+    how = [text for status, text in ENDED_TEXT if status in ended]
+    if how and not ended & {"current", "standing"}:
+        said = how[0] if len(how) == 1 else f"{', '.join(how[:-1])} or {how[-1]}"
+        checks.append(f"Every piece of its evidence {said}: the case rests on its record "
+                      "(python scripts/casebook.py show <address>)")
     return checks
 
 
 def family_cells(case_score: dict, case: dict) -> dict:
     """{family: [now, central, ceiling, state]}; state is the best status among this
-    case's own items in the family, or "cluster" when only a cluster member carries it."""
+    case's own items that carry a value in the family, or "cluster" when none does and
+    the value is a cluster member's (an item that no longer counts carries nothing)."""
     states: dict[str, str] = {}
     for e in _scored(case):
         spec = model.KINDS.get(e.get("kind"))
-        if not spec:
+        if not spec or not any(score.item_values(e)):
             continue
         status = effective_status(e) if effective_status(e) in STATUS_ORDER else "invalidated"
         held = states.get(spec["family"])

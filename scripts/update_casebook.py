@@ -10,8 +10,10 @@ budgeted), scores every case, writes the index, and alerts when a suspect wakes 
                                                         # DIR/casebook; no alert is sent
     python scripts/update_casebook.py --no-probe        # merge and score only
 
-Exits 1 when the roster or a case file cannot be read: both need a human, and a red
-step is how this project says so. Everything readable is still written.
+Exits 1 when the roster, a case file or the state cannot be read: each needs a human,
+and a red step is how this project says so. Everything readable is still written; an
+unreadable state.json is set aside whole (state.unreadable-<time>.json), because the
+rejections it holds exist nowhere else.
 """
 
 from __future__ import annotations
@@ -82,7 +84,10 @@ def _age(case: dict, now_ms: int) -> int | None:
 
 
 def probe_order(cases: dict, scores: dict, now_ms: int) -> list[str]:
-    """Due cases, most urgent first (spec §8). A case that is not due is not read."""
+    """Due cases, most urgent first (spec §8): the top 25 in rank order, then never
+    read, failed reads, Hyperliquid accounts, the rest. A case that is not due is not
+    read. The top 25 lead because a backlog of never-read cases (about 670 when the
+    casebook went live) would otherwise hold their twelve-hourly read for a day or more."""
     live = [a for a, c in cases.items() if not c.get("excluded")]
     unknown = sorted((a for a in live if not cases[a].get("known")),
                      key=lambda a: score.rank_key(scores[a], a))
@@ -91,11 +96,13 @@ def probe_order(cases: dict, scores: dict, now_ms: int) -> list[str]:
     for address in unknown + sorted(a for a in live if cases[a].get("known")):
         hl = cases[address].get("hl") or {}
         age = _age(cases[address], now_ms)
-        if age is None:
-            buckets[0].append(address)
-        elif hl.get("probe_ok") is False and age >= FAILED_RETRY_MS:
+        failed = hl.get("probe_ok") is False and age is not None and age >= FAILED_RETRY_MS
+        if address in top:
+            if age is None or failed or age >= TOP_AGE_MS:
+                buckets[0].append(address)
+        elif age is None:
             buckets[1].append(address)
-        elif address in top and age >= TOP_AGE_MS:
+        elif failed:
             buckets[2].append(address)
         elif hl.get("on_hl") is True and age >= ON_HL_AGE_MS:
             buckets[3].append(address)
@@ -165,13 +172,17 @@ def run(config: dict, *, data_dir: Path, out_dir: Path, probe: bool = True, fetc
     fetch = fetch or utils.hl_read
     roster, roster_error = read_json(data_dir / "roster" / "latest.json")
     dormancy, _ = read_json(data_dir / "dormancy" / "latest.json")
-    state = store.read_state(out_dir)
+    state, state_problem = store.load_state(out_dir)
     cases, unreadable = store.load_cases(out_dir)
     blocked = {u["address"] for u in unreadable}
     rejected = {r["address"]: r for r in state.get("rejected") or []
                 if isinstance(r, dict) and r.get("address")}
     out = {"at": casefile.iso(now_ms), "unreadable_cases": unreadable,
            "exit_code": 1 if unreadable else 0, "probes": {}}
+    if state_problem:
+        kept = store.set_aside_state(out_dir, now_ms=now_ms)
+        out.update(state=f"unreadable ({state_problem}): set aside as {kept.name}; a fresh one "
+                         "is written and the roster re-read", exit_code=1)
     events: list = []
     tokens = token_registry_addresses(data_dir / "labels" / "token_contracts.json")
     at_ms, consumed = computed_ms(roster), state.get("roster_computed_at_ms")
@@ -253,6 +264,8 @@ def main(argv=None) -> int:
           f"{calibration.get('sum_p_central_unknown')} ({calibration.get('expected_sum')})")
     if out.get("activity"):
         print(f"[casebook] activity table {out['activity']}")
+    if out.get("state"):
+        print(f"[casebook] STATE {out['state']}")
     for bad in out.get("unreadable_cases") or []:
         print(f"[casebook] UNREADABLE case file {bad['address']}: {bad['error']} (left untouched)")
     if out.get("alerts"):

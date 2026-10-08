@@ -139,3 +139,36 @@ def test_an_unmeasured_counterpart_is_absent_from_the_verdicts():
     cases = {A: {"address": A, "evidence": {"quiet_first_funder": {
         "kind": "quiet_first_funder", "facts": {"funder": funder}}}}}
     assert ingest.counterpart_services(cases, {}, CONFIG) == {}
+
+
+def test_a_counterpart_hyperliquid_knows_as_a_trader_keeps_its_vote_despite_code_elsewhere():
+    # The roster's own rule (services_from_activity): code on one chain does not unmake a
+    # trading account. 0xb798aef7... is an EOA on Arbitrum, a contract on Ethereum, and
+    # trades $9.7M on Hyperliquid.
+    funder = "0x" + "f9" * 20
+    cases = {A: {"address": A, "evidence": {"quiet_first_funder": {
+        "kind": "quiet_first_funder", "facts": {"funder": funder}}}},
+        funder: {"address": funder, "evidence": {}, "hl": {"on_hl": True}}}
+    table = {f"ethereum:{funder}": {"txs": 35, "token_transfers": 3, "is_contract": True, "name": "Proxy"}}
+    assert ingest.counterpart_services(cases, table, CONFIG)[funder] is None
+
+
+def _funder_verdict(hl: dict, reading: dict) -> str | None:
+    funder = "0x" + "f9" * 20
+    cases = {A: {"address": A, "evidence": {"quiet_first_funder": {
+        "kind": "quiet_first_funder", "facts": {"funder": funder}}}},
+        funder: {"address": funder, "evidence": {}, "hl": hl}}
+    return ingest.counterpart_services(cases, {f"ethereum:{funder}": reading}, CONFIG)[funder]
+
+
+def test_the_rosters_user_role_also_exempts_a_counterpart_from_the_contract_verdict():
+    contract = {"txs": 35, "token_transfers": 3, "is_contract": True, "name": "Proxy"}
+    assert _funder_verdict({"roster": {"role": "user"}}, contract) is None
+    assert _funder_verdict({"roster": {"role": "missing"}}, contract) == "contract: Proxy"
+    assert _funder_verdict({"on_hl": False}, contract) == "contract: Proxy"
+
+
+def test_a_busy_counterpart_is_invalidated_even_when_hyperliquid_knows_it():
+    # An exchange hot wallet holds a Hyperliquid account too; busy is never exempt.
+    busy = {"txs": 2_282_986, "token_transfers": 1_031, "is_contract": False}
+    assert _funder_verdict({"on_hl": True}, busy) == "global activity: 2,282,986 txs, 1,031 token transfers"
