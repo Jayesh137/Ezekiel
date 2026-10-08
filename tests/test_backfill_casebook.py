@@ -71,3 +71,17 @@ def test_an_empty_history_writes_nothing(tmp_path):
 def test_parse_log_reads_sha_and_seconds():
     sha = "a" * 40
     assert backfill.parse_log(f"{sha} 1757500000\n\nnot a line\n{sha} x\n") == [(sha, 1_757_500_000_000)]
+
+
+def test_backfill_voids_what_only_the_2026_09_10_rosters_reported(tmp_path):
+    day = 1_789_027_200_000           # 2026-09-10T08:00:00Z, before that day's fixes
+    history = [(day, "v0", {"computed_at": iso(day), "wallets": [
+                   {"wallet": B, "tier": "POSSIBLE", "vectors": ["transfer"]}]}),
+               (day + 50 * H, "v1", {"computed_at": iso(day + 50 * H), "wallets": [
+                   {"wallet": B, "tier": "WATCH"}]}),
+               (day + 80 * H, "v2", {"computed_at": iso(day + 80 * H), "wallets": [   # absent 24 h+
+                   {"wallet": B, "tier": "WATCH"}]})]
+    backfill.run_backfill(history, CONFIG, out_dir=tmp_path)
+    entry = json.loads(store.case_path(B, tmp_path).read_text())["evidence"]["direct_transfer"]
+    assert entry["status"] == "historical"
+    assert entry["invalid_reason"].startswith("reported only by the 2026-09-10 rosters")

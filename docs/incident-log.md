@@ -2075,3 +2075,21 @@ reported funders nobody had measured — and two of those cases were still expla
 their rank with the roster's own "Shares the target's original funding source". The
 reason line now says what stopped counting and why, the CLI and its SQLite export carry
 `invalid_reason`, and the funder item no longer claims "measured quiet".
+
+**The backfill replayed the first day's rosters, and their money was void (found
+2026-10-08, after go-live).** Every roster version from 2026-09-10 (the first in git,
+06:27-15:33 UTC) was computed before that day's fixes: counterfeit tokens were priced as
+real until 07:37, and until 17:54 a token quantity was booked as dollars (1,030,689,918 MAX
+as $1.03B), every HL-native record counted three times and shared contracts read as private
+deposit addresses. No roster ran between 15:33 and 2026-09-11 15:59, so "last seen
+2026-09-10" marks exactly the evidence only those rosters reported. The casebook was
+showing it: `0x207700bd...` "sent $1,030,689,919", and three `0x160...` look-alikes of
+`0x160f6ef9...` credited with $45M, $17M and $6M of what was almost certainly counterfeit
+USDC from address poisoning. History never counts in the central band, so no suspect's
+likelihood was wrong, but the ceilings broke ties among the cases at the base odds (the
+look-alikes sat at ranks 84-86) and the text stated amounts this project had already
+proved false. `cases.void_pre_fix` now marks such money, linkage and correlation items
+`invalid_reason` every run, drops peaks taken that day (an event keeps the figure), and
+names the kind rather than the amount in the reason line. Replayed on `main`: 36 items, 23
+peaks, no central or now band moved. **A backfill inherits every fault the history held;
+when a fix lands, ask what the replay of the days before it still says.**

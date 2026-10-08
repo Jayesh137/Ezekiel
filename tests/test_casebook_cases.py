@@ -195,3 +195,68 @@ def test_an_unmeasured_counterpart_keeps_its_stored_verdict():
     cases.rejudge(case, {funder: "global activity: 2,282,986 txs"}, at_ms=T0, origin="live")
     assert cases.rejudge(case, {}, at_ms=T0 + H, origin="live") == []
     assert case["evidence"]["quiet_first_funder"]["invalid_reason"].startswith("global activity")
+
+
+def _from_day(kind, last_seen, **extra):
+    """A backfilled item as stored: first seen in the 2026-09-10 rosters."""
+    return {"kind": kind, "status": "historical", "origin": "backfill", "live": False,
+            "first_seen": "2026-09-10T06:27:49Z", "last_seen": last_seen, "summary": "s", "strength": 1.0,
+            "facts": {}, "peak_strength": None, "peak_summary": None, "peak_at": None, **extra}
+
+
+def test_money_only_the_2026_09_10_rosters_reported_no_longer_counts():
+    # Those rosters priced counterfeit tokens as real and booked 1,030,689,918 MAX as $1.03B;
+    # the fixed code's first roster (2026-09-11) no longer reported these items.
+    case = opened()
+    case["evidence"] = {
+        "direct_transfer": _from_day("direct_transfer", "2026-09-10",
+                                     summary="Moved money with the target (received $0, sent $1,030,689,919)"),
+        "linkage_graph": _from_day("linkage_graph", "2026-09-10")}
+    events = cases.void_pre_fix(case, at_ms=T0, origin="live")
+    assert sorted(e["detail"]["key"] for e in events if e["kind"] == "evidence_invalidated") == [
+        "direct_transfer", "linkage_graph"]
+    entry = case["evidence"]["direct_transfer"]
+    assert cases.effective_status(entry) == "invalidated" and entry["status"] == "historical"
+    assert entry["invalid_reason"].startswith("reported only by the 2026-09-10 rosters")
+    assert cases.void_pre_fix(case, at_ms=T0 + H, origin="live") == []      # once
+
+
+def test_evidence_seen_after_the_fixes_keeps_counting_but_not_a_peak_from_that_day():
+    case = opened()
+    case["evidence"] = {"two_way_flow": _from_day(
+        "two_way_flow", "2026-09-12", peak_strength=1.03e9, peak_summary="Money both ways ($1.03B)",
+        peak_at="2026-09-10T09:00:00Z")}
+    events = cases.void_pre_fix(case, at_ms=T0, origin="live")
+    entry = case["evidence"]["two_way_flow"]
+    assert "invalid_reason" not in entry
+    assert (entry["peak_strength"], entry["peak_summary"], entry["peak_at"]) == (None, None, None)
+    assert [e["kind"] for e in events] == ["evidence_peak_voided"]
+    assert events[0]["detail"]["summary"] == "Money both ways ($1.03B)"     # the event keeps the figure
+
+
+def test_kinds_that_days_faults_did_not_touch_keep_what_it_reported():
+    case = opened()
+    case["evidence"] = {"behavioural_score": _from_day(
+        "behavioural_score", "2026-09-10", peak_strength=0.7, peak_summary="score 0.70",
+        peak_at="2026-09-10T09:00:00Z")}
+    assert cases.void_pre_fix(case, at_ms=T0, origin="live") == []
+    entry = case["evidence"]["behavioural_score"]
+    assert "invalid_reason" not in entry and entry["peak_summary"] == "score 0.70"
+
+
+def test_evidence_reported_again_after_the_fixes_counts_again():
+    case = opened()
+    case["evidence"] = {"direct_transfer": _from_day("direct_transfer", "2026-09-10")}
+    cases.void_pre_fix(case, at_ms=T0, origin="live")
+    cases.merge_items(case, [item("direct_transfer", 5000.0)], set(), at_ms=T0 + H, origin="live")
+    events = cases.void_pre_fix(case, at_ms=T0 + H, origin="live")
+    assert "invalid_reason" not in case["evidence"]["direct_transfer"]
+    assert [e["kind"] for e in events] == ["evidence_revalidated"]
+
+
+def test_the_rule_never_lifts_a_reason_it_did_not_give():
+    case = opened()
+    case["evidence"] = {"direct_transfer": _from_day("direct_transfer", "2026-10-01",
+                                                     invalid_reason="not a wallet: token contract")}
+    assert cases.void_pre_fix(case, at_ms=T0, origin="live") == []
+    assert case["evidence"]["direct_transfer"]["invalid_reason"] == "not a wallet: token contract"

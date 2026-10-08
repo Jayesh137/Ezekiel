@@ -75,6 +75,16 @@ def rejudge_all(cases: dict, activity_table: dict | None, config: dict, *, at_ms
     return events
 
 
+def void_pre_fix_all(cases: dict, *, at_ms: int, origin: str, blocked=frozenset()) -> list:
+    """`cases.void_pre_fix` on every readable case. It needs no measurement, so it runs
+    whether or not the activity table can be read."""
+    events: list = []
+    for address, case in cases.items():
+        if address not in blocked:
+            events += casefile.void_pre_fix(case, at_ms=at_ms, origin=origin)
+    return events
+
+
 def apply_roster(cases: dict, roster: dict, config: dict, *, at_ms: int, origin: str,
                  tokens: set | None = None, refuted_by: dict | None = None,
                  blocked=frozenset(), rejected: dict | None = None) -> dict:

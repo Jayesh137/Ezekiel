@@ -553,3 +553,17 @@ row and rules, incident-log entry, `ARCHITECTURE.md` §8).
   one,** as in the roster's `services_from_activity`: the casebook's own `portfolio` read
   or the roster's `userRole` (anything but missing). Code on another chain does not unmake
   an account. No such counterpart existed when this landed.
+- **What only the 2026-09-10 rosters reported no longer counts** (`cases.void_pre_fix`, every
+  run and at the end of the backfill). Every roster that day (the first in git, 06:27-15:33
+  UTC) predates its fixes: counterfeit tokens priced as real (07:37), and token quantities
+  booked as dollars (1,030,689,918 MAX as $1.03B), records counted three times and contracts
+  read as deposit addresses (17:54). The next roster ran the fixed code (2026-09-11 15:59),
+  so `last_seen == "2026-09-10"` marks evidence only the faulty rosters reported. Money,
+  `linkage_graph` and `amount_correlation` items like that gain `invalid_reason`; a peak
+  taken that day is dropped, and the `evidence_peak_voided` event keeps the figure; the
+  reason line names the kind instead of repeating a void amount; a later report lifts it.
+  Replayed on `main`'s casebook (2026-10-08 20:53): 36 items invalidated (32 direct
+  transfers, 4 linkage), 23 peaks voided, and no case's central or now band moved. Only
+  ceilings fell (23 cases), so ties at the base odds reorder: `0x207700bd...` (the $1.03B)
+  and three `0x160...` look-alikes credited with counterfeit USDC went from ranks 84-109 to
+  about 605.

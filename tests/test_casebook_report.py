@@ -1,6 +1,6 @@
 """The index a phone, a dashboard and a reader in a year all read (spec §11)."""
 
-from src.casebook import report, score
+from src.casebook import cases, report, score
 
 A, B, C = ("0x" + c * 40 for c in "abc")
 
@@ -178,3 +178,11 @@ def test_every_way_evidence_ends_leaves_the_case_resting_on_its_record():
     both = case(B, {"amount_correlation": entry("amount_correlation", "lapsed", strength=0.9),
                     "two_way_flow": entry("two_way_flow")})
     assert not any("rests on its record" in check for check in report.next_checks(both))
+
+
+def test_a_case_resting_only_on_that_days_money_never_repeats_its_void_figure():
+    item = {**entry("direct_transfer", "historical",
+                    summary="Moved money with the target (received $0, sent $1,030,689,919)"),
+            "invalid_reason": cases.PRE_FIX_REASON}
+    why = build({B: case(B, {"direct_transfer": item})})["cases"][0]["why"]
+    assert "1,030,689,919" not in why and "no longer counts" in why
