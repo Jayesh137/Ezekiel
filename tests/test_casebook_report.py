@@ -94,3 +94,17 @@ def test_rejected_are_carried_newest_first_and_bounded():
     assert len(index["rejected"]) == report.MAX_REJECTED_SHOWN
     assert index["rejected"][0]["last_seen"] >= index["rejected"][-1]["last_seen"]
     assert index["counts"]["rejected"] == report.MAX_REJECTED_SHOWN + 10
+
+
+def test_a_case_scored_through_its_cluster_says_whose_evidence_it_is():
+    # Measured 2026-10-08: a sub-account with no evidence of its own ranked 6th on its
+    # family's dormancy handoff, and its headline read "Opened by tier:PROBABLE".
+    group = {"operator_group": {"master": A, "subaccounts": [B]}}
+    cases = {A: case(A, {"dormancy_handoff": entry("dormancy_handoff", strength=0.49,
+                                                   summary="First active 2 day(s) into a 10-day silence")},
+                     links=group),
+             B: case(B, {}, links={**group, "subaccount_of": A})}
+    rows = {r["address"]: r for r in build(cases)["cases"]}
+    assert rows[B]["headline"].startswith(
+        f"One operator with {A[:10]}... (2 accounts): First active 2 day(s) into a 10-day silence")
+    assert rows[A]["headline"].startswith("First active 2 day(s) into a 10-day silence")

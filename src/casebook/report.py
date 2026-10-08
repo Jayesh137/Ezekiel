@@ -62,24 +62,54 @@ def _scored(case: dict) -> list[dict]:
             if isinstance(e, dict) and e.get("kind") not in model.CONTEXT_KINDS]
 
 
-def headline(case: dict) -> str:
-    """Why it is a suspect, in one line, and where it stands on Hyperliquid."""
+def best_item(case: dict) -> dict | None:
+    """The case's own strongest supporting item: what counts now, else what it once had."""
     items = _scored(case)
-    best = None
-    for band_index in (1, 2):                      # what counts now, else what it once had
+    for band_index in (1, 2):
         ranked = [(score.item_values(e)[band_index], e) for e in items]
         ranked = [(v, e) for v, e in ranked if v > 0]
         if ranked:
-            best = max(ranked, key=lambda pair: pair[0])[1]
-            break
+            return max(ranked, key=lambda pair: pair[0])[1]
+    return None
+
+
+def _why(item: dict) -> str:
+    why = item.get("summary") or model.KINDS.get(item.get("kind"), {}).get("label") or item.get("kind")
+    if item.get("status") not in ("current", "standing"):
+        why = f"{why} ({item.get('status')})"
+    return why
+
+
+def headline(case: dict, cluster_note: str | None = None) -> str:
+    """Why it is a suspect, in one line, and where it stands on Hyperliquid. A case
+    with no evidence of its own says whose evidence in its operator cluster it shares."""
+    best = best_item(case)
     if best is not None:
-        why = best.get("summary") or model.KINDS.get(best.get("kind"), {}).get("label") or best.get("kind")
-        if best.get("status") not in ("current", "standing"):
-            why = f"{why} ({best.get('status')})"
+        why = _why(best)
+    elif cluster_note:
+        why = cluster_note
     else:
         reasons = (case.get("roster") or {}).get("reasons") or []
         why = reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])
     return f"{why} - {hl_text(case)}"
+
+
+def cluster_notes(cases: dict, scores: dict) -> dict[str, str]:
+    """cluster id -> "One operator with <member> (<n> accounts): <its strongest evidence>",
+    from the member whose own evidence is strongest (spec §7.5)."""
+    members: dict[str, list] = {}
+    for address, s in scores.items():
+        if s.get("cluster") and address in cases:
+            members.setdefault(s["cluster"], []).append(address)
+    notes = {}
+    for cid, group in members.items():
+        scored = [(score.item_values(item)[1] or score.item_values(item)[2] * 1e-3, address, item)
+                  for address in sorted(group)
+                  for item in [best_item(cases[address])] if item is not None]
+        if scored:
+            _, address, item = max(scored, key=lambda t: t[0])
+            notes[cid] = f"One operator with {address[:10]}... ({len(group)} accounts): {_why(item)}"
+    return notes
 
 
 def next_checks(case: dict) -> list[str]:
@@ -119,7 +149,8 @@ def family_cells(case_score: dict, case: dict) -> dict:
             for family, values in (case_score.get("families") or {}).items()}
 
 
-def index_row(case: dict, case_score: dict, rank: int | None) -> dict:
+def index_row(case: dict, case_score: dict, rank: int | None,
+              cluster_note: str | None = None) -> dict:
     statuses: dict[str, int] = {}
     for e in _scored(case):
         status = e.get("status") or "current"
@@ -135,7 +166,7 @@ def index_row(case: dict, case_score: dict, rank: int | None) -> dict:
         "solo_central": case_score.get("solo_central"), "cluster": case_score.get("cluster"),
         "cluster_size": case_score.get("cluster_size") or 1,
         "families": family_cells(case_score, case),
-        "headline": headline(case),
+        "headline": headline(case, cluster_note),
         "tier": roster.get("tier"), "peak_tier": roster.get("peak_tier"),
         "opened_at": case.get("opened_at"), "last_change": case.get("last_change"),
         "hl": {"on_hl": hl.get("on_hl"), "role": (hl.get("roster") or {}).get("role"),
@@ -156,9 +187,14 @@ def build_index(cases: dict, scores: dict, *, rejected: dict, run: dict, target:
     known = ordered(lambda c: c.get("known") and not c.get("excluded"))
     unknown = ordered(lambda c: not c.get("known") and not c.get("excluded"))
     excluded = ordered(lambda c: bool(c.get("excluded")))
-    rows = [index_row(cases[a], scores[a], None) for a in known]
-    rows += [index_row(cases[a], scores[a], i + 1) for i, a in enumerate(unknown)]
-    rows += [index_row(cases[a], scores[a], None) for a in excluded]
+    notes = cluster_notes(cases, scores)
+
+    def row(a, rank):
+        return index_row(cases[a], scores[a], rank, notes.get(scores[a].get("cluster")))
+
+    rows = [row(a, None) for a in known]
+    rows += [row(a, i + 1) for i, a in enumerate(unknown)]
+    rows += [row(a, None) for a in excluded]
     rejected_rows = sorted((r for r in (rejected or {}).values() if isinstance(r, dict)),
                            key=lambda r: (r.get("last_seen") or "", r.get("address") or ""),
                            reverse=True)[:MAX_REJECTED_SHOWN]
