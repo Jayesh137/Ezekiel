@@ -99,6 +99,7 @@ trading style. Never promote a wallet on one vector alone.
 | Funding provenance | `src/boundary/provenance.py`, `scripts/run_provenance.py` (trace.yml) | Large new money into any account (fresh Bridge2 deposits ≥$100K, the Circle pool, newborns, roster leads, dormancy handoffs, `route_unknown` matches) traced back ≤2 hops through its own HL ledger to its first boundary — Bridge2 depositor, Circle source, Unit, HyperEVM, an HL send — and joined against the perimeter. Hop-1 core/identity → CRITICAL with a `transfer` vote; any other member of weight ≥0.6 → HIGH, evidence only; his exchange family → `same_exchange` evidence. Owns the complete Bridge2 deposit pool (`data/provenance/bridge_deposits.json`, 30 days, ≥$10K) |
 | Perimeter | `src/boundary/perimeter.py`, `scripts/build_perimeter.py` (trace.yml) | His world as ONE lookup table of measured roles and weights — core 1.0 (config), deposit 1.0 (sentinels + engine deposit addresses), identity 1.0 (Solana), sink/funder 0.6 (measured quiet only), associate 0.3 (≥$1M both ways, never alerts) — each put to HL (perp, spot, portfolio; strict). **Never built from a roster tier**: the roster calls his deposit addresses INFRASTRUCTURE, and reading that as "service" dropped all four (dry run, 2026-10-06). Exchange families (the hot wallets behind each deposit address) feed provenance |
 | Re-scoring roster leads | `scanner.roster_rescore_targets` | Priority source 7: up to 25 roster leads (operator list pinned) and 10 stale unvetoed scores ≥0.65 re-scored every scan, so behaviour can corroborate what dormancy, linkage or a sentinel found. Not corroboration by itself |
+| Casebook | `src/casebook/`, `scripts/update_casebook.py` (trace.yml), `scripts/casebook.py`, `scripts/backfill_casebook.py` | Every wallet ever suspected, kept forever in `data/casebook/` (a case file each, a dated event log), seeded from all 592 roster versions. Evidence that lapses is marked, never deleted: current / standing (protocol fact) / lapsed / refuted (a detector re-checked) / historical / invalidated. Ranked by Bayesian log-odds over a 1:1,000 prior from a declared LR table (`latest.json` -> `model`; only the study's tooling LR is measured): bands now / central (rank key) / ceiling; a family never sums, a second family in a category counts half, evidence against subtracts. Re-reads due suspects on HL (`portfolio`) and alerts a suspect waking (CRITICAL in his unusual silence); pins its best 8 HL suspects into every per-wallet detector. Casts no vote, changes no tier. `python scripts/casebook.py top`; dashboard Casebook page; phone Ranked tab |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -112,6 +113,7 @@ standing state and the rule each incident taught.
 
 ## Where the hunt stands (read the roster, never this list, for a tier)
 
+- **The ranked suspects live in the casebook** (`data/casebook/latest.json`, `python scripts/casebook.py top`, the dashboard's Casebook page, the phone's Ranked tab), never in this list. At its backfill (2026-10-08): 831 cases from 592 roster versions; his known wallets rank 3rd on evidence alone; the four September leads rest on history plus a current style veto (below the prior; ceiling up to ~35%); the strongest current HL suspects were the `0xb2f7374b…`/`0xd4758770…`/`0x4196dc4a…` sub-account family ($22.5M, born inside a 10-day silence of his) and `0x3b2d7db2…`. Rule on a case with `config.casebook_rulings`.
 - **Where his money goes (decoded 2026-09-10, not inferred):** $66.5M "to
   infrastructure" at the CCTP extension was him depositing into his own HL
   account through Circle; $22.75M went to a Solana wallet of his (`2xm4bb8K…`);
@@ -255,6 +257,8 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   before pushing.
 - **A number measured under one access pattern does not size another**, and
   check a commit landed with `merge-base --is-ancestor`, not a log window.
+- **A detector's latest.json is a reading, not a memory.** Each is rewritten whole and the roster is rebuilt from scratch, so a lapsed lead becomes indistinguishable from strangers: on 2026-10-08 the four best September leads sat at WATCH with no vectors and no reasons. What must survive a lapse goes in the casebook, which records whether a detector refuted it or only stopped looking. Backfilled history counts only in the ceiling (early votes were retracted).
+- **An address with no key is never a suspect** (`src/not_wallets.py`): token contracts, precompiles and HyperCore system addresses held detector slots (USDC on Base was #12 of 40). `0x2222…2222` is HYPE's system address and `0x5555…5555` WHYPE: never use them as test wallets.
 - **A reference that cannot produce a statistic is unmeasured, never a
   non-match.** The candidate study counted strangers with no rhythm as
   non-matches; 73 of 74 ran no slicer, so T2 measured only "runs a slicer" and

@@ -490,3 +490,29 @@ row and rules, incident-log entry, `ARCHITECTURE.md` §8).
 - **Successor investigations as a source** — research-only, `insufficient_data` for 100 of 100.
 - **Changing tiers or votes from the casebook** — evidence memory is not evidence; the roster stays
   the only voter.
+
+## 18. As implemented (2026-10-08)
+
+- **The index is `data/casebook/latest.json`,** not `index.json`: every watched feed is a
+  `latest.json` (feed health and the dashboard's feed list both require it).
+- **A transfer vote with no valued flow with the target** (cast through his config wallets,
+  or on an unpriced movement) says "Observed transfer with the target / one of his wallets
+  (N movements, M unpriced)" and carries no strength: the real backfill showed "received $0,
+  sent $0" for them, and $0 is not the amount of an unpriced movement (rule 6).
+- **Index rows carry `why`** (the reason alone) beside `headline` (reason plus the
+  Hyperliquid line, for the CLI and alerts), because the phone card and the dashboard show
+  the Hyperliquid line in their own place. The reason is the case's own current evidence,
+  else its operator cluster's current evidence (naming the member), else its own history,
+  else the roster's words.
+- **The roster grades only well-formed addresses as keyless;** malformed test identifiers
+  were never its question. Canonical tokens were confirmed on Blockscout (Ethereum,
+  Optimism) and by reading `symbol()`/`name()` on-chain (Arbitrum, Base, Polygon, WHYPE on
+  HyperEVM); three test fixtures had used HYPE's system address or WHYPE as wallets.
+- **Measured:** the backfill read 592 roster versions (1 unreadable) in 7 minutes at ~63 MB
+  into 831 cases, 3,264 events, 5.4 MB. Recall: his known wallets rank 3rd among 697 unknown
+  cases on evidence alone; coherence: the unknown cases' probabilities sum to 0.78. A live
+  dry run on the newest roster read 30 suspects on Hyperliquid at ~2 s each (0 failures, no
+  events: a first read is a baseline) and wrote 228 case files in ~110 s including the
+  60 s probe budget.
+- **The committed casebook** is that backfill plus one live merge of the 2026-10-08 02:31
+  roster with those 30 reads, so the first run on `main` consumes the next roster.
