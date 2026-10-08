@@ -461,7 +461,7 @@ and the `.evidence` fields `hl_total_value` (total account value, spot + perp),
 
 **`data/casebook/latest.json`** (the Ranked tab): `computed_at`, `counts.unknown`, and for
 each of `cases[]`: `.address`, `.rank`, `.known`, `.excluded`, `.ruling`, `.p`, `.p_now`,
-`.p_ceiling`, `.families` (`{family: [now, central, ceiling, state]}`), `.headline`,
+`.p_ceiling`, `.families` (`{family: [now, central, ceiling, state]}`), `.why` (falling back to `.headline`),
 `.cluster_size`, `.last_change`, and `.hl.on_hl`, `.hl.value`, `.hl.month_volume`,
 `.hl.probed_at`. A missing or unreadable file shows "Casebook unavailable" on that tab only.
 

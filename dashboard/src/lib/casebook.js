@@ -83,6 +83,12 @@ export function familyChips(row) {
 		.sort((a, b) => Math.abs(b.central || b.ceiling) - Math.abs(a.central || a.ceiling));
 }
 
+/** Why it ranks where it does, without the Hyperliquid line the card shows apart.
+ *  An index written before `why` existed still reads, through its full headline. */
+export function reasonLine(row) {
+	return row?.why || row?.headline || '';
+}
+
 /** One line about the account on Hyperliquid. */
 export function hlLine(row) {
 	const hl = row?.hl || {};

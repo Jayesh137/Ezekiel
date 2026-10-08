@@ -81,24 +81,26 @@ def _why(item: dict) -> str:
     return why
 
 
-def headline(case: dict, cluster_note: tuple | None = None) -> str:
-    """Why it ranks where it does, in one line, and where it stands on Hyperliquid:
-    its own current evidence first, then the current evidence of its operator
-    cluster (whose member it names), then its own history, then the roster's words."""
+def reason(case: dict, cluster_note: tuple | None = None) -> str:
+    """Why it ranks where it does, in one line: its own current evidence first, then
+    the current evidence of its operator cluster (whose member it names), then its own
+    history, then the roster's words."""
     current = best_item(case, (1,))
     note_address, note = cluster_note or (None, None)
     if current is not None:
-        why = _why(current)
-    elif note and note_address != case.get("address"):
-        why = note
-    else:
-        past = best_item(case, (2,))
-        if past is not None:
-            why = _why(past)
-        else:
-            reasons = (case.get("roster") or {}).get("reasons") or []
-            why = reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])
-    return f"{why} - {hl_text(case)}"
+        return _why(current)
+    if note and note_address != case.get("address"):
+        return note
+    past = best_item(case, (2,))
+    if past is not None:
+        return _why(past)
+    reasons = (case.get("roster") or {}).get("reasons") or []
+    return reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])
+
+
+def headline(case: dict, cluster_note: tuple | None = None) -> str:
+    """The reason and where it stands on Hyperliquid, for the CLI and the alerts."""
+    return f"{reason(case, cluster_note)} - {hl_text(case)}"
 
 
 def cluster_notes(cases: dict, scores: dict) -> dict[str, tuple]:
@@ -177,6 +179,7 @@ def index_row(case: dict, case_score: dict, rank: int | None,
         "solo_central": case_score.get("solo_central"), "cluster": case_score.get("cluster"),
         "cluster_size": case_score.get("cluster_size") or 1,
         "families": family_cells(case_score, case),
+        "why": reason(case, cluster_note),
         "headline": headline(case, cluster_note),
         "tier": roster.get("tier"), "peak_tier": roster.get("peak_tier"),
         "opened_at": case.get("opened_at"), "last_change": case.get("last_change"),

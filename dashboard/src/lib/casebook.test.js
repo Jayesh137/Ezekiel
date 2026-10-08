@@ -116,3 +116,11 @@ test('seen-time storage survives a storage that throws', () => {
 	assert.equal(readSeen(ok), '2026-10-08T00:00:00Z');
 	assert.equal(mem.has(SEEN_KEY), true);
 });
+
+import { reasonLine } from './casebook.js';
+
+test('reasonLine prefers the reason alone and falls back to the full headline', () => {
+	assert.equal(reasonLine({ why: 'Paid his deposit', headline: 'Paid his deposit - $6 on Hyperliquid' }), 'Paid his deposit');
+	assert.equal(reasonLine({ headline: 'Older index - $6 on Hyperliquid' }), 'Older index - $6 on Hyperliquid');
+	assert.equal(reasonLine({}), '');
+});

@@ -4,7 +4,7 @@
 	import Addr from '$lib/Addr.svelte';
 	import {
 		caseRows, familyChips, hlLine, pct, bandText, money, calibrationLines, waterfall, timeline,
-		lifeChart, STATUS_LABEL
+		lifeChart, reasonLine, STATUS_LABEL
 	} from '$lib/casebook.js';
 
 	let index = null;
@@ -133,11 +133,11 @@
 							{:else}
 								<span class="text-muted">—</span>
 							{/each}
-							<div class="headline">{r.headline}</div>
+							<div class="headline">{reasonLine(r)}</div>
 						</td>
 						<td class="hl">{hlLine(r)}</td>
-						<td>{r.peak_tier ?? '—'}</td>
-						<td>{(r.opened_at || '').slice(0, 10) || '—'}</td>
+						<td class="date">{r.peak_tier ?? '—'}</td>
+						<td class="date">{(r.opened_at || '').slice(0, 10) || '—'}</td>
 					</tr>
 					<tr class="detail" id={detailId(r.address)} hidden={!isOpen}>
 						<td colspan="7">
@@ -285,6 +285,7 @@
 	.chip.faded { opacity: 0.55; }
 	.headline { font-size: 0.8rem; color: var(--text-secondary); max-width: 34rem; }
 	.hl { font-size: 0.82rem; }
+	.date { white-space: nowrap; }
 	.detail td { background: rgba(255, 255, 255, 0.02); }
 	.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
 	.steps td { padding: 0.2rem 0.4rem; font-size: 0.85rem; }

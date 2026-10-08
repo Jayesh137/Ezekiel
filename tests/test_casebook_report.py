@@ -120,3 +120,13 @@ def test_current_cluster_evidence_explains_a_rank_before_own_history():
     rows = {r["address"]: r for r in build(cases)["cases"]}
     assert rows[A]["headline"].startswith(f"One operator with {B[:10]}... (2 accounts): born in a silence")
     assert rows[B]["headline"].startswith("born in a silence")
+
+
+def test_a_row_carries_its_reason_apart_from_the_hyperliquid_line():
+    # The phone card and the dashboard show the Hyperliquid line in their own place;
+    # the headline repeated it. `why` is the reason alone (2026-10-08 render check).
+    c = case(B, {"private_deposit_address": entry("private_deposit_address", summary="Paid his deposit")},
+             hl={"on_hl": True, "total_value": 6.0, "month_volume": 0.0, "last_ok_at": "x"})
+    row = build({B: c})["cases"][0]
+    assert row["why"] == "Paid his deposit"
+    assert row["headline"] == "Paid his deposit - $6 on Hyperliquid, no trades in 30 days"

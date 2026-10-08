@@ -3,7 +3,7 @@
 	// address opens Hypurrscan, and Copy hands the address to the page's copy helper.
 	import { createEventDispatcher } from 'svelte';
 	import { addressUrl, shortAddr } from '$lib/api.js';
-	import { pct, bandText, familyChips, hlLine } from '$lib/casebook.js';
+	import { pct, bandText, familyChips, hlLine, reasonLine } from '$lib/casebook.js';
 	import Avatar from '$lib/ui/Avatar.svelte';
 
 	export let c;
@@ -31,7 +31,7 @@
 			<span>{bandText(c)}</span>
 		</div>
 	</header>
-	<p class="why">{c.headline}</p>
+	<p class="why">{reasonLine(c)}</p>
 	{#if chips.length}
 		<div class="chips">
 			{#each chips as ch}
