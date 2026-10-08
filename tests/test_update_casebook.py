@@ -233,3 +233,15 @@ def test_an_unreadable_state_is_set_aside_reported_and_replaced(tmp_path):
     kept = list(store.root(tmp_path).glob("state.unreadable-*.json"))
     assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == "{broken"
     assert json.loads(state.read_text(encoding="utf-8"))["roster_computed_at_ms"]
+
+
+def test_the_run_voids_what_only_the_2026_09_10_rosters_reported_without_an_activity_table(tmp_path):
+    write_roster(tmp_path, "2026-10-08T00:00:00+00:00", [LEAD])
+    run(tmp_path, probe=False)
+    path = store.case_path(A, tmp_path)
+    case = json.loads(path.read_text())
+    case["evidence"]["direct_transfer"].update(status="historical", live=False, last_seen="2026-09-10")
+    path.write_text(json.dumps(case))
+    run(tmp_path, probe=False, now=NOW + DAY)          # the same roster: stale, nothing merged
+    entry = json.loads(path.read_text())["evidence"]["direct_transfer"]
+    assert entry["invalid_reason"].startswith("reported only by the 2026-09-10 rosters")

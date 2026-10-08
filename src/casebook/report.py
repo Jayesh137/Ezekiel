@@ -8,7 +8,7 @@ other case ranked by its central estimate, then excluded cases. Generated text i
 from __future__ import annotations
 
 from src.casebook import model, score
-from src.casebook.cases import effective_status
+from src.casebook.cases import PRE_FIX_REASON, effective_status
 
 INDEX_SCHEMA = "casebook-index/1"
 MAX_REJECTED_SHOWN = 500
@@ -116,7 +116,9 @@ def reason(case: dict, cluster_note: tuple | None = None) -> str:
     voided = [e for e in _scored(case) if e.get("invalid_reason")]
     if voided:    # before the roster's words, which may repeat the claim itself
         item = max(voided, key=lambda e: model.band(e.get("kind"), e.get("strength"), e.get("facts"))[1])
-        summary = item.get("summary") or model.KINDS.get(item.get("kind"), {}).get("label") or item.get("kind")
+        label = model.KINDS.get(item.get("kind"), {}).get("label") or item.get("kind")
+        # That day's rosters valued money wrongly, so the line names the kind, not their figures.
+        summary = label if item["invalid_reason"] == PRE_FIX_REASON else (item.get("summary") or label)
         return f"{summary}, which no longer counts: {item['invalid_reason']}"
     reasons = (case.get("roster") or {}).get("reasons") or []
     return reasons[0] if reasons else "Opened by " + ", ".join(case.get("opened_by") or ["unknown"])

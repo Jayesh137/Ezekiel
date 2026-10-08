@@ -189,6 +189,46 @@ def rejudge(case: dict, verdicts: dict, *, at_ms: int, origin: str) -> list:
     return events
 
 
+# The rosters of 2026-09-10 (the first in git, 06:27-15:33 UTC) were all computed before that
+# day's fixes: counterfeit tokens priced as real (6d215db6c4, 07:37 UTC); token quantities
+# booked as dollars (1,030,689,918 MAX as $1.03B), records counted up to three times and
+# contracts read as private deposit addresses (8026d6fadf, 17:54 UTC). The next roster
+# (2026-09-11 15:59 UTC) ran the fixed code, so an item last seen that day is one only the
+# faulty rosters reported. Kinds those faults could not touch keep what the day reported.
+PRE_FIX_DAY = "2026-09-10"
+PRE_FIX_KINDS = frozenset(k for k, spec in model.KINDS.items() if spec["family"] == "money") | {
+    "linkage_graph", "amount_correlation"}
+PRE_FIX_REASON = ("reported only by the 2026-09-10 rosters, built before that day's fixes (counterfeit "
+                  "tokens priced as real, token quantities as dollars, records counted 3x, contracts as "
+                  "deposit addresses)")
+
+
+def void_pre_fix(case: dict, *, at_ms: int, origin: str) -> list:
+    """Evidence only the 2026-09-10 rosters reported stops counting, and a peak taken from them
+    is dropped (its event keeps the figure). Reversible like `rejudge`: a later report of the
+    item lifts the reason, and a reason this rule did not give is never touched."""
+    events = []
+    for key, entry in (case.get("evidence") or {}).items():
+        if not isinstance(entry, dict) or entry.get("kind") not in PRE_FIX_KINDS:
+            continue
+        reason = entry.get("invalid_reason")
+        if entry.get("last_seen") == PRE_FIX_DAY:
+            if not reason:
+                entry["invalid_reason"] = PRE_FIX_REASON
+                events.append(event(at_ms, case["address"], "evidence_invalidated", origin, key=key,
+                                    reason=PRE_FIX_REASON))
+        elif reason == PRE_FIX_REASON:
+            entry.pop("invalid_reason")
+            events.append(event(at_ms, case["address"], "evidence_revalidated", origin, key=key))
+        peak_at = entry.get("peak_at")
+        if isinstance(peak_at, str) and peak_at[:10] == PRE_FIX_DAY:
+            events.append(event(at_ms, case["address"], "evidence_peak_voided", origin, key=key,
+                                summary=entry.get("peak_summary"), strength=entry.get("peak_strength"),
+                                taken_at=peak_at, reason=f"taken from a {PRE_FIX_DAY} roster"))
+            entry["peak_strength"] = entry["peak_summary"] = entry["peak_at"] = None
+    return events
+
+
 def update_roster(case: dict, row: dict, at_ms: int, origin: str) -> list:
     """The roster's own view of the wallet: tier by day, peak, reasons, HL facts, links."""
     events: list = []

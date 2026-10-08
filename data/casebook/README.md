@@ -65,7 +65,7 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
 | `lapsed` | seen live, then absent 24 hours or more, cause unknown | no / half / yes |
 | `refuted` | absent after a detector re-checked the wallet and found nothing | no / no / yes |
 | `historical` | from the git-history backfill and not current when the casebook went live | no / no / yes |
-| `invalidated` | not stored as a status: an item with `invalid_reason`, whose address was since measured a service (busy, or a contract Hyperliquid does not know as an account) or has no key. Re-judged every run against `data/labels/address_activity.json`; a new measurement that passes the address clears it, and an address with no new measurement keeps its verdict | no / no / no |
+| `invalidated` | not stored as a status: an item with `invalid_reason`. Either its address was since measured a service (busy, or a contract Hyperliquid does not know as an account) or has no key — re-judged every run against `data/labels/address_activity.json`; a new measurement that passes the address clears it, and an address with no new measurement keeps its verdict — or it is money, linkage or correlation evidence that only the 2026-09-10 rosters reported, all built before that day's fixes (counterfeit tokens priced as real, token quantities booked as dollars, records counted three times, contracts read as deposit addresses); a later report of the item clears that one. A peak taken from those rosters is dropped, and its event keeps the figure | no / no / no |
 
 ## How the likelihood is computed
 

@@ -206,6 +206,7 @@ def run(config: dict, *, data_dir: Path, out_dir: Path, probe: bool = True, fetc
         out["activity"] = f"unreadable: {activity_error or 'not a table'}; nothing re-judged"
     events += ingest.rejudge_all(cases, activity, config, at_ms=now_ms, origin="live",
                                  tokens=tokens, blocked=blocked)
+    events += ingest.void_pre_fix_all(cases, at_ms=now_ms, origin="live", blocked=blocked)
     scores = score.score_all(cases, extract.cluster_of(config))
     if probe and cases:
         found, out["probes"] = probe_cases(cases, scores, now_ms=now_ms, fetch=fetch,
