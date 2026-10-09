@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "id": "polygon:0xcea5243a703702a6de34598f29527d0ced085c94ea34a75f49becdd38fad39e0:erc20:0",
+      "original_funder": "0x6b81fbb949866890290f8659525e1e6676ca85eb",
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "source_chain": "polygon",
+      "source_tx": "0xcea5243a703702a6de34598f29527d0ced085c94ea34a75f49becdd38fad39e0",
+      "amount_usd": null,
+      "ts_ms": 1791521965000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "polygon:0xcea5243a703702a6de34598f29527d0ced085c94ea34a75f49becdd38fad39e0:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "monad:0xc67abe38293768003ea94a7105d5bfc28e82f72a76d39b98a1911b51fb76ecf7:erc20:0",
       "original_funder": "0x0000000000000000000000000000000000000000",
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
@@ -14375,20 +14389,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "arbitrum:0x6fe24ef90f9d3f7b473cf04fd648efd4a14c07b363c906a4b01af4ab2d82d4a5:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "arbitrum:0xa395ca219c47ea202c7812ad579e9031bf65f3e101c6e4921c8102d571c88cd6:erc20:0",
-      "original_funder": "0x0000000000000000000000000000000000000000",
-      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
-      "source_chain": "arbitrum",
-      "source_tx": "0xa395ca219c47ea202c7812ad579e9031bf65f3e101c6e4921c8102d571c88cd6",
-      "amount_usd": 999999.6,
-      "ts_ms": 1753596516000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "arbitrum:0xa395ca219c47ea202c7812ad579e9031bf65f3e101c6e4921c8102d571c88cd6:erc20:0"
       ],
       "confirms_owner": false
     }
@@ -34397,6 +34397,17 @@
   ],
   "discoveries": [
     {
+      "wallet": "0x6b81fbb949866890290f8659525e1e6676ca85eb",
+      "source": "funding_route",
+      "positive": true,
+      "event_id": "polygon:0xcea5243a703702a6de34598f29527d0ced085c94ea34a75f49becdd38fad39e0:erc20:0",
+      "parent_event_ids": [
+        "polygon:0xcea5243a703702a6de34598f29527d0ced085c94ea34a75f49becdd38fad39e0:erc20:0"
+      ],
+      "assertion": "observed_transfer",
+      "confirms_owner": false
+    },
+    {
       "wallet": "0x698e5075777db9bff209c9573abfd8df4cf4da27",
       "source": "funding_route",
       "positive": true,
@@ -45384,29 +45395,18 @@
       ],
       "assertion": "observed_transfer",
       "confirms_owner": false
-    },
-    {
-      "wallet": "0x0d562e14310e3494b9d60355b1e3c28ff1ffe11e",
-      "source": "funding_route",
-      "positive": true,
-      "event_id": "ethereum:0xac7b3a71df8324faa3e7d09c9a8b1d8219f5250869e2bd2f4bf5661be0d907b8:erc20:0",
-      "parent_event_ids": [
-        "ethereum:0xac7b3a71df8324faa3e7d09c9a8b1d8219f5250869e2bd2f4bf5661be0d907b8:erc20:0"
-      ],
-      "assertion": "observed_transfer",
-      "confirms_owner": false
     }
   ],
   "coverage": {
-    "transfer_records": 5738,
-    "circle_events": 21365
+    "transfer_records": 5739,
+    "circle_events": 18619
   },
   "counts": {
-    "routes": 3230,
+    "routes": 3231,
     "unresolved": 2514,
-    "discoveries": 2155
+    "discoveries": 2156
   },
-  "computed_at_ms": 1791519134134,
+  "computed_at_ms": 1791523496220,
   "authority": {
     "intervals": [
       {
@@ -57180,6 +57180,10 @@
     "queries": 20,
     "errors": [
       {
+        "tx": "0xa66961f98c5b4bccd753630122dde13cefd44a86ecd5792e7b9a59fd2614a07a",
+        "reason": "no validated complete V2 message"
+      },
+      {
         "tx": "0xcf95ed986af9cc9baf4500627206fd5c751bb41b58706556e95ada3623aebad9",
         "reason": "no validated complete V2 message"
       },
@@ -57254,15 +57258,11 @@
       {
         "tx": "0x5c335965b1f4fdb83e969e339b8bec1a9811774ac53979783eda4f267b9e9b43",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0xf0767047d9f2a817a7256679326a1ce94e3b9c0c7188d23c9aecb7d61c2bcb3b",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 21365,
+    "circle_rows_read": 18619,
     "store_read_limit": 100000
   }
 }
