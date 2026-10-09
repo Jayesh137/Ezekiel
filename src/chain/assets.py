@@ -239,7 +239,7 @@ def canonical_symbol(contract: str | None, chain: str | None,
 
 
 
-# Cyrillic and Greek letters that are visually identical to Latin ones. Used
+# Letters from other scripts that are visually identical to Latin ones. Used
 # ONLY to detect a disguise, never to price: folding `USDС` (Cyrillic С) onto
 # `USDC` for pricing would book a counterfeit at par, which is rule 2's $3.07B
 # lesson. See SYMBOL_HOMOGLYPHS above for the pricing side, which stays a
@@ -252,6 +252,9 @@ _CONFUSABLES = {
     "у": "Y", "Β": "B", "Ε": "E", "Η": "H", "Ι": "I",
     "Κ": "K", "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P",
     "Τ": "T", "Χ": "X",
+    # Measured 2026-10-08: a fake USDC spoofed "from" the target spelled with Lisu U,
+    # Armenian S and Cherokee D and C, padded with invisible Khmer vowels.
+    "ꓴ": "U", "Տ": "S", "Ꭰ": "D", "Ꮳ": "C",
 }
 
 

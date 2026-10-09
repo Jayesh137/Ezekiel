@@ -208,8 +208,10 @@ Each one cost a real finding or a real outage. The story is in the incident log.
 - **Never fit a tier to the story** — no hand promotion. Demotions are recorded
   (`peak_tier`, `tier_dropped_from`), never alerted.
 - **Votes need their own evidence bar:** `transfer` needs an observed transfer
-  with the target or through a config wallet with `self_flow_usd` ≥ $1K (reach
-  is `graph_reach_only`); behaviour votes only from the current
+  with the target that moved at least $1 MEASURED (dust and unpriced edges stay
+  edges for discovery, never votes: two ETH-dust leads were POSSIBLE on 2026-10-09),
+  or a config wallet with `self_flow_usd` ≥ $1K (reach is `graph_reach_only`;
+  the row carries `self_flow_usd`, so read it there, not off the target totals); behaviour votes only from the current
   `scoring_schema`; a shared funder votes only once MEASURED quiet; busy or
   contract addresses are services at tiering — **except an address HL knows as
   a trader**. **Replay a filter against production data before trusting it.**

@@ -2116,8 +2116,31 @@ run whether or not the roster lists them. All three spare a look-alike that move
 money with him (≥ $1K): it might be his own vanity wallet, the very thing hunted, and a
 human tells that apart from a poisoner he paid. The first version convicted every record
 on the anchor; the pre-push hook's `test_spam_ground_truth` caught it destroying a $1,000
-transfer, and the rule was narrowed rather than the test. Two gaps the same records exposed are
-left open, measured: the homoglyph fold does not map these Lisu/Armenian/Cherokee letters
-(`is_symbol_forgery` passed the fake USDC), and dust stored while its price was
-"unavailable" is never re-judged once repricing values it. **An anchor that has to turn
+transfer, and the rule was narrowed rather than the test. Two gaps the same records exposed were
+followed up the next day (below): the homoglyph fold now maps these Lisu/Armenian/Cherokee
+letters, and the dust turned out to matter only where its price was NEVER fetched. **An anchor that has to turn
 up in the same batch as its forgery is a net with a hole the size of a quiet day.**
+
+**Two leads voted on ETH dust whose price was never fetched (2026-10-09).** Asked to check
+every POSSIBLE lead whose transfer vote showed under $1K of money with the target, eleven
+came back from a query of the roster alone, and that count was wrong: the roster row
+carried the target totals but not `self_flow_usd`, the config-wallet money a two-hop
+vote rests on, and six of the eleven had moved $16K-$120M with his wallets; two more were
+real Hyperliquid sends to him ($963, $31) and one a sub-account of the account he paid
+$1M. Two were noise: `0x1606060b…` (1e-7 ETH to the target, 2026-06-01) and `0x3779a5d7…`
+(0.0001515 ETH, 2025-07-23), both stored `price_unavailable` and never repriced (the free
+price tier serves 365 days, and the 2026-06-01 group had never been asked). The graph keeps
+an unvalued edge on purpose, since discovery runs on edges, and `edge_passes_dust` lets an
+unknown value through; the vote read any edge with the target. Bounding the value with
+the highest cached price was considered and dropped: POL's nine cached days top out at
+$0.11, far under its history, so it would delete real transfers. Instead a transfer with
+the target now votes only from $1 MEASURED (`roster.DIRECT_MIN_USD`), the existing
+principle that an unvalued edge can never satisfy a value threshold; a $5 test transfer
+still votes and gas funding keeps its own linkage vote. Replayed on `main`: 12 graph nodes
+lose the vote, 171 keep it, none gains, and only those two change tier (POSSIBLE to WATCH;
+the rest are services or forgeries). The casebook now reads `graph_reach_only` without a
+transfer vote as a refutation, so their items end `refuted`, not `lapsed`. The row now
+carries `self_flow_usd`, and the homoglyph fold maps the measured letters. The repricing
+gap itself was smaller than recorded: the graph re-judges dust from the stored value every
+build, so a repriced record was always caught. **When a lead looks unbacked, read the
+record the vote was computed from, not the summary written beside it.**

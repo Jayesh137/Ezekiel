@@ -92,7 +92,8 @@ def test_transfer_plus_linkage_does_not_confirm_ownership(tmp_path, monkeypatch)
            transfer_graph=("nodes", [_node(
                confidence=0.88,
                evidence={"transfer_count": 376, "direct_from_target": True,
-                         "shared_deposit_address": True})]))
+                         "shared_deposit_address": True},
+               totals={"received_from_target_usd": 50_000.0, "sent_to_target_usd": 0})]))
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert set(row["vectors"]) == {"transfer", "linkage"}
     assert row["tier"] == roster.TIER_POSSIBLE
@@ -164,7 +165,8 @@ def test_rows_are_ordered_by_tier_then_vector_count(tmp_path, monkeypatch):
                _node(wallet=other, confidence=0.2),
                _node(confidence=0.88,
                      evidence={"transfer_count": 5, "direct_from_target": True,
-                                   "shared_deposit_address": True}),
+                                   "shared_deposit_address": True},
+                     totals={"received_from_target_usd": 50_000.0, "sent_to_target_usd": 0}),
            ]))
     rows = roster.build_roster({"target_wallet": TARGET})["wallets"]
     assert rows[0]["wallet"] == W
@@ -272,11 +274,29 @@ def test_a_two_hop_reach_through_a_stranger_casts_no_transfer_vote(tmp_path, mon
 
 
 def test_a_direct_transfer_with_the_target_still_votes(tmp_path, monkeypatch):
+    """Even a $5 test transfer: sending a little to a new wallet first is what a
+    migration looks like."""
     _setup(tmp_path, monkeypatch,
            transfer_graph=("nodes", [_node(evidence={"transfer_count": 1,
-                                                     "funded_target": True})]))
+                                                     "funded_target": True},
+                                           totals={"received_from_target_usd": 0,
+                                                   "sent_to_target_usd": 5.0})]))
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert row["vectors"] == ["transfer"]
+
+
+def test_a_direct_transfer_that_moved_no_measured_value_casts_no_vote(tmp_path, monkeypatch):
+    """Measured 2026-10-09: 0x1606060b... and 0x3779a5d7... were POSSIBLE on ETH dust to the
+    target (1e-7 and 0.0001515 ETH) whose price was never fetched. An edge we cannot value
+    stays an edge, for discovery; it cannot satisfy a vote's bar."""
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(evidence={"transfer_count": 2, "funded_target": True},
+                                           totals={"received_from_target_usd": 0,
+                                                   "sent_to_target_usd": 0, "edge_count": 2,
+                                                   "unvalued_edge_count": 2})]))
+    row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
+    assert "transfer" not in row["vectors"]
+    assert row["evidence"]["graph_reach_only"] is True
 
 
 def test_real_money_with_his_own_config_wallet_votes(tmp_path, monkeypatch):
@@ -313,3 +333,16 @@ def test_a_correlation_edge_path_to_the_target_is_not_a_transfer(tmp_path, monke
                                            evidence={"transfer_count": 9})]))
     row = roster.build_roster({"target_wallet": TARGET})["wallets"][0]
     assert "transfer" not in row["vectors"]
+
+
+def test_a_rows_evidence_shows_the_money_its_transfer_vote_rests_on(tmp_path, monkeypatch):
+    """Reading the roster alone, eight self-flow votes looked unbacked (2026-10-09): the
+    row carried the target totals but not the config-wallet flow the vote rested on."""
+    treasury = "0x" + "55" * 20
+    _setup(tmp_path, monkeypatch,
+           transfer_graph=("nodes", [_node(depth=2, path=[TARGET, treasury, W],
+                                           evidence={"transfer_count": 3,
+                                                     "self_flow_usd": 97_430.0})]))
+    row = next(r for r in roster.build_roster({"target_wallet": TARGET,
+                               "known_self_wallets": [treasury]})["wallets"] if r['wallet'] == W)
+    assert row["evidence"]["self_flow_usd"] == 97_430.0
