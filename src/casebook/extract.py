@@ -191,6 +191,10 @@ def extract_items(row: dict, config: dict) -> tuple[list[dict], set[str]]:
         add("direct_transfer", {"totals": totals, "depth": evidence.get("depth"),
                                 "chains": evidence.get("chains"), "reasons": reasons},
             summary, max(valued) if valued else None)
+    elif evidence.get("graph_reach_only") and "transfer" not in own:
+        # The graph re-read the wallet and found no transfer that meets the vote's bar
+        # (`roster.transfer_touches_cluster`): a refutation, not a lapse of unknown cause.
+        refutes.add("direct_transfer")
     if "hl_native" in own or (received is not None and sent is not None
                               and min(received, sent) >= TWO_WAY_MIN_USD):
         add("two_way_flow", {"received_from_target_usd": received, "sent_to_target_usd": sent,

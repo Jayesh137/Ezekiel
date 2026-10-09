@@ -227,3 +227,13 @@ def test_a_lookalike_the_roster_saw_move_real_money_with_him_is_admitted():
     row = {"wallet": forgery, "tier": "POSSIBLE", "vectors": ["transfer"],
            "evidence": {"totals": {"received_from_target_usd": 25_000.0, "sent_to_target_usd": 0}}}
     assert extract.classify_row(row, CONFIG)["status"] == "admitted"
+
+
+def test_a_graph_reach_without_a_transfer_vote_refutes_the_transfer_item():
+    # The graph re-read the wallet and found no transfer that meets the vote's bar:
+    # a refutation (spec §6.3), not a lapse with an unknown cause.
+    row = {"wallet": B, "tier": "WATCH", "vectors": [], "evidence": {"graph_reach_only": True}}
+    _, refutes = extract.extract_items(row, CONFIG)
+    assert "direct_transfer" in refutes
+    voted = {**row, "vectors": ["transfer"], "evidence": {}}
+    assert "direct_transfer" not in extract.extract_items(voted, CONFIG)[1]

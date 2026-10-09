@@ -157,3 +157,11 @@ def test_the_quarantine_pass_leaves_a_genuine_unpriced_token_alone():
 
     assert marked == 0
     assert recs[0]["spam"] is False
+
+
+def test_the_live_lisu_armenian_cherokee_usdc_is_a_forgery():
+    # Spoofed "from" the target on Arbitrum, 2026-10-08: Lisu U, Armenian S, Cherokee D
+    # and C, padded with invisible Khmer vowels.
+    forged = "\ua4f4\u17b5\u054f\u13a0\u17b5\u13e3"
+    assert assets.confusable_fold(forged) == "USDC"
+    assert assets.is_symbol_forgery(forged, FAKE, "arbitrum", CANONICAL) is True

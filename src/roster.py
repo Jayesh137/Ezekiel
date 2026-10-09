@@ -108,6 +108,9 @@ def linkage_from_first_funders(funders: dict, target: str,
 # wallet may vote. Poisoners move $0; the smallest genuine counterparty of
 # `0xf078969e…` measured on 2026-09-17 moved $97,430.
 SELF_FLOW_MIN_USD = 1_000.0
+# A transfer WITH the target votes from the dust bar up: below it, or unvalued, it is
+# the shape of poisoning dust, never money moved with him.
+DIRECT_MIN_USD = 1.0
 
 
 def forgery_reason(address: str, evidence: dict, ground: set) -> str | None:
@@ -152,12 +155,27 @@ def transfer_touches_cluster(node: dict, evidence: dict, known_self: set) -> boo
     path voted for every one of them. Config only, never a roster tier: ground
     truth is the operator's, and one inference must not mint another's vote.
 
+    A transfer with the target votes only when it moved a MEASURED amount of at
+    least `DIRECT_MIN_USD` (the dust bar): an edge we could not value stays an
+    edge, for discovery, but cannot satisfy a vote's bar, as it can never satisfy
+    any value threshold. Measured 2026-10-09: `0x1606060b…` and `0x3779a5d7…`
+    were POSSIBLE on 1e-7 and 0.0001515 ETH sent to the target, priced never. A $5
+    test transfer still votes; that is what a migration's first step looks like.
+
     A node that is merely reached keeps `graph_reach_only` as evidence: rule 7,
-    reach is never thrown away, it just does not vote. `node` and `known_self`
-    are kept in the signature for the callers that pass them.
+    reach is never thrown away, it just does not vote. `known_self` is kept in
+    the signature for the callers that pass it.
     """
     if evidence.get("direct_from_target") or evidence.get("funded_target"):
-        return True
+        totals = node.get("totals") if isinstance(node.get("totals"), dict) else {}
+        moved = 0.0
+        for key in ("received_from_target_usd", "sent_to_target_usd"):
+            try:
+                moved += float(totals.get(key) or 0)
+            except (TypeError, ValueError):
+                continue
+        if moved >= DIRECT_MIN_USD:
+            return True
     try:
         return float(evidence.get("self_flow_usd") or 0) >= SELF_FLOW_MIN_USD
     except (TypeError, ValueError):
@@ -695,6 +713,9 @@ def build_roster(config: dict | None = None) -> dict:
         e["is_service"] = bool(ev.get("is_service"))
         e["evidence"]["service_reason"] = ev.get("service_reason")
         e["evidence"]["totals"] = node.get("totals") or {}
+        # The money a two-hop transfer vote rests on, with his config wallets: without
+        # it the row reads as a vote on nothing (`totals` holds only the target's).
+        e["evidence"]["self_flow_usd"] = ev.get("self_flow_usd")
         e["evidence"]["depth"] = node.get("depth")
         e["evidence"]["chains"] = node.get("chains") or []
         # An inferred correlation edge is not an observed transfer, so it must
