@@ -85,6 +85,17 @@ def void_pre_fix_all(cases: dict, *, at_ms: int, origin: str, blocked=frozenset(
     return events
 
 
+def exclude_forgeries_all(cases: dict, config: dict, *, at_ms: int, origin: str,
+                          blocked=frozenset()) -> list:
+    """`cases.exclude_forgery` on every readable case, listed in the roster or not."""
+    cluster = extract.cluster_of(config)
+    events: list = []
+    for address, case in cases.items():
+        if address not in blocked:
+            events += casefile.exclude_forgery(case, cluster, at_ms=at_ms, origin=origin)
+    return events
+
+
 def apply_roster(cases: dict, roster: dict, config: dict, *, at_ms: int, origin: str,
                  tokens: set | None = None, refuted_by: dict | None = None,
                  blocked=frozenset(), rejected: dict | None = None) -> dict:

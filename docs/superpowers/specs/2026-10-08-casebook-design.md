@@ -567,3 +567,10 @@ row and rules, incident-log entry, `ARCHITECTURE.md` §8).
   ceilings fell (23 cases), so ties at the base odds reorder: `0x207700bd...` (the $1.03B)
   and three `0x160...` look-alikes credited with counterfeit USDC went from ranks 84-109 to
   about 605.
+- **A forgery of his declared wallets is excluded on every run** (`cases.exclude_forgery`,
+  the live update and the backfill): an address with the same first and last four hex
+  characters as the target or a `known_self_wallets` entry (`spam.lookalike_of`) and no
+  money item of $1,000 or more with him is address poisoning. The roster now grades such
+  rows INFRASTRUCTURE too, but five of the eight on `main` (2026-10-08) came from roster
+  history and are listed by no roster today, so the casebook checks every case itself.
+  `0xf078170f...f19e` had ranked #3 on spoofed fake-USDC transfers "from" the target.

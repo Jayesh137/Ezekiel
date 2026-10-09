@@ -2093,3 +2093,31 @@ proved false. `cases.void_pre_fix` now marks such money, linkage and correlation
 names the kind rather than the amount in the reason line. Replayed on `main`: 36 items, 23
 peaks, no central or now band moved. **A backfill inherits every fault the history held;
 when a fix lands, ask what the replay of the days before it still says.**
+
+**A forgery of his own wallet reached POSSIBLE and casebook #3 (found 2026-10-08,
+verifying the casebook's go-live).** `0xf078170f…f19e` shares the first and last four hex
+characters of `0xf078969e…f19e`, his known self-wallet: address poisoning. The target's
+daily Arbitrum sweep held three spoofed transfers "from" him of 7,999,999.81 of a fake
+USDC whose symbol is Lisu, Armenian and Cherokee look-alike letters joined by invisible
+Khmer vowels, plus 1e-9 ETH dust both ways and a phishing "claim" token. All were stored
+as clean money: `spam.is_lookalike` anchors only on the volume each counterparty moved
+inside the batch being swept, and this batch held nothing with `0xf078969e…`; his declared
+wallets were passed in only as protection from being called forgeries, never as anchors.
+The roster then counted the edges as a transfer with the target (any amount) and its
+first funder as the target, two votes on $0. A replay of the rule on `main` found four
+forgeries in the live roster (two POSSIBLE) and eight among the casebook's cases, five
+of them from roster history the roster no longer lists (two copies of the treasury
+`0x1419e753…`, three of the target), still ranked 78-201. Now `spam.lookalike_of` makes
+his declared wallets anchors at collection for records proven to carry nothing (9 of that
+day's stored records; ETH dust whose price could not be fetched is left alone, unknown not
+nothing), the roster grades their forgeries INFRASTRUCTURE ("forgery of his wallet …:
+address poisoning"; records kept, non-destructive), and the casebook excludes them on every
+run whether or not the roster lists them. All three spare a look-alike that moved real
+money with him (≥ $1K): it might be his own vanity wallet, the very thing hunted, and a
+human tells that apart from a poisoner he paid. The first version convicted every record
+on the anchor; the pre-push hook's `test_spam_ground_truth` caught it destroying a $1,000
+transfer, and the rule was narrowed rather than the test. Two gaps the same records exposed are
+left open, measured: the homoglyph fold does not map these Lisu/Armenian/Cherokee letters
+(`is_symbol_forgery` passed the fake USDC), and dust stored while its price was
+"unavailable" is never re-judged once repricing values it. **An anchor that has to turn
+up in the same batch as its forgery is a net with a hole the size of a quiet day.**

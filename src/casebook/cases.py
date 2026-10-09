@@ -229,6 +229,25 @@ def void_pre_fix(case: dict, *, at_ms: int, origin: str) -> list:
     return events
 
 
+def exclude_forgery(case: dict, cluster: set, *, at_ms: int, origin: str) -> list:
+    """A case whose address is made to look like one of his declared wallets is address
+    poisoning, never a suspect. Run on every case each run: the roster only re-grades
+    the wallets it still lists, and five forgeries from its history listed nowhere today
+    still ranked (2026-10-08)."""
+    if case.get("known") or case.get("excluded"):
+        return []
+    real_money = any(
+        isinstance(e, dict) and model.KINDS.get(e.get("kind"), {}).get("family") == "money"
+        and not e.get("invalid_reason") and isinstance(e.get("strength"), (int, float))
+        and not isinstance(e.get("strength"), bool) and e["strength"] >= extract.TWO_WAY_MIN_USD
+        for e in (case.get("evidence") or {}).values())
+    reason = extract.forgery_of(case["address"], cluster, real_money=real_money)
+    if not reason:
+        return []
+    case["excluded"] = {"reason": reason, "since": iso(at_ms)}
+    return [event(at_ms, case["address"], "case_excluded", origin, reason=reason)]
+
+
 def update_roster(case: dict, row: dict, at_ms: int, origin: str) -> list:
     """The roster's own view of the wallet: tier by day, peak, reasons, HL facts, links."""
     events: list = []

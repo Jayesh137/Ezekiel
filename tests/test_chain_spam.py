@@ -301,3 +301,43 @@ def test_rollup_incoming_dust_rolls_up_under_spammer():
     addresses = {entry["address"] for entry in rolled}
     assert spammer1 in addresses
     assert spammer2 in addresses
+
+
+TARGET = "0x45d26f28196d226497130c4bac709d808fed4029"
+F078 = "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e"
+F078_FORGERY = "0xf078170f3993bcbd76c3234724314ae8ba59f19e"      # live, 2026-10-08
+
+
+def test_a_forgery_of_a_declared_wallet_is_caught_with_no_anchor_in_the_batch():
+    # The target's sweep on 2026-10-08 held three spoofed fake-USDC transfers to the
+    # forgery and none with the real wallet: the volume map had no anchor, so they
+    # were stored as clean and voted.
+    record = {"src": TARGET, "dst": F078_FORGERY, "amount": 7999999.808651, "asset": "\ua4f4\u054f\u13a0\u13e3",
+              "token_address": "0xef4e53d4422b" + "0" * 28, "chain": "arbitrum",
+              "value_basis": "unpriced", "amount_usd": None}
+    protected = {TARGET, F078}
+    assert spam.classify_spam(record, {}, wallet=TARGET, protected=protected) == "lookalike"
+    assert spam.forged_side(record, {}, wallet=TARGET, protected=protected) == (F078_FORGERY, F078)
+
+
+def test_lookalike_of_names_the_declared_wallet_and_never_the_wallet_itself():
+    declared = {TARGET, F078}
+    assert spam.lookalike_of(F078_FORGERY, declared) == F078
+    assert spam.lookalike_of(F078, declared) is None
+    assert spam.lookalike_of("0x" + "ab" * 20, declared) is None
+    assert spam.lookalike_of("0xf078" + "0" * 32 + "f19f", declared) is None     # last four differ
+    assert spam.lookalike_of("0xf079" + "0" * 32 + "f19e", declared) is None     # first four differ
+
+
+def test_a_forgerys_record_that_moved_real_value_is_left_to_the_volume_rule():
+    # A look-alike that moves real money with him might be his own vanity wallet: only
+    # records that carry nothing are convicted on the declared anchor alone.
+    paid = {"src": TARGET, "dst": F078_FORGERY, "amount": 5000.0, "asset": "USDC", "chain": "arbitrum",
+            "value_basis": "stable_par", "amount_usd": 5000.0}
+    assert spam.classify_spam(paid, {}, wallet=TARGET, protected={TARGET, F078}) is None
+
+
+def test_a_price_that_could_not_be_fetched_is_not_proof_the_record_carried_nothing():
+    unknown = {"src": F078_FORGERY, "dst": TARGET, "amount": 2.5, "asset": "ETH", "chain": "ethereum",
+               "value_basis": "price_unavailable", "amount_usd": None}
+    assert spam.forged_side(unknown, {}, wallet=TARGET, protected={TARGET, F078}) is None

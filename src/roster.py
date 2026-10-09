@@ -110,6 +110,27 @@ def linkage_from_first_funders(funders: dict, target: str,
 SELF_FLOW_MIN_USD = 1_000.0
 
 
+def forgery_reason(address: str, evidence: dict, ground: set) -> str | None:
+    """Why `address` is address poisoning, else None. Pure.
+
+    A look-alike of one of his declared wallets (`spam.lookalike_of`) that moved under
+    `SELF_FLOW_MIN_USD` of valued money with him. One that moved more stays a lead: it
+    might be his own vanity wallet — the very thing this project hunts — or a poisoner
+    he paid by mistake, and a human tells those apart, never this rule.
+    """
+    from src.chain.spam import lookalike_of
+
+    forged = lookalike_of(address, ground)
+    if not forged:
+        return None
+    totals = evidence.get("totals") if isinstance(evidence.get("totals"), dict) else {}
+    for value in (totals.get("received_from_target_usd"), totals.get("sent_to_target_usd"),
+                  evidence.get("self_flow_usd")):
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= SELF_FLOW_MIN_USD:
+            return None
+    return f"forgery of his wallet {forged[:10]}...: address poisoning"
+
+
 def transfer_touches_cluster(node: dict, evidence: dict, known_self: set) -> bool:
     """Whether a graph node moved money WITH one of his wallets. Pure.
 
@@ -1093,6 +1114,20 @@ def build_roster(config: dict | None = None) -> dict:
         if reason:
             e["is_service"] = True
             e["evidence"]["service_reason"] = f"not a wallet: {reason}"
+
+    # A look-alike of one of his declared wallets that moved no real money with him is
+    # address poisoning, never a lead: `0xf078170f…f19e` reached POSSIBLE on 2026-10-08
+    # on spoofed fake-USDC transfers "from" the target and dust, all $0. Its records
+    # stay; it just cannot be a candidate.
+    from src.chain.spam import ground_truth_addresses
+    ground = ground_truth_addresses(config)
+    for address, e in wallets.items():
+        if e["known_self"] or address in ground or e.get("is_service"):
+            continue
+        reason = forgery_reason(address, e["evidence"], ground)
+        if reason:
+            e["is_service"] = True
+            e["evidence"]["service_reason"] = reason
 
     rows = []
     for e in wallets.values():
