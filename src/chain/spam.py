@@ -103,6 +103,21 @@ def lookalike_of(addr: str, anchors, *, prefix: int = 4, suffix: int = 4) -> str
     return None
 
 
+def moved_no_value(record: dict, dust_usd: float = 1.0) -> bool:
+    """Proven to carry nothing: a zero amount, a priced amount under the dust bar, or
+    a token we do not value (a forged ticker included). A price we could not fetch
+    today is unknown, not nothing (rule 5), so it proves nothing either way."""
+    try:
+        if record.get("amount") is not None and float(record["amount"]) == 0.0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    if record.get("value_basis") in ("unpriced", "impostor_token"):
+        return True
+    usd = record.get("amount_usd")
+    return isinstance(usd, (int, float)) and not isinstance(usd, bool) and usd < dust_usd
+
+
 def derive_real_counterparties(records: list[dict], wallet: str,
                                dust_usd: float = 1.0) -> set[str]:
     """Addresses that moved priced value >= dust_usd with `wallet`.
@@ -149,16 +164,19 @@ def forged_side(record: dict, volume, *, wallet: str | None = None,
     One-sided on purpose: it stops a protected address being called the
     forgery, and does nothing to stop the address forging IT from being caught.
     These are precisely the addresses worth poisoning, so the net stays up — and
-    a protected address is also an ANCHOR in its own right (`lookalike_of`), so
-    its forgeries are caught even when this batch holds none of its money.
+    a protected address is also an ANCHOR in its own right (`lookalike_of`), so a
+    record that carries nothing is caught even when this batch holds none of the
+    protected address's money. A record that moved real value is left to the volume
+    rule: a look-alike he pays might be his own vanity wallet, the very thing hunted.
     """
     w = (wallet or "").lower()
     safe = {(a or "").lower() for a in (protected or ())}
+    valueless = moved_no_value(record, dust_usd)
     for side in ((record.get("src") or ""), (record.get("dst") or "")):
         s = side.lower()
         if not s or s == w or s in safe:
             continue
-        mimicked = (lookalike_of(s, safe, prefix=prefix, suffix=suffix)
+        mimicked = ((lookalike_of(s, safe, prefix=prefix, suffix=suffix) if valueless else None)
                     or is_lookalike(s, volume, prefix=prefix, suffix=suffix, dust_usd=dust_usd))
         if mimicked:
             return s, mimicked

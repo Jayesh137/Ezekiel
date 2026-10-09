@@ -348,11 +348,22 @@ def supporting(item: dict) -> bool:
     return model.band(item["kind"], item.get("strength"), item.get("facts"))[1] > 0
 
 
-def forgery_of(address: str, cluster: set) -> str | None:
-    """Why `address` can never be his, when it is made to look like one of his declared
-    wallets (address poisoning: `chain.spam.lookalike_of`), else None."""
-    forged = lookalike_of(address, cluster)
+def forgery_of(address: str, cluster: set, *, real_money: bool = False) -> str | None:
+    """Why `address` can never be his: made to look like one of his declared wallets
+    (address poisoning: `chain.spam.lookalike_of`) and moving no real money with him.
+    One that moved real money stays a suspect: it might be his own vanity wallet."""
+    forged = None if real_money else lookalike_of(address, cluster)
     return f"forgery of his wallet {forged[:10]}...: address poisoning" if forged else None
+
+
+def _row_moved_money(row: dict) -> bool:
+    """At least TWO_WAY_MIN_USD of valued money with him in this roster row: with the
+    target either way, or with his config wallets (the roster's own vote floor)."""
+    evidence = row.get("evidence") if isinstance(row.get("evidence"), dict) else {}
+    totals = evidence.get("totals") if isinstance(evidence.get("totals"), dict) else {}
+    values = (_num(totals.get("received_from_target_usd")), _num(totals.get("sent_to_target_usd")),
+              _num(evidence.get("self_flow_usd")))
+    return any(v is not None and v >= TWO_WAY_MIN_USD for v in values)
 
 
 def classify_row(row: dict, config: dict, tokens: set | None = None) -> dict:
@@ -387,7 +398,7 @@ def classify_row(row: dict, config: dict, tokens: set | None = None) -> dict:
     out.update(items=items, refutes=refutes, why=list(dict.fromkeys(why)))
     if pin != "config:known_self":
         reason = not_wallets.classify(address, config=config, token_contracts=tokens)
-        forged = forgery_of(address, cluster_of(config))
+        forged = forgery_of(address, cluster_of(config), real_money=_row_moved_money(row))
         service = bool(row.get("is_service")) or tier == "INFRASTRUCTURE"
         if reason or forged or service:
             evidence = row.get("evidence") if isinstance(row.get("evidence"), dict) else {}

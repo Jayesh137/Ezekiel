@@ -43,7 +43,8 @@ The dashboard's **Casebook** page and the phone app's **Ranked** tab read the sa
 - `ruling`: the operator's ruling from `config.casebook_rulings`, if any.
 - `excluded`: set when today's filters call the address a service or not a wallet, or
   when it is a forgery of one of his declared wallets (the same first four and last four
-  hex characters: address poisoning), checked on every case each run. The case is kept
+  hex characters: address poisoning) that moved no real money (under $1,000) with him,
+  checked on every case each run. The case is kept
   and leaves the ranking.
 - `roster`: the roster's tier by day (`tiers`, changes only), the peak tier, and the
   last non-empty reasons it gave, kept even after the roster stopped giving any.

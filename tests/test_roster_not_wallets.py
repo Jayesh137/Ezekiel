@@ -54,3 +54,13 @@ def test_a_lookalike_of_his_declared_wallet_is_infrastructure(tmp_path, monkeypa
     assert rows[forgery]["evidence"]["service_reason"].startswith("forgery of his wallet 0xf078969e")
     assert rows[EOA]["tier"] != "INFRASTRUCTURE"
     assert forgery not in roster.detector_candidates(config, doc, 40, casebook={})
+
+
+def test_a_lookalike_that_moved_real_money_with_him_stays_a_lead():
+    ground = {T, "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e"}
+    forgery = "0xf078170f3993bcbd76c3234724314ae8ba59f19e"
+    paid = {"totals": {"received_from_target_usd": 0.0, "sent_to_target_usd": 25_000.0}}
+    nothing = {"totals": {"received_from_target_usd": 0.0, "sent_to_target_usd": 0}, "self_flow_usd": None}
+    assert roster.forgery_reason(forgery, paid, ground) is None
+    assert roster.forgery_reason(forgery, nothing, ground).startswith("forgery of his wallet 0xf078969e")
+    assert roster.forgery_reason(EOA, nothing, ground) is None

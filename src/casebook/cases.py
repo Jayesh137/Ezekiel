@@ -236,7 +236,12 @@ def exclude_forgery(case: dict, cluster: set, *, at_ms: int, origin: str) -> lis
     still ranked (2026-10-08)."""
     if case.get("known") or case.get("excluded"):
         return []
-    reason = extract.forgery_of(case["address"], cluster)
+    real_money = any(
+        isinstance(e, dict) and model.KINDS.get(e.get("kind"), {}).get("family") == "money"
+        and not e.get("invalid_reason") and isinstance(e.get("strength"), (int, float))
+        and not isinstance(e.get("strength"), bool) and e["strength"] >= extract.TWO_WAY_MIN_USD
+        for e in (case.get("evidence") or {}).values())
+    reason = extract.forgery_of(case["address"], cluster, real_money=real_money)
     if not reason:
         return []
     case["excluded"] = {"reason": reason, "since": iso(at_ms)}

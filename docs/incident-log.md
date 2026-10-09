@@ -2108,10 +2108,15 @@ first funder as the target, two votes on $0. A replay of the rule on `main` foun
 forgeries in the live roster (two POSSIBLE) and eight among the casebook's cases, five
 of them from roster history the roster no longer lists (two copies of the treasury
 `0x1419e753…`, three of the target), still ranked 78-201. Now `spam.lookalike_of` makes
-his declared wallets anchors at collection (14 of that day's stored records would be
-quarantined), the roster grades their forgeries INFRASTRUCTURE ("forgery of his wallet
-…: address poisoning"; records kept, non-destructive), and the casebook excludes them
-on every run whether or not the roster lists them. Two gaps the same records exposed are
+his declared wallets anchors at collection for records proven to carry nothing (9 of that
+day's stored records; ETH dust whose price could not be fetched is left alone, unknown not
+nothing), the roster grades their forgeries INFRASTRUCTURE ("forgery of his wallet …:
+address poisoning"; records kept, non-destructive), and the casebook excludes them on every
+run whether or not the roster lists them. All three spare a look-alike that moved real
+money with him (≥ $1K): it might be his own vanity wallet, the very thing hunted, and a
+human tells that apart from a poisoner he paid. The first version convicted every record
+on the anchor; the pre-push hook's `test_spam_ground_truth` caught it destroying a $1,000
+transfer, and the rule was narrowed rather than the test. Two gaps the same records exposed are
 left open, measured: the homoglyph fold does not map these Lisu/Armenian/Cherokee letters
 (`is_symbol_forgery` passed the fake USDC), and dust stored while its price was
 "unavailable" is never re-judged once repricing values it. **An anchor that has to turn

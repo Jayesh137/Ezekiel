@@ -327,3 +327,17 @@ def test_lookalike_of_names_the_declared_wallet_and_never_the_wallet_itself():
     assert spam.lookalike_of("0x" + "ab" * 20, declared) is None
     assert spam.lookalike_of("0xf078" + "0" * 32 + "f19f", declared) is None     # last four differ
     assert spam.lookalike_of("0xf079" + "0" * 32 + "f19e", declared) is None     # first four differ
+
+
+def test_a_forgerys_record_that_moved_real_value_is_left_to_the_volume_rule():
+    # A look-alike that moves real money with him might be his own vanity wallet: only
+    # records that carry nothing are convicted on the declared anchor alone.
+    paid = {"src": TARGET, "dst": F078_FORGERY, "amount": 5000.0, "asset": "USDC", "chain": "arbitrum",
+            "value_basis": "stable_par", "amount_usd": 5000.0}
+    assert spam.classify_spam(paid, {}, wallet=TARGET, protected={TARGET, F078}) is None
+
+
+def test_a_price_that_could_not_be_fetched_is_not_proof_the_record_carried_nothing():
+    unknown = {"src": F078_FORGERY, "dst": TARGET, "amount": 2.5, "asset": "ETH", "chain": "ethereum",
+               "value_basis": "price_unavailable", "amount_usd": None}
+    assert spam.forged_side(unknown, {}, wallet=TARGET, protected={TARGET, F078}) is None

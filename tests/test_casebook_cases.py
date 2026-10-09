@@ -271,3 +271,10 @@ def test_a_forgery_of_his_wallet_is_excluded_whether_or_not_the_roster_lists_it(
     assert cases.exclude_forgery(forgery, cluster, at_ms=T0 + H, origin="live") == []      # once
     genuine = opened()
     assert cases.exclude_forgery(genuine, cluster, at_ms=T0, origin="live") == [] and not genuine["excluded"]
+
+
+def test_a_lookalike_holding_real_money_with_him_is_not_excluded():
+    cluster = {"0xf078969e55cabf9ae3f26afeb5ec627b4430f19e"}
+    paid, _ = cases.new_case("0xf078170f3993bcbd76c3234724314ae8ba59f19e", T0, ["tier:POSSIBLE"], "live")
+    cases.merge_items(paid, [item("direct_transfer", 25_000.0)], set(), at_ms=T0, origin="live")
+    assert cases.exclude_forgery(paid, cluster, at_ms=T0, origin="live") == [] and not paid["excluded"]
