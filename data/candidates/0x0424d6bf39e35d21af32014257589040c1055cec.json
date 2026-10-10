@@ -1,13 +1,13 @@
 {
   "wallet": "0x0424d6bf39e35d21af32014257589040c1055cec",
-  "last_checked": "2026-10-09T01:44:16.042749+00:00",
+  "last_checked": "2026-10-10T00:23:49.489800+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-30T17:01:55.238287+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-10-09T01:44:16.042749+00:00",
-  "last_positive_evidence": "2026-10-09T01:44:02.777819+00:00",
+  "last_successful_read": "2026-10-10T00:23:49.489800+00:00",
+  "last_positive_evidence": "2026-10-10T00:23:43.486627+00:00",
   "observations": [
     {
       "status": "ok",
@@ -146,32 +146,53 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-09T01:44:02.777819+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1789777411802,
+      "coverage": {
+        "start_ms": 1789777411802,
+        "end_ms": 1791591811802,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1789777411802,
+        "requested_start_ms": 1789777411802,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1791591811802,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-10T00:23:43.486627+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1789695841528,
-    "end_ms": 1791510241528,
+    "start_ms": 1789777411802,
+    "end_ms": 1791591811802,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1789695841528,
-    "requested_start_ms": 1789695841528,
+    "fetched_start_ms": 1789777411802,
+    "requested_start_ms": 1789777411802,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-10-09T01:44:16.042749+00:00",
-  "last_scored": "2026-10-09T01:44:16.042749+00:00",
+  "last_seen": "2026-10-10T00:23:49.489800+00:00",
+  "last_scored": "2026-10-10T00:23:49.489800+00:00",
   "best_score": 0.385,
-  "latest_score": 0.379,
+  "latest_score": 0.2617,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
-      "Matching trade frequency and cadence",
-      "Similar scaling/TWAP/clip-size habits"
+      "Similar account-size bracket"
     ],
     "warnings": [
       "Weak asset overlap",
@@ -179,10 +200,9 @@
     ],
     "vetoes": [],
     "asset_overlap": {
-      "overlap": [
-        "BTC"
-      ],
+      "overlap": [],
       "target_only": [
+        "BTC",
         "FARTCOIN",
         "LIT",
         "MON",
@@ -192,9 +212,9 @@
         "@107",
         "@142"
       ],
-      "overlap_count": 1,
+      "overlap_count": 0,
       "rare_overlap": [],
-      "jaccard": 0.1429
+      "jaccard": 0.0
     },
     "market_rarity": {
       "shared_markets": [],
@@ -203,28 +223,27 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.379,
+      "score_without_bonus": 0.2617,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
-      "status": "research",
+      "status": "insufficient_data",
       "promotable": false,
-      "similarity": 0.5879,
+      "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9396,
+        "relative_size_dispersion": 0.8897,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
-        "round_100_fraction": 0.0,
+        "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 6,
+      "independent_sessions": 4,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::@107:1789746239037:1070295218077770",
         "fill::@107:1790632769247:1077425316905450",
         "fill::@107:1790632769247:267180069580174",
         "fill::@107:1790632769247:303612573678818",
@@ -339,36 +358,6 @@
         "fill::@107:1790632878797:727434026245520",
         "fill::@107:1790632878797:89216739634515",
         "fill::@107:1790632878797:904942479884488",
-        "fill::@142:1789750328871:137119518198538",
-        "fill::@142:1789750328871:738236602156580",
-        "fill::@142:1789750354044:1000343910704291",
-        "fill::@142:1789750354044:1045475776815430",
-        "fill::@142:1789750354044:1101470246263389",
-        "fill::@142:1789750354044:1111857823437733",
-        "fill::@142:1789750354044:183505668412110",
-        "fill::@142:1789750354044:26248833493841",
-        "fill::@142:1789750354044:661464715322721",
-        "fill::@142:1789750354044:790438398764942",
-        "fill::@142:1789750354044:827095272795223",
-        "fill::@142:1789750354044:85389284521334",
-        "fill::@142:1789750354044:877894720496071",
-        "fill::@142:1789750356447:497586385384889",
-        "fill::@142:1789750356447:501276955874372",
-        "fill::@142:1789750356447:677946133985554",
-        "fill::@142:1789750361315:340486007085194",
-        "fill::@142:1789750361315:461323458089025",
-        "fill::@142:1789750361315:530806077864892",
-        "fill::@142:1789750361315:546398230229132",
-        "fill::@142:1789750361315:779537924020883",
-        "fill::@142:1789750361315:829218702884152",
-        "fill::@142:1789750361315:926402411877261",
-        "fill::@142:1789750362546:1014163130684819",
-        "fill::@142:1789750362546:220007992220646",
-        "fill::@142:1789750362546:699830579635449",
-        "fill::@142:1789750362546:796493797262586",
-        "fill::@142:1789750362546:864511672310485",
-        "fill::@142:1789750362546:95554053056976",
-        "fill::@142:1789776000048:0",
         "fill::@142:1790772763823:281228655662794",
         "fill::@142:1790772763823:464435963849185",
         "fill::@142:1790772823136:1005601937173321",
@@ -439,47 +428,7 @@
         "fill::@142:1790773841883:113856353566367",
         "fill::@142:1790773841883:130801320152097",
         "fill::@142:1790812800051:0",
-        "fill::@142:1791417600062:0",
-        "fill::BTC:1789738649417:1001636823194294",
-        "fill::BTC:1789738649417:1002742463289223",
-        "fill::BTC:1789738649417:1002843156325252",
-        "fill::BTC:1789738649417:1004637119970888",
-        "fill::BTC:1789738649417:1006316076467149",
-        "fill::BTC:1789738649417:1011035793895984",
-        "fill::BTC:1789738649417:1014067353740812",
-        "fill::BTC:1789738649417:1014397232228621",
-        "fill::BTC:1789738649417:101459081603859",
-        "fill::BTC:1789738649417:1021025101839971",
-        "fill::BTC:1789738649417:1023280476337882",
-        "fill::BTC:1789738649417:1023332450570615",
-        "fill::BTC:1789738649417:1026213328253306",
-        "fill::BTC:1789738649417:1026246786527009",
-        "fill::BTC:1789738649417:1034723034852974",
-        "fill::BTC:1789738649417:1034734790951509",
-        "fill::BTC:1789738649417:1035232850108588",
-        "fill::BTC:1789738649417:1040680952685748",
-        "fill::BTC:1789738649417:1043675440725723",
-        "fill::BTC:1789738649417:1044058428786130",
-        "fill::BTC:1789738649417:1048386837883220",
-        "fill::BTC:1789738649417:1051437979418458",
-        "fill::BTC:1789738649417:1052636230008123",
-        "fill::BTC:1789738649417:105398944405970",
-        "fill::BTC:1789738649417:105404636734328",
-        "fill::BTC:1789738649417:1054808121287786",
-        "fill::BTC:1789738649417:1055377472451789",
-        "fill::BTC:1789738649417:1057345267539225",
-        "fill::BTC:1789738649417:1060463113623911",
-        "fill::BTC:1789738649417:1060730989116659",
-        "fill::BTC:1789738649417:1066187327310372",
-        "fill::BTC:1789738649417:1066406775161138",
-        "fill::BTC:1789738649417:1066557845773772",
-        "fill::BTC:1789738649417:1067717658004478",
-        "fill::BTC:1789738649417:1067903118988997",
-        "fill::BTC:1789738649417:1068673844692064",
-        "fill::BTC:1789738649417:1073158965382271",
-        "fill::BTC:1789738649417:1075777480059589",
-        "fill::BTC:1789738649417:1077521363469081",
-        "fill::BTC:1789738649417:1078501947054915"
+        "fill::@142:1791417600062:0"
       ]
     },
     "tooling": {
@@ -614,9 +563,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-10T00:23:49.489800+00:00",
+      "score": 0.2617,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.4154,
+        "hold_duration": null,
+        "account_size": 0.8657,
+        "trade_sequencing": 0.5391,
+        "position_sizing": 0.5,
+        "order_profile": 0.7325,
+        "activity": 0.6687,
+        "direction_bias": null,
+        "position_management": 0.4774,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
-  "status": "ACTIVE",
-  "recent_avg_score": null,
+  "status": "COOLING",
+  "recent_avg_score": 0.361,
   "last_investigated_ms": 1791506300015
 }
