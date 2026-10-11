@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-10-11T00:42:10.921562+00:00",
+  "computed_at": "2026-10-11T01:14:26.537837+00:00",
   "target": "0x45d26f28196d226497130c4bac709d808fed4029",
   "wallet_count": 2939,
   "behavioural_counts_as_a_vector": false,
@@ -156,7 +156,7 @@
         "behavioural_threshold": 0.8,
         "hl_role": "user",
         "hl_account_value": 54.0,
-        "hl_total_value": 51457.084232,
+        "hl_total_value": 51456.982232,
         "hl_month_volume": 0.0,
         "hl_birth_ms": 1735768080050,
         "hyperevm_nonce": 0
@@ -253,7 +253,7 @@
         "behavioural_threshold": 0.8,
         "hl_role": "user",
         "hl_account_value": 0.0,
-        "hl_total_value": 52902201.247575,
+        "hl_total_value": 52672974.034618,
         "hl_month_volume": 0.0,
         "hl_birth_ms": 1723677360091,
         "hyperevm_nonce": 0
@@ -1013,7 +1013,7 @@
       "vectors": [
         "transfer"
       ],
-      "confidence": 0.276,
+      "confidence": 0.2759,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Received funds directly from the target wallet",
@@ -1214,7 +1214,7 @@
       "tier": "POSSIBLE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.276
+      "rank_strength": 0.2759
     },
     {
       "wallet": "0x36715f6408819492c27c1a1538156af9a2bfe963",
@@ -58058,6 +58058,79 @@
       "rank_strength": 0.1725
     },
     {
+      "wallet": "0x27c9fa86c91b84ddfa15de58c482ff662498d65d",
+      "vectors": [],
+      "confidence": 0.06,
+      "classification": "DIRECT_RECIPIENT",
+      "reasons": [
+        "Behavioural similarity only 45% \u2014 weak on its own",
+        "Actively trading on Hyperliquid after receiving funds",
+        "Last movement 409 days ago \u2014 transfer evidence aged to 40%",
+        "Reached at 2 hops from target \u2014 confidence discounted"
+      ],
+      "evidence": {
+        "service_reason": null,
+        "totals": {
+          "received_from_target_usd": 0,
+          "sent_to_target_usd": 0,
+          "edge_count": 2,
+          "unvalued_edge_count": 0
+        },
+        "self_flow_usd": 0,
+        "depth": 2,
+        "chains": [
+          "ethereum"
+        ],
+        "graph_reach_only": true,
+        "behavioural_score": 0.45,
+        "behavioural_tier": "BACKGROUND",
+        "behavioural_scored_at": "2026-10-06T14:26:28.637447+00:00",
+        "behavioural_scorer_current": true,
+        "style_vetoes": [
+          "Decision frequency 33x apart (0.88 vs 29.00 position episodes/day)"
+        ],
+        "behavioural_threshold": 0.8,
+        "portfolio_overlap": 0.1456,
+        "shared_rare_markets": [
+          "kSHIB",
+          "FIL",
+          "SPX",
+          "TIA",
+          "TRX"
+        ],
+        "hl_role": "user",
+        "hl_account_value": 1336728.505265,
+        "hl_total_value": 1427672.805455,
+        "hl_month_volume": 437411844.21,
+        "hl_birth_ms": 1715814240092
+      },
+      "is_service": false,
+      "known_self": false,
+      "detector_count": 0,
+      "evidence_summary": {
+        "families": [],
+        "independent_groups": 0,
+        "promotable_groups": 0,
+        "categories": {
+          "protocol": [],
+          "financial": [],
+          "behaviour": [],
+          "successor": []
+        },
+        "legacy_observations": 0,
+        "identity_confirmed": false,
+        "count_kind": "observation_groups_not_owners",
+        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
+      },
+      "vector_count": 0,
+      "identity_confirmed": false,
+      "tier_basis": "investigation_priority_not_ownership",
+      "tier": "WATCH",
+      "peak_tier": "WATCH",
+      "tier_dropped_from": null,
+      "rank_strength": 0.1456
+    },
+    {
       "wallet": "0xd6e1a6f7bb47aca69aaa511210227d40926ff256",
       "vectors": [],
       "confidence": 0.1309,
@@ -58153,79 +58226,6 @@
       "peak_tier": "WATCH",
       "tier_dropped_from": null,
       "rank_strength": 0.1309
-    },
-    {
-      "wallet": "0x27c9fa86c91b84ddfa15de58c482ff662498d65d",
-      "vectors": [],
-      "confidence": 0.06,
-      "classification": "DIRECT_RECIPIENT",
-      "reasons": [
-        "Behavioural similarity only 45% \u2014 weak on its own",
-        "Actively trading on Hyperliquid after receiving funds",
-        "Last movement 409 days ago \u2014 transfer evidence aged to 40%",
-        "Reached at 2 hops from target \u2014 confidence discounted"
-      ],
-      "evidence": {
-        "service_reason": null,
-        "totals": {
-          "received_from_target_usd": 0,
-          "sent_to_target_usd": 0,
-          "edge_count": 2,
-          "unvalued_edge_count": 0
-        },
-        "self_flow_usd": 0,
-        "depth": 2,
-        "chains": [
-          "ethereum"
-        ],
-        "graph_reach_only": true,
-        "behavioural_score": 0.45,
-        "behavioural_tier": "BACKGROUND",
-        "behavioural_scored_at": "2026-10-06T14:26:28.637447+00:00",
-        "behavioural_scorer_current": true,
-        "style_vetoes": [
-          "Decision frequency 33x apart (0.88 vs 29.00 position episodes/day)"
-        ],
-        "behavioural_threshold": 0.8,
-        "portfolio_overlap": 0.1129,
-        "shared_rare_markets": [
-          "FIL",
-          "SPX",
-          "ETHFI",
-          "TIA",
-          "TRX"
-        ],
-        "hl_role": "user",
-        "hl_account_value": 1336728.505265,
-        "hl_total_value": 1427672.805455,
-        "hl_month_volume": 437411844.21,
-        "hl_birth_ms": 1715814240092
-      },
-      "is_service": false,
-      "known_self": false,
-      "detector_count": 0,
-      "evidence_summary": {
-        "families": [],
-        "independent_groups": 0,
-        "promotable_groups": 0,
-        "categories": {
-          "protocol": [],
-          "financial": [],
-          "behaviour": [],
-          "successor": []
-        },
-        "legacy_observations": 0,
-        "identity_confirmed": false,
-        "count_kind": "observation_groups_not_owners",
-        "caveat": "Distinct events may still share an unobserved cause; shared authority is not beneficial ownership."
-      },
-      "vector_count": 0,
-      "identity_confirmed": false,
-      "tier_basis": "investigation_priority_not_ownership",
-      "tier": "WATCH",
-      "peak_tier": "WATCH",
-      "tier_dropped_from": null,
-      "rank_strength": 0.1129
     },
     {
       "wallet": "0x0a80ae587ffb58dbc84f60a64fdcc26ffa0dd794",
@@ -58969,11 +58969,11 @@
         },
         "portfolio_overlap": 0.0968,
         "shared_rare_markets": [
-          "MOODENG",
           "STX",
+          "MOODENG",
           "OP",
           "SEI",
-          "2Z"
+          "FIL"
         ],
         "hl_role": "subAccount",
         "hl_account_value": 4909108.039381,
@@ -60302,7 +60302,7 @@
     {
       "wallet": "0x785648669b8e90a75a6a8de682258957f9028462",
       "vectors": [],
-      "confidence": 0.0579,
+      "confidence": 0.0578,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (17 separate movements)",
@@ -60353,7 +60353,7 @@
       "tier": "WATCH",
       "peak_tier": "WATCH",
       "tier_dropped_from": null,
-      "rank_strength": 0.0579
+      "rank_strength": 0.0578
     },
     {
       "wallet": "0x041cd9b839a7312be3cbadd3c77ce28384c9464a",
@@ -63730,7 +63730,12 @@
         "style_vetoes": [
           "Decision frequency 59x apart (0.83 vs 49.41 position episodes/day)"
         ],
-        "behavioural_threshold": 0.8
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 69.399272,
+        "hl_total_value": 150.52603,
+        "hl_month_volume": 1975128.61,
+        "hl_birth_ms": 1782338400034
       },
       "is_service": false,
       "known_self": false,
@@ -72652,7 +72657,13 @@
         "behavioural_scored_at": "2026-10-11T00:10:01.191284+00:00",
         "behavioural_scorer_current": true,
         "style_vetoes": [],
-        "behavioural_threshold": 0.8
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 1017.578786,
+        "hl_total_value": 54144.016072,
+        "hl_month_volume": 2551291.99,
+        "hl_birth_ms": 1786572480010,
+        "frontend_agent": "0xabd9bb67b275deda291f700778605a60e19dc5ea"
       },
       "is_service": false,
       "known_self": false,
@@ -99821,10 +99832,10 @@
         ],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 58.278883,
-        "hl_total_value": null,
-        "hl_month_volume": null,
-        "hl_birth_ms": 1788647160053
+        "hl_account_value": 47.435451,
+        "hl_total_value": 10512.744244,
+        "hl_month_volume": 241092.16,
+        "hl_birth_ms": 1788991560049
       },
       "is_service": false,
       "known_self": false,
@@ -99864,7 +99875,12 @@
         "behavioural_scored_at": "2026-10-08T03:53:54.658523+00:00",
         "behavioural_scorer_current": true,
         "style_vetoes": [],
-        "behavioural_threshold": 0.8
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 2391.733655,
+        "hl_total_value": 2391.733655,
+        "hl_month_volume": 1587113.78,
+        "hl_birth_ms": 1790203200064
       },
       "is_service": false,
       "known_self": false,
@@ -99908,9 +99924,9 @@
         ],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 206802.208515,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_account_value": 279090.154711,
+        "hl_total_value": 288928.798355,
+        "hl_month_volume": 14988644.71,
         "hl_birth_ms": 1732143720107,
         "frontend_agent": "0x24396af33e98e641289efef78390e3b11b78c408"
       },
@@ -99954,9 +99970,9 @@
         "style_vetoes": [],
         "behavioural_threshold": 0.8,
         "hl_role": "subAccount",
-        "hl_account_value": 11517.390429,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_account_value": 11498.715386,
+        "hl_total_value": 92666.481208,
+        "hl_month_volume": 2901779.02,
         "hl_birth_ms": 1769036040126
       },
       "is_service": false,
@@ -99999,10 +100015,10 @@
         "style_vetoes": [],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 16.453725,
-        "hl_total_value": null,
-        "hl_month_volume": null,
-        "hl_birth_ms": 1790787600035
+        "hl_account_value": 37.820286,
+        "hl_total_value": 53.133599,
+        "hl_month_volume": 24533.12,
+        "hl_birth_ms": 1790810400041
       },
       "is_service": false,
       "known_self": false,
@@ -100044,7 +100060,13 @@
         "style_vetoes": [
           "Decision frequency 8x apart (0.83 vs 6.38 position episodes/day)"
         ],
-        "behavioural_threshold": 0.8
+        "behavioural_threshold": 0.8,
+        "hl_role": "user",
+        "hl_account_value": 9134.136676,
+        "hl_total_value": 11337.077761,
+        "hl_month_volume": 15415602.34,
+        "hl_birth_ms": 1743632640014,
+        "frontend_agent": "0xa24b07b3ec6353c45dd7b0e58e926760dd06691e"
       },
       "is_service": false,
       "known_self": false,
@@ -100087,8 +100109,8 @@
         "behavioural_threshold": 0.8,
         "hl_role": "user",
         "hl_account_value": 0.0,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_total_value": 1179424.956588,
+        "hl_month_volume": 4324952.5,
         "hl_birth_ms": 1779315720039
       },
       "is_service": false,
@@ -100131,10 +100153,10 @@
         "style_vetoes": [],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 164407.47332,
-        "hl_total_value": null,
-        "hl_month_volume": null,
-        "hl_birth_ms": 1790865120037
+        "hl_account_value": 860909.960685,
+        "hl_total_value": 947706.752136,
+        "hl_month_volume": 2847031.58,
+        "hl_birth_ms": 1790897520078
       },
       "is_service": false,
       "known_self": false,
@@ -100176,9 +100198,9 @@
         "style_vetoes": [],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 34811.309108,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_account_value": 15826.665196,
+        "hl_total_value": 48844.925923,
+        "hl_month_volume": 41409080.73,
         "hl_birth_ms": 1786576680038,
         "frontend_agent": "0xbefe34f6421c6a1b7658ef013cb9b920de5411f1"
       },
@@ -100224,11 +100246,11 @@
         ],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 952853.338432,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_account_value": 690308.950005,
+        "hl_total_value": 8118959.500667,
+        "hl_month_volume": 1879489231.51,
         "hl_birth_ms": 1724278320118,
-        "frontend_agent": "0xf962989d7c5f103b15aac75fad603511272def6e"
+        "frontend_agent": "0x6ad02187567d28ce4abe094bd1089c88893b6dca"
       },
       "is_service": false,
       "known_self": false,
@@ -100326,8 +100348,8 @@
         "behavioural_threshold": 0.8,
         "hl_role": "user",
         "hl_account_value": 0.0,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_total_value": 1558.654803,
+        "hl_month_volume": 0.0,
         "hl_birth_ms": 1777500480052
       },
       "is_service": false,
@@ -100370,9 +100392,9 @@
         "style_vetoes": [],
         "behavioural_threshold": 0.8,
         "hl_role": "user",
-        "hl_account_value": 250.349769,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_account_value": 199.708077,
+        "hl_total_value": 368.285786,
+        "hl_month_volume": 13089.63,
         "hl_birth_ms": 1782943800010,
         "frontend_agent": "0xb85a8e709eb08ce21bb98ffa5c9ae4f0fb7140aa"
       },
@@ -100417,8 +100439,8 @@
         "behavioural_threshold": 0.8,
         "hl_role": "user",
         "hl_account_value": 0.0,
-        "hl_total_value": null,
-        "hl_month_volume": null,
+        "hl_total_value": 0.855286,
+        "hl_month_volume": 1022611.11,
         "hl_birth_ms": 1790117400044,
         "frontend_agent": "0xbd10636bc4b078a4f670164726464ba6cff22ddc"
       },
@@ -202911,7 +202933,7 @@
     {
       "wallet": "0x87283edb0f12e7cd0ed3e18baeab20aaf43b5f6e",
       "vectors": [],
-      "confidence": 0.0966,
+      "confidence": 0.0965,
       "classification": "OPERATIONAL_COUNTERPARTY",
       "reasons": [
         "Repeated transfers (5 separate movements)",
@@ -202962,7 +202984,7 @@
       "tier": "INFRASTRUCTURE",
       "peak_tier": "POSSIBLE",
       "tier_dropped_from": null,
-      "rank_strength": 0.0966
+      "rank_strength": 0.0965
     },
     {
       "wallet": "0x01087f4e1dbc0c52690a9397677dd90983711c37",
