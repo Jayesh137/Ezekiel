@@ -1,9 +1,9 @@
 {
   "wallet": "0x6d7823cd5c3d9dcd63e6a8021b475e0c7c94b291",
   "first_seen": "2026-08-13T03:27:05.650460+00:00",
-  "last_seen": "2026-10-11T07:41:06.929137+00:00",
+  "last_seen": "2026-10-12T06:19:52.064674+00:00",
   "best_score": 0.3983,
-  "latest_score": 0.2122,
+  "latest_score": 0.203,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -38,16 +38,16 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2122,
+      "score_without_bonus": 0.203,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
       "status": "research",
       "promotable": false,
-      "similarity": 0.5776,
+      "similarity": 0.564,
       "features": {
-        "relative_size_dispersion": 0.8878,
+        "relative_size_dispersion": 0.8202,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 1.0,
@@ -138,6 +138,12 @@
         "fill::@335:1791392242208:170358902805281",
         "fill::@335:1791392545390:937836216513446",
         "fill::@335:1791392776870:527105798073377",
+        "fill::@335:1791731563037:1059531876745773",
+        "fill::@335:1791731568572:749946889176998",
+        "fill::@335:1791731574224:782082325651243",
+        "fill::@335:1791731576727:131901633204839",
+        "fill::@335:1791731604651:392250789360699",
+        "fill::@335:1791741226568:719194156833613",
         "fill::CASHCAT:1790271274104:311569119990044",
         "fill::CASHCAT:1790271281415:1113057874775993",
         "fill::CASHCAT:1790271281488:992245655327384",
@@ -308,36 +314,11 @@
         "fill::CASHCAT:1790351175650:810633619635230",
         "fill::CASHCAT:1790351175650:814293055185023",
         "fill::CASHCAT:1790351175650:823729588820340",
-        "fill::CASHCAT:1790351175650:844195804132602",
-        "fill::CASHCAT:1790351175650:851528043962986",
-        "fill::CASHCAT:1790351175650:86573217719534",
-        "fill::CASHCAT:1790351175650:875428005883414",
-        "fill::CASHCAT:1790351175650:879074498244886",
-        "fill::CASHCAT:1790351175650:882171179426169",
-        "fill::CASHCAT:1790351175650:919600202377045"
+        "fill::CASHCAT:1790351175650:844195804132602"
       ]
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-14T12:41:29.697816+00:00",
-      "score": 0.1047,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.1667,
-        "timing_profile": null,
-        "leverage_profile": 0.0,
-        "entry_exit_style": 0.0005,
-        "hold_duration": null,
-        "account_size": 0.4791,
-        "trade_sequencing": 0.1451,
-        "position_sizing": 0.5,
-        "activity": 0.3548,
-        "direction_bias": null,
-        "position_management": 0.7005,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-14T14:11:31.820641+00:00",
       "score": 0.1047,
@@ -2250,17 +2231,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-12T06:19:52.064674+00:00",
+      "score": 0.203,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.4747,
+        "hold_duration": null,
+        "account_size": 0.1982,
+        "trade_sequencing": 0.5606,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.5685,
+        "direction_bias": 0.0,
+        "position_management": 0.7431,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2263,
-  "last_checked": "2026-10-11T07:41:06.929137+00:00",
+  "recent_avg_score": 0.2226,
+  "last_checked": "2026-10-12T06:19:52.064674+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-10-11T07:41:06.929137+00:00",
-  "last_positive_evidence": "2026-10-11T07:41:03.389855+00:00",
+  "last_successful_read": "2026-10-12T06:19:52.064674+00:00",
+  "last_positive_evidence": "2026-10-12T06:19:48.672341+00:00",
   "observations": [
     {
       "status": "ok",
@@ -2491,21 +2493,44 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-10-11T07:41:03.389855+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1789971588234,
+      "coverage": {
+        "start_ms": 1789971588234,
+        "end_ms": 1791785988234,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1789971588234,
+        "requested_start_ms": 1789971588234,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1791785988234,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-10-12T06:19:48.672341+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1789890063189,
-    "end_ms": 1791704463189,
+    "start_ms": 1789971588234,
+    "end_ms": 1791785988234,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1789890063189,
-    "requested_start_ms": 1789890063189,
+    "fetched_start_ms": 1789971588234,
+    "requested_start_ms": 1789971588234,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-10-11T07:41:06.929137+00:00",
+  "last_scored": "2026-10-12T06:19:52.064674+00:00",
   "latest_scoring_schema": "2026-09-26.2",
   "last_investigated_ms": 1791758022472
 }
