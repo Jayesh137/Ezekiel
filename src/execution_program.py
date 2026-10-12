@@ -68,6 +68,30 @@ MIN_VOTE_CLIPS = 3
 # vector records matches but casts no vote, however perfect.
 MIN_CENSUS_POPULATION = 20
 
+# The comparability bound — the third way a match can be judged rare.
+#
+# The two paths above need a p99 from MIN_CENSUS_POPULATION COMPARABLE controls:
+# strangers who carry a constant-clip table on at least two of his coins, so that
+# an exact-size ratio exists at all. Measured 2026-10-12, after 252 leaderboard
+# accounts: 2 were comparable. At that rate the distribution forms in years, while
+# the thing it was failing to measure IS the rarity — almost nobody runs a
+# fixed-clip slicer on his coins. A stranger can reproduce his clip sizes only if
+# it is comparable, so P(reproduces his table) <= P(comparable), and P(comparable)
+# is a binomial proportion the census has measured over hundreds of reads. Its
+# Wilson 95% upper limit is a MEASURED ceiling on the false-match rate; a match is
+# rare when that ceiling is at most MAX_FALSE_MATCH_RATE (a likelihood ratio of at
+# least 20). Not a relaxation of rule 4: no bar moved, a different statistic was
+# measured, and it is conservative — it assumes EVERY comparable stranger would
+# match in full. Being comparable alone never clears it: the match itself must be
+# strong (most shared clips identical, or his rank structure over enough coins).
+MIN_CENSUS_ATTEMPTS = 200
+MAX_FALSE_MATCH_RATE = 0.05
+BOUNDED_MIN_RATIO = 0.75
+BOUNDED_MIN_RHO = 0.9
+# rho >= 0.9 over 4 coins is the identity permutation, 1 in 24 by chance; over 3 it
+# is 1 in 6, too easy to hit by luck on top of the comparability ceiling.
+BOUNDED_MIN_STRUCTURE_COINS = 4
+
 
 def _num(value):
     try:
@@ -255,7 +279,8 @@ def compare(target: dict, candidate: dict) -> dict:
     `insufficient_data`, never a low score.
     """
     result = {"status": "insufficient_data", "clip_match_ratio": None, "clips_matched": 0,
-              "clips_compared": 0, "cadence_agreement": None, "offset_agreement": None,
+              "clips_compared": 0, "clips_matched_coins": [],
+              "cadence_agreement": None, "offset_agreement": None,
               "notional_structure_rho": None, "notional_coins_compared": 0,
               "strength": None, "promotable": False}
     t_table = target.get("clip_table") or {}
@@ -275,11 +300,12 @@ def compare(target: dict, candidate: dict) -> dict:
             result["clip_match_ratio"] = 0.0
             result["strength"] = round(max(0.0, rho), 4)
         return result
-    matched = sum(1 for coin in shared
-                  if math.isclose(t_table[coin]["size"], c_table[coin]["size"], rel_tol=1e-9))
+    matched_coins = sorted(coin for coin in shared
+                           if math.isclose(t_table[coin]["size"], c_table[coin]["size"], rel_tol=1e-9))
+    matched = len(matched_coins)
     ratio = matched / len(shared)
     result.update(status="measured", clips_compared=len(shared), clips_matched=matched,
-                  clip_match_ratio=round(ratio, 4))
+                  clip_match_ratio=round(ratio, 4), clips_matched_coins=matched_coins)
     # Both running programs at a scripted cadence is corroborating, not decisive.
     result["cadence_agreement"] = bool(target.get("program_runs") and candidate.get("program_runs"))
     if target.get("ioc_5pct_share") is not None and candidate.get("ioc_5pct_share") is not None:
@@ -347,7 +373,104 @@ def is_discriminating(match: dict, census: dict | None) -> bool:
     rho_ready = (census.get("rho_population") or 0) >= MIN_CENSUS_POPULATION
     structural = (rho_ready and rho is not None and rho_threshold is not None
                   and rho > rho_threshold and structure_coins >= MIN_STRUCTURE_COINS)
+    return bool(exact or structural or bounded_rare(match, census))
+
+
+def rarity_path(match: dict, census: dict | None) -> str | None:
+    """Which measured path makes the match rare: `exact`, `structure`, `bounded`, or
+    None. The alert says how the judgement was made, so the operator can weigh it."""
+    if not census or not is_discriminating(match, census):
+        return None
+    probe = dict(census)
+    probe.pop("comparable_upper", None)
+    if is_discriminating(match, probe):
+        ratio_threshold = census.get("ratio_p99")
+        exact = ((census.get("population") or 0) >= MIN_CENSUS_POPULATION
+                 and match.get("clip_match_ratio") is not None and ratio_threshold is not None
+                 and match["clip_match_ratio"] > ratio_threshold)
+        return "exact" if exact else "structure"
+    return "bounded"
+
+
+def wilson_upper(successes: int, trials: int, z: float = 1.96):
+    """Upper limit of the Wilson score interval for a binomial proportion.
+
+    Conservative where it matters: with 0 successes in n trials it is ~3.8/n
+    (never 0), and it narrows only as trials accumulate.
+    """
+    if not trials or trials <= 0:
+        return None
+    successes = max(0, min(int(successes), int(trials)))
+    n = float(trials)
+    p = successes / n
+    denominator = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denominator
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denominator
+    return round(min(1.0, centre + half), 4)
+
+
+def comparable_bound(attempted: int, comparable: int) -> dict:
+    """The measured ceiling on how often a stranger could reproduce his table.
+
+    `attempted` is the number of accounts whose fills were read successfully (an
+    unread account is unknown, not a non-match — rule 5) and `comparable` how
+    many of them carried a clip table comparable with his. Below
+    MIN_CENSUS_ATTEMPTS the ceiling is not trustworthy and is left None.
+    """
+    attempted = int(attempted or 0)
+    comparable = int(comparable or 0)
+    rate = round(comparable / attempted, 4) if attempted else None
+    upper = wilson_upper(comparable, attempted) if attempted >= MIN_CENSUS_ATTEMPTS else None
+    return {"attempted": attempted, "comparable": comparable, "comparable_rate": rate,
+            "comparable_upper": upper}
+
+
+def bounded_rare(match: dict, census: dict | None) -> bool:
+    """The comparability path: a STRONG match while the census has measured that
+    comparable strangers are at most MAX_FALSE_MATCH_RATE of the population."""
+    if not census:
+        return False
+    upper = census.get("comparable_upper")
+    attempted = census.get("attempted") or 0
+    if upper is None or attempted < MIN_CENSUS_ATTEMPTS or upper > MAX_FALSE_MATCH_RATE:
+        return False
+    ratio = match.get("clip_match_ratio")
+    matched = match.get("clips_matched") or 0
+    compared = match.get("clips_compared") or 0
+    min_clips = max(MIN_VOTE_CLIPS, int(census.get("min_clips") or 0))
+    exact = (ratio is not None and ratio >= BOUNDED_MIN_RATIO
+             and matched >= MIN_VOTE_CLIPS and compared >= min_clips)
+    rho = match.get("notional_structure_rho")
+    coins = match.get("notional_coins_compared") or 0
+    structural = rho is not None and rho >= BOUNDED_MIN_RHO and coins >= BOUNDED_MIN_STRUCTURE_COINS
     return bool(exact or structural)
+
+
+def merge_census(primary: dict | None, *others: dict | None) -> dict | None:
+    """One census for the gate from several measured populations.
+
+    The p99 distributions come from `primary` (the leaderboard census). The
+    comparability ceiling is the LARGEST upper limit any population reports: the
+    detector's candidates are drawn from wallets trading his markets, a class the
+    tape census measures directly and where comparability is likelier than on the
+    leaderboard at large, so the gate must not take the kindest reading.
+    """
+    parts = [c for c in (primary, *others) if isinstance(c, dict)]
+    if not parts:
+        return None
+    out = dict(parts[0]) if isinstance(primary, dict) else {"population": 0, "rho_population": 0}
+    bounds = [(c.get("comparable_upper"), c.get("attempted") or 0) for c in parts
+              if c.get("comparable_upper") is not None
+              and (c.get("attempted") or 0) >= MIN_CENSUS_ATTEMPTS]
+    if bounds:
+        upper, attempted = max(bounds, key=lambda b: b[0])
+        out["comparable_upper"] = upper
+        out["attempted"] = attempted
+        out["bound_sources"] = len(bounds)
+    else:
+        out["comparable_upper"] = None
+    out["min_clips"] = max(int(c.get("min_clips") or 0) for c in parts)
+    return out
 
 
 def _p99(values):
@@ -358,20 +481,29 @@ def _p99(values):
     return round(clean[idx], 4), round(clean[-1], 4), round(sum(clean) / len(clean), 4), len(clean)
 
 
-def summarise_census(ratios: list[float], rhos: list[float] | None = None) -> dict:
+def summarise_census(ratios: list[float], rhos: list[float] | None = None,
+                     attempted: int | None = None) -> dict:
     """Distribution of stranger clip-match ratios, and the rarity threshold.
 
     `ratios` are the clip_match_ratio of every population wallet that had a
     MEASURED comparison against the target. The 99th percentile is the bar a
     candidate must beat to count as rare. An empty sample yields no threshold, so
     `is_discriminating` refuses every match until a real population exists.
+
+    `attempted` — how many accounts were READ (comparable or not) — adds the
+    comparability ceiling (`comparable_bound`), the measured bound that lets a
+    strong match vote while the comparable population is still too small for a
+    p99.
     """
     ratio_p99, ratio_max, ratio_mean, population = _p99(ratios)
     rho_p99, rho_max, rho_mean, rho_population = _p99(rhos or [])
-    return {"population": population, "ratio_p99": ratio_p99, "ratio_max": ratio_max,
-            "ratio_mean": ratio_mean, "min_clips": MIN_VOTE_CLIPS,
-            "rho_p99": rho_p99, "rho_max": rho_max, "rho_mean": rho_mean,
-            "rho_population": rho_population}
+    out = {"population": population, "ratio_p99": ratio_p99, "ratio_max": ratio_max,
+           "ratio_mean": ratio_mean, "min_clips": MIN_VOTE_CLIPS,
+           "rho_p99": rho_p99, "rho_max": rho_max, "rho_mean": rho_mean,
+           "rho_population": rho_population}
+    if attempted is not None:
+        out.update(comparable_bound(attempted, population))
+    return out
 
 
 def voting_wallets(report: dict | None) -> dict:

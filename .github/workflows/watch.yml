@@ -86,8 +86,9 @@ jobs:
     # above the sum of its step timeouts (8 + 3 + 5), or a slow run is
     # CANCELLED and the commit step never persists what the others read.
     # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 + 2 = 22), and
-    # the boundary-attribution step keeps it inside 30 (8 + 3 + 5 + 4 + 4 + 2 + 2 = 28).
-    timeout-minutes: 30
+    # the boundary-attribution step keeps it inside 30 (8 + 3 + 5 + 4 + 4 + 2 + 2 = 28),
+    # and the digest step (2) lifts it to 32.
+    timeout-minutes: 32
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -197,6 +198,15 @@ jobs:
       # Every writer rewrites its own file whole, so a file not updated this
       # run keeps the previous value. (Job CANCELLATION still skips this — only
       # a step-level failure is survivable.)
+      # One low-priority message a day (src/digest.py): is he trading, did
+      # anything move, is the system alive. The first watch run at or after
+      # 07:00 UTC sends it; the day is remembered in data/state/digest_sent_day.txt
+      # (committed below) so the ~10-minute cadence sends exactly one. It never
+      # touches alert-delivery health.
+      - name: Send the daily digest
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 2
+        run: python scripts/send_digest.py
       - name: Preserve observations for the discovery scanner
         id: discovery_snapshot
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}

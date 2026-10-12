@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-**Ezekiel** is an automated intelligence system that comprehensively logs every action performed by a specific Hyperliquid trader (codename: **"Ezekiel"**), builds a behavioral fingerprint from the data, and uses that fingerprint to identify the trader if they migrate to a new wallet.
+**Ezekiel** is an automated intelligence system that comprehensively logs every action performed by a specific Hyperliquid trader (codename: **"Ezekiel"**) and identifies **every Hyperliquid wallet he operates** — the wallets he runs beside the tracked one today, and any he migrates to — from fund flow, protocol links (agents, sub-accounts, referrals), his execution program, and his silences, so that the whole trader can be copy-traded rather than one address. (Mission widened 2026-10-12; it was originally "identify the trader if they migrate to a new wallet".)
 
 **Target Wallet:** `0x45d26f28196d226497130c4bac709d808fed4029`
 
@@ -22,7 +22,7 @@
 
 ## 2. Problem Statement
 
-The user copy-trades a specific Hyperliquid wallet manually. If this trader closes the wallet and opens a new one, the user loses the ability to follow their trades. Hyperliquid's API only returns the most recent ~2000 entries per endpoint, and historical data disappears over time. Without continuous recording, this data is permanently lost.
+The user copy-trades a specific Hyperliquid wallet manually. Two things defeat that: a wallet the trader already operates beside the tracked one, which the user does not know about and so does not follow; and the trader closing the wallet and opening a new one, which leaves the user following a dead address. Hyperliquid's API only returns the most recent ~2000 entries per endpoint, and historical data disappears over time. Without continuous recording, this data is permanently lost.
 
 ---
 
@@ -30,6 +30,7 @@ The user copy-trades a specific Hyperliquid wallet manually. If this trader clos
 
 | Priority | Goal |
 |----------|------|
+| **P0** | Identify and keep current the complete set of Hyperliquid wallets the trader operates, each with the evidence that it is his (roster tiers, casebook ranking, close watch, daily digest) |
 | **P0** | Permanently capture and store ALL historical and ongoing trading activity for the target wallet before data expires |
 | **P0** | Build a multi-dimensional behavioral fingerprint from collected data |
 | **P0** | Trace fund flows when withdrawals occur to directly find linked wallets |

@@ -37,6 +37,14 @@
 	$: findings = [...(circle?.findings || [])].reverse().slice(0, 25);
 	$: clusterFlows = [...(circle?.cluster_flows || [])].reverse().slice(0, 25);
 	$: pendingPayees = data?.watch?.l1_pending || [];
+	$: gate = data?.gate;
+	$: execMatches = (data?.execution?.matches || []).filter((m) => m.discriminating);
+	$: tapeHandoffs = data?.tape?.newcomer_handoffs || [];
+	$: digestLines = (data?.digest?.body || '').split('\n').filter(Boolean);
+
+	function pct(x) {
+		return typeof x === 'number' ? `${(100 * x).toFixed(1)}%` : 'unmeasured';
+	}
 </script>
 
 <svelte:head><title>Tripwires · Ezekiel</title></svelte:head>
@@ -77,6 +85,72 @@
 				{/each}
 			</tbody>
 		</table>
+	</section>
+
+	<section class="card">
+		<h2>
+			Execution-program vote gate
+			{#if gate?.open}
+				<span class="badge badge-green">open · {gate.path}</span>
+			{:else}
+				<span class="badge badge-grey">closed</span>
+			{/if}
+		</h2>
+		<p class="text-muted">
+			His SDK slicer's clip table votes only once the census has MEASURED a match rare (rule 4):
+			{gate?.why ?? '—'}. Two populations, the larger ceiling wins.
+		</p>
+		<table>
+			<thead><tr><th>Population</th><th>Read</th><th>Comparable</th><th>False-match ceiling</th><th></th></tr></thead>
+			<tbody>
+				<tr>
+					<td>Leaderboard census</td>
+					<td>{gate?.leaderboard?.attempted?.toLocaleString() ?? '—'}</td>
+					<td>{gate?.leaderboard?.comparable ?? '—'}</td>
+					<td>{pct(gate?.leaderboard?.ceiling)}</td>
+					<td class="text-muted">analyze.yml</td>
+				</tr>
+				<tr>
+					<td>Tape census (takers of his markets)</td>
+					<td>{gate?.tape?.attempted?.toLocaleString() ?? '—'}</td>
+					<td>{gate?.tape?.comparable ?? '—'}</td>
+					<td>{pct(gate?.tape?.ceiling)}</td>
+					<td class="text-muted">
+						{#if gate?.tape}{gate.tape.sketched?.toLocaleString()} wallets sketched over {gate.tape.windows} windows, {gate.tape.hits} program hit(s){:else}no window folded yet{/if}
+					</td>
+				</tr>
+			</tbody>
+		</table>
+		{#if execMatches.length}
+			<h3>Rare matches among candidates read</h3>
+			<ul>
+				{#each execMatches as m}
+					<li><Addr address={m.wallet} /> — {m.clips_matched}/{m.clips_compared} clips ({(m.clips_matched_coins || []).join(', ')}), rho {m.notional_structure_rho ?? '—'}, judged by {m.rarity_path}</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="text-muted">No candidate read reproduces his program rarely enough to vote.</p>
+		{/if}
+		{#if tapeHandoffs.length}
+			<h3>Newcomers born in his silence (tape)</h3>
+			<ul>
+				{#each tapeHandoffs as h}
+					<li><Addr address={h.wallet} /> — score {h.score}, {h.delay_days} d into a {h.gap_length} d silence{h.open ? ' (open now)' : ''}, on {(h.rare_markets || []).join(', ')}</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>Daily digest</h2>
+		{#if !data.digest}
+			<p class="text-muted">Not sent yet — written by <code>scripts/send_digest.py</code> at 07:00 UTC.</p>
+		{:else}
+			<p class="text-muted">{data.digest.title} · rendered {when(data.digest.computed_at)}</p>
+			<ul class="digest">
+				{#each digestLines as line}<li>{line}</li>{/each}
+			</ul>
+		{/if}
 	</section>
 
 	<section class="card">
@@ -197,4 +271,6 @@
 	section { margin-bottom: 20px; }
 	table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 	th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+	.digest { list-style: none; padding: 0; margin: 0; font-size: 0.9rem; }
+	.digest li { padding: 4px 0; border-bottom: 1px solid var(--border); }
 </style>

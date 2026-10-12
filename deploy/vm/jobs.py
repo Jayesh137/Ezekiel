@@ -34,6 +34,7 @@ JOBS: dict[str, dict] = {
             (["python", "scripts/check_circle_flows.py"], 240),
             (["python", "scripts/check_boundary.py"], 240),
             (["python", "scripts/check_feed_health.py", "other"], 120),
+            (["python", "scripts/send_digest.py"], 120),
         ],
     },
     "trace": {

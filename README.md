@@ -1,13 +1,20 @@
 # Ezekiel
 
-Tracks one Hyperliquid trader (`0x45d2…4029`, codename **Ezekiel**), builds a
-behavioural fingerprint from everything they do, and tries to re-identify them if
-they move to a new wallet.
+Tracks one Hyperliquid trader (`0x45d2…4029`, codename **Ezekiel**) and works
+out **every Hyperliquid wallet he operates** — the ones he runs beside this one
+today and any he moves to — from fund flow, protocol links, his trading program
+and his silences, so that all of him can be copy-traded, not one address.
 
-The problem it solves: the owner copy-trades this wallet manually. Hyperliquid's
-API only serves roughly the last 2,000 records per endpoint, so history that
-isn't captured is gone for good — and if the trader migrates without being
-detected, they're lost. Everything runs on free tiers.
+The problem it solves: the owner copy-trades this wallet manually. A wallet of
+his the owner does not know about is money the owner is not following, and if
+the trader migrates without being detected the owner follows a dead wallet.
+Hyperliquid's API only serves roughly the last 2,000 records per endpoint, so
+history that isn't captured is gone for good. Everything runs on free tiers.
+
+The current answer lives in the roster (`data/roster/latest.json`, tiers by how
+many independent vectors agree), the casebook (`python scripts/casebook.py top`,
+every suspect ranked), the close watch (what each known wallet is doing now) and
+the daily digest on the phone (the set, every morning).
 
 ## How it works
 

@@ -373,6 +373,7 @@
 	<h1>Dashboard</h1>
 	<p class="text-muted">
 		Tracking <Addr address={'0x45d26f28196d226497130c4bac709d808fed4029'} className="mono text-blue" />
+		— and every other Hyperliquid wallet he operates: see the Roster, the Casebook and the phone Review.
 	</p>
 </div>
 

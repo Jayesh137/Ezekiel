@@ -190,7 +190,9 @@ def measure_habits(fetch, addr: str, fills: list) -> dict | None:
 def write_census(state):
     ratios = [v["ratio"] for v in state["processed"].values() if v.get("ratio") is not None]
     rhos = [v["rho"] for v in state["processed"].values() if v.get("rho") is not None]
-    census = ep.summarise_census(ratios, rhos)
+    # `processed` holds only accounts whose fills were read, so its size is the
+    # number of attempts the comparability ceiling may count (rule 5).
+    census = ep.summarise_census(ratios, rhos, attempted=len(state["processed"]))
     census.update(computed_at=datetime.now(UTC).isoformat(),
                   measured=len(ratios), attempted=len(state["processed"]),
                   habit_measured=len(state.get("habits") or {}),
@@ -250,7 +252,8 @@ def run(*, limit, budget_seconds, fetch=None, leaderboard=None):
     census = write_census(state)
     print(f"[census] +{processed_now} this run; population measured "
           f"{census['measured']}/{census['attempted']}; ratio_p99={census['ratio_p99']}; "
-          f"ratio_max={census['ratio_max']}; hits={len(state['hits'])}")
+          f"ratio_max={census['ratio_max']}; comparable_upper={census.get('comparable_upper')}; "
+          f"hits={len(state['hits'])}")
     return census
 
 
