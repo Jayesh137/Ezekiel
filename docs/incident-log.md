@@ -2145,16 +2145,21 @@ gap itself was smaller than recorded: the graph re-judges dust from the stored v
 build, so a repriced record was always caught. **When a lead looks unbacked, read the
 record the vote was computed from, not the summary written beside it.**
 
-**The scan paged HIGH most middays for a benign listing lag (2026-10-08/09).** Three
-scan runs failed in the step "Acknowledge persisted observations and bound artifact
-storage" (`scripts/discovery_artifacts.py cleanup`): it lists the repo's artifacts and
-refuses to prune unless the checkpoint uploaded seconds earlier is in the list, and
-GitHub's listing sometimes had not caught up (6 artifacts in all, newest first, so not
-pagination; the next run always succeeded). Nothing was lost (the refusal keeps every
-artifact), but each failure opened "[pipeline] scan workflow failing" (#78, #83) and
-pushed HIGH to the operator's phone. A first read of the log blamed the push step,
-because the echoed script carries the text "cannot rebase: You have unstaged" in a
-comment; the push had in fact succeeded after one rebase. `cleanup` now re-lists up to
-four times, 10 s apart (inside the step's 2-minute limit), before concluding the
-checkpoint is missing; a checkpoint that never appears still refuses. **Grep a CI log for
-what the run printed, not for what its script says in comments.**
+**The scan paged HIGH twice for a benign listing lag (2026-10-08/09).** Three scan runs
+(10-08 12:18 and 13:33, 10-09 12:46 UTC) failed in the step "Acknowledge persisted
+observations and bound artifact storage" (`scripts/discovery_artifacts.py cleanup`): it
+lists the repo's artifacts and refuses to prune unless the checkpoint uploaded about half
+a second earlier is in the list, and GitHub's listing had not caught up (6 artifacts in
+all, newest first, so not pagination). Nothing was lost: the refusal keeps every
+artifact, and each next run restored the very checkpoint the failed one could not see
+(11550337811, 11553934672, 11617427754). The first failure each day opened "[pipeline]
+scan workflow failing" (#78, #83) and pushed HIGH to the operator's phone; the 13:33
+failure fell inside that issue's 6-hour re-ping window. A first read of the log blamed
+the push step, because the echoed script carries the text "cannot rebase: You have
+unstaged" in a comment; the push had in fact succeeded after one rebase. `cleanup` now
+re-lists up to four times, 10 s apart, before concluding the checkpoint is missing; a
+checkpoint that never appears still refuses, and a test pins the wait inside the step's
+2-minute limit. Its JSON reports `listings`: 1 is the normal case, more is the lag being
+absorbed. The lag is intermittent: none of the 61 runs from 10-09 14:01 to 10-12 failed
+on it. **Grep a CI log for what the run printed, not for what its script says in
+comments.**

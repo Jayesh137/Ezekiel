@@ -132,29 +132,35 @@ def test_artifact_restore_is_branch_scoped_and_failure_is_explicit(tmp_path):
 
 
 def test_artifact_cleanup_requires_acknowledged_checkpoint_and_keeps_two(tmp_path):
-    from scripts.discovery_artifacts import cleanup, prefix
+    from scripts.discovery_artifacts import ACK_ATTEMPTS, ACK_DELAY_SECONDS, cleanup, prefix
     class Client:
         truncated = False
-        deleted = []
+        def __init__(self):
+            self.calls, self.deleted = 0, []
         def artifacts(self):
+            self.calls += 1
             return [{'id': i, 'name': prefix('state', 'main') + str(i), 'expired': False} for i in [1, 2, 3]]
         def delete(self, artifact):
             self.deleted.append(artifact['id'])
     db = tmp_path / 'db'
     with DiscoveryStore(db):
         pass
-    client = Client()
+    client, naps = Client(), []
     with pytest.raises(ValueError):
-        cleanup(client, db, 'main', 999, sleep=lambda seconds: None)
+        cleanup(client, db, 'main', 999, sleep=naps.append)
+    # Refused only after every listing, with a nap between each and none after the last.
+    assert client.calls == ACK_ATTEMPTS and naps == [ACK_DELAY_SECONDS] * (ACK_ATTEMPTS - 1)
     assert not client.deleted
-    cleanup(client, db, 'main', 3)
-    assert client.deleted == [1]
+    client, naps = Client(), []
+    assert cleanup(client, db, 'main', 3, sleep=naps.append) == {
+        'deleted': 1, 'retained_checkpoints': 2, 'listings': 1}
+    assert client.deleted == [1] and naps == []
 
 
 def test_artifact_cleanup_waits_for_the_listing_to_show_a_fresh_upload(tmp_path):
-    # Measured 2026-10-08/09: three scan runs failed, and paged HIGH, because GitHub's
+    # Measured 2026-10-08/09: three scan runs failed (two paging HIGH) because GitHub's
     # artifact listing had not yet caught up with the checkpoint uploaded seconds before.
-    from scripts.discovery_artifacts import cleanup, prefix
+    from scripts.discovery_artifacts import ACK_DELAY_SECONDS, cleanup, prefix
     class Lagging:
         truncated = False
         def __init__(self):
@@ -169,8 +175,10 @@ def test_artifact_cleanup_waits_for_the_listing_to_show_a_fresh_upload(tmp_path)
     with DiscoveryStore(db):
         pass
     naps, client = [], Lagging()
-    cleanup(client, db, 'main', 3, sleep=naps.append)
-    assert client.calls == 2 and len(naps) == 1 and client.deleted == [1]
+    report = cleanup(client, db, 'main', 3, sleep=naps.append)
+    assert client.calls == 2 and naps == [ACK_DELAY_SECONDS] and client.deleted == [1]
+    # The step's JSON says the lag was absorbed: a live run with listings > 1 is the fix working.
+    assert report['listings'] == 2
 
 
 @pytest.mark.parametrize('corrupt_zip', [False, True])

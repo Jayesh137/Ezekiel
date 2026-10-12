@@ -135,8 +135,9 @@ def restore_state(client, db_path, state_path, branch, *, read_only=False, impor
     return report
 
 
-# GitHub's artifact listing can trail an upload made seconds before it: three scan runs
-# failed on that, and each paged HIGH, before the next run recovered (2026-10-08/09).
+# GitHub's artifact listing can trail an upload made half a second before it: three scan
+# runs failed on that, two of them paging HIGH, and each next run restored the very
+# checkpoint the failed one could not see (2026-10-08/09).
 ACK_ATTEMPTS = 4
 ACK_DELAY_SECONDS = 10
 
@@ -159,7 +160,8 @@ def cleanup(client, db_path, branch, uploaded_id, *, attempts=ACK_ATTEMPTS,
         if a['name'].startswith(prefix('observations', branch)) and str(a['id']) in imported]
     for artifact in removable[:200]:
         client.delete(artifact)
-    return {'deleted': min(200, len(removable)), 'retained_checkpoints': min(2, len(checkpoints))}
+    return {'deleted': min(200, len(removable)), 'retained_checkpoints': min(2, len(checkpoints)),
+            'listings': attempt + 1}
 
 
 def main():
