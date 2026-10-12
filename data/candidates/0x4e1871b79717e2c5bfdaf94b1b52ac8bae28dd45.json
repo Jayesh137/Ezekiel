@@ -1,14 +1,14 @@
 {
   "wallet": "0x4e1871b79717e2c5bfdaf94b1b52ac8bae28dd45",
-  "last_checked": "2026-10-11T22:21:44.223541+00:00",
+  "last_checked": "2026-10-12T19:59:32.355329+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-27T15:06:34.653231+00:00",
   "discovery_sources": [
     "bridge_depositor",
     "newborn"
   ],
-  "last_successful_read": "2026-10-11T22:21:44.223541+00:00",
-  "last_positive_evidence": "2026-10-11T22:21:37.572495+00:00",
+  "last_successful_read": "2026-10-12T19:59:32.355329+00:00",
+  "last_positive_evidence": "2026-10-12T19:59:26.616401+00:00",
   "observations": [
     {
       "status": "ok",
@@ -304,33 +304,58 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-11T22:21:37.572495+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1790020764622,
+      "coverage": {
+        "start_ms": 1790020764622,
+        "end_ms": 1791835164622,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790020764622,
+        "requested_start_ms": 1790020764622,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1791835164622,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-12T19:59:26.616401+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1789942895721,
-    "end_ms": 1791757295721,
+    "start_ms": 1790020764622,
+    "end_ms": 1791835164622,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1789942895721,
-    "requested_start_ms": 1789942895721,
+    "fetched_start_ms": 1790020764622,
+    "requested_start_ms": 1790020764622,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-10-11T22:21:44.223541+00:00",
-  "last_scored": "2026-10-11T22:21:44.223541+00:00",
+  "last_seen": "2026-10-12T19:59:32.355329+00:00",
+  "last_scored": "2026-10-12T19:59:32.355329+00:00",
   "best_score": 0.3475,
-  "latest_score": 0.2835,
+  "latest_score": 0.3327,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style"
+      "Similar market/limit execution style",
+      "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
@@ -343,10 +368,7 @@
         "NEAR"
       ],
       "candidate_only": [
-        "ADA",
-        "CAKE",
-        "PENGU",
-        "kSHIB"
+        "CAKE"
       ],
       "overlap_count": 0,
       "rare_overlap": [],
@@ -359,7 +381,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2835,
+      "score_without_bonus": 0.3327,
       "explanations": [],
       "frequencies": {}
     },
@@ -368,39 +390,18 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.6382,
+        "relative_size_dispersion": 0.3763,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 2,
+      "independent_sessions": 1,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::ADA:1790003948662:1001548138593423",
-        "fill::ADA:1790003948662:102799993674298",
-        "fill::ADA:1790003948662:1029118312081261",
-        "fill::ADA:1790003948662:1072557729231020",
-        "fill::ADA:1790003948662:118439392673543",
-        "fill::ADA:1790003948662:123486771477358",
-        "fill::ADA:1790003948662:137372519221861",
-        "fill::ADA:1790003948662:166504924825740",
-        "fill::ADA:1790003948662:231043139620022",
-        "fill::ADA:1790003948662:280234962142514",
-        "fill::ADA:1790003948662:285531149433311",
-        "fill::ADA:1790003948662:290277502380044",
-        "fill::ADA:1790003948662:310783102340011",
-        "fill::ADA:1790003948662:337859128281619",
-        "fill::ADA:1790003948662:479473280889599",
-        "fill::ADA:1790003948662:499802876549009",
-        "fill::ADA:1790003948662:601209166752784",
-        "fill::ADA:1790003948662:646446710130401",
-        "fill::ADA:1790003948662:670366178326931",
-        "fill::ADA:1790003948662:743230576758996",
-        "fill::ADA:1790003948662:768385895090301",
         "fill::CAKE:1791480182031:1017087122886353",
         "fill::CAKE:1791480182031:104081101591815",
         "fill::CAKE:1791480182031:1044113068751620",
@@ -566,76 +567,7 @@
         "fill::CAKE:1791480185068:959468827739254",
         "fill::CAKE:1791480185068:964854639007804",
         "fill::CAKE:1791480185068:99126920847161",
-        "fill::CAKE:1791480185068:996734993167625",
-        "fill::PENGU:1790006309412:196398280146135",
-        "fill::PENGU:1790006309412:535361935933725",
-        "fill::PENGU:1790006309412:586730002518722",
-        "fill::PENGU:1790006309412:694122830038329",
-        "fill::PENGU:1790006309412:915885005788574",
-        "fill::PENGU:1790006311020:1026438448097363",
-        "fill::PENGU:1790006311020:1113252008097687",
-        "fill::PENGU:1790006311020:180217368768313",
-        "fill::PENGU:1790006311020:464187788866336",
-        "fill::PENGU:1790006311020:482794639822360",
-        "fill::PENGU:1790006311020:503663173526018",
-        "fill::PENGU:1790006311020:773372769597436",
-        "fill::PENGU:1790006311020:797406693534522",
-        "fill::PENGU:1790006311020:918609027871282",
-        "fill::PENGU:1790006311020:957928206987748",
-        "fill::PENGU:1790006313689:141935700601888",
-        "fill::PENGU:1790006313689:163896392233513",
-        "fill::PENGU:1790006313689:353698164109480",
-        "fill::PENGU:1790006313689:658288813364241",
-        "fill::PENGU:1790006313689:728851351687292",
-        "fill::PENGU:1790006313689:843154478535043",
-        "fill::PENGU:1790006313689:967122294311272",
-        "fill::PENGU:1790006316200:482847339138350",
-        "fill::PENGU:1790006316200:500980982361328",
-        "fill::PENGU:1790006316200:613579810254078",
-        "fill::PENGU:1790006316200:701294197434100",
-        "fill::PENGU:1790006316200:731936579963214",
-        "fill::PENGU:1790006316200:79612451275844",
-        "fill::PENGU:1790006316200:969966703730250",
-        "fill::PENGU:1790006318012:1038559385324791",
-        "fill::PENGU:1790006318012:1049455997109296",
-        "fill::PENGU:1790006318012:192846671805521",
-        "fill::PENGU:1790006318012:560206240068104",
-        "fill::PENGU:1790006318012:653677596504701",
-        "fill::PENGU:1790006320709:265125048652488",
-        "fill::PENGU:1790006320709:682628556073562",
-        "fill::PENGU:1790006320709:870631871663666",
-        "fill::PENGU:1790006320709:902867979779415",
-        "fill::PENGU:1790006324074:1045778643472578",
-        "fill::PENGU:1790006324074:1076746895288129",
-        "fill::PENGU:1790006324074:150729958313089",
-        "fill::PENGU:1790006324074:215717368041201",
-        "fill::PENGU:1790006324074:308230379303335",
-        "fill::PENGU:1790006324074:395367613727334",
-        "fill::PENGU:1790006324074:511653339983986",
-        "fill::PENGU:1790006324074:526145376882956",
-        "fill::PENGU:1790006324074:717069898761108",
-        "fill::PENGU:1790006324074:752320950833052",
-        "fill::PENGU:1790006324074:902407067825366",
-        "fill::PENGU:1790006327751:1010350917719609",
-        "fill::PENGU:1790006327751:1036514359530921",
-        "fill::PENGU:1790006327751:172040584225373",
-        "fill::PENGU:1790006327751:433512591230097",
-        "fill::PENGU:1790006327751:746300070678953",
-        "fill::PENGU:1790006327751:749621459148423",
-        "fill::PENGU:1790006327751:961316154761407",
-        "fill::PENGU:1790006330383:1074158603141637",
-        "fill::PENGU:1790006330383:225892631853276",
-        "fill::PENGU:1790006330383:576665344676361",
-        "fill::PENGU:1790006330383:657568381953351",
-        "fill::PENGU:1790006330383:724608899335947",
-        "fill::PENGU:1790006330383:868450033565850",
-        "fill::PENGU:1790006330383:869327691094436",
-        "fill::PENGU:1790006330383:989351675739903",
-        "fill::PENGU:1790006330383:991242949847479",
-        "fill::PENGU:1790006331689:1021408889848954",
-        "fill::PENGU:1790006331689:187684708744008",
-        "fill::PENGU:1790006331689:239166880251191",
-        "fill::PENGU:1790006331689:373646074740102"
+        "fill::CAKE:1791480185068:996734993167625"
       ]
     },
     "tooling": {
@@ -917,9 +849,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-12T19:59:32.355329+00:00",
+      "score": 0.3327,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.422,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.2995,
+        "trade_sequencing": 0.5561,
+        "position_sizing": 0.1677,
+        "order_profile": 0.7118,
+        "activity": 0.6793,
+        "direction_bias": null,
+        "position_management": 0.8146,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2873,
+  "recent_avg_score": 0.2895,
   "last_investigated_ms": 1791709066519
 }
