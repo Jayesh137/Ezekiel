@@ -2163,3 +2163,61 @@ checkpoint that never appears still refuses, and a test pins the wait inside the
 absorbed. The lag is intermittent: none of the 61 runs from 10-09 14:01 to 10-12 failed
 on it. **Grep a CI log for what the run printed, not for what its script says in
 comments.**
+
+**The sharpest vector was muted by its own census, and the tape was being thrown
+away (2026-10-12).** The execution-program vote waited for a p99 over 20 COMPARABLE
+controls — strangers carrying a constant-clip table on two or more of his coins —
+and after 252 leaderboard reads there were 2. At that rate (one per ~125 reads) the
+vote was years off, while the thing the census was failing to measure was the
+rarity itself: almost nobody runs a fixed-clip slicer on his coins. A stranger can
+reproduce his sizes only if it is comparable, so P(match) ≤ P(comparable), and
+P(comparable) is a binomial proportion measured over 252 reads whose Wilson 95%
+upper limit is 2.85%. `execution_program.bounded_rare` lets a STRONG match (ratio
+≥0.75 over ≥3 clips, or rank-structure rho ≥0.9 over ≥4 coins — the identity of 4
+is 1 in 24 by chance, of 3 it is 1 in 6) vote when that ceiling is ≤5% (LR ≥20); no
+bar moved and the bound assumes every comparable stranger would match in full.
+`rarity_path` names the path and the alert says which coins matched — round sizes
+on majors are common, ZEC 1 / SILVER 20 / NEAR 250 are not. `merge_census` takes
+the LARGER ceiling of two populations, because the detector's candidates are drawn
+from wallets trading his markets, where comparability is likelier than on the
+leaderboard at large. The committed `census.json` was regenerated from the committed
+state so the gate reads the bound on the next trace run. **A statistic that cannot
+form is sometimes the measurement.**
+
+The tape (`tape.yml`, a ~150 s window of his 43 markets every run) saw 461 distinct
+takers in a 90 s probe — 7-19 on each of his `xyz:` markets — and kept nothing but an
+exact-clip burst. `src/tape_census.py` folds every window into a bounded per-wallet
+sketch (sizes per coin, first/last seen; 3,000 wallets, ~0.5 MB compact, comparable
+sketches evicted last) and reads it three ways: a second execution census on the
+takers of his markets (the reference class the detector actually draws from), a
+venue-wide screen for his table or its rank structure (hits become `tape_census`
+candidates, and `check_execution_program.select_candidates` now reserves a slice for
+registry leads — a registry-only wallet carries no vector and sorted below every
+wallet with one, so a tape hit was otherwise never read), and newcomers in size on a
+rare market whose REAL birth is read from `portfolio` and judged against his
+silences — the closed anomalous gaps and, new, the one open right now, which
+`handoff_score` cannot see because it is not yet a gap in his day list. A newcomer
+born inside one alerts through the dormancy detector's own alert and key. Live
+120 s probe: 700 wallets sketched, 7 judgeable, 0 comparable, 15 newcomers ≥$25K,
+8 births read, none in a silence (he traded that day — correct).
+
+And one quiet digest a day (`src/digest.py`, `scripts/send_digest.py`, watch.yml at
+07:00 UTC, LOW priority, outside delivery health): the owner could not tell a quiet
+day from a dead system, because only CRITICAL and HIGH reach the phone. Rendered
+from production data on the first run it said: last fill 8 h ago, silence 0 d
+against p90 7 d, $84.3M, 0/0/21 beyond his known wallets, gate closed (ceiling
+unmeasured until the regenerated census landed), and the two pages of the previous
+24 h — the 9.3-day silence and the stalled frontier.
+
+**The mission was widened (2026-10-12, operator's instruction).** It had read "find
+this trader's other Hyperliquid wallets, and catch him the moment he moves to a new
+one"; the operator asked for the project to "track in general / identify his other
+wallets (to help with copy trading him)", not only the migration. The deliverable is
+now the COMPLETE, CURRENT set of Hyperliquid wallets he operates, each with its
+evidence — a migration is the urgent special case of a new member appearing, and a
+wallet he already runs beside this one is the other failure. Reflected in CLAUDE.md
+(mission, "what counts as a result", a rule that an idle CONFIRMED wallet stays in
+the set), README, PRD, the dashboard home, the phone-facing daily digest (a "His
+other wallets" line read off the close watch: known and CONFIRMED only, never a
+wallet watched as a question) and the project memory. No detector changed: every
+vector already produced "a wallet of his" rather than "a migration".

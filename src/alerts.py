@@ -582,6 +582,49 @@ def _send_webhooks(subject: str, body: str) -> list[str]:
     return delivered
 
 
+def send_notice(title: str, body: str, priority: str = "low") -> list[str]:
+    """Deliver a scheduled NOTICE on the instant channels, quietly.
+
+    For the daily digest only (`src/digest.py`): a message the operator asked
+    to receive on a schedule, not a detection. It bypasses the severity gate on
+    purpose and is sent at LOW priority (ntfy shows it without a sound), and it
+    records nothing in delivery health — a digest that fails to arrive says
+    nothing about the channel a CRITICAL needs, and counting it would be the
+    INFO-pins-healthy-false mistake again. Never raises; returns the channels
+    that took it.
+    """
+    delivered: list[str] = []
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat = os.environ.get("TELEGRAM_CHAT_ID")
+    if token and chat:
+        try:
+            import requests
+            r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                              json={"chat_id": chat, "text": (title + "\n\n" + body)[:4000],
+                                    "disable_web_page_preview": True,
+                                    "disable_notification": True}, timeout=20)
+            if r.status_code == 200:
+                delivered.append("telegram")
+            else:
+                print(f"[alerts] Telegram rejected the notice (HTTP {r.status_code})")
+        except Exception as exc:                      # noqa: BLE001 - transport
+            print(f"[alerts] Telegram notice failed ({type(exc).__name__}): {exc}")
+    topic = os.environ.get("NTFY_TOPIC")
+    if topic:
+        try:
+            import requests
+            r = requests.post(f"https://ntfy.sh/{topic}", data=body.encode("utf-8"),
+                              headers={"Title": title.encode("ascii", "ignore").decode(),
+                                       "Priority": priority, "Tags": "clipboard"}, timeout=20)
+            if r.status_code == 200:
+                delivered.append("ntfy")
+            else:
+                print(f"[alerts] ntfy rejected the notice (HTTP {r.status_code})")
+        except Exception as exc:                      # noqa: BLE001 - transport
+            print(f"[alerts] ntfy notice failed ({type(exc).__name__}): {exc}")
+    return delivered
+
+
 def send_alert(subject: str, body: str, html_body: str | None = None) -> bool:
     """Deliver an alert on every configured channel. True if any took it.
 
@@ -692,11 +735,27 @@ def alert_execution_program_match(wallet: str, match: dict, severity: str) -> bo
     ratio = match.get("clip_match_ratio")
     matched = match.get("clips_matched")
     compared = match.get("clips_compared")
+    coins = match.get("clips_matched_coins") or []
+    coins_line = f"Matched clips: {', '.join(str(c) for c in coins)}.\n" if coins else ""
+    rho = match.get("notional_structure_rho")
+    rho_line = (f"Per-coin size structure (rank rho): {rho} over "
+                f"{match.get('notional_coins_compared')} coins.\n") if rho is not None else ""
+    how = {
+        "exact": "the exact clip match beats the census's 99th percentile",
+        "structure": "the size-rank structure beats the census's 99th percentile",
+        "bounded": "comparable strangers are measured at most 5% of the venue "
+                   "(Wilson 95% ceiling), and this match is strong",
+    }.get(match.get("rarity_path"))
+    path_line = f"Judged rare because {how}.\n" if how else ""
     reading = (
         f"Reproduces {matched} of {compared} of the target's per-coin clip sizes "
         f"(match ratio {ratio}).\n"
+        f"{coins_line}{rho_line}"
         f"Cadence agreement: {match.get('cadence_agreement')}; "
         f"5% IOC offset agreement: {match.get('offset_agreement')}.\n"
+        f"{path_line}"
+        f"Round sizes on majors (BTC 0.1, ETH 2, XRP 1000) are common; his odd sizes "
+        f"(ZEC 1, SILVER 20, NEAR 250) are not: weigh WHICH coins matched.\n"
     )
     if match.get("known_self"):
         subject = (f"[EZEKIEL] {severity}: Execution Program on a KNOWN Wallet of His "

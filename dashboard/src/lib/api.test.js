@@ -144,3 +144,30 @@ test('the trace feeds are on the detector list', () => {
 	const names = new Set(FEEDS2.map((f) => f.name.toLowerCase()));
 	for (const n of ['boundary attribution', 'his perimeter', 'funding provenance']) assert.ok(names.has(n), n);
 });
+
+import { executionGate } from './api.js';
+
+test('the execution gate opens on the comparability bound when the p99 cannot form', () => {
+	const leaderboard = { population: 2, ratio_p99: 0, attempted: 252, comparable_upper: 0.0285 };
+	const gate = executionGate(leaderboard, null);
+	assert.equal(gate.open, true);
+	assert.equal(gate.path, 'bounded');
+	assert.match(gate.why, /2\.9% of 252 read/);
+});
+
+test('the larger ceiling of the two populations decides, never the kinder', () => {
+	const leaderboard = { population: 2, ratio_p99: 0, attempted: 252, comparable_upper: 0.0285 };
+	const tape = { source: 'tape', population: 30, attempted: 300, comparable_upper: 0.13, sketch_wallets: 2900, windows: 40, hits: [] };
+	const gate = executionGate(leaderboard, tape);
+	assert.equal(gate.open, false);
+	assert.match(gate.why, /13\.0%.*above the 5% cap/);
+	assert.equal(gate.tape.sketched, 2900);
+});
+
+test('a young tape census does not count and no census means closed', () => {
+	const young = { source: 'tape', population: 0, attempted: 40, comparable_upper: null };
+	assert.equal(executionGate(null, young).open, false);
+	assert.equal(executionGate(null, null).why, 'no census has read 200 accounts yet');
+	const p99 = { population: 40, ratio_p99: 0.3, attempted: 400, comparable_upper: 0.2 };
+	assert.equal(executionGate(p99, null).path, 'p99');
+});

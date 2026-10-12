@@ -57,25 +57,72 @@ def load_target_signature(*, fills=None, orders=None):
     return sig
 
 
-def load_census():
+def _read_json(path):
     try:
-        with open(OUT_DIR / "census.json") as handle:
-            return json.load(handle)
+        with open(path) as handle:
+            data = json.load(handle)
+            return data if isinstance(data, dict) else None
     except (OSError, ValueError):
         return None
 
 
-def select_candidates(roster_candidates, discovery, clip_coins, cap=MAX_CANDIDATES):
-    """Roster leads plus fresh wallets seen trading his clipped coins.
+def load_census():
+    """The leaderboard census merged with the tape census (`src/tape_census.py`).
+
+    Each measures comparability on its own population — the leaderboard at
+    large, and the takers of his markets — and the gate takes the LARGER ceiling
+    (`execution_program.merge_census`), never the kinder one.
+    """
+    leaderboard = _read_json(OUT_DIR / "census.json")
+    tape = _read_json(DATA_DIR / "tape" / "census.json")
+    return ep.merge_census(leaderboard, tape)
+
+
+# Registry sources whose observations say "this wallet trades like his program":
+# the live tape's exact-clip bursts, the leaderboard census, the tape census's
+# sketch screen and a newcomer born in his silence. Each is a lead the detector
+# must READ (real fills, the census gate) — left to roster order, a registry-only
+# wallet carries no vector and sorts below every wallet that has one.
+REGISTRY_SOURCES = ("tape_census", "execution_program_tape", "execution_program_census",
+                    "tape_handoff")
+REGISTRY_RESERVE = 10
+
+
+def registry_candidates(rows, sources=REGISTRY_SOURCES, limit=REGISTRY_RESERVE):
+    """Registry wallets observed by one of `sources`, newest positive evidence first."""
+    wanted = set(sources)
+    picked = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        wallet = str(row.get("wallet") or "").lower()
+        if wallet and wanted & set(row.get("discovery_sources") or []):
+            picked.append((str(row.get("last_positive_evidence") or ""), wallet))
+    picked.sort(key=lambda p: (p[0], p[1]), reverse=True)
+    out = []
+    for _, wallet in picked:
+        if wallet not in out:
+            out.append(wallet)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def select_candidates(roster_candidates, discovery, clip_coins, cap=MAX_CANDIDATES,
+                      registry=None):
+    """Roster leads, registry leads, and fresh wallets seen trading his clipped coins.
 
     A migration wallet is small and new — outside the leaderboard and off the
     roster for a long time — so checking only roster candidates would find it late
     or never. The discovery tape sees whoever trades his markets; a wallet trading
     a coin he runs a fixed clip on is exactly where his script would surface first.
     A slice of the budget is reserved for these so roster leads cannot crowd them
-    out (the "reserve exploration capacity" lesson). Deterministic and deduped.
+    out (the "reserve exploration capacity" lesson), and another for `registry`
+    wallets the tape and census screens flagged (`registry_candidates`), which the
+    roster would otherwise rank last. Deterministic and deduped.
     """
     clip_coins = {c for c in (clip_coins or set())}
+    registry_wallets = [str(w).lower() for w in (registry or [])]
     ordered_roster = [str(w).lower() for w in (roster_candidates or [])]
     fresh = []
     for row in (discovery or {}).get("candidates", []):
@@ -86,6 +133,7 @@ def select_candidates(roster_candidates, discovery, clip_coins, cap=MAX_CANDIDAT
     fresh.sort(key=lambda wc: (-wc[1], wc[0]))
     fresh_wallets = [w for w, _ in fresh]
     reserved = max(0, cap // 2)
+    reserved_registry = min(len(registry_wallets), max(0, cap // 6))
     picked, seen = [], set()
 
     def add(wallet):
@@ -93,8 +141,12 @@ def select_candidates(roster_candidates, discovery, clip_coins, cap=MAX_CANDIDAT
             seen.add(wallet)
             picked.append(wallet)
 
-    # Roster leads first (they carry evidence), leaving the reserved tail for fresh.
-    for wallet in ordered_roster[:cap - min(reserved, len(fresh_wallets))]:
+    # Roster leads first (they carry evidence), leaving reserved tails for the
+    # registry's screened leads and for fresh wallets.
+    head = cap - min(reserved, len(fresh_wallets)) - reserved_registry
+    for wallet in ordered_roster[:max(0, head)]:
+        add(wallet)
+    for wallet in registry_wallets[:reserved_registry]:
         add(wallet)
     for wallet in fresh_wallets:
         if len(picked) >= cap:
@@ -124,9 +176,12 @@ def load_discovery():
 
 
 def candidate_wallets(config, roster, clip_coins):
+    from src.candidate_registry import iter_candidates
     from src.roster import detector_candidates
     roster_candidates = detector_candidates(config, roster, MAX_CANDIDATES)
-    return select_candidates(roster_candidates, load_discovery(), clip_coins, MAX_CANDIDATES)
+    registry = registry_candidates(iter_candidates(DATA_DIR))
+    return select_candidates(roster_candidates, load_discovery(), clip_coins, MAX_CANDIDATES,
+                             registry=registry)
 
 
 def order_by_staleness(wallets, last_checked):
@@ -154,7 +209,8 @@ def carry_forward(previous, wallets, read_wallets, census):
         wallet = (match.get("wallet") or "").lower()
         if wallet in keep:
             out.append({**match, "carried_forward": True,
-                        "discriminating": ep.is_discriminating(match, census)})
+                        "discriminating": ep.is_discriminating(match, census),
+                        "rarity_path": ep.rarity_path(match, census)})
     return out
 
 
@@ -205,6 +261,7 @@ def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_w
         matches.append({
             **match,
             "discriminating": ep.is_discriminating(match, census),
+            "rarity_path": ep.rarity_path(match, census),
             "has_independent_vector": bool(vectors & INDEPENDENT_VECTORS),
             "known_self": wallet in known_self,
         })
@@ -213,6 +270,8 @@ def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_w
         "target_clip_count": len(target_sig.get("clip_table") or {}),
         "census_present": census is not None,
         "census_population": (census or {}).get("population"),
+        "census_comparable_upper": (census or {}).get("comparable_upper"),
+        "census_attempted": (census or {}).get("attempted"),
         "matches": matches,
     }
 

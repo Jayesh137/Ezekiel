@@ -701,7 +701,9 @@ export const DETECTOR_FEEDS = [
 	{ name: 'Boundary attribution', path: 'data/boundary/latest.json', key: 'computed_at', limitMin: 360 },
 	{ name: 'His perimeter', path: 'data/perimeter/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Funding provenance', path: 'data/provenance/latest.json', key: 'computed_at', limitMin: 720 },
-	{ name: 'Casebook', path: 'data/casebook/latest.json', key: 'computed_at', limitMin: 720 }
+	{ name: 'Casebook', path: 'data/casebook/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Live tape', path: 'data/tape/latest.json', key: 'computed_at', limitMin: 360 },
+	{ name: 'Execution program', path: 'data/execution_program/latest.json', key: 'computed_at', limitMin: 720 }
 ];
 
 /**
@@ -746,20 +748,64 @@ export function feedStatus(doc, feed, blind = {}, nowMs = Date.now()) {
 }
 
 export async function fetchTripwires() {
-	const [feeds, sentinels, circle, watch, blindWatch, blindOther] = await Promise.all([
-		Promise.all(DETECTOR_FEEDS.map((f) => fetchJSON(f.path))),
-		fetchJSON('data/deposit_sentinels/latest.json'),
-		fetchJSON('data/circle_flows/latest.json'),
-		fetchJSON('data/watchlist/latest.json'),
-		fetchJSON('data/feed_health/watch.json'),
-		fetchJSON('data/feed_health/other.json')
-	]);
+	const [feeds, sentinels, circle, watch, blindWatch, blindOther, census, tapeCensus, tape, execution, digest] =
+		await Promise.all([
+			Promise.all(DETECTOR_FEEDS.map((f) => fetchJSON(f.path))),
+			fetchJSON('data/deposit_sentinels/latest.json'),
+			fetchJSON('data/circle_flows/latest.json'),
+			fetchJSON('data/watchlist/latest.json'),
+			fetchJSON('data/feed_health/watch.json'),
+			fetchJSON('data/feed_health/other.json'),
+			fetchJSON('data/execution_program/census.json'),
+			fetchJSON('data/tape/census.json'),
+			fetchJSON('data/tape/latest.json'),
+			fetchJSON('data/execution_program/latest.json'),
+			fetchJSON('data/digest/latest.json')
+		]);
 	const blind = blindSince(blindWatch, blindOther);
 	return {
 		feeds: DETECTOR_FEEDS.map((f, i) => ({ ...f, ...feedStatus(feeds[i], f, blind) })),
 		sentinels,
 		circle,
-		watch
+		watch,
+		gate: executionGate(census, tapeCensus),
+		tape,
+		execution,
+		digest
+	};
+}
+
+// Mirrors src/execution_program.is_discriminating's three paths for display only:
+// a p99 from >= 20 comparable controls (exact or structure), or the comparability
+// bound — the LARGER Wilson ceiling of the two populations, at most 5%, over >= 200
+// reads. The Python decides the vote; this says why it is open or closed.
+export const GATE_MIN_POPULATION = 20;
+export const GATE_MIN_ATTEMPTS = 200;
+export const GATE_MAX_CEILING = 0.05;
+
+export function executionGate(census, tapeCensus) {
+	const parts = [census, tapeCensus].filter((c) => c && typeof c === 'object');
+	const bounds = parts
+		.filter((c) => typeof c.comparable_upper === 'number' && (c.attempted || 0) >= GATE_MIN_ATTEMPTS)
+		.map((c) => ({ ceiling: c.comparable_upper, attempted: c.attempted, source: c.source || 'leaderboard' }));
+	const bound = bounds.length ? bounds.reduce((a, b) => (b.ceiling > a.ceiling ? b : a)) : null;
+	const population = census?.population || 0;
+	const p99Open = population >= GATE_MIN_POPULATION && typeof census?.ratio_p99 === 'number';
+	const boundOpen = !!bound && bound.ceiling <= GATE_MAX_CEILING;
+	let why;
+	if (p99Open) why = `a 99th percentile measured over ${population} comparable controls`;
+	else if (boundOpen) why = `comparable strangers are at most ${(100 * bound.ceiling).toFixed(1)}% of ${bound.attempted} read (${bound.source})`;
+	else if (bound) why = `comparable strangers may be ${(100 * bound.ceiling).toFixed(1)}% of the population — above the 5% cap`;
+	else why = 'no census has read 200 accounts yet';
+	return {
+		open: p99Open || boundOpen,
+		path: p99Open ? 'p99' : boundOpen ? 'bounded' : null,
+		why,
+		leaderboard: census ? { attempted: census.attempted ?? null, comparable: census.population ?? 0,
+			ceiling: census.comparable_upper ?? null } : null,
+		tape: tapeCensus ? { attempted: tapeCensus.attempted ?? null, comparable: tapeCensus.population ?? 0,
+			ceiling: tapeCensus.comparable_upper ?? null, sketched: tapeCensus.sketch_wallets ?? null,
+			windows: tapeCensus.windows ?? null, hits: (tapeCensus.hits || []).length } : null
 	};
 }
 

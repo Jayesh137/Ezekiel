@@ -366,7 +366,8 @@ def save_snapshot(directory: str, data: dict | list) -> str:
         json.dump(data, f, indent=2)
     return str(filepath)
 
-def atomic_write_json(path: str | Path, data: dict | list, *, sort_keys: bool = False) -> None:
+def atomic_write_json(path: str | Path, data: dict | list, *, sort_keys: bool = False,
+                      compact: bool = False) -> None:
     """Write JSON to `path` atomically: write-then-rename, not truncate-in-place.
 
     A kill during a plain `open(path, "w")` leaves a truncated file on disk. For
@@ -380,13 +381,19 @@ def atomic_write_json(path: str | Path, data: dict | list, *, sort_keys: bool = 
     Shared rather than reimplemented per caller: save_latest below and
     src/tracer.py's marker both need exactly this, and a second, slightly
     different hand-rolled version is how one of them would eventually drift.
+
+    `compact` drops the indentation: for a large committed memory rewritten
+    every run (the tape sketches), the pretty form roughly doubles every blob.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.parent / f".{path.name}.{os.getpid()}.tmp"
     try:
         with open(tmp, "w") as f:
-            json.dump(data, f, indent=2, sort_keys=sort_keys)
+            if compact:
+                json.dump(data, f, separators=(",", ":"), sort_keys=sort_keys)
+            else:
+                json.dump(data, f, indent=2, sort_keys=sort_keys)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)

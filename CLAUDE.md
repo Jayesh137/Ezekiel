@@ -1,17 +1,33 @@
 # Ezekiel — the mission
 
-**Find this trader's other HYPERLIQUID wallets, and catch him the moment he
-moves to a new one.**
+**Identify every HYPERLIQUID wallet this trader operates — the ones he runs today
+and any he moves to — so the owner can copy-trade all of him, not one address.**
+(Mission widened 2026-10-12, on the operator's instruction; it had read "catch him
+the moment he moves to a new one".)
 
 Target: `0x45d26f28196d226497130c4bac709d808fed4029` (Hyperliquid, possibly GCR).
-The owner copy-trades him manually. If he migrates undetected, the owner is
-following a dead wallet and the project has failed at the only thing it does.
+The owner copy-trades him manually. Two ways that fails, and this project exists
+to prevent both:
+
+- **A wallet he already runs beside this one is unknown.** He splits activity
+  across accounts (his own FTX screenshots show "positions on all subaccounts"
+  aggregated, img007); a quarter of him is what a single perp account shows
+  (img337). Every wallet of his the owner does not know about is money the owner
+  is not following today.
+- **He migrates undetected.** The owner is then following a dead wallet. A
+  migration is the urgent special case of the first failure: a new wallet of his
+  appearing.
 
 He almost certainly has other wallets already. Assume so, and hunt accordingly.
+**The deliverable is the complete, current set of his Hyperliquid wallets, each
+with the evidence that says it is his**, kept current as it changes — the roster
+(tiers), the casebook (ranked suspects), the close watch (what each known wallet
+is doing now) and the daily digest (the set, every morning).
 
 Everything else in this repo — the graph, the scanner, the correlator, the
 accounting — exists only to serve that. When a design choice is unclear, pick the
-one that makes an undetected migration less likely.
+one that makes an unknown wallet of his less likely to stay unknown, and an
+undetected migration less likely.
 
 ## What counts as a result
 
@@ -39,7 +55,12 @@ nothing to him, however interesting it is otherwise. So:
 - A worked example of this rule biting: the GCR Ethereum cluster below is
   confirmed, traced across four chains, and **reaches no Hyperliquid account**.
   Real work, correctly done, and it did not move the mission. Good research on
-  the wrong chain still leaves the owner following a dead wallet.
+  the wrong chain still leaves the owner following an incomplete set of his
+  wallets.
+- **A wallet of his that is idle still counts.** The set the owner follows is
+  every wallet he operates, so a CONFIRMED wallet that has gone quiet stays in
+  the set (the close watch reports when it wakes); only a demotion of its
+  evidence removes it, never silence.
 
 Two things are worth chasing off-Hyperliquid anyway, and only these: evidence
 that identifies the person (which then tells you where to look on HL), and flow
@@ -75,7 +96,7 @@ trading style. Never promote a wallet on one vector alone.
 | New dex | `collector.new_dexes` (collector step) | A book on a HIP-3 dex he has never traded — a migration INSIDE Hyperliquid, with no L1 trace, no transfer and no new address. He uses only `xyz` of the ten the venue lists. CRITICAL, and the set was collected every run from 2026-09-11 with nothing diffing it until 2026-09-12 |
 | Referral | `referral.py` (collector step) | He has no code today. Creating one, referring an account through it, or being referred alerts HIGH with the addresses — a referred account is one he chose to link to himself |
 | Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated, so it casts no vote** — the backtest is inconclusive until its fixed held-out cohort accumulates (rule 4); read `thresholds.policy` in `data/scans/latest.json` |
-| Execution program | `execution_program.py`, `scripts/check_execution_program.py`, `scripts/census_execution_program.py` | His SDK slicer, recognised by his CLIP TABLE — the exact base size he fires per coin (ZEC 1, SILVER 20, NEAR 250, BTC 0.1) through `market_open` (5% IOC, ~1.7s, no client id). A behaviour vote (`execution_program`), so it corroborates and never reaches PROBABLE without a financial/protocol vector (rule 9), and casts NO vote until the census has MEASURED the match rare — `data/execution_program/census.json`, `ratio_p99` (rule 4). Match + independent vector → CRITICAL; census-rare match alone → HIGH; a match on a KNOWN wallet of his (`config.known_self_wallets`) is capped at HIGH — he trading from a known wallet is worth knowing, not a new identification. Measured 2026-09-28: 0 of 248 large accounts carry the full signature. **Scale-invariant too:** `notional_structure_rho` (Spearman rank correlation of per-coin clip notionals) survives him RESCALING every clip — a uniform rescale keeps rank order (rho 1.0), and his structure is stable across drift (recent-window rho ~0.9 vs exact-size ~0.5); `is_discriminating` clears on EITHER a census-rare `ratio_p99` (exact) OR `rho_p99` (structure) |
+| Execution program | `execution_program.py`, `scripts/check_execution_program.py`, `scripts/census_execution_program.py` | His SDK slicer, recognised by his CLIP TABLE — the exact base size he fires per coin (ZEC 1, SILVER 20, NEAR 250, BTC 0.1) through `market_open` (5% IOC, ~1.7s, no client id). A behaviour vote (`execution_program`), so it corroborates and never reaches PROBABLE without a financial/protocol vector (rule 9), and casts NO vote until the census has MEASURED the match rare — `data/execution_program/census.json`, `ratio_p99` (rule 4). Match + independent vector → CRITICAL; census-rare match alone → HIGH; a match on a KNOWN wallet of his (`config.known_self_wallets`) is capped at HIGH — he trading from a known wallet is worth knowing, not a new identification. Measured 2026-09-28: 0 of 248 large accounts carry the full signature. **The vote gate has a third, measured path since 2026-10-12:** the census could not reach 20 COMPARABLE controls (2 of 252 reads carried a clip table on two of his coins), so a strong match (ratio ≥0.75 over ≥3 clips, or rho ≥0.9 over ≥4 coins) votes when the Wilson 95% ceiling on P(comparable) is ≤5% (live 2.85%; LR ≥20; `bounded_rare`, `rarity_path`); `merge_census` takes the LARGER ceiling of the leaderboard and tape censuses. **Scale-invariant too:** `notional_structure_rho` (Spearman rank correlation of per-coin clip notionals) survives him RESCALING every clip — a uniform rescale keeps rank order (rho 1.0), and his structure is stable across drift (recent-window rho ~0.9 vs exact-size ~0.5); `is_discriminating` clears on EITHER a census-rare `ratio_p99` (exact) OR `rho_p99` (structure) |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
 | HL account surface | `hl_surface.py`, `scripts/check_hl_surface.py` | `subAccounts`, `referral`, `userVaultEquities` for every detector candidate. A sub-account on either side of a cluster wallet CONFIRMs alone; a master and its sub-accounts are ONE operator in the roster; a quiet referral (≤10 accounts on the code) with the cluster is one vote (`referral`) |
@@ -100,6 +121,7 @@ trading style. Never promote a wallet on one vector alone.
 | Perimeter | `src/boundary/perimeter.py`, `scripts/build_perimeter.py` (trace.yml) | His world as ONE lookup table of measured roles and weights — core 1.0 (config), deposit 1.0 (sentinels + engine deposit addresses), identity 1.0 (Solana), sink/funder 0.6 (measured quiet only), associate 0.3 (≥$1M both ways, never alerts) — each put to HL (perp, spot, portfolio; strict). **Never built from a roster tier**: the roster calls his deposit addresses INFRASTRUCTURE, and reading that as "service" dropped all four (dry run, 2026-10-06). Exchange families (the hot wallets behind each deposit address) feed provenance |
 | Re-scoring roster leads | `scanner.roster_rescore_targets` | Priority source 7: up to 25 roster leads (operator list pinned) and 10 stale unvetoed scores ≥0.65 re-scored every scan, so behaviour can corroborate what dormancy, linkage or a sentinel found. Not corroboration by itself |
 | Casebook | `src/casebook/`, `scripts/update_casebook.py` (trace.yml), `scripts/casebook.py`, `scripts/backfill_casebook.py` | Every wallet ever suspected, kept forever in `data/casebook/` (a case file each, a dated event log), seeded from all 592 roster versions. Evidence that lapses is marked, never deleted: current / standing (protocol fact) / lapsed / refuted (a detector re-checked) / historical / invalidated. Ranked by Bayesian log-odds over a 1:1,000 prior from a declared LR table (`latest.json` -> `model`; only the study's tooling LR is measured): bands now / central (rank key) / ceiling; a family never sums, a second family in a category counts half, evidence against subtracts. Re-reads due suspects on HL (`portfolio`) and alerts a suspect waking (CRITICAL in his unusual silence); pins its best 8 HL suspects into every per-wallet detector. Casts no vote, changes no tier. `python scripts/casebook.py top`; dashboard Casebook page; phone Ranked tab |
+| Tape census | `src/tape_census.py`, `scripts/collect_tape.py` (tape.yml) | Every ~150 s tape window (several hundred takers on his 43 markets; his `xyz:` markets carry 7-19 each) is folded into a bounded per-wallet SKETCH of sizes per coin (`data/tape/sketches.json`, 3,000 wallets, comparable ones evicted last). Read three ways: a second execution census on the takers of his markets (`data/tape/census.json`, the reference class the detector draws from); a venue-wide screen for his clip table or its rank structure (hits → `tape_census` candidates, which the detector reads through a reserved registry slice; no vote from the tape); and NEWCOMERS in size (≥$25K) on a rare market (≤40 sketch takers), whose REAL birth is read from `portfolio` (≤8 a window) and judged against his silences — closed gaps and the one open now — alerting through the dormancy detector's own handoff alert. First seen means first seen in the sketch's memory; the judgement is on the real birth |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -790,6 +812,7 @@ that it is.
 
 ## Operating facts
 
+- **One quiet digest a day (2026-10-12).** `scripts/send_digest.py` (watch.yml, first run at or after 07:00 UTC, day remembered in `data/state/digest_sent_day.txt`) sends `src/digest.py`'s one-screen summary at LOW priority through `alerts.send_notice`: his last fill and silence against his own p90, hunt tiers beyond his known wallets, the casebook's top suspects, the execution gate and both ceilings, the tape's sketch count, feeds blind, alert health, data age and what paged in the last 24 h. It bypasses the severity gate on purpose, never buzzes and records nothing in delivery health; `data/digest/latest.json` holds the text. Silence from the phone now means a quiet day, not a dead system.
 - **Alerts arrive as GitHub Issues and ntfy, not email.** Brevo SMTP has never
   once delivered (account unactivated). `_github_issue_fallback` in
   `alerts.py`. `send_alert` also delivers through Telegram
