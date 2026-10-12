@@ -135,11 +135,24 @@ def restore_state(client, db_path, state_path, branch, *, read_only=False, impor
     return report
 
 
-def cleanup(client, db_path, branch, uploaded_id):
-    artifacts = client.artifacts()
-    checkpoints = sorted([a for a in artifacts if a['name'].startswith(prefix('state', branch))
-                          and not a.get('expired')], key=lambda a: a['id'], reverse=True)
-    if not any(a['id'] == int(uploaded_id) for a in checkpoints):
+# GitHub's artifact listing can trail an upload made half a second before it: three scan
+# runs failed on that, two of them paging HIGH, and each next run restored the very
+# checkpoint the failed one could not see (2026-10-08/09).
+ACK_ATTEMPTS = 4
+ACK_DELAY_SECONDS = 10
+
+
+def cleanup(client, db_path, branch, uploaded_id, *, attempts=ACK_ATTEMPTS,
+            delay=ACK_DELAY_SECONDS, sleep=time.sleep):
+    for attempt in range(attempts):
+        artifacts = client.artifacts()
+        checkpoints = sorted([a for a in artifacts if a['name'].startswith(prefix('state', branch))
+                              and not a.get('expired')], key=lambda a: a['id'], reverse=True)
+        if any(a['id'] == int(uploaded_id) for a in checkpoints):
+            break
+        if attempt + 1 < attempts:
+            sleep(delay)
+    else:
         raise ValueError('new checkpoint not acknowledged; retaining every prior artifact')
     with DiscoveryStore(db_path) as store:
         imported = set(store.meta('imported_artifacts', []))
@@ -147,7 +160,8 @@ def cleanup(client, db_path, branch, uploaded_id):
         if a['name'].startswith(prefix('observations', branch)) and str(a['id']) in imported]
     for artifact in removable[:200]:
         client.delete(artifact)
-    return {'deleted': min(200, len(removable)), 'retained_checkpoints': min(2, len(checkpoints))}
+    return {'deleted': min(200, len(removable)), 'retained_checkpoints': min(2, len(checkpoints)),
+            'listings': attempt + 1}
 
 
 def main():
