@@ -152,3 +152,38 @@ def test_schedule_refreshes_skips_named_addresses():
     previous = {svc: {"next_check": 10, "depth": 1}, real: {"next_check": 20, "depth": 1}}
     due, _ = schedule_refreshes([svc, real], [], T, previous, 100, 1, skip={svc})
     assert [row["wallet"] for row in due] == [real]
+
+
+# --- refreshes may not starve the frontier ------------------------------------
+
+def test_refreshes_stop_at_their_time_share_so_new_wallets_are_walked(monkeypatch):
+    """Ten due refreshes, each slow; the frontier's new wallet must still get a lookup.
+
+    Live, 2026-10-13 01:29 UTC: the first run after the rebuild made 4 lookups,
+    all refreshes, and 70,235 pending wallets waited another run.
+    """
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(tg.time, "monotonic", lambda: clock["now"])
+    swept = []
+
+    def slow_sweep(wallet, *args, **kw):
+        swept.append(wallet)
+        clock["now"] += 30.0          # each lookup costs 30 "seconds"
+        return {"status": "ok"}
+    monkeypatch.setattr("src.chain.collect.sweep_wallet", slow_sweep)
+    monkeypatch.setattr("src.chain.collect.records_for", lambda w, **kw: [])
+    olds = ["0x" + f"{i:040x}" for i in range(1, 11)]
+    new = addr("e")
+    edges = [l1(T, o, 10_000, 100 + i, f"0xo{i}") for i, o in enumerate(olds)]
+    edges += [l1(T, olds[0], 1_000_000, 50, "0xbig"), l1(olds[0], new, 950_000, 40, "0xnew")]
+    state = {o: {"next_check": 10, "depth": 1} for o in olds}
+    _, diag = tg.expand_frontier(
+        edges, T, {**tg.DEFAULTS, "max_expansions": 40, "time_budget_seconds": 120},
+        now_ts=NOW, resume=[], already_expanded=olds, refresh_state=state)
+    assert new in swept, f"the new wallet never got a lookup: {swept}"
+    # A refresh may START while under the half-way mark, so three 30 s refreshes
+    # fit a 120 s walk (0, 30, 60 s); the fourth, at 90 s, is deferred.
+    assert len([w for w in swept if w in olds]) == 3, swept
+    assert swept[-1] == new, "the new wallet is walked after the refreshes stop"
+    assert any(d["action"] == "deferred" and "refresh share" in d["reason"]
+               for d in diag["decisions"])

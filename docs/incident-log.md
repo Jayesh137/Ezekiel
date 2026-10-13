@@ -2274,3 +2274,12 @@ added edges. A `transfer graph` blind check (`feed_health._graph`) reports a wal
 no lookup for six hours with a ledger behind it. Tests: `tests/test_frontier_rebuild.py`.
 **A collection that can only shrink dies silently; make it a function of the facts it is
 derived from, and ask what RECORDS a step that skips.**
+
+*Verified live, and one more thing found (run 38331502967, 01:29 UTC).* The first run with
+the rebuild made 4 lookups, 13,530 new edges, `frontier_reseeded` 69,956, 2,000 retained,
+`0xd4758770…` third in the queue, preparation 3.8 s. All four lookups were REFRESHES: due
+re-sweeps run first, each costs 20-40 s across seven chains, and the 150 s walk was spent
+before any of the 70,235 pending wallets got a look — the schedule would have starved the
+frontier for ever. Refreshes now stop at half the walk's time (`REFRESH_TIME_SHARE`); a
+deferred one stays due and leads the next run. **When two queues share one budget, neither
+may be allowed to spend all of it.**

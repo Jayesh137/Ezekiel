@@ -143,6 +143,11 @@ MAX_EXPANDED_LEDGER = 20000
 # finish and persist. The walk's own budget stays the outer bound.
 LOOKUP_SECONDS = 45.0
 
+# The share of the walk's time budget that re-sweeps of already-explored wallets
+# may spend before new wallets get the rest. Half: the schedule and the frontier
+# both have more work than any run can finish, and neither may starve the other.
+REFRESH_TIME_SHARE = 0.5
+
 
 def lookup_seconds(remaining: float) -> float:
     """The slice for the next lookup: never more than what the walk has left.
@@ -2363,6 +2368,18 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
         passes = [(r["depth"], r["wallet"]) for r in due if r["depth"] <= max_depth]
         passes.extend((depth, None) for depth in range(1, max_depth + 1))
         for depth, refresh_wallet in passes:
+            if (refresh_wallet
+                    and time.monotonic() - started
+                    > budget["time_budget_seconds"] * REFRESH_TIME_SHARE):
+                # Refreshes run first and a lookup costs ~20-40 s across seven
+                # chains, so ten of them can spend the whole walk before a
+                # single NEW wallet is looked at — the first live run after the
+                # frontier was rebuilt made 4 lookups, all refreshes, and left
+                # 70,235 pending wallets untouched (2026-10-13). A due wallet
+                # deferred here stays due and comes first next run.
+                decide(refresh_wallet, depth, "deferred",
+                       f"refresh share of the walk's time ({REFRESH_TIME_SHARE:.0%}) spent")
+                continue
             level = [(d, w) for d, w in queue
                      if d == depth and w not in explored and w != target
                      and (w == refresh_wallet if refresh_wallet else w not in due_order)]
