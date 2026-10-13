@@ -200,6 +200,16 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   it is priority, for a ledger age, for a node budget value moved; never the
   address or the file order. Broken four times (`expanded_ledger`, frontier
   queue, `evidence_strength` ranking, `build_graph` node budget).
+- **A collection that can only shrink dies silently — derive it from the facts
+  instead of persisting it.** The frontier queue was the only way a depth-2+
+  wallet entered the walk, its parents sat in the ledger for ever, and once it
+  drained (≈2026-09-18) depth-2+ discovery was dead for a month while every run
+  read `ok`: replayed over the full edge set, 68,336 wallets were pending.
+  `expand_frontier` now rebuilds the frontier from the edges every run
+  (`_ledger_children`); the persisted queue is a cache. **And ask what RECORDS a
+  step that skips:** services suppressed from the refresh slice were never
+  marked checked, so the same ten held the slice on every run and 2,232 overdue
+  wallets were re-swept 0 times (2026-10-13, `docs/incident-log.md`).
 - **A cap on a ranking of evidence-already-found starves the wallets with no
   evidence yet** — the population this project hunts. `detector_candidates`
   pins `config.watch_wallets`/`known_self_wallets` and ranks HL-known wallets
@@ -418,6 +428,20 @@ the next session rebuilding them:
   books. No weight and no threshold was changed.
 - **Rare-market co-presence** — already partly used via `xyz:` markets; extend to
   any market with few participants.
+- ~~**The explorer websocket as a venue-wide program screen**~~ — **measured
+  2026-10-13 and rejected** (`scripts/probe_explorer_stream.py`, two 40-60 s
+  windows). `wss://rpc.hyperliquid.xyz/ws` `explorerTxs` streams every L1
+  transaction with its signing user at only ~15 tx/s and ~7 KB/s — cheap enough
+  for an always-on host to hold open for ever — but it is **not the order flow**:
+  82 BTC orders from 31 users against 138 BTC trades from 99 takers in the same
+  40 s, and 97% of the orders it does carry are post-only (`Alo`). His program is
+  taker IOC, so a screen built on it would miss him by construction. The tape
+  (`trades`, which names both users) stays the venue-wide behavioural net. What
+  the stream IS good for — `approveAgent`, `usdSend`, `spotSend`,
+  `createSubAccount`, `sendToEvmWithData` venue-wide, with the user — needs an
+  always-on host to be complete (a 150 s window in 20 min sees 12% of one-off
+  events) and its completeness for those actions is unmeasured. Re-measure before
+  building on it; the probe is the tool.
 - **Measured 2026-09-17 and rejected — do not rebuild without new evidence:**
   - *Testnet.* The target and the treasury exist on testnet, but every row is
     inbound: `spotGenesis` airdrops and token deployers sending the same tokens

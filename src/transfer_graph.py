@@ -2079,6 +2079,52 @@ def _expandable_edges(edges: list[dict], dust_usd: float) -> list[dict]:
 
 
 
+def _walk_depths(walkable: list[dict], target: str, max_depth: int) -> dict:
+    """Shortest hop count from the target to every wallet reachable over
+    `walkable` edges, up to `max_depth`. Pure; O(edges)."""
+    adjacency: dict[str, set] = {}
+    for e in walkable:
+        adjacency.setdefault(e["src"], set()).add(e["dst"])
+    depths = {target: 0}
+    level = [target]
+    while level and depths[level[0]] < max_depth:
+        following = []
+        for src in level:
+            for dst in adjacency.get(src, ()):
+                if dst not in depths:
+                    depths[dst] = depths[src] + 1
+                    following.append(dst)
+        level = following
+    return depths
+
+
+def _ledger_children(walkable: list[dict], target: str, done: set,
+                     refresh_state: dict, max_depth: int) -> list[tuple[int, str]]:
+    """Every unexplored recipient of a wallet already expanded, with its depth.
+
+    The frontier's own definition, computed from the edges rather than read
+    from the persisted queue: a wallet is pending exactly when some finished
+    wallet paid it and it has not itself been expanded. A parent's depth comes
+    from the walk over expandable edges, falling back to the depth recorded by
+    its refresh schedule (a wallet reached through a gas-funding or HL-ledger
+    edge may have no path over walkable edges). Parents with neither are
+    skipped rather than guessed at. Pure.
+    """
+    depths = _walk_depths(walkable, target, max_depth)
+    out = []
+    for e in walkable:
+        src, dst = e["src"], e["dst"]
+        if src not in done or dst in done or dst == target:
+            continue
+        depth = depths.get(src)
+        if depth is None:
+            depth = (refresh_state.get(src) or {}).get("depth")
+        if depth is None or depth + 1 > max_depth:
+            continue
+        out.append((depth + 1, dst))
+    return out
+
+
 def _canonical(config: dict) -> dict:
     """Canonical token contracts, so a token merely CALLED "USDC" is not priced
     as USDC. See src/chain/assets.is_impostor."""
@@ -2156,11 +2202,21 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     from src.chain.spam import ground_truth_addresses as spam_ground_truth
     from src.surveillance import record_refresh, schedule_refreshes
 
+    # Services are decided BEFORE the refresh schedule draws its slice, because a
+    # service holding a refresh slot is never swept and never recorded as
+    # checked, so it stays due and holds the same slot on every run after. That
+    # is how the schedule re-swept nothing from at least 2026-10-07 to 10-13
+    # with all 2,232 of its wallets overdue (docs/incident-log.md).
+    services = detect_services(edges, {(a or "").lower()
+                                       for a in (known_services or set())},
+                               never_services=never_services)
     due, refreshes = schedule_refreshes(
         already_expanded or [], edges, target, refresh_state or {}, now_ts,
-        max(1, budget["max_expansions"] // 4) if budget["max_expansions"] else 0)
+        max(1, budget["max_expansions"] // 4) if budget["max_expansions"] else 0,
+        skip=set(services) | {target.lower()})
     diag["refresh_state"] = refreshes
     diag["refreshed_wallets"] = []
+    diag["frontier_reseeded"] = 0
 
     sweep_chains = enabled_chains(load_config())
     # Expansion spans every enabled chain. "arbitrum_l1" was the honest label
@@ -2206,7 +2262,12 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     # has left, which is exactly what killed the graph step.
     sweep_calls = lookup_call_budget(sweep_chains)
 
-    started = time.monotonic()
+    prepared_at = time.monotonic()
+    # `started`/`deadline` are set again just before the first lookup: the walk's
+    # time budget is for LOOKUPS. Rebuilding the frontier from ~1.5M edges takes
+    # tens of seconds, and when that ran on the lookup clock the first replay
+    # deferred every lookup as "time budget exhausted" having made none.
+    started = prepared_at
     deadline = started + budget["time_budget_seconds"]
     max_calls = budget["max_expansions"]
     max_depth = budget.get("max_depth", DEFAULTS["max_depth"])
@@ -2246,9 +2307,10 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     added = []
     stopped_reason = None
 
-    # Seed: resumed work first, then the target's direct recipients. Both are
-    # drawn from expandable edges only, so the frontier and build_graph agree on
-    # what counts as a real transfer.
+    # Seed: resumed work first, then the target's direct recipients, then every
+    # unexplored recipient of a wallet already expanded. All are drawn from
+    # expandable edges only, so the frontier and build_graph agree on what
+    # counts as a real transfer.
     walkable = _expandable_edges(edges, dust_usd)
     queue = []
     queue.extend((item["depth"], item["wallet"]) for item in due)
@@ -2257,9 +2319,44 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                  if (w := (item.get("wallet") or "").lower()) and w != target)
     queue.extend((1, e["dst"]) for e in walkable if e["src"] == target)
 
-    services = detect_services(edges, {(a or "").lower()
-                                       for a in (known_services or set())},
-                               never_services=never_services)
+    # The frontier is REBUILT from the edges every run, not merely resumed from
+    # the persisted queue. Until 2026-10-13 a wallet at depth 2 or deeper could
+    # enter the walk only through `frontier_queue`, written by the run that
+    # expanded its parent; the parent then sat in the ledger for ever and
+    # nothing ever re-queued its children. So the queue could only shrink, and
+    # once it hit zero — truncation, a lost file, a schema migration, a cap
+    # trimmed by hand — depth-2+ discovery was dead for good while every run
+    # reported `ok`. Measured on production: the queue read 0 from at least
+    # 2026-10-07 while the stored edges alone named 182 unexplored, non-service
+    # recipients of explored wallets, $53.8M and $51.5M at the top. Here the
+    # ledger says what is finished and the edges say what finished work leads
+    # to; the persisted queue is now a cache of this, never the only copy.
+    seeded_before = {w for _d, w in queue}
+    for d, w in _ledger_children(walkable, target, done, refreshes, max_depth):
+        if w in services:
+            continue
+        queue.append((d, w))
+        if w not in seeded_before:
+            seeded_before.add(w)
+            diag["frontier_reseeded"] += 1
+    if diag["frontier_reseeded"]:
+        print(f"[graph] frontier rebuilt from the edges: "
+              f"{diag['frontier_reseeded']} unexplored recipient(s) of explored "
+              f"wallets were not in the persisted queue")
+
+    # Indexed ONCE for the walk's own priority calls. `_frontier_priority` over a
+    # raw edge list is O(edges) per wallet; with the frontier rebuilt from the
+    # edges a level can hold thousands of wallets against ~1.4M edges, which is
+    # hours of work per run (measured 2026-10-13: an offline replay had not
+    # finished its first level after 20 minutes). Edges found during this walk
+    # are not in the index; they are ranked by the full index at the end.
+    walk_index = EdgeIndex(walkable)
+
+    diag["prepare_seconds"] = round(time.monotonic() - prepared_at, 1)
+    started = time.monotonic()
+    deadline = started + budget["time_budget_seconds"]
+    print(f"[graph] frontier prepared in {diag['prepare_seconds']}s; "
+          f"{len(queue)} queued entries before ranking", flush=True)
 
     expanded_now = set()
     try:
@@ -2271,14 +2368,21 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                      and (w == refresh_wallet if refresh_wallet else w not in due_order)]
             if not level:
                 continue
+            added_before_pass = len(added)
 
             ranked = []
             for d, w in sorted(set(level)):
                 if w in services:
                     decide(w, d, "suppressed", f"service address: {services[w]}")
                     explored[w] = None
+                    if w in due_order:
+                        # A service never takes a lookup, so its refresh must
+                        # still be recorded or it stays due and blocks the slice
+                        # for ever (the schedule skips services; this is the
+                        # same rule at the other end of the pair).
+                        record_refresh(refreshes, w, now_ts, d)
                     continue
-                pr, prof = _frontier_priority(w, d, walkable, now_ts)
+                pr, prof = _frontier_priority(w, d, walk_index, now_ts)
                 ranked.append((pr, w, d, prof))
             # Deterministic: address breaks priority ties so two runs over the
             # same data expand the same wallets in the same order.
@@ -2430,10 +2534,13 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                 decide(wallet, d, "deferred",
                        f"beyond branching limit ({branching}) at depth {d}", pr)
             # A wallet that just turned into a high-fan-degree hub must be
-            # suppressed before its recipients are walked, not after.
-            services = detect_services(edges, {(a or "").lower()
-                                               for a in (known_services or set())},
-                                       never_services=never_services)
+            # suppressed before its recipients are walked, not after. Only when
+            # this pass added edges: services depend on nothing else, and the
+            # recount walks every edge (~1.5M) each time it runs.
+            if len(added) != added_before_pass:
+                services = detect_services(edges, {(a or "").lower()
+                                                   for a in (known_services or set())},
+                                           never_services=never_services)
     except Exception as exc:  # partial results must survive a mid-run failure
         diag["status"] = "failed"
         diag["error"] = str(exc)[:200]
@@ -2492,9 +2599,12 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     diag["frontier_cap"] = max_queue
     # Truncation has to be visible: silently dropping the tail of the queue
     # while still reporting the full remaining count makes lost work look done.
-    # Anything dropped here is dropped PERMANENTLY — a queued wallet is only
-    # known because its parent was expanded, and that parent is now in the
-    # ledger and will never be expanded again to rediscover it.
+    # Until 2026-10-13 anything dropped here was dropped PERMANENTLY — a queued
+    # wallet was known only because its parent had been expanded, and the
+    # parent sat in the ledger never to be expanded again. The frontier is now
+    # rebuilt from the edges on every run (`_ledger_children`), so a truncated
+    # wallet comes back the moment the queue has room; the count still matters
+    # because it says how far behind the walk is.
     diag["frontier_truncated"] = max(0, len(pending) - max_queue)
     # `decisions` is per-wallet-per-level and grows with the frontier, so it has
     # to be bounded too or raising the queue cap inflates the file indirectly.
