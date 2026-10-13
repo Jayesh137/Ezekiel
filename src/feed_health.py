@@ -44,6 +44,7 @@ OTHER_FEEDS = {
     "his perimeter": ("perimeter/latest.json", "computed_at", 720),
     "funding provenance": ("provenance/latest.json", "computed_at", 720),
     "casebook": ("casebook/latest.json", "computed_at", 720),
+    "transfer graph": ("transfer_graph/latest.json", "computed_at", 720),
 }
 GROUPS = {"watch": WATCH_FEEDS, "other": OTHER_FEEDS}
 
@@ -58,6 +59,9 @@ CIRCLE_MAX_LAG_BLOCKS = 30_000
 # has lasted this long; an endpoint, key or parser broken for six hours is not
 # coming back by itself.
 BLIND_HOURS = 6.0
+# A graph walk with fewer finished wallets than this may genuinely have nothing
+# due; above it, a run that spends no lookup has stopped looking.
+GRAPH_MIN_LEDGER = 50
 # Below this many wallets a detector's zero is not surprising enough to act on.
 MIN_WALLETS = 20
 # ~50 minutes of HyperEVM blocks. Circle transfers into and out of Hyperliquid
@@ -147,6 +151,30 @@ def _discovery(doc: dict):
     return None
 
 
+def _graph(doc: dict):
+    """The L1 walk wrote a graph but looked at nothing.
+
+    From ~2026-09-18 to 2026-10-13 every run read `ok` with 0 lookups: the
+    frontier queue had drained and could not refill, and the refresh slice was
+    held by services that were never recorded as checked. A walk with a budget
+    and a ledger of finished wallets that spends no lookup for six hours is not
+    up to date, it is blind — its ~2,000 ledger wallets come due for a re-read
+    every three days, so some are always waiting.
+    """
+    expansion = (doc.get("health") or {}).get("expansion") or {}
+    status = expansion.get("status")
+    if status in (None, "disabled", "skipped_no_api_key", "not_attempted"):
+        return None
+    if status == "failed":
+        return f"expansion failed: {str(expansion.get('error') or '')[:120]}"
+    ledger = len(expansion.get("expanded_ledger") or [])
+    if (expansion.get("lookup_budget") and ledger >= GRAPH_MIN_LEDGER
+            and not expansion.get("lookups")):
+        return (f"0 lookups with {ledger} wallets in the ledger, "
+                f"{expansion.get('frontier_eligible') or 0} eligible")
+    return None
+
+
 def _boundary(doc: dict):
     if doc.get("read_error") and not doc.get("withdrawals_read"):
         return f"Bridge2 reads failing: {str(doc['read_error'])[:120]}"
@@ -201,6 +229,7 @@ BLIND_CHECKS = {
     "boundary attribution": _boundary,
     "his perimeter": _perimeter,
     "funding provenance": _provenance,
+    "transfer graph": _graph,
 }
 
 

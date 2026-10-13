@@ -6,7 +6,18 @@ COVERAGE_SCHEMA = "2026-09-26.1"
 INTERVAL = 3 * 86400
 
 
-def schedule_refreshes(wallets, edges, target, previous, now_ts, limit):
+def schedule_refreshes(wallets, edges, target, previous, now_ts, limit, skip=None):
+    """The `limit` most overdue wallets to re-sweep this run, and the updated state.
+
+    `skip` names addresses that must never take a refresh slot — services, the
+    target itself. Measured 2026-10-13: the ten oldest due entries were all
+    exchange contracts and routers. The walk suppressed each one as a service
+    without ever recording the check, so the same ten came back at the head of
+    the list on every run and the refresh schedule re-swept nothing for at least
+    six days while every one of its 2,232 wallets was due. A wallet that cannot
+    be swept must not occupy the slot of one that can.
+    """
+    skipped = {(w or "").lower() for w in (skip or ())}
     state = {w.lower(): dict(row) for w, row in previous.items() if isinstance(row, dict)}
     depths = {target.lower(): 0}
     incoming, outgoing, newest = {}, {}, {}
@@ -41,6 +52,8 @@ def schedule_refreshes(wallets, edges, target, previous, now_ts, limit):
         last = row.get("last_successful_read") or 0
         if newest.get(wallet, 0) > last or row.get("coverage_schema", COVERAGE_SCHEMA) != COVERAGE_SCHEMA:
             row["next_check"] = min(row.get("next_check", now_ts), now_ts)
+        if wallet in skipped:
+            continue
         if row.get("next_check", now_ts + 1) <= now_ts:
             due.append({"wallet": wallet, **row})
     due.sort(key=lambda row: (row["next_check"], row["wallet"]))

@@ -702,6 +702,7 @@ export const DETECTOR_FEEDS = [
 	{ name: 'His perimeter', path: 'data/perimeter/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Funding provenance', path: 'data/provenance/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Casebook', path: 'data/casebook/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'Transfer graph', path: 'data/transfer_graph/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Live tape', path: 'data/tape/latest.json', key: 'computed_at', limitMin: 360 },
 	{ name: 'Execution program', path: 'data/execution_program/latest.json', key: 'computed_at', limitMin: 720 }
 ];

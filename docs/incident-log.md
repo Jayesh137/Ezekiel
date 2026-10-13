@@ -2221,3 +2221,56 @@ the set), README, PRD, the dashboard home, the phone-facing daily digest (a "His
 other wallets" line read off the close watch: known and CONFIRMED only, never a
 wallet watched as a question) and the project memory. No detector changed: every
 vector already produced "a wallet of his" rather than "a migration".
+
+---
+
+**Discovery had been dead for almost a month, and the stall alert could only see the
+last six days of it (found 2026-10-13).** The transfer graph's frontier queue read
+**0 on every run from between 2026-09-14 (80 queued, 8 expanded) and 2026-09-18**, and
+stayed there: `ok`, 0 lookups, 0 eligible, run after run, while the ledger of finished
+wallets sat at 2,219 → 2,232. Two defects, one in each half of the walk.
+
+*The frontier could only shrink.* A wallet at depth 2 or deeper entered the walk only
+through `frontier_queue`, written by the run that expanded its parent. The parent then
+sat in `expanded_ledger` for ever, and nothing ever re-queued its children — a refresh
+re-sweeps a ledger wallet but queues only edges it has never seen. So the moment the
+queue reached zero (here by draining normally; a lost file, a schema migration or a cap
+would do the same) depth-2+ discovery was over for good, and every run reported `ok`
+because an empty frontier is what "finished" looks like. The stored (trimmed) edges
+alone named 182 unexplored, non-service recipients of explored wallets; replayed offline
+over the full 1,497,741-edge set the rebuilt frontier held **68,336 pending wallets** (of
+the 2,000 retained by chase priority: 554 at depth 2, 1,432 at depth 3, 14 at depth 4),
+with `0xd4758770…` — a casebook suspect, $51.4M — third. The walk had been declaring the
+graph complete at `max_depth_reached 2` against a configured 4.
+`expand_frontier` now REBUILDS the frontier from the edges on every run
+(`_ledger_children`: every expandable edge from a ledger wallet to a wallet not in the
+ledger, at the parent's walk depth + 1, services excluded); the persisted queue is a
+cache of that, never the only copy, and `frontier_reseeded` reports how many pending
+wallets the queue had lost. Truncation stops being permanent for the same reason.
+
+*The refresh schedule livelocked on services.* `schedule_refreshes` takes the ten most
+overdue ledger wallets each run. A service suppressed by the walk is written into the
+ledger (`explored[w] = None`), so it joins the schedule — and when its turn came it was
+suppressed again without `record_refresh`, so it stayed due and held the same slot on
+the next run. By 2026-10-13 the ten oldest due entries were all exchange contracts and
+routers (`0x88888c03…`, the zero address, 1inch's `0x1111111254…`), **all 2,232 wallets
+were overdue (99–371 h) and only 25 had ever been successfully re-read.** The schedule
+now skips services (and the target) before it draws the slice, and the suppressed
+branch records the check anyway.
+
+*Why the alert saw six days of it.* `alert_discovery_stalled` keys on `wallets_expanded`,
+which a refresh also sets, so the five "failed" refresh lookups of 2026-09-30/10-03 and
+the two of 2026-10-08 each reset the clock. It then fired correctly on 10-10, 10-11 and
+10-12 (36.7 h, 61.0 h, 85.7 h) and nobody acted on it, including the session that put it
+in the first daily digest. The alert was right; what was missing was the diagnosis above.
+Two costs of the rebuild, found by the same replay: ranking a level with the raw edge
+list was O(edges) per wallet (the walk's own priority call now uses the `EdgeIndex` the
+final ranking already had, built once), and the preparation ran on the LOOKUP clock, so
+the replay deferred every lookup as "time budget exhausted" having made none — the walk's
+clock now starts at the first lookup and `prepare_seconds` is reported (measured: expandable
+filter 5 s, service detection 10 s, depths 1 s, children 2 s, index 1 s), and the per-pass
+service recount (10 s each, once per refresh pass and per level) runs only after a pass that
+added edges. A `transfer graph` blind check (`feed_health._graph`) reports a walk that spends
+no lookup for six hours with a ledger behind it. Tests: `tests/test_frontier_rebuild.py`.
+**A collection that can only shrink dies silently; make it a function of the facts it is
+derived from, and ask what RECORDS a step that skips.**

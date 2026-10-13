@@ -335,9 +335,12 @@
 							{:else}
 								drained
 							{/if}
-							{#if expansion?.frontier_truncated}<span class="text-red"
-									>· {expansion.frontier_truncated} dropped permanently (lowest chase
-									priority)</span
+							{#if expansion?.frontier_reseeded}<span class="text-muted"
+									>· {expansion.frontier_reseeded} rebuilt from the edges</span
+								>{/if}
+							{#if expansion?.frontier_truncated}<span class="text-yellow"
+									>· {expansion.frontier_truncated} beyond the cap (lowest chase
+									priority; back when the queue has room)</span
 								>{/if}
 						</span>
 					</div>

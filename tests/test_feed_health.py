@@ -157,3 +157,27 @@ def test_provenance_is_blind_when_every_account_it_tried_must_be_retried():
     p = fh.BLIND_CHECKS["funding provenance"]
     assert "retry" in p({"attempted": 6, "resolved": 6, "retrying": 6})
     assert p({"attempted": 6, "resolved": 6, "retrying": 2}) is None
+
+
+def test_the_transfer_graph_is_blind_when_it_walks_nothing():
+    """2026-09-18 → 10-13: `ok`, 0 lookups, every run, while 2,232 wallets waited."""
+    ledger = ["0x" + f"{i:040x}" for i in range(1, 60)]
+    walked_nothing = {"health": {"expansion": {
+        "status": "ok", "lookups": 0, "lookup_budget": 40,
+        "frontier_eligible": 0, "expanded_ledger": ledger}}}
+    reason = fh.BLIND_CHECKS["transfer graph"](walked_nothing)
+    assert reason and reason.startswith("0 lookups with 59 wallets")
+    assert "failed" in fh.BLIND_CHECKS["transfer graph"](
+        {"health": {"expansion": {"status": "failed", "error": "Blockscout 403",
+                                  "expanded_ledger": ledger, "lookup_budget": 40}}})
+    # A walk that looked at something, a disabled walk, or a young graph is ordinary.
+    assert fh.BLIND_CHECKS["transfer graph"]({"health": {"expansion": {
+        "status": "partial", "lookups": 3, "lookup_budget": 40,
+        "expanded_ledger": ledger}}}) is None
+    assert fh.BLIND_CHECKS["transfer graph"]({"health": {"expansion": {
+        "status": "disabled", "lookups": 0, "lookup_budget": 40,
+        "expanded_ledger": ledger}}}) is None
+    assert fh.BLIND_CHECKS["transfer graph"]({"health": {"expansion": {
+        "status": "ok", "lookups": 0, "lookup_budget": 40,
+        "expanded_ledger": ledger[:5]}}}) is None
+    assert fh.OTHER_FEEDS["transfer graph"] == ("transfer_graph/latest.json", "computed_at", 720)
