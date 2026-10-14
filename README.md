@@ -26,6 +26,7 @@ same underlying event count as dependent evidence:
 | Behavioural | `scanner.py`, `fingerprint.py`, `calibration.py`, `backtest.py` | Leaderboard wallets scored against the fingerprint |
 | Fund flow (L1) | `tracer.py`, `correlator.py`, `linkage.py` | Arbitrum USDC, CEX-gap re-linking, address reuse |
 | HL-native | `ledger_analyzer.py` | In-platform transfers that never touch L1 |
+| Venue tape | `fills_feed.py`, `tape_census.py`, `cofire.py` | Every fill on his markets (SQD's keyless portal): his program's clip table on any taker, who opens his bursts with him to the second, newcomers born in his silence |
 
 `transfer_graph.py` normalises all of them into one graph of transfer edges and
 grades each discovered wallet. `risk.py` collapses everything into a 0–100 score.

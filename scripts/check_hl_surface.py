@@ -45,11 +45,11 @@ def cluster(config: dict) -> list[str]:
     return out
 
 
-def wallets_to_check(config: dict, roster: dict) -> list[str]:
+def wallets_to_check(config: dict, roster: dict, tape_sketches: dict | None = None) -> list[str]:
     from src.roster import detector_candidates
 
     out = cluster(config)
-    for a in detector_candidates(config, roster, MAX_WALLETS):
+    for a in detector_candidates(config, roster, MAX_WALLETS, tape_sketches=tape_sketches):
         if a not in out:
             out.append(a)
     return out[:max(MAX_WALLETS, len(cluster(config)))]
@@ -82,8 +82,8 @@ def read_wallet(wallet: str, post, sleep) -> tuple[dict, int]:
 
 
 def run(config: dict, roster: dict, previous: dict | None, post, *, now: datetime,
-        budget_seconds: float, clock, sleep) -> dict:
-    wallets = wallets_to_check(config, roster)
+        budget_seconds: float, clock, sleep, tape_sketches: dict | None = None) -> dict:
+    wallets = wallets_to_check(config, roster, tape_sketches=tape_sketches)
     start = clock()
     readings: dict[str, dict] = {}
     unreadable = 0
@@ -154,7 +154,9 @@ def main() -> int:
     config = load_config()
     roster = _load(DATA_DIR / "roster" / "latest.json")
     previous = _load(hl_surface.HL_SURFACE_DIR / "latest.json") or None
+    from src.roster import load_tape_sketches
     report = run(config, roster, previous, strict_read, now=datetime.now(UTC),
+                 tape_sketches=load_tape_sketches(DATA_DIR),
                  budget_seconds=TIME_BUDGET_SECONDS, clock=time.monotonic,
                  sleep=time.sleep)
 

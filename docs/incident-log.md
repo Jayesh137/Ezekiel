@@ -2283,3 +2283,49 @@ before any of the 70,235 pending wallets got a look — the schedule would have 
 frontier for ever. Refreshes now stop at half the walk's time (`REFRESH_TIME_SHARE`); a
 deferred one stays due and leads the next run. **When two queues share one budget, neither
 may be allowed to spend all of it.**
+
+---
+
+**The tape was a 12% sample, and a keyless feed of every fill on the venue was
+sitting in public (found 2026-10-14).** Asked to research broadly, the session
+audited Hyperliquid's full info surface against the 28 request types the code uses
+and measured two external sources. The explorer websocket (`explorerTxs`) is NOT
+the order flow (82 BTC orders from 31 users against 138 BTC trades from 99 takers in
+40 s; 97% post-only) and is rejected as a program screen. **SQD's public portal**
+(`portal.sqd.dev/datasets/hyperliquid-fills`) is the real thing: every fill, with its
+user, filtered server-side by coin or user, real-time, back to block 750,000,000, no
+key. 20 min of his 43 markets came back as 63,318 fills from 2,718 distinct takers
+(15.6 MB) in one request in one second; the first unfiltered probe hit an overload
+(HTTP 529, `retry-after: 10`) twice before answering. `src/fills_feed.py` reads it
+strictly (a failure raises; an empty page is never "the present") behind a block
+cursor that never moves past an unread range; `scripts/collect_tape.py` now folds
+every fill since the last run — ≤60 min, 3x the cadence — into the same sketches,
+census and newcomer path, the websocket window as fallback. Live dry run (sandboxed):
+56,612 fills, 14,695 taker orders, 2,227 takers over 1,208 s in 18 s end to end,
+judgeable sketches 165 (was 7), comparable 6 (was 0). Two consequences: the tape
+census will reach its 200-judgeable bar within a day instead of never, and "rare
+market" could no longer be a fixed 40 takers (`xyz:MU` already carried 103 under
+full coverage against 1,095 on BTC), so `tape_census.rare_bar` reads rarity as
+≤10% of his busiest market's takers.
+
+**Co-firing (`src/cofire.py`).** The same feed carries his own fills, so the one
+timing reading a copier cannot fake — who opens his bursts WITH him, to the second —
+is now measured continuously rather than at decision resolution over 21 days where he
+makes too few decisions to test. Chance is corrected per wallet from its own order
+rate on that coin and side during his bursts. The first version judged lead/follow on
+the nearest of his orders and called a copier 1.5 s behind a tie: inside a burst his
+clips are 1.75 s apart, so 1.5 s behind one is 0.25 s ahead of the next. Lead, tie
+and follow are now judged once per burst on the wallet's earliest order against his
+first; a hit needs ≥10 events over ≥3 bursts, lift ≥5 and ≥25% of bursts opened
+before or with him. Hits are `tape_cofire` registry candidates and context, never a
+vote, until the lift's base rate is measured. He made no order in the dry run's
+window, so the first live reading is still to come.
+
+**Measured and rejected the same day:** account abstraction mode (his two main
+accounts run `unifiedAccount`; so do 59% of 240 takers of his markets), HYPE staking
+as a vote (10% of the same stake). Both his and the population's readings are in
+CLAUDE.md. **The detectors now rotate through the tape population** (6 a run into
+agents, sub-accounts and dormancy; `roster.tape_rotation`) and the digest carries a
+Discovery line and the tape's coverage. **When a public source can answer the
+question the sample was built to approximate, measure it before improving the
+sample.**

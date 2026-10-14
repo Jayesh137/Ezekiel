@@ -166,7 +166,27 @@ def execution_section(readings: dict) -> dict:
         "tape_ceiling": tape_census.get("comparable_upper"),
         "tape_hits": len(tape_census.get("hits") or []),
         "newcomer_handoffs": len(tape.get("newcomer_handoffs") or []),
+        "tape_source": tape.get("source"),
+        "tape_seconds": tape.get("window_seconds"),
+        "cofire_hits": int(((tape.get("cofire") or {}).get("hits")) or 0),
+        "cofire_his_windows": (tape.get("cofire") or {}).get("his_windows"),
     }
+
+
+def discovery_section(readings: dict) -> dict:
+    """What the L1 walk did on its last run: the one vector that reaches an
+    address nobody has seen, and the one that was dead for a month while every
+    run read `ok` (2026-10-13)."""
+    expansion = ((readings.get("graph") or {}).get("health") or {}).get("expansion") or {}
+    refreshed = set(expansion.get("refreshed_wallets") or [])
+    expanded = [w for w in (expansion.get("wallets_expanded") or []) if w not in refreshed]
+    return {"status": expansion.get("status"),
+            "lookups": expansion.get("lookups"),
+            "new_wallets": len(expanded),
+            "refreshed": len(refreshed),
+            "new_edges": expansion.get("new_edges"),
+            "pending": expansion.get("frontier_eligible"),
+            "last_expansion_at": expansion.get("last_expansion_at")}
 
 
 def health_section(readings: dict, now: datetime) -> dict:
@@ -209,6 +229,7 @@ def build(readings: dict, config: dict | None, now: datetime | None = None) -> d
         "target": target_section(readings, now),
         "hunt": hunt_section(readings, config),
         "execution": execution_section(readings),
+        "discovery": discovery_section(readings),
         "health": health_section(readings, now),
     }
 
@@ -258,8 +279,19 @@ def render(digest: dict) -> tuple[str, str]:
                  f"{e['discriminating']} rare match(es) among {e['read'] or 0} candidates read.")
     tape_ceiling = (f"{100 * e['tape_ceiling']:.1f}%" if isinstance(e["tape_ceiling"], (int, float))
                     else "unmeasured")
-    lines.append(f"Tape: {e['sketch_wallets'] or 0} wallets sketched, ceiling {tape_ceiling}, "
-                 f"{e['tape_hits']} program hit(s), {e['newcomer_handoffs']} newcomer handoff(s).")
+    covered = (f"{e['tape_seconds'] / 60:.0f} min continuous" if e.get("tape_source") == "sqd"
+               and isinstance(e.get("tape_seconds"), (int, float))
+               else f"{e.get('tape_seconds') or 0}s sample")
+    lines.append(f"Tape ({covered}): {e['sketch_wallets'] or 0} wallets sketched, ceiling "
+                 f"{tape_ceiling}, {e['tape_hits']} program hit(s), {e['cofire_hits']} co-firing "
+                 f"hit(s), {e['newcomer_handoffs']} newcomer handoff(s).")
+    d = digest["discovery"]
+    if d.get("lookups") is None:
+        lines.append("Discovery: no graph reading.")
+    else:
+        lines.append(f"Discovery: {d['lookups']} lookup(s) last run, {d['new_wallets']} new "
+                     f"wallet(s) walked, {d['refreshed']} re-read, {d['new_edges'] or 0} new "
+                     f"edge(s), {d['pending'] or 0} pending.")
     health = "healthy" if s["alerts_healthy"] else "FAILING"
     blind = f"; BLIND: {', '.join(s['blind_feeds'])}" if s["blind_feeds"] else "; feeds fresh"
     lines.append(f"System: alerts {health} ({s['undelivered'] or 0} undelivered){blind}; "

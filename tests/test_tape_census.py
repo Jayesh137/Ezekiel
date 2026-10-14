@@ -264,3 +264,13 @@ def test_registry_leads_get_a_reserved_slice_of_the_detector():
     picked = chk.select_candidates(roster, None, {"ZEC"}, cap=60, registry=leads)
     assert _w(1) in picked and _w(3) in picked and len(picked) == 60
     assert picked[0] in roster                            # roster leads still lead
+
+
+def test_a_rare_market_is_read_relative_to_his_busiest_one():
+    from src import tape_census as tc
+    counts = {"BTC": 1100, "xyz:MU": 103, "xyz:COPPER": 51, "BLAST": 15}
+    coins = set(counts)
+    assert tc.rare_bar(counts, coins) == 110
+    assert tc.rare_markets(counts, coins) == ["BLAST", "xyz:COPPER", "xyz:MU"]
+    # A small sketch keeps the fixed bar.
+    assert tc.rare_bar({"BTC": 100, "xyz:MU": 12}, {"BTC", "xyz:MU"}) == tc.RARE_MARKET_TAKERS

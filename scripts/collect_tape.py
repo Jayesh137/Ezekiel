@@ -18,9 +18,17 @@ candidates), and newcomers in size on his rare markets, whose real birth is read
 from `portfolio` and judged against his silences — the dormancy-handoff shape, and
 the one alert this script raises, through the dormancy detector's own alert.
 
-`build_report`/`register_hits`/`judge_newcomers` are pure or injectable and
-unit-tested; `main` is the network shell (requires the optional `websockets`
-dependency, requirements-stream.txt).
+Since 2026-10-14 the window is no longer a sample. `src/fills_feed.py` reads EVERY
+fill on his markets from SQD's keyless portal between runs (a block cursor in
+`data/state/`, never skipping an unread range, bounded per run), so the sketches,
+the census, the newcomer check and the co-firing detector (`src/cofire.py`: who
+opens his bursts with him, to the second, corrected for chance) see the whole
+order flow of his markets rather than 150 s in 20 min. The websocket window is
+the fallback when the portal is overloaded or unreadable.
+
+`build_report`/`register_hits`/`judge_newcomers`/`fetch_feed_window`/`fold_cofire`
+are pure or injectable and unit-tested; `main` is the network shell (the websocket
+fallback needs the optional `websockets` dependency, requirements-stream.txt).
 """
 
 import json
@@ -31,17 +39,33 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src import tape
+from src import cofire, tape
+from src import fills_feed as ff
 from src import tape_census as tc
-from src.utils import DATA_DIR, atomic_write_json, load_config, save_latest
+from src.utils import (
+    DATA_DIR,
+    atomic_write_json,
+    load_config,
+    read_cursor,
+    save_latest,
+    write_cursor,
+)
 
 OUT_DIR = DATA_DIR / "tape"
 SKETCH_FILE = OUT_DIR / "sketches.json"
 CENSUS_FILE = OUT_DIR / "census.json"
+COFIRE_FILE = OUT_DIR / "cofire.json"
 DEFAULT_SECONDS = 150
 WS_URL = "wss://api.hyperliquid.xyz/ws"
 # Newcomer birth reads per window: one `portfolio` call each, largest first.
 MAX_NEWCOMER_READS = 8
+# The fill feed's block cursor. A first run starts FEED_BACKFILL_MINUTES behind
+# the head; a run reads at most FEED_MAX_MINUTES of blocks (3x the cadence, so a
+# gap is caught up in a few runs) in at most FEED_MAX_REQUESTS requests.
+FEED_CURSOR = "sqd_fills_block"
+FEED_BACKFILL_MINUTES = 20
+FEED_MAX_MINUTES = 60
+FEED_MAX_REQUESTS = 40
 
 
 def target_clip_table():
@@ -63,11 +87,13 @@ def target_signature():
     return signature(load_fills())
 
 
-def build_report(trades, target_clips, *, seconds=None, markets=None):
-    orders = tape.taker_orders(trades)
+def build_report(trades, target_clips, *, seconds=None, markets=None, orders=None,
+                 source="websocket"):
+    orders = tape.taker_orders(trades) if orders is None else list(orders)
     hits = tape.program_clip_hits(orders, target_clips)
     return {
         "computed_at": datetime.now(UTC).isoformat(),
+        "source": source,
         "window_seconds": seconds,
         "markets_watched": sorted(markets or []),
         "trades_seen": len(trades),
@@ -118,6 +144,80 @@ def register_census_hits(hits, data_dir=None):
         }, data_dir=data_dir)
         registered.append(wallet)
     return registered
+
+
+def fetch_feed_window(markets, *, head=None, stream=None, cursor=None, write=None,
+                      backfill_minutes=FEED_BACKFILL_MINUTES, max_minutes=FEED_MAX_MINUTES,
+                      max_requests=FEED_MAX_REQUESTS):
+    """Every fill on `markets` since the cursor, as taker orders. Raises FeedError.
+
+    The cursor moves only past blocks read in full (`last_block + 1`); an
+    overloaded or empty answer leaves it where it was and raises, so the caller
+    falls back to the websocket and the range is read next run.
+    """
+    head = int(head if head is not None else ff.head())
+    stream = stream or ff.stream
+    cursor = cursor or (lambda: read_cursor(FEED_CURSOR))
+    write = write or (lambda value: write_cursor(FEED_CURSOR, value))
+    start = int(cursor() or 0)
+    if start <= 0:
+        start = head - ff.blocks_for_minutes(backfill_minutes)
+    if start > head:
+        raise ff.FeedError(f"cursor {start} is ahead of the head {head}")
+    to_block = min(head, start + ff.blocks_for_minutes(max_minutes) - 1)
+    out = stream(start, to_block, coins=markets, max_requests=max_requests)
+    if out.get("last_block") is None:
+        raise ff.FeedError(f"no blocks read from {start} to {to_block} "
+                           f"({out.get('requests')} request(s), {out.get('overloads')} overloaded)")
+    write(int(out["last_block"]) + 1)
+    fills = out["fills"]
+    times = [f["time"] for f in fills]
+    seconds = round((max(times) - min(times)) / 1000.0, 1) if len(times) > 1 else 0.0
+    return {"orders": ff.taker_orders(fills), "fills": len(fills), "from_block": start,
+            "to_block": to_block, "last_block": out["last_block"], "last_ts": out.get("last_ts"),
+            "head": head, "seconds": seconds, "requests": out["requests"],
+            "overloads": out["overloads"], "bytes": out["bytes"], "complete": out["complete"],
+            "behind_blocks": max(0, head - int(out["last_block"]))}
+
+
+def load_cofire_state():
+    """The committed co-firing state, or empty on the first run (strict like the sketch)."""
+    try:
+        with open(COFIRE_FILE, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except FileNotFoundError:
+        return cofire.empty_state()
+    except ValueError as exc:
+        raise ValueError(f"{COFIRE_FILE}: not valid JSON, refusing to restart co-firing: {exc}") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("wallets"), dict):
+        raise ValueError(f"{COFIRE_FILE}: unexpected shape, refusing to restart co-firing")
+    return data
+
+
+def fold_cofire(orders, config, *, state=None, now_ms=None, data_dir=None):
+    """Fold the window's orders (his included) into the co-firing state; screen;
+    register hits as `tape_cofire` candidates. Writes nothing itself."""
+    from src.candidate_registry import observe_candidate, valid_wallet
+    state = state if state is not None else cofire.empty_state()
+    now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+    excluded = cluster(config)
+    window = cofire.fold_window(state, orders, excluded, now_ms)
+    cofire.cap(state)
+    hits = cofire.screen(state, exclude=excluded)
+    registered = []
+    for hit in hits:
+        try:
+            wallet = valid_wallet(hit["wallet"])
+        except ValueError:
+            continue
+        observe_candidate(wallet, {
+            "source": "tape_cofire", "positive": True, "event_id": f"cofire:{wallet}",
+            "detail": {k: hit.get(k) for k in ("events", "expected", "lift", "z", "lead",
+                                               "tie", "follow", "lead_share", "bursts", "coins")},
+        }, data_dir=data_dir)
+        registered.append(wallet)
+    return {"state": state, "hits": hits, "registered": registered, "window": window,
+            "summary": cofire.summary(state, hits)}
 
 
 def load_sketches():
@@ -227,16 +327,18 @@ def stream_trades(markets, seconds, *, connect=None):
 
 
 def fold_and_census(trades, target_sig, config, *, now_ms=None, fetch=None, alert=None,
-                    data_dir=None, sketches=None, state=None, target_days=None):
+                    data_dir=None, sketches=None, state=None, target_days=None, orders=None):
     """Fold the window into the sketches; census, screen and judge newcomers.
 
     Returns the census and what the window contributed; writes nothing itself.
+    `orders` (the feed's taker orders) replaces grouping `trades` when given.
     """
     now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
     sketches = sketches if sketches is not None else tc.empty_sketches()
     exclude = cluster(config)
     target_coins = set((target_sig.get("clip_table") or {}).keys())
-    orders = [o for o in tape.taker_orders(trades) if o["wallet"] not in exclude]
+    orders = tape.taker_orders(trades) if orders is None else list(orders)
+    orders = [o for o in orders if o["wallet"] not in exclude]
     window = tc.fold_window(sketches, orders, now_ms)
     counts = tc.market_counts(sketches)
     fresh = tc.newcomers(window, counts, target_coins, exclude=exclude)
@@ -248,8 +350,8 @@ def fold_and_census(trades, target_sig, config, *, now_ms=None, fetch=None, aler
         judged = judge_newcomers(fresh, target_days or [], now_ms // 86_400_000, state,
                                  fetch=fetch, data_dir=data_dir, alert=alert)
     return {"sketches": sketches, "census": census, "window": window, "newcomers": fresh,
-            "judged": judged, "rare_markets": sorted(
-                m for m in target_coins if int(counts.get(m) or 0) <= tc.RARE_MARKET_TAKERS)}
+            "judged": judged, "rare_markets": tc.rare_markets(counts, target_coins),
+            "rare_bar": tc.rare_bar(counts, target_coins)}
 
 
 def main():
@@ -268,15 +370,37 @@ def main():
     markets = sorted(set(clips) | {f"{dex}:{c.split(':')[-1]}" for dex in config.get("hip3_dexes", [])
                                    for c in clips if c.startswith(f"{dex}:")})
     sketches = load_sketches()   # before the stream: a damaged memory fails fast
+    cofire_state = load_cofire_state()
+    feed, feed_error, trades = None, None, []
     try:
-        trades = stream_trades(markets, args.seconds)
-    except Exception as exc:  # noqa: BLE001 - the optional dep or the socket may be unavailable
-        print(f"[tape] stream unavailable: {type(exc).__name__}: {exc}")
-        report = build_report([], clips, seconds=args.seconds, markets=markets)
-        report["stream_error"] = str(exc)[:200]
-        save_latest(str(OUT_DIR), report)
-        return report
-    report = build_report(trades, clips, seconds=args.seconds, markets=markets)
+        feed = fetch_feed_window(markets)
+        print(f"[tape] feed: {feed['fills']} fills on {len(markets)} markets, blocks "
+              f"{feed['from_block']}-{feed['last_block']} ({feed['seconds']}s of tape) in "
+              f"{feed['requests']} request(s), {feed['overloads']} overloaded, "
+              f"{feed['behind_blocks']} block(s) behind the head")
+    except Exception as exc:  # noqa: BLE001 - the portal may be overloaded or unreadable
+        feed_error = f"{type(exc).__name__}: {exc}"
+        print(f"[tape] feed unavailable, falling back to the websocket: {feed_error}")
+    if feed is not None:
+        orders, seconds, source, now_ms = feed["orders"], feed["seconds"], "sqd", feed["last_ts"]
+    else:
+        try:
+            trades = stream_trades(markets, args.seconds)
+        except Exception as exc:  # noqa: BLE001 - the optional dep or the socket may be unavailable
+            print(f"[tape] stream unavailable: {type(exc).__name__}: {exc}")
+            report = build_report([], clips, seconds=args.seconds, markets=markets)
+            report["stream_error"] = str(exc)[:200]
+            report["feed_error"] = feed_error
+            save_latest(str(OUT_DIR), report)
+            return report
+        orders, seconds, source, now_ms = tape.taker_orders(trades), args.seconds, "websocket", None
+    report = build_report(trades, clips, seconds=seconds, markets=markets, orders=orders,
+                          source=source)
+    report["feed"] = ({k: feed[k] for k in ("fills", "from_block", "to_block", "last_block",
+                                            "head", "requests", "overloads", "bytes",
+                                            "complete", "behind_blocks")}
+                      if feed is not None else None)
+    report["feed_error"] = feed_error
     register_hits(report["program_hits"])
 
     from src.alerts import alert_dormancy_handoff
@@ -286,12 +410,17 @@ def main():
     target_days = active_days(load_fills())
     folded = fold_and_census(trades, target_sig, config, fetch=hl_read,
                              alert=alert_dormancy_handoff, sketches=sketches,
-                             state=load_dormancy_state(), target_days=target_days)
+                             state=load_dormancy_state(), target_days=target_days,
+                             orders=orders, now_ms=now_ms)
     census = folded["census"]
     registered = register_census_hits(census.get("hits"))
+    cof = fold_cofire(orders, config, state=cofire_state, now_ms=now_ms)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     atomic_write_json(SKETCH_FILE, folded["sketches"], sort_keys=True, compact=True)
     atomic_write_json(CENSUS_FILE, census)
+    atomic_write_json(COFIRE_FILE, cof["state"], sort_keys=True, compact=True)
+    report["cofire"] = {**cof["summary"], "window": cof["window"], "registered": cof["registered"],
+                        "top": cof["hits"][:10]}
     judged = folded["judged"] or {}
     report["census"] = {k: census.get(k) for k in (
         "attempted", "population", "comparable_rate", "comparable_upper", "sketch_wallets",
@@ -302,9 +431,17 @@ def main():
     report["newcomer_handoffs"] = judged.get("handoffs") or []
     report["newcomers_unread"] = judged.get("unread") or []
     report["rare_markets"] = folded["rare_markets"]
+    report["rare_bar"] = folded["rare_bar"]
     save_latest(str(OUT_DIR), report)
-    print(f"[tape] {report['trades_seen']} trades, {report['distinct_takers']} takers, "
-          f"{report['hit_count']} program hits at his clips over {args.seconds}s")
+    print(f"[tape] {source}: {report['taker_orders']} taker orders, {report['distinct_takers']} "
+          f"takers, {report['hit_count']} program hits at his clips over {seconds}s")
+    c = report["cofire"]
+    print(f"[tape-cofire] his orders this window={c['window']['his_orders']} events="
+          f"{c['window']['events']}; state: {c['his_windows']}/{c['windows']} windows with him, "
+          f"{c['wallets_with_events']} wallets with events, {c['hits']} hit(s)")
+    for h in c["top"][:5]:
+        print(f"  COFIRE {h['wallet']} events={h['events']} lift={h['lift']} z={h['z']} "
+              f"lead_share={h['lead_share']} bursts={h['bursts']} on {','.join(h['coins'][:6])}")
     for h in report["program_hits"][:10]:
         print(f"  {h['wallet']} {h['coin']} clip={h['clip']} orders={h['orders']} gap_med={h['gap_med']}")
     print(f"[tape-census] sketches={census.get('sketch_wallets')} windows={census.get('windows')} "

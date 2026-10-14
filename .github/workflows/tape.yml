@@ -1,13 +1,17 @@
 name: Sample the live tape
 
-# The free-setup recovery of the real-time behavioural net. A 24/7 tape stream
-# needs an always-on host (scrapped for lack of one); this samples instead — a
-# bounded ~150s websocket window each run, driven on the usual cadence — and finds
-# any wallet running his EXACT clip program live on his markets, off the leaderboard
-# and off the roster, with no per-wallet API call. Hits become execution-program
-# candidates the census-gated detector examines fully next trace run; this workflow
-# raises no alerts of its own, so it adds coverage without noise. A trade in the gap
-# between windows is still caught later by the other vectors, just not instantly.
+# The venue-wide behavioural net. Since 2026-10-14 each run reads EVERY fill on
+# his markets since the last run from SQD's keyless fills portal
+# (src/fills_feed.py; a block cursor, bounded per run, never skipping an unread
+# range), so the sketches, the execution census, the newcomer check and the
+# co-firing detector (src/cofire.py) see the whole order flow of his markets
+# rather than a ~150s websocket sample in 20 min; the websocket window is the
+# fallback when the portal is overloaded. It finds any wallet running his EXACT
+# clip program, any wallet that opens his bursts with him to the second, and
+# newcomers in size on his rare markets, all off the leaderboard and off the
+# roster, with no per-wallet API call. Hits become candidates the per-wallet
+# detectors examine next trace run; the only alert raised here is the dormancy
+# handoff for a newcomer born in his silence.
 on:
   schedule:
     - cron: '*/20 * * * *'   # best-effort; the keeper/relay drives the real cadence

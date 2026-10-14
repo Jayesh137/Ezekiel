@@ -116,7 +116,7 @@
 					<td>{gate?.tape?.comparable ?? '—'}</td>
 					<td>{pct(gate?.tape?.ceiling)}</td>
 					<td class="text-muted">
-						{#if gate?.tape}{gate.tape.sketched?.toLocaleString()} wallets sketched over {gate.tape.windows} windows, {gate.tape.hits} program hit(s){:else}no window folded yet{/if}
+						{#if gate?.tape}{gate.tape.sketched?.toLocaleString()} wallets sketched over {gate.tape.windows} windows, {gate.tape.hits} program hit(s){#if data?.tape?.source === 'sqd'}; fed continuously ({Math.round((data.tape.window_seconds || 0) / 60)} min last run){:else}; websocket sample{/if}{#if data?.tape?.cofire}; {data.tape.cofire.hits} co-firing hit(s) over {data.tape.cofire.his_windows} window(s) with him{/if}{:else}no window folded yet{/if}
 					</td>
 				</tr>
 			</tbody>
