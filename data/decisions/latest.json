@@ -1,0 +1,58 @@
+{
+  "computed_at": "2026-10-14T20:08:38.485527+00:00",
+  "pending": [
+    {
+      "address": "0x793a3e8a1f0e19719bfa39288436958bcd475dc4",
+      "kind": "suspect",
+      "p_now": 0.00499,
+      "on_hl": false,
+      "value": 0.0,
+      "why": "Paid his private deposit address 0x734c9213... $3,500,671 (2025-09-20) - no Hyperliquid account",
+      "ask": "Not a Hyperliquid account: only you can say whether it is his \u2014 if it is, every wallet it funds inherits the link.",
+      "command": "python scripts/casebook.py rule 0x793a3e8a1f0e19719bfa39288436958bcd475dc4 him|not_him|unsure --note \"...\""
+    },
+    {
+      "address": "0xda0932d2a880bafa82bc2ac41ab0caafc5544f52",
+      "kind": "suspect",
+      "p_now": 0.00499,
+      "on_hl": true,
+      "value": 6.0,
+      "why": "Paid his private deposit address 0x8570c2ae... $249,994 (2024-07-31) - $6 on Hyperliquid, no trades in 30 days",
+      "ask": "On Hyperliquid: rule it, or leave it to the detectors.",
+      "command": "python scripts/casebook.py rule 0xda0932d2a880bafa82bc2ac41ab0caafc5544f52 him|not_him|unsure --note \"...\""
+    },
+    {
+      "address": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
+      "kind": "suspect",
+      "p_now": 0.00499,
+      "on_hl": false,
+      "value": 0.0,
+      "why": "Money both ways with him - no Hyperliquid account",
+      "ask": "Not a Hyperliquid account: only you can say whether it is his \u2014 if it is, every wallet it funds inherits the link.",
+      "command": "python scripts/casebook.py rule 0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b him|not_him|unsure --note \"...\""
+    },
+    {
+      "address": "0x41ba52eedc421bea6a3f59b6473edddd6caa6080",
+      "kind": "suspect",
+      "p_now": 0.00499,
+      "on_hl": false,
+      "value": 0.0,
+      "why": "Money both ways with him - no Hyperliquid account",
+      "ask": "Not a Hyperliquid account: only you can say whether it is his \u2014 if it is, every wallet it funds inherits the link.",
+      "command": "python scripts/casebook.py rule 0x41ba52eedc421bea6a3f59b6473edddd6caa6080 him|not_him|unsure --note \"...\""
+    },
+    {
+      "address": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
+      "kind": "watch_question",
+      "age_days": 33,
+      "why": "Opened at zero 2026-08-17 22:20, two days into a six-day silence of the target's (his p90 gap is five); $999 to $5.0M in a day and $51.3M in three weeks; matche",
+      "ask": "Watched as a question; the watch cannot close it. Rule it or drop it.",
+      "command": "python scripts/casebook.py rule 0xdd53c5297309130ab5fe5623dc905752e3342b13 him|not_him|unsure --note \"...\""
+    }
+  ],
+  "counts": {
+    "suspects": 4,
+    "watch_questions": 1
+  },
+  "ruled": 0
+}

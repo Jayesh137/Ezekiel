@@ -7,6 +7,14 @@ database file you choose (default data/.local/casebook.sqlite3, which git ignore
     python scripts/casebook.py events [--since 2026-10-01] [--address 0x...] [-n 200]
     python scripts/casebook.py check
     python scripts/casebook.py sqlite [PATH]
+    python scripts/casebook.py rule 0xADDRESS him|not_him|unsure [--note "..."]
+
+`rule` is the one command that WRITES config.json: a ruling is ground truth and
+belongs there (never in a roster tier). `not_him` adds a `casebook_rulings`
+entry the model scores against; `him` ALSO adds the address to
+`known_self_wallets`, so it joins the config cluster, the close watch and every
+detector's pins on the next run; `unsure` records the note and leaves the case
+in the queue's "ruled" count without changing any score.
 
 The likelihood columns assume a 1-in-1,000 prior and mostly declared likelihood
 ratios (data/casebook/latest.json "model" says which). They rank cases; they do not
@@ -217,6 +225,44 @@ def cmd_sqlite(args) -> int:
     return 0
 
 
+VERDICTS = ("him", "not_him", "unsure")
+
+
+def apply_ruling(config: dict, address: str, verdict: str, note: str | None, *, at: str) -> dict:
+    """The config with the ruling applied. Pure; the caller writes it."""
+    address = str(address).lower()
+    if verdict not in VERDICTS:
+        raise ValueError(f"verdict must be one of {VERDICTS}")
+    rulings = dict(config.get("casebook_rulings") or {})
+    rulings[address] = {"verdict": verdict, "note": (note or "")[:200], "at": at}
+    config["casebook_rulings"] = rulings
+    if verdict == "him":
+        known = [str(w).lower() for w in config.get("known_self_wallets") or []]
+        if address not in known and address != str(config.get("target_wallet") or "").lower():
+            known.append(address)
+        config["known_self_wallets"] = known
+    return config
+
+
+def cmd_rule(args) -> int:
+    from datetime import UTC, datetime
+    address = str(args.address).lower()
+    if not address.startswith("0x") or len(address) != 42:
+        out(f"not an address: {args.address}")
+        return 2
+    with open(utils.CONFIG_PATH, encoding="utf-8") as f:
+        config = json.load(f)
+    apply_ruling(config, address, args.verdict, args.note, at=datetime.now(UTC).isoformat())
+    utils.atomic_write_json(utils.CONFIG_PATH, config)
+    out(f"ruled {address} {args.verdict}" + (f" — {args.note}" if args.note else ""))
+    if args.verdict == "him":
+        out("added to known_self_wallets: it joins the cluster, the close watch and every "
+            "detector's pins on the next run; commit config.json to make it live")
+    else:
+        out("commit config.json to make it live; the casebook re-scores it next trace run")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Read the casebook.")
     parser.add_argument("--data-dir", type=Path, default=None, help="the data directory (default: data/)")
@@ -233,10 +279,14 @@ def main(argv=None) -> int:
     sub.add_parser("check", help="verify every file reads and the index matches the cases")
     sq = sub.add_parser("sqlite", help="export to a SQLite database")
     sq.add_argument("path", nargs="?")
+    rule = sub.add_parser("rule", help="record your ruling on a case (writes config.json)")
+    rule.add_argument("address")
+    rule.add_argument("verdict", choices=VERDICTS)
+    rule.add_argument("--note", default=None)
     args = parser.parse_args(argv)
     args.data_dir = args.data_dir or utils.DATA_DIR
     commands = {"top": cmd_top, "show": cmd_show, "events": cmd_events, "check": cmd_check,
-                "sqlite": cmd_sqlite}
+                "sqlite": cmd_sqlite, "rule": cmd_rule}
     return commands[args.command](args)
 
 

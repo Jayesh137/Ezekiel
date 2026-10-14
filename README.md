@@ -16,6 +16,12 @@ many independent vectors agree), the casebook (`python scripts/casebook.py top`,
 every suspect ranked), the close watch (what each known wallet is doing now) and
 the daily digest on the phone (the set, every morning).
 
+> **2026-10-14:** co-firing has been read over every session he has traded since
+> February (all 294; 0 of 1,127 strangers clear the bar; his known wallets never
+> share his tape), his book now reaches the phone as position notices, and the
+> questions only the operator can settle are listed in `data/decisions/latest.json`
+> and ruled with `python scripts/casebook.py rule`.
+
 ## How it works
 
 Several observation families feed the discovery process. Reports sharing the

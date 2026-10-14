@@ -82,6 +82,14 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 5   # step-bounded so a hung socket cannot cancel the commit
         run: python scripts/collect_tape.py --seconds 150
+      # Co-firing over his STORED sessions (src/cofire_history.py): the live fold
+      # above sees only the windows since the feed cursor, so each run also folds
+      # a few of his historical sessions it has not read yet, until the census
+      # covers every session he has ever traded. Idempotent by session key.
+      - name: Fold his historical sessions into the co-firing census
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 4
+        run: python scripts/census_cofire_history.py --max-sessions 4 --time-budget 150
       - name: Commit and push
         if: always()
         run: |

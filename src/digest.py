@@ -173,6 +173,21 @@ def execution_section(readings: dict) -> dict:
     }
 
 
+def cofire_history_section(readings: dict) -> dict | None:
+    """The co-firing census over his stored sessions (src/cofire_history.py)."""
+    doc = readings.get("cofire_history")
+    if not isinstance(doc, dict) or not isinstance(doc.get("coverage"), dict):
+        return None
+    cov, rate = doc["coverage"], doc.get("base_rate") or {}
+    controls = [c for c in doc.get("controls") or [] if isinstance(c, dict)]
+    return {"sessions_read": cov.get("sessions_read"), "sessions": cov.get("sessions"),
+            "hits": len(doc.get("hits") or []),
+            "population": rate.get("wallets"), "hit_rate": rate.get("hit_rate"),
+            "controls_seen": sum(1 for c in controls if c.get("seen")),
+            "controls_hit": sum(1 for c in controls if c.get("hit")),
+            "controls": len(controls)}
+
+
 def discovery_section(readings: dict) -> dict:
     """What the L1 walk did on its last run: the one vector that reaches an
     address nobody has seen, and the one that was dead for a month while every
@@ -221,6 +236,12 @@ def health_section(readings: dict, now: datetime) -> dict:
     }
 
 
+def decisions_section(readings: dict, config: dict | None, now: datetime) -> dict:
+    """What waits on the operator (src/decisions.py)."""
+    from src import decisions
+    return decisions.pending(config or {}, readings.get("casebook"), now)
+
+
 def build(readings: dict, config: dict | None, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     return {
@@ -228,8 +249,10 @@ def build(readings: dict, config: dict | None, now: datetime | None = None) -> d
         "computed_at": now.isoformat(),
         "target": target_section(readings, now),
         "hunt": hunt_section(readings, config),
+        "decisions": decisions_section(readings, config, now),
         "execution": execution_section(readings),
         "discovery": discovery_section(readings),
+        "cofire_history": cofire_history_section(readings),
         "health": health_section(readings, now),
     }
 
@@ -272,6 +295,10 @@ def render(digest: dict) -> tuple[str, str]:
             where = f"HL {_money(row['value'])}" if row.get("on_hl") else "not on HL"
             parts.append(f"{_short(row['address'])} {pct} ({where})")
         lines.append("Top suspects: " + "; ".join(parts) + ".")
+    from src import decisions
+    ruling = decisions.render_line(digest.get("decisions") or {}, _short)
+    if ruling:
+        lines.append(ruling)
     gate = "OPEN" if e["gate_open"] else "closed"
     ceiling = f"{100 * e['ceiling']:.1f}%" if isinstance(e["ceiling"], (int, float)) else "unmeasured"
     lines.append(f"Execution vote gate {gate}: false-match ceiling {ceiling} "
@@ -285,6 +312,13 @@ def render(digest: dict) -> tuple[str, str]:
     lines.append(f"Tape ({covered}): {e['sketch_wallets'] or 0} wallets sketched, ceiling "
                  f"{tape_ceiling}, {e['tape_hits']} program hit(s), {e['cofire_hits']} co-firing "
                  f"hit(s), {e['newcomer_handoffs']} newcomer handoff(s).")
+    ch = digest.get("cofire_history")
+    if ch:
+        rate = (f"{100 * ch['hit_rate']:.2f}% of {ch['population']}" if isinstance(ch.get("hit_rate"), (int, float))
+                else f"unmeasured over {ch.get('population') or 0}")
+        lines.append(f"History co-firing: {ch['sessions_read'] or 0}/{ch['sessions'] or 0} of his sessions "
+                     f"read, {ch['hits']} hit(s), base rate {rate}; his known wallets: "
+                     f"{ch['controls_seen']}/{ch['controls']} on his tape, {ch['controls_hit']} co-firing.")
     d = digest["discovery"]
     if d.get("lookups") is None:
         lines.append("Discovery: no graph reading.")

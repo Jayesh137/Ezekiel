@@ -2360,3 +2360,55 @@ CLOSED until a path to a smaller measured ceiling exists — the leaderboard's 2
 the smaller population's figure, and the takers of his markets are the population the
 detector actually draws from. An exact-clip match on rare coins still reaches HIGH as
 a census-rare match; nothing votes on structure alone while rank structure is this common.
+
+
+## 2026-10-14 — co-firing over his whole history; his book on the phone; the decision queue
+
+**Why.** After eight months the set beyond config is empty, and the vectors that
+can find a wallet funded across a custody gap are behavioural. The co-firing
+detector (built that morning) had seen none of his bursts; the project held 296
+of them locally and SQD serves every fill around each, keyless. The owner
+copy-trades by hand and the watch discarded his book every run. Two decisions
+(`0x160f6ef9…`, `0xb83de012…`) had waited weeks unseen.
+
+**Built** (branch `feat/cofire-history-positions-decisions`):
+
+- `fills_feed.header_at` / `BlockIndex.block_at`: a block for a timestamp by
+  interpolation search on header-only reads (~0.1 s each; the dataset starts at
+  block 750,000,000 = 2025-10-02 16:24:56 UTC). **Measured:** the portal's
+  529 "overloaded" is answered per request SHAPE — the same block refused at span
+  400 and served at span 10 in the same second — so a refused header read tries
+  four other shapes before waiting the retry-after, and `stream` halves a refused
+  range before waiting and widens again once served. 28 of 48 cold reads were
+  refused on the first probe and every lookup still converged; a dense index
+  answers in <1 s.
+- `src/cofire_history.py` + `scripts/census_cofire_history.py`: sessions (60 s
+  gap across all coins), ±15 min padded windows per session sliced at 60 min,
+  `cofire.fold_window` with the target alone as "him", known wallets as
+  controls, base rate with deciles, resumable by session key, bounded per run
+  (tape.yml folds 4 sessions a run; the full history ran locally in ~2.5 h).
+- `src/positions_watch.py` + `check_watchlist.notify_positions`: books, diff,
+  one notice, aggregate; baseline on first read; `data/watchlist/positions.json`.
+- `src/decisions.py`, `send_digest.write_decisions`, `casebook.py rule`.
+- Tripwires page: three cards (Needs your ruling, His book now, Co-firing over
+  his history); digest lines for the queue and the history census.
+
+**Measured.** All 294 sessions read (3 refused by the portal with 503s and a
+read timeout on the first pass, read on the second): all 92,833 of his taker orders folded; **1,127 strangers with ≥10 events, 0 clear the bar**; lift
+deciles p10 0.76 / p50 1.19 / p90 1.83 / p99 5.76; lead-share p90 0.25, p99
+1.0. **His known wallets `0x1419e75…` and `0xf078969e…` never appeared on his
+tape in any session.** So the method is NOT validated on him (he has never
+worked two of his known wallets together) and the venue-wide answer is that
+nobody opens his bursts with him beyond chance. Recorded as a bound on the
+vector's reach: a second account of his, if any, is not worked in the same
+seconds, and the live detector's bar is rare (<1 in 1,127).
+
+**Rulings taken without the operator** (each recorded with its cost): position
+notices at default priority (may sound; `POSITION_NOTICES=0` silences); the
+decision queue's bar at p_now ≥0.3% and 30-day watch questions (a longer queue
+is ignored); the casebook model's `cofire` LR is NOT changed (rule 4 — a bump
+needs a hit to calibrate against, and there is none).
+
+**Not built:** his own fills 2025-10 → 2026-02 by user filter (~2,000 requests at
+the measured 222K blocks per user-filtered request); PnL-series correlation off
+leaderboard snapshots (no series is kept).

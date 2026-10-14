@@ -125,6 +125,10 @@ trading style. Never promote a wallet on one vector alone.
 | Fill feed | `src/fills_feed.py`, `scripts/collect_tape.py` (tape.yml) | **Every fill on his markets, by user, keyless, uncapped** (measured 2026-10-14): SQD's public portal `portal.sqd.dev/datasets/hyperliquid-fills` streams Hyperliquid fills as JSON lines, filtered server-side by coin or user, real-time, back to block 750M (~Oct 2025). 20 min of his 43 markets = 63,318 fills, 2,718 takers, 15.6 MB in ONE request in 1 s. The tape reads every fill since its block cursor (`data/state/sqd_fills_block`, never past an unread range, ≤60 min a run, overload 529s waited on then reported incomplete) and folds the taker orders (`crossed` fills grouped by hash) into the same sketches/census/newcomer path; the 150 s websocket window is the fallback. Strict: a failed read raises, never an empty page. Rare markets are now read relative to his busiest one (`tape_census.rare_bar`) |
 | Co-firing | `src/cofire.py`, `scripts/collect_tape.py` (tape.yml) | **Who opens his bursts WITH him, to the second.** Every taker order on the same coin and side within ±5 s of one of his is an event; chance is corrected for by the wallet's own order rate on that coin and side during his bursts (`expected`); lead/tie/follow is judged ONCE PER BURST on the wallet's earliest order against his first (inside a burst his 1.75 s cadence makes a copier 1.5 s behind one clip 0.25 s "ahead" of the next). A hit needs ≥10 events over ≥3 bursts, lift ≥5 over chance, and ≥25% of bursts opened before or with him — a wallet that only follows is a copier, however tight. Hits → `tape_cofire` registry candidates; state in `data/tape/cofire.json` (2,000 wallets). Evidence, not a vote, until the lift's base rate is measured |
 
+| Co-firing over his history | `src/cofire_history.py`, `scripts/census_cofire_history.py` (tape.yml) | **The same co-firing read over EVERY session he has traded since 2026-02-05**, not the live windows alone: his stored taker orders clustered by a 60 s gap across all coins (294 sessions), each read ±15 min from SQD by coin (a block for a time found by interpolation search on header-only reads, cached in `data/state/sqd_block_index.json`; a refused request is narrowed before it is waited on) and folded with `cofire.fold_window` with the target ALONE as "him", so his known wallets are **positive controls**. **Measured 2026-10-14 over all 294 sessions (every one of his 92,833 taker orders): 0 of 1,127 strangers with ≥10 events clear the bar** (lift p50 1.19, p99 5.8; lead-share p90 0.25), and **his known wallets never once appeared on his tape** — so whatever other wallet he runs is not worked in the same seconds as this one, and the live detector's bar is rare (<1 in 1,127). Resumable by session key; `data/tape/cofire_history.json`; hits would register as `tape_cofire` candidates |
+| Position notices | `src/positions_watch.py`, `check_watchlist.notify_positions` (watch.yml) | **What his book did since the last run, pushed to the phone** — opened / closed / flipped / resized ≥25% on the target, `known_self_wallets` and roster CONFIRMED wallets, across every dex, as ONE notice per run through `send_notice` at default priority (never `send_alert`: not a detection, touches no severity gate or delivery health). First reading is a baseline; an unreadable wallet keeps its stored book. `data/watchlist/positions.json` holds the books and his aggregate book (the FTX "all subaccounts" view); the dashboard's Tripwires page shows it. `POSITION_NOTICES=0` disables |
+| Decision queue | `src/decisions.py`, `scripts/send_digest.py` (every watch run), `scripts/casebook.py rule` | **Questions only the operator can settle, made visible and one command from settled**: casebook cases ≥0.3% unruled (a suspect not on HL can only be joined to him by a ruling), and `watch_wallets` questions open ≥30 days. `data/decisions/latest.json`, a "Needs your ruling" digest line and Tripwires card. `rule <address> him|not_him|unsure --note` writes `config.casebook_rulings` (and `known_self_wallets` on `him`) — ground truth stays in config, never in a tier |
+
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
 
@@ -189,6 +193,18 @@ standing state and the rule each incident taught.
   `0x9430801e…` is an exchange gas feeder: settled no.
 - **His frontend agent is now `0x6f4e393f…`** (was `0x98cf3fee…`); new agents
   of his alert (named CRITICAL, frontend HIGH).
+- **Co-firing has been asked over his whole history and answers no (2026-10-14).**
+  all 294 sessions, 1,127 strangers with enough events, 0 hits; his own
+  known wallets never appear on his tape. If he runs a second Hyperliquid
+  account it is not worked in the same seconds as this one, so the live
+  co-firing detector is a tripwire for a habit he has not shown, not the net
+  that finds him; the custody-gap vectors (execution program, dormancy,
+  provenance) keep that job.
+- **Decisions waiting on the operator are listed, not buried.** Read
+  `data/decisions/latest.json` or the digest's "Needs your ruling" line; rule
+  with `python scripts/casebook.py rule`. On 2026-10-14 the queue held
+  `0x793a3e8a…`, `0xda0932d2…`, `0x160f6ef9…`, `0x41ba52ee…` and the
+  `0xdd53c529…` watch question.
 - **Open:** `_load_cached`'s 256 MiB ceiling counts file bytes while holding
   parsed objects (~1.5x); recovering unpriced records lost across the frontier
   is an API-budget decision for the operator (target re-sweeps, never
@@ -856,6 +872,13 @@ that it is.
 ## Operating facts
 
 - **One quiet digest a day (2026-10-12).** `scripts/send_digest.py` (watch.yml, first run at or after 07:00 UTC, day remembered in `data/state/digest_sent_day.txt`) sends `src/digest.py`'s one-screen summary at LOW priority through `alerts.send_notice`: his last fill and silence against his own p90, hunt tiers beyond his known wallets, the casebook's top suspects, the execution gate and both ceilings, the tape's sketch count, feeds blind, alert health, data age and what paged in the last 24 h. It bypasses the severity gate on purpose, never buzzes and records nothing in delivery health; `data/digest/latest.json` holds the text. Silence from the phone now means a quiet day, not a dead system.
+- **His book reaches the phone (2026-10-14).** Every watch run diffs the
+  positions of the target, his known wallets and roster CONFIRMED wallets
+  against the stored books and sends one notice (`send_notice`, default
+  priority) naming what opened, closed, flipped or resized ≥25%; the Tripwires
+  page shows the aggregate book. It is the owner's working signal and bypasses
+  the severity gate on purpose, like the digest; it records nothing in
+  delivery health.
 - **Alerts arrive as GitHub Issues and ntfy, not email.** Brevo SMTP has never
   once delivered (account unactivated). `_github_issue_fallback` in
   `alerts.py`. `send_alert` also delivers through Telegram

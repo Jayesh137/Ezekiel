@@ -63,6 +63,7 @@ def load_readings(data_dir: Path = DATA_DIR) -> dict:
         "census": _read(data_dir / "execution_program" / "census.json"),
         "tape_census": _read(data_dir / "tape" / "census.json"),
         "tape": _read(data_dir / "tape" / "latest.json"),
+        "cofire_history": _read(data_dir / "tape" / "cofire_history.json"),
         "execution": _read(data_dir / "execution_program" / "latest.json"),
         "alerts": _read(data_dir / "alerts" / "latest.json"),
         "feed_other": _read(data_dir / "feed_health" / "other.json"),
@@ -74,6 +75,15 @@ def load_readings(data_dir: Path = DATA_DIR) -> dict:
     }
 
 
+def write_decisions(now: datetime, data_dir: Path = DATA_DIR) -> dict:
+    """The operator's decision queue, rewritten every run for the dashboard
+    (src/decisions.py). Cheap: two files, no network."""
+    from src import decisions
+    queue = decisions.pending(load_config(), _read(data_dir / "casebook" / "latest.json"), now)
+    save_latest(str(data_dir / "decisions"), queue)
+    return queue
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="send even if today's was sent")
@@ -82,6 +92,7 @@ def main(argv=None) -> int:
 
     now = datetime.now(UTC)
     last = read_cursor_text(CURSOR)
+    write_decisions(now)
     if not args.force and not args.dry_run and not digest.due(last, now):
         print(f"[digest] not due (last sent {last or 'never'}, hour {now.hour:02d} UTC)")
         return 0

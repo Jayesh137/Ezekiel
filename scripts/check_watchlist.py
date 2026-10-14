@@ -20,11 +20,12 @@ evidence about what it is doing, reported once, on the transition.
 import json
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src import utils
+from src import positions_watch, utils
 from src.agent_links import multisig_signers, normalise_agents
 from src.alerts import (
     alert_explicit_link,
@@ -39,7 +40,7 @@ from src.chain.hyperevm import account_activity
 from src.hl_actions import fetch_actions, own_actions, record
 from src.hl_identity import probe
 from src.scanner import live_hip3_dexes
-from src.utils import DATA_DIR, hl_post, load_config
+from src.utils import DATA_DIR, atomic_write_json, hl_post, load_config
 from src.watchlist import (
     WATCHLIST_DIR,
     build_report,
@@ -242,7 +243,12 @@ def target_account_value(config: dict) -> float | None:
     if not target:
         return None
     try:
-        return account_value(target, live_hip3_dexes())[0]
+        value, state = account_value(target, live_hip3_dexes())
+        # His book, kept beside the value for the position notices below: the
+        # same reading, no second call, and a reader that fakes this function
+        # simply finds no book (the notice step then has nothing to say).
+        TARGET_BOOK[target] = positions_watch.book(state)
+        return value
     except Exception as exc:                          # noqa: BLE001 - transport
         print(f"[watchlist] the target's own value is unreadable "
               f"({type(exc).__name__}: {exc}) — no wallet can be sized against "
@@ -259,9 +265,10 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
     if not ident.get("read_ok"):
         errors.extend(ident.get("errors") or [])
 
-    value, dexes = None, []
+    value, dexes, book = None, [], None
     try:
         value, state = account_value(address, live_hip3_dexes())
+        book = positions_watch.book(state)
         # Which venues it actually has a book on. A position opening on a dex
         # it has never used is what a migration INSIDE Hyperliquid looks like,
         # and the total account value alone cannot show it.
@@ -363,6 +370,8 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
         dexes=dexes if value is not None else None,
         target_value=target_value,
         read_ok=not errors, errors=errors)
+    if book is not None:
+        snap["book"] = book
     return snap, sorted(counterparties)
 
 
@@ -488,6 +497,9 @@ def main() -> int:
     if his_value is not None:
         print(f"[watchlist] the target is worth ${his_value:,.0f} across every "
               f"live dex and spot")
+    books: dict = {}
+    if target in TARGET_BOOK:
+        books[target] = TARGET_BOOK.pop(target)
 
     for entry in wallets:
         address = entry["address"]
@@ -496,6 +508,8 @@ def main() -> int:
         snap["why"] = entry.get("why")
         snap["source"] = entry.get("source") or "config"
         snapshots.append(snap)
+        if address in his and isinstance(snap.get("book"), dict):
+            books[address] = snap["book"]
 
         if entry.get("settled") and not seeding:
             held_payees |= check_new_payees(address, seen_payees, his, payee_readings)
@@ -558,7 +572,72 @@ def main() -> int:
         print(f"[watchlist] first reading of his payees — {len(seen_payees)} address(es) "
               f"recorded as seen, nothing alerted")
     save(report)
+    notify_positions(books, config)
     return 0
+
+
+# The target's book from `target_account_value`'s one read (see there).
+TARGET_BOOK: dict = {}
+POSITIONS_FILE = "positions.json"
+
+
+def _previous_books() -> dict | None:
+    """The stored books, or None when there are none yet (a baseline run)."""
+    try:
+        with open(utils.DATA_DIR / "watchlist" / POSITIONS_FILE, encoding="utf-8") as f:
+            doc = json.load(f)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as exc:
+        print(f"[watchlist] stored positions unreadable ({type(exc).__name__}); "
+              f"this reading is a new baseline")
+        return None
+    return doc.get("books") if isinstance(doc, dict) and isinstance(doc.get("books"), dict) else None
+
+
+def notify_positions(books: dict, config: dict) -> dict | None:
+    """What his book did since the last run, as ONE notice (src/positions_watch.py).
+
+    Covers every wallet of his the watch read this run (the target, his known
+    wallets, roster CONFIRMED). A wallet read for the first time is a baseline;
+    a wallet unreadable this run keeps its stored book rather than reading as
+    "closed everything". Sent through `send_notice`, never `send_alert`: the
+    owner's working signal, not a detection. `POSITION_NOTICES=0` disables.
+    """
+    import os
+    if not books:
+        return None
+    previous = _previous_books()
+    stored = dict(previous or {})
+    changes = {}
+    for wallet, book in books.items():
+        changes[wallet] = positions_watch.diff(None if previous is None else previous.get(wallet), book)
+        stored[wallet] = book
+    target = (config.get("target_wallet") or "").lower()
+    labels = {target: "target"}
+    for w in config.get("known_self_wallets") or []:
+        labels[str(w).lower()] = f"his {str(w)[:6]}…{str(w)[-4:]}"
+    rendered = positions_watch.render(changes, labels)
+    doc = {"computed_at": datetime.now(UTC).isoformat(), "books": stored,
+           "aggregate": positions_watch.summarise(stored),
+           "changes": {w: c for w, c in changes.items() if c}}
+    atomic_write_json(utils.DATA_DIR / "watchlist" / POSITIONS_FILE, doc)
+    for wallet, deltas in changes.items():
+        for change in deltas:
+            print(f"[watchlist]   POSITION {wallet[:12]}... {positions_watch.describe(change)}")
+    if previous is None:
+        print(f"[watchlist] first reading of his book — {len(books)} wallet(s) recorded as a "
+              f"baseline, nothing sent")
+        return doc
+    if rendered is None:
+        return doc
+    if os.environ.get("POSITION_NOTICES", "1") == "0":
+        print("[watchlist] position notice withheld (POSITION_NOTICES=0)")
+        return doc
+    from src.alerts import send_notice
+    via = send_notice(rendered[0], rendered[1], priority="default")
+    print(f"[watchlist] position notice {'sent via ' + ', '.join(via) if via else 'not delivered'}")
+    return doc
 
 
 if __name__ == "__main__":

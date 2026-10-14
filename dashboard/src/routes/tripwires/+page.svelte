@@ -41,6 +41,25 @@
 	$: execMatches = (data?.execution?.matches || []).filter((m) => m.discriminating);
 	$: tapeHandoffs = data?.tape?.newcomer_handoffs || [];
 	$: digestLines = (data?.digest?.body || '').split('\n').filter(Boolean);
+	$: pendingDecisions = data?.decisions?.pending || [];
+	$: book = Object.entries(data?.positions?.aggregate || {});
+	$: bookChanges = Object.entries(data?.positions?.changes || {});
+	$: history = data?.cofireHistory;
+	$: historyHits = (history?.hits || []).slice(0, 15);
+	$: historyControls = history?.controls || [];
+
+	function size(x) {
+		const v = Math.abs(Number(x) || 0);
+		return v >= 100 ? v.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : String(v);
+	}
+
+	function describeChange(c) {
+		const a = c.after, b = c.before;
+		if (c.kind === 'opened') return `OPENED ${a.side} ${c.coin} ${size(a.size)} (${formatUSD(a.value)})`;
+		if (c.kind === 'closed') return `CLOSED ${b.side} ${c.coin} ${size(b.size)} (${formatUSD(b.value)})`;
+		if (c.kind === 'flipped') return `FLIPPED ${c.coin} ${b.side} ${size(b.size)} → ${a.side} ${size(a.size)}`;
+		return `${a.side.toUpperCase()} ${c.coin} ${size(b.size)} → ${size(a.size)} (${formatUSD(a.value)})`;
+	}
 
 	function pct(x) {
 		return typeof x === 'number' ? `${(100 * x).toFixed(1)}%` : 'unmeasured';
@@ -138,6 +157,115 @@
 					<li><Addr address={h.wallet} /> — score {h.score}, {h.delay_days} d into a {h.gap_length} d silence{h.open ? ' (open now)' : ''}, on {(h.rare_markets || []).join(', ')}</li>
 				{/each}
 			</ul>
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>
+			Needs your ruling
+			{#if pendingDecisions.length}<span class="badge badge-yellow">{pendingDecisions.length} waiting</span>{:else}<span class="badge badge-green">queue empty</span>{/if}
+		</h2>
+		<p class="text-muted">
+			Questions the pipeline cannot settle: a suspect that is not a Hyperliquid account can only be
+			joined to him by you, and a wallet watched as a question stays one until ruled. A ruling is
+			ground truth (<code>config.json</code>); record it with the command shown.
+		</p>
+		{#if !pendingDecisions.length}
+			<p class="text-muted">Nothing waits on you.</p>
+		{:else}
+			<ul class="decisions">
+				{#each pendingDecisions as d}
+					<li>
+						<div><Addr address={d.address} />
+							{#if d.kind === 'suspect'}<span class="badge badge-grey">{(100 * d.p_now).toFixed(2)}% · {d.on_hl ? 'on HL' : 'not on HL'}</span>
+							{:else}<span class="badge badge-grey">watched {d.age_days ?? '?'} d</span>{/if}
+						</div>
+						<div class="why">{d.why}</div>
+						<div class="text-muted">{d.ask}</div>
+						<code>{d.command}</code>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>His book now</h2>
+		<p class="text-muted">
+			Every position across every wallet of his the close watch reads (the target, his known
+			wallets, roster CONFIRMED), aggregated the way his FTX "all subaccounts" view was. A change
+			between two readings is pushed to the phone as one notice per run.
+			{#if data?.positions?.computed_at}Read {when(data.positions.computed_at)}.{/if}
+		</p>
+		{#if !book.length}
+			<p class="text-muted">No book read yet — written by <code>scripts/check_watchlist.py</code> on the watch job.</p>
+		{:else}
+			<table>
+				<thead><tr><th>Market</th><th>Side</th><th>Size</th><th>Net value</th><th>Wallets</th></tr></thead>
+				<tbody>
+					{#each book as [coin, p]}
+						<tr>
+							<td>{coin}</td>
+							<td><span class="badge {p.side === 'long' ? 'badge-green' : 'badge-red'}">{p.side}</span></td>
+							<td>{size(p.size)}</td>
+							<td>{formatUSD(Math.abs(p.net_value))}</td>
+							<td>{p.wallets.length}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+			{#if bookChanges.length}
+				<h3>Changed on the last reading</h3>
+				<ul>
+					{#each bookChanges as [wallet, changes]}
+						{#each changes as c}<li><Addr address={wallet} /> — {describeChange(c)}</li>{/each}
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>
+			Co-firing over his history
+			{#if history}<span class="badge badge-grey">{history.coverage?.sessions_read ?? 0}/{history.coverage?.sessions ?? 0} sessions</span>{/if}
+		</h2>
+		<p class="text-muted">
+			Who opened his bursts WITH him, to the second, over every session he has traded since
+			February — read from SQD's fill portal around each stored session, chance-corrected by each
+			wallet's own order rate. His known wallets are scored like strangers: the positive controls.
+			A hit leads or ties him on several bursts; a wallet that only follows is a copier.
+		</p>
+		{#if !history}
+			<p class="text-muted">No census yet — written by <code>scripts/census_cofire_history.py</code> on the tape job.</p>
+		{:else}
+			<p>
+				Base rate: {history.base_rate?.hits ?? 0} of {history.base_rate?.wallets ?? 0} wallets with ≥{history.base_rate?.min_events} events clear the bar
+				({typeof history.base_rate?.hit_rate === 'number' ? `${(100 * history.base_rate.hit_rate).toFixed(2)}%` : 'unmeasured below 20 wallets'}).
+				{#each historyControls as c}
+					· control <Addr address={c.wallet} />: {c.seen ? `${c.events} events, lift ${c.lift}, lead share ${c.lead_share}, ${c.hit ? 'HIT' : 'no hit'}` : 'never on his tape'}
+				{/each}
+			</p>
+			{#if historyHits.length}
+				<table>
+					<thead><tr><th>Wallet</th><th>Events</th><th>Lift</th><th>z</th><th>Lead / tie / follow</th><th>Bursts</th><th>Coins</th></tr></thead>
+					<tbody>
+						{#each historyHits as h}
+							<tr>
+								<td><Addr address={h.wallet} /></td>
+								<td>{h.events}</td>
+								<td>{h.lift}</td>
+								<td>{h.z}</td>
+								<td>{h.lead} / {h.tie} / {h.follow}</td>
+								<td>{h.bursts}</td>
+								<td>{(h.coins || []).slice(0, 6).join(', ')}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{:else}
+				<p class="text-muted">No wallet opens his bursts with him beyond chance so far.</p>
+			{/if}
 		{/if}
 	</section>
 
@@ -273,4 +401,8 @@
 	th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 	.digest { list-style: none; padding: 0; margin: 0; font-size: 0.9rem; }
 	.digest li { padding: 4px 0; border-bottom: 1px solid var(--border); }
+	.decisions { list-style: none; padding: 0; margin: 0; }
+	.decisions li { padding: 8px 0; border-bottom: 1px solid var(--border); display: grid; gap: 4px; font-size: 0.9rem; }
+	.decisions .why { font-weight: 500; }
+	.decisions code { font-size: 0.8rem; word-break: break-all; }
 </style>
