@@ -2329,3 +2329,23 @@ agents, sub-accounts and dormancy; `roster.tape_rotation`) and the digest carrie
 Discovery line and the tape's coverage. **When a public source can answer the
 question the sample was built to approximate, measure it before improving the
 sample.**
+
+---
+
+**The casebook's top lead read by hand (2026-10-14): `0x793a3e8a…` is two-way with
+`0x160f6ef9…`.** The case rests on one item — it paid his private deposit address
+`0x734c9213…` $3.5M on 2025-09-20, the address his cluster paid $2M — and ranks at the
+prior. Read on Ethereum (Blockscout, 161 transactions, 372 token transfers, no label), it
+moves money BOTH WAYS with `0x160f6ef9…`, the wallet that sent the target $100.56M and
+is two-way $180M with him: 641.5 ETH and 550 ETH in (2024-07/08), 617 ETH out (2025-05),
+1,651 ezETH in on **2025-09-20 — the day it paid the deposit address** (a 0.15 ETH test
+went first), $500K + $400K + $655K USDT in (2025-09 to 11), 1,768 stETH out (2026-02),
+$106K USDC and 50 wstETH out (2026). It uses Aave (variableDebtEthUSDT), holds stETH,
+and bet on bimarket.io binary markets. The address-poisoning forgeries aimed at it mimic
+exactly `0x160f6ef9…` and `0x734c9213…`, which only happens to an address that really
+pays those. Neither it nor `0x160f6ef9…` has a Hyperliquid account (`userRole` missing),
+so neither is the deliverable; but together they are the person's wider wallet family,
+and an HL account funded by either would be his. **Operator's call, not the code's:** if
+`0x160f6ef9…` is judged his, adding it to `config.known_self_wallets` makes `0x793a3e8a…`
+a two-way counterparty of the cluster (transfer vote + deposit-address linkage →
+PROBABLE) and extends the perimeter and provenance to both. Nothing was promoted.
