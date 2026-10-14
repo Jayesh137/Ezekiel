@@ -103,3 +103,74 @@ def test_head_is_strict():
         ff.head(get=lambda url: _Resp(503))
     with pytest.raises(ff.FeedError):
         ff.head(get=lambda url: _Resp(200, payload={"number": 0}))
+
+
+# --- time -> block ----------------------------------------------------------
+
+def _headers_only(blocks):
+    return "\n".join(json.dumps({"header": {"number": n, "timestamp": ts}}) for n, ts in blocks)
+
+
+def _chain_post(rate_ms_per_block=70, refuse=None, log=None):
+    """A portal whose block n sits at START_TS + n*rate; `refuse` makes some
+    request shapes answer 529 (measured: refusal is per request shape)."""
+    def post(url, body):
+        if log is not None:
+            log.append((body["fromBlock"], body["toBlock"]))
+        if refuse and refuse(body):
+            return _Resp(529, "overloaded", {"retry-after": "3"})
+        n = body["fromBlock"]
+        ts = ff.START_TS_MS + (n - ff.START_BLOCK) * rate_ms_per_block
+        return _Resp(200, _headers_only([(n, ts), (n + 1, ts + rate_ms_per_block)]))
+    return post
+
+
+def test_block_at_converges_by_interpolation_and_caches_checkpoints():
+    log = []
+    idx = ff.BlockIndex()
+    head = (ff.START_BLOCK + 10_000_000, ff.START_TS_MS + 10_000_000 * 70)
+    target_ts = ff.START_TS_MS + 4_000_000 * 70 + 35
+    block = idx.block_at(target_ts, post=_chain_post(log=log), head=head)
+    assert abs(block - (ff.START_BLOCK + 4_000_000)) <= 1
+    assert len(log) <= 3, log  # linear chain: the first guess lands
+    # The checkpoints are kept, sorted and unique, so the next lookup is cheaper.
+    assert idx.points == sorted(set(idx.points)) and len(idx.points) >= 2
+    assert idx.block_at(target_ts, post=_chain_post(log=log), head=head) == block
+
+
+def test_block_at_past_the_head_is_the_head_and_a_dead_portal_raises():
+    idx = ff.BlockIndex()
+    head = (ff.START_BLOCK + 10_000_000, ff.START_TS_MS + 10_000_000 * 70)
+    assert idx.block_at(head[1] + 99_999_999, post=_chain_post(), head=head) == head[0]
+    with pytest.raises(ff.FeedError):
+        idx.block_at(ff.START_TS_MS + 5_000_000 * 70, post=lambda url, body: _Resp(500, "boom"),
+                     head=head)
+
+
+def test_a_refused_header_read_is_retried_with_another_shape_before_waiting():
+    waits = []
+    # Refuse every 400-wide request; serve the narrow ones.
+    post = _chain_post(refuse=lambda body: body["toBlock"] - body["fromBlock"] >= 400)
+    number, ts = ff.header_at(ff.START_BLOCK + 50, post=post, sleep=waits.append)
+    assert number == ff.START_BLOCK + 50 and waits == []
+    # Refused at every shape: waits retry-after, bounded, then raises.
+    always = _chain_post(refuse=lambda body: True)
+    with pytest.raises(ff.FeedError):
+        ff.header_at(ff.START_BLOCK, post=always, sleep=waits.append)
+    assert waits and all(w == 3 for w in waits) and len(waits) <= ff.MAX_OVERLOADS
+
+
+def test_stream_halves_a_refused_range_and_widens_again_once_served():
+    asked = []
+
+    def post(url, body):
+        span = body["toBlock"] - body["fromBlock"] + 1
+        asked.append(span)
+        if span > 4_000:
+            return _Resp(529, "overloaded", {"retry-after": "9"})
+        return _Resp(200, _page([(body["toBlock"], 1, [_fill(h=f"0x{body['toBlock']}")])]))
+    waits = []
+    out = ff.stream(0, 20_000, coins=["NEAR"], post=post, sleep=waits.append)
+    assert out["complete"] and out["last_block"] == 20_000 and waits == []
+    assert asked[0] == 20_001 and min(asked) >= ff.MIN_NARROW_BLOCKS
+    assert out["overloads"] == 0, "a refusal answered by narrowing is not an overload wait"

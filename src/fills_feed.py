@@ -37,6 +37,8 @@ BLOCKS_PER_MINUTE = 840
 OVERLOAD_STATUS = 529
 DEFAULT_RETRY_AFTER = 10
 MAX_OVERLOADS = 6
+# Below this many blocks (~2 minutes) a refused range is waited on, not halved.
+MIN_NARROW_BLOCKS = 1_500
 REQUEST_TIMEOUT = (10, 90)
 
 
@@ -140,10 +142,17 @@ def stream(from_block: int, to_block: int, *, coins=None, users=None, post=None,
     last_block = last_ts = None
     requests_made = overloads = total_bytes = 0
     complete = False
+    # Measured 2026-10-14: "overloaded" (529) is answered per request SHAPE —
+    # the same range refused at one width is served at a narrower one in the
+    # same second — so a refusal first halves the range asked for, and only
+    # waits the retry-after once the range is already small. Narrowing is safe:
+    # the cursor advances only past blocks read in full.
+    narrow = None
     while cursor <= to_block:
         if requests_made >= max_requests or total_bytes >= max_bytes:
             break
-        body = {**body_base, "fromBlock": cursor, "toBlock": int(to_block)}
+        stop = int(to_block) if narrow is None else min(int(to_block), cursor + narrow)
+        body = {**body_base, "fromBlock": cursor, "toBlock": stop}
         try:
             r = post(f"{PORTAL}/stream", body)
         except Exception as exc:  # noqa: BLE001 - transport
@@ -151,6 +160,10 @@ def stream(from_block: int, to_block: int, *, coins=None, users=None, post=None,
         requests_made += 1
         status = getattr(r, "status_code", None)
         if status == OVERLOAD_STATUS:
+            span = stop - cursor + 1
+            if span > MIN_NARROW_BLOCKS:
+                narrow = max(MIN_NARROW_BLOCKS, span // 2)
+                continue
             overloads += 1
             if overloads > max_overloads:
                 break
@@ -175,6 +188,9 @@ def stream(from_block: int, to_block: int, *, coins=None, users=None, post=None,
             complete = True
             break
         cursor = page_last + 1
+        if narrow is not None:
+            # Served: widen again, so one refusal does not price the whole walk.
+            narrow = narrow * 2 if narrow * 2 < int(to_block) - cursor else None
     return {"fills": fills, "last_block": last_block, "last_ts": last_ts,
             "requests": requests_made, "overloads": overloads, "bytes": total_bytes,
             "complete": complete}
@@ -205,3 +221,144 @@ def taker_orders(fills: list[dict]) -> list[dict]:
 
 def blocks_for_minutes(minutes: float) -> int:
     return max(1, int(minutes * BLOCKS_PER_MINUTE))
+
+
+# --- time -> block ----------------------------------------------------------
+#
+# The portal is addressed by block, this project's records by millisecond. With
+# an empty filter the portal answers header-only lines (block number and its
+# timestamp) for a range, in ~0.1 s, so a block for a time is found by
+# interpolation search on cheap header reads. Checkpoints are cached and
+# monotone; the caller persists them (`data/state/sqd_block_index.json`).
+START_BLOCK = 750_000_000
+# The dataset's first block and its timestamp (2025-10-02 16:24:56 UTC), measured
+# 2026-10-14; the search is seeded with it so the first guess interpolates from
+# the real start rather than from zero.
+START_TS_MS = 1_759_422_296_717
+# How close a found block must sit to the asked time. The history census pads
+# every window by minutes, so a few seconds either way change nothing.
+BLOCK_TOLERANCE_MS = 20_000
+MAX_SEARCH_STEPS = 40
+
+
+def header_at(block: int, *, post=None, span: int = 400, sleep=time.sleep) -> tuple[int, int]:
+    """(block number, timestamp ms) of the first block the portal reports at or
+    after `block`. Raises FeedError when nothing can be read there.
+
+    Measured 2026-10-14: the portal's "overloaded" (529) answer is per request
+    shape, not per client — the same block answered 529 at span 400 and 200 at
+    span 10 in the same second — so a refusal is retried with a different span
+    and a small shift BEFORE waiting the retry-after it asks for.
+    """
+    post = post or _post()
+    shapes = [(0, span), (0, 10), (3, 25), (11, 60), (0, 10)]
+    r = None
+    waited = 0
+    for attempt in range(len(shapes) * (MAX_OVERLOADS + 1)):
+        shift, width = shapes[attempt % len(shapes)]
+        body = {"type": "hyperliquidFills", "fromBlock": int(block) + shift,
+                "toBlock": int(block) + shift + width,
+                "fields": {"block": BLOCK_FIELDS}, "fills": [{"coin": ["__NONE__"]}]}
+        try:
+            r = post(f"{PORTAL}/stream", body)
+        except Exception as exc:  # noqa: BLE001 - transport
+            raise FeedError(f"header unreadable: {type(exc).__name__}: {exc}") from exc
+        if getattr(r, "status_code", None) != OVERLOAD_STATUS:
+            break
+        if attempt % len(shapes) == len(shapes) - 1:
+            if waited >= MAX_OVERLOADS:
+                break
+            waited += 1
+            try:
+                wait = int((getattr(r, "headers", {}) or {}).get("retry-after", DEFAULT_RETRY_AFTER))
+            except (TypeError, ValueError):
+                wait = DEFAULT_RETRY_AFTER
+            sleep(max(1, min(60, wait)))
+    if getattr(r, "status_code", None) != 200:
+        raise FeedError(f"header answered {getattr(r, 'status_code', '?')} at {block}")
+    for line in str(r.text).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        header = (json.loads(line).get("header") or {})
+        number, ts = header.get("number"), header.get("timestamp")
+        if isinstance(number, int) and isinstance(ts, int) and ts > 0:
+            return number, ts
+    raise FeedError(f"no header between {block} and {block + span}")
+
+
+class BlockIndex:
+    """Monotone (block, timestamp) checkpoints with interpolation search."""
+
+    def __init__(self, points=None):
+        self.points: list[tuple[int, int]] = [(START_BLOCK, START_TS_MS)]
+        for p in points or []:
+            try:
+                self.add(int(p[0]), int(p[1]))
+            except (TypeError, ValueError, IndexError):
+                continue
+
+    def add(self, block: int, ts: int) -> None:
+        if block <= 0 or ts <= 0:
+            return
+        self.points.append((int(block), int(ts)))
+        self.points = sorted(set(self.points))
+
+    def bracket(self, ts: int) -> tuple[tuple[int, int] | None, tuple[int, int] | None]:
+        lo = hi = None
+        for p in self.points:
+            if p[1] <= ts:
+                lo = p
+            elif hi is None:
+                hi = p
+                break
+        return lo, hi
+
+    def guess(self, ts: int, head: tuple[int, int]) -> int:
+        lo, hi = self.bracket(ts)
+        if lo is not None and lo[1] == ts:
+            return lo[0]
+        if hi is None:
+            hi = head
+        if lo is None:
+            lo = (START_BLOCK, START_TS_MS)
+        if lo[0] >= hi[0] or lo[1] >= hi[1]:
+            return max(START_BLOCK, min(lo[0], hi[0]))
+        frac = (ts - lo[1]) / (hi[1] - lo[1])
+        block = lo[0] + int(frac * (hi[0] - lo[0]))
+        return max(lo[0], min(hi[0], block))
+
+    def block_at(self, ts: int, *, post=None, head: tuple[int, int] | None = None,
+                 tolerance_ms: int = BLOCK_TOLERANCE_MS) -> int:
+        """The block whose timestamp is within `tolerance_ms` of `ts` (at or just
+        before it when the bracket is tight). Raises FeedError when the portal
+        cannot be read; never guesses silently."""
+        ts = int(ts)
+        if head is None:
+            head_block = head_number(post=post)
+            head = header_at(max(START_BLOCK, head_block - 50), post=post)
+            self.add(*head)
+        if ts >= head[1]:
+            return head[0]
+        for _ in range(MAX_SEARCH_STEPS):
+            lo, hi = self.bracket(ts)
+            if lo is not None and ts - lo[1] <= tolerance_ms:
+                return lo[0]
+            if lo is not None and hi is not None and hi[0] - lo[0] <= 1:
+                return lo[0]
+            block = self.guess(ts, head)
+            if lo is not None and block <= lo[0]:
+                block = lo[0] + 1
+            if hi is not None and block >= hi[0]:
+                block = max(lo[0] + 1 if lo else START_BLOCK, hi[0] - 1)
+            found = header_at(block, post=post)
+            if found in self.points:
+                # The portal reported the same checkpoint again: step past it.
+                found = header_at(found[0] + 1, post=post)
+            self.add(*found)
+        raise FeedError(f"block for {ts} not found in {MAX_SEARCH_STEPS} steps")
+
+
+def head_number(*, post=None) -> int:
+    """The head block through the same transport the search uses."""
+    return head()
