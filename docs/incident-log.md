@@ -2349,3 +2349,14 @@ and an HL account funded by either would be his. **Operator's call, not the code
 `0x160f6ef9…` is judged his, adding it to `config.known_self_wallets` makes `0x793a3e8a…`
 a two-way counterparty of the cluster (transfer vote + deposit-address linkage →
 PROBABLE) and extends the perimeter and provenance to both. Nothing was promoted.
+
+*Verified live (tape run 38621523778, 19:11 UTC):* source `sqd`, 48,306 fills, 12,396
+taker orders, 2,085 takers over 1,189 s in one request, cursor persisted. First
+consequence, and a measurement rather than a fault: with the whole population of his
+markets in the sketch the tape census read **212 judgeable, 24 comparable, Wilson ceiling
+16.3%** (the sampled tape had read 7 and 0), and `rho_p99` 1.0. `merge_census` takes the
+larger of the two ceilings by design, so the execution-program vote gate (≤5%) is now
+CLOSED until a path to a smaller measured ceiling exists — the leaderboard's 2.85% was
+the smaller population's figure, and the takers of his markets are the population the
+detector actually draws from. An exact-clip match on rare coins still reaches HIGH as
+a census-rare match; nothing votes on structure alone while rank structure is this common.
