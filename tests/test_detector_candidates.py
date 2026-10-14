@@ -123,3 +123,39 @@ def test_every_per_wallet_detector_pins_the_watched_wallet(script, attr, tmp_pat
                                  "watch_wallets": [{"address": WATCHED}]})
 
     assert WATCHED in picked, f"{script} cut the wallet under close watch"
+
+
+# --- the tape population rotates through the detectors ---------------------------
+
+def _sketches(*wallets_with_coins):
+    return {"wallets": {w: {"c": {c: {"n": 3, "s": {}} for c in coins}, "f": 0, "l": 0, "w": 1}
+                        for w, coins in wallets_with_coins}}
+
+
+def test_tape_rotation_walks_the_multi_coin_takers_round_robin():
+    sk = _sketches(("0x" + "1" * 40, ["BTC"]), ("0x" + "2" * 40, ["ZEC", "NEAR"]),
+                   ("0x" + "3" * 40, ["ZEC", "NEAR", "BTC"]), ("0x" + "4" * 40, ["ETH", "ZEC"]))
+    first, cursor = roster.tape_rotation(sk, 0, 2)
+    assert first == ["0x" + "3" * 40, "0x" + "2" * 40], "most of his coins first"
+    second, cursor = roster.tape_rotation(sk, cursor, 2)
+    assert second == ["0x" + "4" * 40, "0x" + "3" * 40], "wraps around; single-coin takers wait"
+    assert cursor == 1
+
+
+def test_tape_rotation_pins_nothing_without_a_sketch():
+    assert roster.tape_rotation(None, 0, 4) == ([], 0)
+    assert roster.tape_rotation({"wallets": {}}, 3, 4) == ([], 3)
+
+
+def test_detector_candidates_take_a_tape_slice_after_the_pins(monkeypatch):
+    monkeypatch.setattr(roster, "pinned_wallets", lambda config: [])
+    monkeypatch.setattr(roster, "casebook_pins", lambda limit, index=None: [])
+    monkeypatch.setattr("src.utils.read_cursor", lambda name, base=None: 0)
+    monkeypatch.setattr("src.utils.write_cursor", lambda name, value, base=None: None)
+    sk = _sketches(("0x" + "2" * 40, ["ZEC", "NEAR"]), ("0x" + "3" * 40, ["ZEC", "NEAR", "BTC"]))
+    rows = _roster(("0x" + "9" * 40, "POSSIBLE", 0.5), ("0x" + "2" * 40, "WATCH", 0.0))
+    picked = roster.detector_candidates({"target_wallet": "0x" + "a" * 40}, rows, 10,
+                                        tape_sketches=sk)
+    assert picked[:2] == ["0x" + "3" * 40, "0x" + "2" * 40]
+    assert picked.count("0x" + "2" * 40) == 1, "a taker also on the roster is listed once"
+    assert "0x" + "9" * 40 in picked

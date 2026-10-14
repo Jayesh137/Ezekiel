@@ -70,6 +70,7 @@ def load_readings(data_dir: Path = DATA_DIR) -> dict:
         "index": _read(data_dir / "index.json"),
         "risk": _read(data_dir / "risk" / "latest.json"),
         "scans": _read(data_dir / "scans" / "latest.json"),
+        "graph": _read(data_dir / "transfer_graph" / "latest.json"),
     }
 
 

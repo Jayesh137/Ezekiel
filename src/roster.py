@@ -372,6 +372,64 @@ def activity_table() -> dict:
 CASEBOOK_PINS = 8
 
 
+TAPE_PINS = 6
+TAPE_PINS_CURSOR = "tape_pins_cursor"
+
+
+def tape_rotation(sketches: dict | None, cursor: int, limit: int) -> tuple[list[str], int]:
+    """The next `limit` takers of his markets, round-robin, and the new cursor.
+
+    The tape sketch (`data/tape/sketches.json`, fed continuously since 2026-10-14)
+    holds every taker of his markets, which is the reference class a wallet of
+    his is likeliest to sit in and which no roster ranking reaches: a taker with
+    no vector sorts below every wallet with one. Wallets active on the most of
+    his coins come first; the cursor walks the list so every per-wallet detector
+    (agents, sub-accounts, identity, dormancy, surface) covers the whole
+    population over successive runs. Pure.
+    """
+    wallets = (sketches or {}).get("wallets") if isinstance(sketches, dict) else None
+    if not isinstance(wallets, dict) or not wallets or limit <= 0:
+        return [], cursor
+    ranked = sorted(wallets.items(),
+                    key=lambda kv: (-len((kv[1] or {}).get("c") or {}), kv[0]))
+    multi = [w for w, entry in ranked if len((entry or {}).get("c") or {}) >= 2] or [w for w, _ in ranked]
+    start = int(cursor or 0) % len(multi)
+    picked = [multi[(start + i) % len(multi)] for i in range(min(limit, len(multi)))]
+    return picked, (start + len(picked)) % len(multi)
+
+
+def load_tape_sketches(data_dir=None) -> dict | None:
+    """The committed tape sketch for `detector_candidates(tape_sketches=...)`; None
+    when missing or unreadable (then no slice is taken: a detector never blocks).
+    Callers pass their OWN data directory binding, the one their tests redirect."""
+    try:
+        with open(Path(data_dir or DATA_DIR) / "tape" / "sketches.json", encoding="utf-8") as f:
+            doc = json.load(f)
+        return doc if isinstance(doc, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def tape_pins(limit: int = TAPE_PINS, sketches: dict | None = None) -> list[str]:
+    """Rotate through the tape population, persisting the cursor. Callers pass the
+    sketch explicitly (`load_tape_sketches`), so a detector that does not want the
+    slice, and every test, gets none."""
+    from src.utils import read_cursor, write_cursor
+    if not sketches:
+        return []
+    try:
+        cursor = read_cursor(TAPE_PINS_CURSOR)
+    except (OSError, ValueError):
+        cursor = 0
+    picked, cursor = tape_rotation(sketches, cursor, limit)
+    if picked:
+        try:
+            write_cursor(TAPE_PINS_CURSOR, cursor)
+        except OSError:
+            pass
+    return picked
+
+
 def casebook_pins(limit: int = CASEBOOK_PINS, index: dict | None = None) -> list[str]:
     """Unknown suspects Hyperliquid knows, best first, whose central estimate beats the
     prior. A missing or unreadable index pins nothing (it never blocks a detector)."""
@@ -401,7 +459,8 @@ def casebook_pins(limit: int = CASEBOOK_PINS, index: dict | None = None) -> list
 
 
 def detector_candidates(config: dict | None, roster: dict | None,
-                        limit: int, casebook: dict | None = None) -> list[str]:
+                        limit: int, casebook: dict | None = None,
+                        tape_sketches: dict | None = None) -> list[str]:
     """The wallets a per-wallet detector should ask about this run.
 
     The roster ranks by how much evidence a wallet ALREADY has, so taking the
@@ -428,8 +487,11 @@ def detector_candidates(config: dict | None, roster: dict | None,
 
     After the operator's pins come up to CASEBOOK_PINS of the casebook's best
     suspects (spec 2026-10-08 §12), so a lead whose evidence lapsed from the
-    roster is still measured. They count against `limit`; the operator's own
-    pins never do.
+    roster is still measured, then — when the caller passes `tape_sketches`
+    (`load_tape_sketches`) — a rotating slice of TAPE_PINS takers of his markets
+    (`tape_rotation`, 2026-10-14), so the HL-native vectors cover that population
+    over successive runs. Both count against `limit`; the operator's own pins
+    never do.
     """
     picked = pinned_wallets(config)
     seen = set(picked)
@@ -446,6 +508,18 @@ def detector_candidates(config: dict | None, roster: dict | None,
         seen.add(address)
         picked.append(address)
         added += 1
+    # Then a rotating slice of the tape population (takers of his markets), so
+    # the strongest HL-native vectors eventually ask about every one of them.
+    # They count against `limit` like the casebook's pins.
+    tape_added = 0
+    for address in (tape_pins(TAPE_PINS, sketches=tape_sketches) if tape_sketches else []):
+        if tape_added >= min(TAPE_PINS, room - added):
+            break
+        if address in seen:
+            continue
+        seen.add(address)
+        picked.append(address)
+        tape_added += 1
     rows = (roster or {}).get("wallets")
     rows = rows if isinstance(rows, list) else []
     # Wallets Hyperliquid knows go first. The deliverable is an address that

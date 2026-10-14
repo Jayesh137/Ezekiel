@@ -51,8 +51,13 @@ MAX_SIZES_PER_COIN = 6
 # could never be comparable, so it does not belong in the denominator either.
 MIN_JUDGEABLE_COINS = ep.MIN_SHARED_CLIP_COINS
 # A market is RARE when the sketch has seen at most this many distinct takers on
-# it. His `xyz:` markets measured 7-19 takers per 90 s window.
+# it, OR at most RARE_MARKET_FRACTION of the takers of his busiest market. The
+# fixed bar was calibrated on 150 s samples (his `xyz:` markets measured 7-19
+# takers per 90 s window); under the continuous fill feed (2026-10-14) a day of
+# sketch memory holds hundreds of takers on `xyz:MU` against ~1,100 on BTC, so
+# rarity is read relative to the population the sketch actually holds.
 RARE_MARKET_TAKERS = 40
+RARE_MARKET_FRACTION = 0.10
 # A newcomer matters only in size: gas-level traders on a rare market are retail.
 NEWCOMER_MIN_NOTIONAL_USD = 25_000
 # Candidate-registry bars for a sketch that reproduces his program.
@@ -132,6 +137,17 @@ def market_counts(sketches: dict) -> dict:
         for coin in (entry.get("c") or {}):
             counts[coin] += 1
     return dict(counts)
+
+
+def rare_bar(counts: dict, target_coins: set) -> int:
+    """The taker count at or below which one of his markets is rare."""
+    busiest = max((int(counts.get(m) or 0) for m in target_coins), default=0)
+    return max(RARE_MARKET_TAKERS, int(busiest * RARE_MARKET_FRACTION))
+
+
+def rare_markets(counts: dict, target_coins: set) -> list[str]:
+    bar = rare_bar(counts, target_coins)
+    return sorted(m for m in target_coins if int(counts.get(m) or 0) <= bar)
 
 
 def clip_table(entry: dict) -> dict:
@@ -227,6 +243,7 @@ def newcomers(window: dict, counts: dict, target_coins: set, *,
     birth before anything is said about it.
     """
     exclude = {str(w).lower() for w in (exclude or ())}
+    bar = rare_bar(counts, target_coins)
     out = []
     for wallet in window.get("first_seen") or []:
         if wallet in exclude:
@@ -236,7 +253,7 @@ def newcomers(window: dict, counts: dict, target_coins: set, *,
             continue
         markets = (window.get("markets") or {}).get(wallet) or []
         rare = sorted(m for m in markets
-                      if m in target_coins and int(counts.get(m) or 0) <= RARE_MARKET_TAKERS)
+                      if m in target_coins and int(counts.get(m) or 0) <= bar)
         if not rare:
             continue
         out.append({"wallet": wallet, "notional_usd": round(notional, 2),

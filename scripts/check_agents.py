@@ -40,7 +40,7 @@ from src.utils import DATA_DIR, hl_post, load_config
 DEFAULT_MAX_WALLETS = 120
 
 
-def wallets_to_check(config: dict) -> list[str]:
+def wallets_to_check(config: dict, tape_sketches: dict | None = None) -> list[str]:
     """The target, anything believed to be his, and every roster candidate.
 
     Infrastructure is skipped: an exchange's agents say nothing about him.
@@ -61,7 +61,8 @@ def wallets_to_check(config: dict) -> list[str]:
         roster = {}
     # The target is never his own candidate inside the selector, so he is put
     # back at the head: this detector reads HIS agents to compare against.
-    return [target] + detector_candidates(config, roster, DEFAULT_MAX_WALLETS - 1)
+    return [target] + detector_candidates(config, roster, DEFAULT_MAX_WALLETS - 1,
+                                          tape_sketches=tape_sketches)
 
 
 def _previous() -> dict:
@@ -75,7 +76,8 @@ def _previous() -> dict:
 def main() -> int:
     config = load_config()
     target = (config.get("target_wallet") or "").lower()
-    wallets = wallets_to_check(config)
+    from src.roster import load_tape_sketches
+    wallets = wallets_to_check(config, tape_sketches=load_tape_sketches(DATA_DIR))
 
     from src.hl_identity import parse_web_data
 

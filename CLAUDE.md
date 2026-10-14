@@ -122,6 +122,8 @@ trading style. Never promote a wallet on one vector alone.
 | Re-scoring roster leads | `scanner.roster_rescore_targets` | Priority source 7: up to 25 roster leads (operator list pinned) and 10 stale unvetoed scores ≥0.65 re-scored every scan, so behaviour can corroborate what dormancy, linkage or a sentinel found. Not corroboration by itself |
 | Casebook | `src/casebook/`, `scripts/update_casebook.py` (trace.yml), `scripts/casebook.py`, `scripts/backfill_casebook.py` | Every wallet ever suspected, kept forever in `data/casebook/` (a case file each, a dated event log), seeded from all 592 roster versions. Evidence that lapses is marked, never deleted: current / standing (protocol fact) / lapsed / refuted (a detector re-checked) / historical / invalidated. Ranked by Bayesian log-odds over a 1:1,000 prior from a declared LR table (`latest.json` -> `model`; only the study's tooling LR is measured): bands now / central (rank key) / ceiling; a family never sums, a second family in a category counts half, evidence against subtracts. Re-reads due suspects on HL (`portfolio`) and alerts a suspect waking (CRITICAL in his unusual silence); pins its best 8 HL suspects into every per-wallet detector. Casts no vote, changes no tier. `python scripts/casebook.py top`; dashboard Casebook page; phone Ranked tab |
 | Tape census | `src/tape_census.py`, `scripts/collect_tape.py` (tape.yml) | Every ~150 s tape window (several hundred takers on his 43 markets; his `xyz:` markets carry 7-19 each) is folded into a bounded per-wallet SKETCH of sizes per coin (`data/tape/sketches.json`, 3,000 wallets, comparable ones evicted last). Read three ways: a second execution census on the takers of his markets (`data/tape/census.json`, the reference class the detector draws from); a venue-wide screen for his clip table or its rank structure (hits → `tape_census` candidates, which the detector reads through a reserved registry slice; no vote from the tape); and NEWCOMERS in size (≥$25K) on a rare market (≤40 sketch takers), whose REAL birth is read from `portfolio` (≤8 a window) and judged against his silences — closed gaps and the one open now — alerting through the dormancy detector's own handoff alert. First seen means first seen in the sketch's memory; the judgement is on the real birth |
+| Fill feed | `src/fills_feed.py`, `scripts/collect_tape.py` (tape.yml) | **Every fill on his markets, by user, keyless, uncapped** (measured 2026-10-14): SQD's public portal `portal.sqd.dev/datasets/hyperliquid-fills` streams Hyperliquid fills as JSON lines, filtered server-side by coin or user, real-time, back to block 750M (~Oct 2025). 20 min of his 43 markets = 63,318 fills, 2,718 takers, 15.6 MB in ONE request in 1 s. The tape reads every fill since its block cursor (`data/state/sqd_fills_block`, never past an unread range, ≤60 min a run, overload 529s waited on then reported incomplete) and folds the taker orders (`crossed` fills grouped by hash) into the same sketches/census/newcomer path; the 150 s websocket window is the fallback. Strict: a failed read raises, never an empty page. Rare markets are now read relative to his busiest one (`tape_census.rare_bar`) |
+| Co-firing | `src/cofire.py`, `scripts/collect_tape.py` (tape.yml) | **Who opens his bursts WITH him, to the second.** Every taker order on the same coin and side within ±5 s of one of his is an event; chance is corrected for by the wallet's own order rate on that coin and side during his bursts (`expected`); lead/tie/follow is judged ONCE PER BURST on the wallet's earliest order against his first (inside a burst his 1.75 s cadence makes a copier 1.5 s behind one clip 0.25 s "ahead" of the next). A hit needs ≥10 events over ≥3 bursts, lift ≥5 over chance, and ≥25% of bursts opened before or with him — a wallet that only follows is a copier, however tight. Hits → `tape_cofire` registry candidates; state in `data/tape/cofire.json` (2,000 wallets). Evidence, not a vote, until the lift's base rate is measured |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -213,7 +215,10 @@ Each one cost a real finding or a real outage. The story is in the incident log.
 - **A cap on a ranking of evidence-already-found starves the wallets with no
   evidence yet** — the population this project hunts. `detector_candidates`
   pins `config.watch_wallets`/`known_self_wallets` and ranks HL-known wallets
-  first. `evidence_strength` orders a queue; it is **not a confidence** and is
+  first; since 2026-10-14 the agents, sub-account and dormancy detectors also
+  take a rotating slice of 6 takers of his markets from the tape sketch
+  (`roster.tape_rotation`, cursor `data/state/tape_pins_cursor`), the population
+  no roster ranking reaches. `evidence_strength` orders a queue; it is **not a confidence** and is
   never stored or thresholded.
 - **When one call in a pair is guarded, ask what guards the other**
   (`extraAgents`/`webData2`, the collector's `webData2`, the backtest's two
@@ -442,6 +447,20 @@ the next session rebuilding them:
   always-on host to be complete (a 150 s window in 20 min sees 12% of one-off
   events) and its completeness for those actions is unmeasured. Re-measure before
   building on it; the probe is the tool.
+- **Measured 2026-10-14 and rejected:** *account abstraction mode.* His two
+  main accounts both run the opt-in `unifiedAccount` mode (`userAbstraction`)
+  while `0xf078969e…` and `0xdd53c529…` run `default` — but of 240 takers of
+  his markets 142 (59%) run `unifiedAccount` (63 disabled, 28 default, 7
+  portfolioMargin). Common, so no vote. *HYPE staking:* he stakes on both main
+  accounts (104K and 505K HYPE); 24 of the same 240 (10%) stake at all — weak,
+  recorded, not a vote (`delegations` are already read for explicit links).
+  *Approved builders:* none on his main accounts; `0xf078969e…` approved
+  `0x1924b856…`. *Native TWAP:* he has used it (XPL, 2025-09-25); fills carry
+  `twapId`. *Borrow/lend:* nothing on any of his accounts. Unused info
+  endpoints still worth knowing: `approvedBuilders`, `userAbstraction`,
+  `userTwapSliceFills`, `delegatorSummary`, `borrowLendUserState`,
+  `vaultDetails` (a vault's followers). Rate limits: 1,200 weight/min/IP,
+  `userRole` costs 60, most others 20, `clearinghouseState` 2.
 - **Measured 2026-09-17 and rejected — do not rebuild without new evidence:**
   - *Testnet.* The target and the treasury exist on testnet, but every row is
     inbound: `spotGenesis` airdrops and token deployers sending the same tokens

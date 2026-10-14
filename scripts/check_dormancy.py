@@ -35,7 +35,7 @@ from src.utils import DATA_DIR, load_config
 MAX_CANDIDATES = 40
 
 
-def candidate_wallets(config: dict) -> list[str]:
+def candidate_wallets(config: dict, tape_sketches: dict | None = None) -> list[str]:
     """Roster candidates, with the operator's own wallets pinned ahead of them.
 
     Taking the top of the roster alone excluded `0xdd53c529…` — the wallet this
@@ -50,7 +50,10 @@ def candidate_wallets(config: dict) -> list[str]:
             roster = json.load(f)
     except (OSError, ValueError, AttributeError):
         roster = {}
-    return detector_candidates(config, roster, MAX_CANDIDATES)
+    if tape_sketches is None:
+        from src.roster import load_tape_sketches
+        tape_sketches = load_tape_sketches(DATA_DIR)
+    return detector_candidates(config, roster, MAX_CANDIDATES, tape_sketches=tape_sketches)
 
 
 def collect_candidates(wallets, target_fills, previous, *, fetch=None):

@@ -205,3 +205,22 @@ def test_an_undelivered_digest_is_retried_next_run(monkeypatch, tmp_path):
     monkeypatch.setattr(alerts_mod, "send_notice", lambda t, b: [])
     assert sd.main([]) == 0
     assert written == []
+
+
+def test_discovery_and_the_continuous_tape_are_in_the_digest():
+    graph = {"health": {"expansion": {"status": "budget_exhausted", "lookups": 5, "new_edges": 4295,
+                                      "frontier_eligible": 71015,
+                                      "wallets_expanded": ["0x" + "1" * 40, "0x" + "2" * 40],
+                                      "refreshed_wallets": ["0x" + "1" * 40]}}}
+    tape = {"source": "sqd", "window_seconds": 1208.5, "newcomer_handoffs": [],
+            "cofire": {"hits": 2, "his_windows": 7}}
+    d = digest.build(_readings(graph=graph, tape=tape), CONFIG, now=NOW)
+    assert d["discovery"] == {"status": "budget_exhausted", "lookups": 5, "new_wallets": 1,
+                              "refreshed": 1, "new_edges": 4295, "pending": 71015,
+                              "last_expansion_at": None}
+    assert d["execution"]["cofire_hits"] == 2 and d["execution"]["tape_source"] == "sqd"
+    _, body = digest.render(d)
+    assert "Discovery: 5 lookup(s) last run, 1 new wallet(s) walked, 1 re-read" in body
+    assert "Tape (20 min continuous)" in body and "2 co-firing hit(s)" in body
+    d2 = digest.build(_readings(), CONFIG, now=NOW)
+    assert "Discovery: no graph reading." in digest.render(d2)[1]
