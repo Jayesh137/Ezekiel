@@ -1,9 +1,9 @@
 {
   "wallet": "0x8196e0648cb16e9151c2920618a58605706b5836",
   "first_seen": "2026-09-13T07:04:38.171646+00:00",
-  "last_seen": "2026-10-13T16:18:12.354023+00:00",
+  "last_seen": "2026-10-14T21:47:17.269319+00:00",
   "best_score": 0.2551,
-  "latest_score": 0.1931,
+  "latest_score": 0.1682,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -15,7 +15,9 @@
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Incompatible hold style: 80% vs 0% of holds under 1h"
+    ],
     "asset_overlap": {
       "overlap": [],
       "target_only": [
@@ -39,7 +41,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.1931,
+      "score_without_bonus": 0.1682,
       "explanations": [],
       "frequencies": {}
     },
@@ -48,7 +50,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.6404,
+        "relative_size_dispersion": 0.5898,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
@@ -847,16 +849,37 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-14T21:47:17.269319+00:00",
+      "score": 0.1682,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.0,
+        "hold_duration": null,
+        "account_size": 0.819,
+        "trade_sequencing": 0.2403,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.8472,
+        "direction_bias": null,
+        "position_management": 0.6047,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2058,
-  "last_checked": "2026-10-13T16:18:12.354023+00:00",
+  "recent_avg_score": 0.2003,
+  "last_checked": "2026-10-14T21:47:17.269319+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-10-13T16:18:12.354023+00:00",
+  "last_successful_read": "2026-10-14T21:47:17.269319+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1044,6 +1067,29 @@
     },
     {
       "status": "ok",
+      "next_cursor_ms": 1790200031380,
+      "coverage": {
+        "start_ms": 1790200031380,
+        "end_ms": 1792014431380,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790200031380,
+        "requested_start_ms": 1790200031380,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1792014431380,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-10-14T21:47:13.556746+00:00"
+    },
+    {
+      "status": "ok",
       "coverage": {
         "start_ms": 1788721699136,
         "end_ms": 1790536099136,
@@ -1180,19 +1226,19 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790093886486,
-    "end_ms": 1791908286486,
+    "start_ms": 1790200031380,
+    "end_ms": 1792014431380,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790093886486,
-    "requested_start_ms": 1790093886486,
+    "fetched_start_ms": 1790200031380,
+    "requested_start_ms": 1790200031380,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1791795308073,
-  "last_positive_evidence": "2026-10-13T16:18:08.680649+00:00",
-  "last_scored": "2026-10-13T16:18:12.354023+00:00",
+  "last_positive_evidence": "2026-10-14T21:47:13.556746+00:00",
+  "last_scored": "2026-10-14T21:47:17.269319+00:00",
   "latest_scoring_schema": "2026-09-26.2"
 }
