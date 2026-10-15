@@ -64,7 +64,7 @@ jobs:
     concurrency:
       group: tape-data
       cancel-in-progress: false
-    timeout-minutes: 22  # tape ~2 min, co-firing ~2.5, one treasury session ≤6, venue ≤3, clients ≤5, commit
+    timeout-minutes: 25  # tape ~2 min, co-firing ~2.5, treasury ≤9 (hard deadline 400s), venue ≤3, clients ≤5, commit
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -100,8 +100,8 @@ jobs:
       # minute and the step is bounded well above one session's worth.
       - name: Fold his treasury sessions into the co-occurrence census
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
-        timeout-minutes: 7
-        run: python scripts/census_treasury_sessions.py --max-sessions 2 --time-budget 60
+        timeout-minutes: 9
+        run: python scripts/census_treasury_sessions.py --max-sessions 2 --time-budget 60 --hard-deadline 400
       # The venue's taker population from a few minutes of EVERY fill
       # (src/venue_sample.py): outcome-market traders, program-shaped takers on
       # any coin, and the population the client census reads. ~8 MB a run.

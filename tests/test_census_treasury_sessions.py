@@ -39,7 +39,7 @@ def test_fold_sessions_reads_each_pending_session_and_its_controls_within_the_bo
     s3 = {"key": "s3", "start": 30 * DAY, "end": 30 * DAY, "n": 1, "destinations": set()}   # beyond the head
     reads = []
 
-    def read(lo, hi):
+    def read(lo, hi, max_requests=None):
         reads.append((lo, hi))
         if lo < 5 * DAY:                               # the -7d control of s1
             return {"actions": [_act(K, lo + 1)]}
@@ -59,7 +59,7 @@ def test_fold_sessions_records_an_unreadable_session_and_moves_on():
     s1 = {"key": "s1", "start": 10 * DAY, "end": 10 * DAY, "n": 1, "destinations": set()}
     s2 = {"key": "s2", "start": 11 * DAY, "end": 11 * DAY, "n": 1, "destinations": set()}
 
-    def read(lo, hi):
+    def read(lo, hi, max_requests=None):
         if abs(lo - (10 * DAY - ts.PAD_MS)) < 1000:          # s1's own window only
             raise rc.FeedError("busy")
         return {"actions": []}
@@ -75,7 +75,7 @@ def test_fold_sessions_stops_at_max_sessions():
                for i in range(5)]
     checkpoints = []
     out = cs.fold_sessions(state, pending, {T}, dataset_start_ms=DAY, head_ms=40 * DAY, now_ms=1,
-                           max_sessions=2, time_budget=60, read=lambda lo, hi: {"actions": []},
+                           max_sessions=2, time_budget=60, read=lambda lo, hi, max_requests=None: {"actions": []},
                            log=lambda *a: None, checkpoint=lambda st: checkpoints.append(st["sessions"]))
     assert len(out["folded"]) == 2 and state["sessions"] == 2
     assert checkpoints == [1, 2]            # a killed run keeps every session already folded
@@ -87,3 +87,23 @@ def test_known_readings_score_the_positive_controls_like_strangers():
     out = cs.known_readings(state, {K, "0x" + "3" * 40})
     assert out[K]["hit"] is True and out[K]["sessions_with"] == 8
     assert out["0x" + "3" * 40] == {"sessions_with": 0, "controls_with": 0}
+
+
+def test_hard_deadline_sizes_each_read_and_leaves_a_session_that_cannot_fit():
+    state = ts.empty_state()
+    pending = [{"key": f"s{i}", "start": (10 + i) * DAY, "end": (10 + i) * DAY, "n": 1, "destinations": set()}
+               for i in range(3)]
+    ticks = iter([0, 0, 0, 0, 0, 0])                 # s0's reads see no time passing, then 100 s have
+    caps = []
+
+    def read(lo, hi, max_requests=None):
+        caps.append(max_requests)
+        return {"actions": []}
+    out = cs.fold_sessions(state, pending, {T}, dataset_start_ms=DAY, head_ms=40 * DAY, now_ms=1,
+                           max_sessions=3, time_budget=600, read=read, log=lambda *a: None,
+                           hard_deadline=120, clock=lambda: next(ticks, 100))
+    # s0 read with the full cap (120 s / 2 s a request = 60); s1 and s2 found 10 requests left: deferred.
+    assert caps[:3] == [60, 60, 60]
+    assert [f["key"] for f in out["folded"]] == ["s0"]
+    assert [f["key"] for f in out["failed"]] == ["s1", "s2"] and all("deadline" in f["error"] for f in out["failed"])
+    assert "s1" not in state["done"]
