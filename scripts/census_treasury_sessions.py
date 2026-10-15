@@ -56,12 +56,18 @@ def his_ledger() -> list[dict]:
     return [r for r in load_all_records(str(DATA_DIR / "ledger")) if isinstance(r, dict)]
 
 
-def read_window(lo_ms: int, hi_ms: int, *, block_at=rc.block_at, stream=rc.stream) -> dict:
+# A served request takes ~1 s and a refused one waits 2 s; this is the pessimistic
+# seconds per request used to size a window's read against the time left.
+SECONDS_PER_REQUEST = 2.0
+MIN_WINDOW_REQUESTS = 12
+
+
+def read_window(lo_ms: int, hi_ms: int, *, block_at=rc.block_at, stream=rc.stream,
+                max_requests: int = MAX_REQUESTS_PER_WINDOW) -> dict:
     """Every treasury-kind action venue-wide between two timestamps (ms)."""
     a = block_at(lo_ms)
     b = max(a, block_at(hi_ms) - 1)
-    out = stream(a, b, action_types=ts.WINDOW_TYPES, status="ok",
-                 max_requests=MAX_REQUESTS_PER_WINDOW)
+    out = stream(a, b, action_types=ts.WINDOW_TYPES, status="ok", max_requests=max_requests)
     if not out["complete"]:
         raise rc.FeedError(f"window {lo_ms}-{hi_ms} read short at {out['last_block']} "
                            f"after {out['requests']} requests ({out['overloads']} refused)")
@@ -70,21 +76,43 @@ def read_window(lo_ms: int, hi_ms: int, *, block_at=rc.block_at, stream=rc.strea
 
 def fold_sessions(state: dict, pending: list[dict], cluster: set, *, dataset_start_ms: int,
                   head_ms: int, now_ms: int, max_sessions: int, time_budget: float,
-                  read=read_window, log=print, checkpoint=None) -> dict:
+                  read=read_window, log=print, checkpoint=None, hard_deadline: float | None = None,
+                  clock=time.time) -> dict:
     """Read and fold up to `max_sessions` unread sessions within the budget.
-    `checkpoint(state)` is called after each fold, so a killed run keeps what it read."""
-    t0 = time.time()
+
+    `time_budget` bounds when a session may START; `hard_deadline` (seconds from
+    the start) bounds the reads themselves: each window's request cap is sized to
+    the time left, and a session whose reads cannot fit is left for the next run.
+    Measured 2026-10-15 (run 38723279070): three unbounded window reads in a busy
+    month overran a 7-minute step. `checkpoint(state)` is called after each fold,
+    so a killed run keeps what it read."""
+    t0 = clock()
     folded, failed = [], []
+
+    def remaining_requests():
+        if hard_deadline is None:
+            return MAX_REQUESTS_PER_WINDOW
+        left = hard_deadline - (clock() - t0)
+        return int(min(MAX_REQUESTS_PER_WINDOW, left / SECONDS_PER_REQUEST))
+
     for session in pending:
-        if len(folded) >= max_sessions or time.time() - t0 > time_budget:
+        if len(folded) >= max_sessions or clock() - t0 > time_budget:
             break
         lo, hi = ts.window(session)
         if hi > head_ms:
             continue                      # the dataset has not reached it yet
         controls = ts.control_windows(session, dataset_start_ms, head_ms)
         try:
-            rows = read(lo, hi)["actions"]
-            control_rows = [read(a, b)["actions"] for a, b in controls]
+            cap = remaining_requests()
+            if cap < MIN_WINDOW_REQUESTS:
+                raise rc.FeedError(f"deadline: {cap} request(s) left for the window")
+            rows = read(lo, hi, max_requests=cap)["actions"]
+            control_rows = []
+            for a, b in controls:
+                cap = remaining_requests()
+                if cap < MIN_WINDOW_REQUESTS:
+                    raise rc.FeedError(f"deadline: {cap} request(s) left for a control")
+                control_rows.append(read(a, b, max_requests=cap)["actions"])
         except rc.FeedError as exc:
             failed.append({"key": session["key"], "error": str(exc)[:200]})
             log(f"[treasury] session {session['key']} unreadable: {exc}")
@@ -135,6 +163,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--max-sessions", type=int, default=DEFAULT_MAX_SESSIONS)
     parser.add_argument("--time-budget", type=float, default=DEFAULT_TIME_BUDGET)
+    parser.add_argument("--hard-deadline", type=float, default=None,
+                        help="seconds after which no further window read is started")
     args = parser.parse_args()
 
     config = load_config()
@@ -156,7 +186,7 @@ def main() -> int:
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         sweep = fold_sessions(state, pending, cluster, dataset_start_ms=rc.START_TS_MS,
                               head_ms=head_ms, now_ms=now_ms, max_sessions=args.max_sessions,
-                              time_budget=args.time_budget,
+                              time_budget=args.time_budget, hard_deadline=args.hard_deadline,
                               checkpoint=lambda st: atomic_write_json(STATE_FILE, st, sort_keys=True,
                                                                       compact=True))
     except rc.FeedError as exc:
