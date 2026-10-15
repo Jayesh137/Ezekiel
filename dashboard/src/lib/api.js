@@ -704,8 +704,14 @@ export const DETECTOR_FEEDS = [
 	{ name: 'Casebook', path: 'data/casebook/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Transfer graph', path: 'data/transfer_graph/latest.json', key: 'computed_at', limitMin: 720 },
 	{ name: 'Live tape', path: 'data/tape/latest.json', key: 'computed_at', limitMin: 360 },
-	{ name: 'Execution program', path: 'data/execution_program/latest.json', key: 'computed_at', limitMin: 720 }
+	{ name: 'Execution program', path: 'data/execution_program/latest.json', key: 'computed_at', limitMin: 720 },
+	{ name: 'X profiles', path: 'data/x_watch/latest.json', key: 'computed_at', limitMin: 360 }
 ];
+
+/** His X accounts' watch (scripts/check_x_profiles.py); null when unreadable. */
+export async function fetchXWatch() {
+	return fetchJSON('data/x_watch/latest.json');
+}
 
 /**
  * One feed's freshness verdict. Pure. A missing or undated file is never
@@ -787,7 +793,9 @@ export async function fetchTripwires() {
 		replica,
 		treasury,
 		venue,
-		clientCensus
+		clientCensus,
+		// Already read as a feed above; the card reads the same document.
+		x: feeds[DETECTOR_FEEDS.findIndex((f) => f.path === 'data/x_watch/latest.json')] || null
 	};
 }
 

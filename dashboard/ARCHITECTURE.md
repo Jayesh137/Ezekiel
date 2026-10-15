@@ -465,6 +465,12 @@ each of `cases[]`: `.address`, `.rank`, `.known`, `.excluded`, `.ruling`, `.p`, 
 `.cluster_size`, `.last_change`, and `.hl.on_hl`, `.hl.value`, `.hl.month_volume`,
 `.hl.probed_at`. A missing or unreadable file shows "Casebook unavailable" on that tab only.
 
+**`data/x_watch/latest.json`** (the "His X accounts" card, `src/lib/XWatch.svelte`, hidden
+unless a change landed in the last 7 days): `computed_at`, `accounts_watched`, `unreadable[]`,
+`changes[]` (`.at`, `.handle`, `.field`, `.line` — the notice's own text), and for each of
+`accounts{id}`: `.handle`, `.status`, `.last_read`, `.profile.protected`, `.profile.tweets`.
+Written by `scripts/check_x_profiles.py`. A missing file hides the card on the phone.
+
 **Vector labels** cover every name `src/roster.py` defines: `transfer`,
 `linkage`, `correlation`, `behavioural`, `hl_native`, `shared_agent`,
 `explicit_link`, `dormancy_handoff` and `referral`. An unknown name renders

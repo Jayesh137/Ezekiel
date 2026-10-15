@@ -105,6 +105,8 @@ def test_each_blind_signal_names_what_it_saw():
                                                    "subaccounts": {}}).startswith("0 sub-accounts")
     assert fh.BLIND_CHECKS["close watch"]({"watched": 3, "unreadable": ["a", "b", "c"]})
     assert fh.BLIND_CHECKS["close watch"]({"watched": 3, "unreadable": ["a"]}) is None
+    assert fh.BLIND_CHECKS["X profiles"]({"accounts_watched": 2, "unreadable": ["a", "b"]})
+    assert fh.BLIND_CHECKS["X profiles"]({"accounts_watched": 2, "unreadable": ["a"]}) is None
     assert "reads failing" in fh.BLIND_CHECKS["Circle flows"]({"error": "HTTPError: 403"})
     assert fh.BLIND_CHECKS["Circle flows"]({"blocks_read": 5_000, "deposits_read": 0,
                                              "withdrawals_read": 0}).startswith("0 Circle")

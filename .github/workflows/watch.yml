@@ -185,6 +185,13 @@ jobs:
         # walk, then core histories, 8 Unit reads and retro; the rest waits.
         timeout-minutes: 4
         run: python scripts/check_boundary.py
+      # His two X accounts (src/x_watch.py): any profile or counter change, one
+      # high-priority notice. Owner awareness, not detection — no severity gate,
+      # no delivery health. Keyless mirrors; observed ~5s, up to 8 calls.
+      - name: Watch his X accounts
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 3
+        run: python scripts/check_x_profiles.py
       # Crosswise freshness: this job reports the feeds trace, scan, analyze
       # and the collector write; trace.yml reports this job's. A dead detector
       # writes the same nothing as a quiet target (src/feed_health.py).

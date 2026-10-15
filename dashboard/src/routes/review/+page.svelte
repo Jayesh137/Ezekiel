@@ -4,7 +4,8 @@
 	// Every rule lives in $lib/review.js; this file wires it to taps.
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
-	import { fetchRoster, fetchWatchlist, fetchCasebook, shortAddr } from '$lib/api.js';
+	import { fetchRoster, fetchWatchlist, fetchCasebook, fetchXWatch, shortAddr } from '$lib/api.js';
+	import XWatch from '$lib/XWatch.svelte';
 	import { rankedFeed, isNew, readSeen, writeSeen } from '$lib/casebook.js';
 	import CasePost from './CasePost.svelte';
 	import {
@@ -25,6 +26,7 @@
 	let roster = null;
 	let watch = null;
 	let casebook = null;
+	let xwatch = null;
 	// The casebook seen-time at the moment the Ranked tab was first opened this session,
 	// frozen so the dots do not vanish under your finger (the same rule as the feed order).
 	let rankedSeen = null;
@@ -57,7 +59,8 @@
 	async function load() {
 		loading = true;
 		// A failed casebook read never fails the roster view: the Ranked tab says so alone.
-		const [r, wl, cb] = await Promise.all([fetchRoster(), fetchWatchlist(), fetchCasebook()]);
+		const [r, wl, cb, xw] = await Promise.all([fetchRoster(), fetchWatchlist(), fetchCasebook(), fetchXWatch()]);
+		xwatch = xw;
 		now = Date.now();
 		loading = false;
 		if (!r) {
@@ -209,6 +212,8 @@
 				The roster is {fresh(rosterFresh)}. The detectors may have stopped; anything newer is not here.
 			</p>
 		{/if}
+
+		<XWatch doc={xwatch} {now} compact quiet={false} />
 
 		<Stories {watch} {state} on:open={(e) => openStory(e.detail)} />
 

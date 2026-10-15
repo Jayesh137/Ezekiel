@@ -28,6 +28,7 @@ WATCH_FEEDS = {
     "deposit-address sentinels": ("deposit_sentinels/latest.json", "computed_at", 360),
     "Circle flows": ("circle_flows/latest.json", "computed_at", 360),
     "boundary attribution": ("boundary/latest.json", "computed_at", 360),
+    "X profiles": ("x_watch/latest.json", "computed_at", 360),
 }
 OTHER_FEEDS = {
     "roster": ("roster/latest.json", "computed_at", 720),
@@ -113,6 +114,14 @@ def _watch(doc: dict):
     if isinstance(watched, int) and watched > 0 and isinstance(unreadable, list) \
             and len(unreadable) >= watched:
         return f"every one of {watched} watched wallet(s) unreadable"
+    return None
+
+
+def _x_profiles(doc: dict):
+    watched, unreadable = doc.get("accounts_watched"), doc.get("unreadable")
+    if isinstance(watched, int) and watched > 0 and isinstance(unreadable, list) \
+            and len(unreadable) >= watched:
+        return f"every one of {watched} X account(s) unreadable on both mirrors"
     return None
 
 
@@ -217,6 +226,7 @@ def _casebook(doc: dict):
 BLIND_CHECKS = {
     "casebook": _casebook,
     "close watch": _watch,
+    "X profiles": _x_profiles,
     "Circle flows": _circle,
     "roster": _roster,
     "HL account surface": _surface,

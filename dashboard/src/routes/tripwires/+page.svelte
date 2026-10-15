@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { fetchTripwires, formatUSD } from '$lib/api.js';
 	import Addr from '$lib/Addr.svelte';
+	import XWatch from '$lib/XWatch.svelte';
 
 	let data = null;
 	let loading = true;
@@ -92,6 +93,7 @@
 {#if loading}
 	<p class="text-muted">Loading…</p>
 {:else}
+	<XWatch doc={data.x} />
 	<section class="card">
 		<h2>
 			Detector health

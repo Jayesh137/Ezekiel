@@ -2735,3 +2735,33 @@ treasury sessions → registry `outcome_treasury`, program-shaped → `venue_pro
 scripted run → registry `client_census`; base rate with Wilson ceiling; known
 wallets' classes and the target's split-half as controls). The execution-program
 detector's registry sources accept all three. Digest line, Tripwires card.
+
+## 2026-10-15 (evening) — his X accounts, watched for the owner
+
+**Ask (operator):** monitor @GCRClassic and @GiganticRebirth constantly; alert on
+any and all changes; hidden in the app until something fires. Spec:
+`docs/superpowers/specs/2026-10-15-x-profile-watch-design.md`.
+
+**Measured.** `api.fxtwitter.com/<handle>` and `api.vxtwitter.com/<handle>` answer
+keyless. Both accounts are **protected** — post text is unreadable and no follower
+account is built to get round that — but the profile and its counters are public:
+GCRClassic 746 tweets / 364 likes / 85 media / following 0 / ~392.2K followers;
+GiganticRebirth 714 / 586 / 132 / 472 / ~254.5K. A post moves `tweets`, a like
+`likes`, a follow `following`, so the counters carry nearly everything he does.
+Neither mirror resolves a numeric id (fx `/i/user/<id>` 404s), so accounts are
+pinned by id and a handle that stops resolving is reported with `x.com/i/user/<id>`.
+fx's timeline (`/2/profile/<h>/statuses?count=20`) reads a public account (200, 20
+results) and answers 500/empty for his — read only if one goes public. Syndication
+answered 429.
+
+**The trap: fx answers a spurious `404 User not found` for a live account on about
+one read in four** (5 of 20 interleaved reads; vx 0 of 20). The first design treated
+either mirror's 404 as "account gone" and would have paged a deletion several times
+a day. Now fx is retried 3x before vx, "gone" needs BOTH mirrors to say not-found,
+and it is announced only after 2 consecutive definite readings; an unreadable run
+between them neither breaks nor extends the streak. Followers alone move with other
+people (392,214 → 392,279 between two reads minutes apart), so they notify only on
+≥1% or ≥2,000 since the last follower notice (operator's choice).
+
+**Rule it re-teaches:** a mirror's "not found" is a read result, not a fact — ask how
+often it lies before it is allowed to alert (rule 5, applied to someone else's API).
