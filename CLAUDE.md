@@ -131,6 +131,7 @@ trading style. Never promote a wallet on one vector alone.
 | Treasury sessions | `treasury_sessions.py`, `scripts/census_treasury_sessions.py` (tape.yml) | Who does treasury work when he does: his non-trading sessions (10-min gap) read venue-wide over padded windows against ±7-day controls; a user counts once per session and only for actions not touching him; known wallets are positive controls. Hit s ≥ 4, lift ≥ 5, p ≤ 1e-4 → registry candidate, no vote (rule 4). `data/replica/treasury_census.json` |
 | Venue population | `venue_sample.py`, `scripts/sample_venue.py` (tape.yml) | Three minutes of EVERY fill on the venue a run (7.7 MB per five minutes, one request): the active taker set (20,000 kept), HIP-4 outcome-contract traders (`#<n>` coins; the instrument his history favours and his main account never touched), program-shaped takers on ANY coin at ANY clip, HIP-3 dex use. Outcome traders in ≥2 of his treasury sessions → registry `outcome_treasury`; program-shaped → `venue_program`. `data/tape/venue_population.json` |
 | Client census | `client_census.py`, `scripts/census_client_fingerprint.py` (tape.yml) | One `historicalOrders` read per venue taker (14-day re-read, `ReadBudget`): the CLIENT a wallet trades through — his script's class is Ioc without client id ≥0.8 with scripted runs; also web UI, cloid bots, makers. Measures the class's base rate over the whole population (Wilson ceiling) and hands his-class wallets to the execution-program detector (`client_census`). **His known wallets trade by hand on the web UI (measured 2026-10-15)** — the control that bounds what any tooling census can find |
+| His X accounts | `x_watch.py`, `scripts/check_x_profiles.py` (watch.yml) | **Owner awareness, not a wallet vector: no vote, no tier, no severity gate, no delivery health.** @GCRClassic and @GiganticRebirth pinned by numeric id (`config.x_accounts`), read keylessly from `api.fxtwitter.com` (vx fallback) every watch run: name, bio, location, website, avatar, banner, protected, verification, and the counters that show what he does while private — tweets (posted/deleted), likes, media, following; followers only on a move ≥1% or ≥2,000. Both are **protected** (2026-10-15), so post text is unreadable; if one goes public its timeline (`/2/profile/<h>/statuses?count=20`) is read and each new post reported. ONE `send_notice` at high priority, tap opens the profile; `X_NOTICES=0` withholds. **fx answers a spurious `404 User not found` on ~1 read in 4** (5/20; vx 0/20): fx is retried 3x, and "gone" needs BOTH mirrors on 2 consecutive runs. Hidden card on Tripwires and the phone app for 7 days after a change; `data/x_watch/latest.json` |
 
 Unified in `roster.py` (tiers on how many vectors agree) and `accounting.py`
 (what fraction of outflow is actually explained).
@@ -333,9 +334,10 @@ agents it answers a measured no: 0 shared, 0 naming-family hits, 0 linked to the
 target. `data/orders/` feeds the `order_profile` dimension: his orders are ~95%
 `Ioc` with 0% cancels and 0% client order ids, and the script behind them is the
 Execution program vector. `data/vaults/`, `data/referral/` and
-`data/subaccounts/` feed the HL account surface. `data/twitter/` was removed and
-is not being built: X's API is paid and scraping is fragile, and agent naming
-schemes (`agent_links.naming_families`) carry the same idea for free.
+`data/subaccounts/` feed the HL account surface. `data/twitter/` was removed: X's API is paid and scraping is fragile, and agent
+naming schemes (`agent_links.naming_families`) carry the same idea for free. His
+X accounts are now watched for the owner through keyless mirrors instead
+(`src/x_watch.py`, 2026-10-15) — awareness, never a vote.
 
 ## Vectors worth inventing
 

@@ -582,12 +582,13 @@ def _send_webhooks(subject: str, body: str) -> list[str]:
     return delivered
 
 
-def send_notice(title: str, body: str, priority: str = "low") -> list[str]:
+def send_notice(title: str, body: str, priority: str = "low", click: str | None = None) -> list[str]:
     """Deliver a scheduled NOTICE on the instant channels, quietly.
 
-    For the daily digest only (`src/digest.py`): a message the operator asked
-    to receive on a schedule, not a detection. It bypasses the severity gate on
-    purpose and is sent at LOW priority (ntfy shows it without a sound), and it
+    For the daily digest (`src/digest.py`), position notices and X-account
+    notices: messages the operator asked to receive, not detections. It
+    bypasses the severity gate on purpose, is sent at LOW priority unless the
+    caller asks louder (ntfy and Telegram stay silent at low), and it
     records nothing in delivery health — a digest that fails to arrive says
     nothing about the channel a CRITICAL needs, and counting it would be the
     INFO-pins-healthy-false mistake again. Never raises; returns the channels
@@ -602,7 +603,9 @@ def send_notice(title: str, body: str, priority: str = "low") -> list[str]:
             r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
                               json={"chat_id": chat, "text": (title + "\n\n" + body)[:4000],
                                     "disable_web_page_preview": True,
-                                    "disable_notification": True}, timeout=20)
+                                    # Silent like ntfy's low; anything above sounds.
+                                    "disable_notification": priority in ("min", "low")},
+                              timeout=20)
             if r.status_code == 200:
                 delivered.append("telegram")
             else:
@@ -615,7 +618,9 @@ def send_notice(title: str, body: str, priority: str = "low") -> list[str]:
             import requests
             r = requests.post(f"https://ntfy.sh/{topic}", data=body.encode("utf-8"),
                               headers={"Title": title.encode("ascii", "ignore").decode(),
-                                       "Priority": priority, "Tags": "clipboard"}, timeout=20)
+                                       "Priority": priority, "Tags": "clipboard",
+                                       # Tapping the notification opens this URL.
+                                       **({"Click": click} if click else {})}, timeout=20)
             if r.status_code == 200:
                 delivered.append("ntfy")
             else:
