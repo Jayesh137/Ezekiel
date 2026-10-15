@@ -64,6 +64,8 @@ def load_readings(data_dir: Path = DATA_DIR) -> dict:
         "tape_census": _read(data_dir / "tape" / "census.json"),
         "tape": _read(data_dir / "tape" / "latest.json"),
         "cofire_history": _read(data_dir / "tape" / "cofire_history.json"),
+        "replica": _read(data_dir / "replica" / "latest.json"),
+        "treasury": _read(data_dir / "replica" / "treasury_latest.json"),
         "execution": _read(data_dir / "execution_program" / "latest.json"),
         "alerts": _read(data_dir / "alerts" / "latest.json"),
         "feed_other": _read(data_dir / "feed_health" / "other.json"),

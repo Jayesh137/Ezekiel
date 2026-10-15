@@ -90,6 +90,14 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 4
         run: python scripts/census_cofire_history.py --max-sessions 4 --time-budget 150
+      # Who does TREASURY work when he does (src/treasury_sessions.py): his
+      # non-trading sessions read venue-wide from SQD's replica-command feed, each
+      # account's chance measured on ±7-day control windows; his known wallets are
+      # the positive controls. Resumable by session key; a few sessions a run.
+      - name: Fold his treasury sessions into the co-occurrence census
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 4
+        run: python scripts/census_treasury_sessions.py --max-sessions 3 --time-budget 150
       - name: Commit and push
         if: always()
         run: |

@@ -202,6 +202,9 @@ def own_actions(rows: list, address: str) -> list[dict]:
             # is also `destination`, so the rest are not lost.
             "parties": parties,
             "signature_chain_id": action.get("signatureChainId"),
+            # The replica stream carries the signing nonce on the row; the explorer
+            # does not. `replica_sweep.dedupe` folds the two views on it.
+            "nonce": tx.get("nonce"),
             "amount": action.get("amount") if action.get("amount") is not None
             else action.get("usd") if action.get("usd") is not None
             else action.get("wei"),

@@ -2634,3 +2634,55 @@ Line numbers below are CLAUDE.md's before the move.
   exists for. **A cosmetic fix that reintroduces the silent death is not a
   fix.**
   Check the log's newest line, never the task's `Status`.
+
+## 2026-10-15 — every L1 action venue-wide: his world's action history and the treasury-session census
+
+**Why.** Eight months in, the set beyond config is empty and every vector that
+needs a connection between his wallets has answered a measured no. What was
+never read: the complete list of what he SET UP (agents, builders, referral
+codes, Circle recipients — the explorer shows 300 actions and rolls a payload
+out within a day) and WHEN he does treasury work venue-wide.
+
+**Found.** SQD's keyless portal serves `hyperliquid-replica-cmds`: every L1
+action with `user`, payload, `nonce`, `vaultAddress`, ok/err `status`, from
+block 868,700,000 (2026-01-21 16:40 UTC) to a head ~10 days behind the chain.
+Filters `user`, `actionType`, `vaultAddress`, `status` (a single string — a
+list is refused "invalid type: sequence"); `/timestamps/{s}/block` maps a time
+to a block. Measured: a user-filtered request answers ~2,300 blocks whatever
+the range or the number of users (~0.6 s); ~40% of requests are refused 529 at
+any concurrency and the SAME shape is served seconds later, so narrowing buys
+nothing; six workers re-asking at once drew 429 "Too Many Requests"; total
+throughput is ~1 served request/s per client however many workers — a full
+user-filtered sweep of the dataset is ~30 hours, so the history backfill runs
+newest-first in bounded CI increments (~4.8M blocks/day against 1.2M/day of
+chain) rather than at once. An `actionType` read is data-bound (~2,900 blocks
+of a dozen rare kinds in 0.9 s); `noop` is 97% of the rare-kind stream.
+~400-1,200 accounts carry a treasury-kind action in any 20-30 minute window.
+
+**Built** (branch `feat/replica-actions`, spec
+`docs/superpowers/specs/2026-10-15-replica-actions-design.md`):
+`src/replica_cmds.py` (strict client, consecutive-refusal bound, explorer-shaped
+rows), `src/replica_sweep.py` + `scripts/sweep_replica_actions.py` (trace.yml:
+his world's actions into `data/actions/<wallet>/`, report in
+`data/replica/latest.json`, outside destinations registered as candidates, the
+one page: an agent of his that `userRole` now resolves to another account),
+`src/treasury_sessions.py` + `scripts/census_treasury_sessions.py` (tape.yml:
+63 sessions of his since 2026-01-21 from stored actions + ledger deposits,
+venue-wide reads with ±7-day controls, known wallets as positive controls, hit
+bar s ≥ 4, lift ≥ 5, p ≤ 1e-4; `data/replica/treasury_census.json`). Digest
+lines and two Tripwires cards. `hl_actions.own_actions` now carries `nonce`
+so the explorer and replica views of one action dedupe.
+
+**Rulings without the operator:** session gap and pad 10 min; bot bar 20
+actions a window; the sweep pages no foreign destination (the collector does,
+live); MAX_P tightened from 1e-3 to 1e-4 once the first windows showed
+hundreds of accounts each.
+
+**Measured on the first live run (2026-10-15):** the three config wallets'
+stored history holds 23 distinct agents ever approved (treasury 18, target 3,
+`0xf078969e…` 2 — one named `BasedApp`, beside a builder approval of
+`0x1924b856…` at 0.001%); `userRole` on all 23: 22 `missing` (expired or
+pruned), 1 `agent` → the target (his current frontend agent). **0 reused by
+another account.** The explorer store had each action stored on up to eleven
+day files (`append_records` dedupes only within a day); `utils.record_key` now
+keys any `_key` record across files.
