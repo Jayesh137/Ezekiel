@@ -2686,3 +2686,16 @@ pruned), 1 `agent` → the target (his current frontend agent). **0 reused by
 another account.** The explorer store had each action stored on up to eleven
 day files (`append_records` dedupes only within a day); `utils.record_key` now
 keys any `_key` record across files.
+
+**First census reading (2026-10-15, 16 of 63 sessions, 30 controls, local
+55-minute run):** 5,000 accounts kept, 1,054 present in two or more of his
+sessions, every top row a service-shaped account present in nearly every
+window and every control (lift ≈ 1). **His known wallets appeared in none of
+the 16 sessions** — the positive controls have not yet validated the vector.
+Three accounts cleared the run's bar (then 1e-3) on `approveAgent` alone, in
+4-5 sessions and no control: `0x341a1fbd…` ($4, 1,958 fills, agents `tw`,
+`BasedApp`, `rabby-mobile`), `0x46e7a32f…` ($0.04, last fill 2026-08-27,
+1,224 `xyz:SILVER` fills) and `0x5f30e9a6…` ($0, `BasedApp`, `Liminal`).
+Retail-sized frontend logins coinciding with his sessions by chance at n=16;
+registered as candidates (the detectors read them, no vote), not leads. The
+bar is 1e-4 from the next run and the census is checkpointed per session.
