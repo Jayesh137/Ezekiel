@@ -1,12 +1,33 @@
 {
   "wallet": "0x645b2eeaa0a46df3c4211bebda1b2c7703e287b8",
-  "last_checked": "2026-10-03T20:06:23.481779+00:00",
-  "last_read_status": "partial",
+  "last_checked": "2026-10-15T03:34:54.287446+00:00",
+  "last_read_status": "ok",
   "first_seen": "2026-10-03T20:06:23.481779+00:00",
   "discovery_sources": [
-    "public_trades"
+    "public_trades",
+    "tape_handoff"
   ],
   "observations": [
+    {
+      "source": "tape_handoff",
+      "positive": true,
+      "event_id": "tapehandoff:0x645b2eeaa0a46df3c4211bebda1b2c7703e287b8",
+      "detail": {
+        "score": 0.5079,
+        "gap_start_day": 20605,
+        "gap_length": 11,
+        "delay_days": 2,
+        "candidate_first_day": 20607,
+        "open": false,
+        "birth_day": 20607,
+        "notional_usd": 365487.68,
+        "rare_markets": [
+          "xyz:MU",
+          "xyz:SILVER"
+        ]
+      },
+      "observed_at": "2026-10-15T03:34:54.287446+00:00"
+    },
     {
       "status": "partial",
       "next_cursor_ms": 1791054738036,
@@ -48,5 +69,7 @@
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_investigated_ms": 1791965323212
+  "last_investigated_ms": 1791965323212,
+  "last_successful_read": "2026-10-15T03:34:54.287446+00:00",
+  "last_positive_evidence": "2026-10-15T03:34:54.287446+00:00"
 }
