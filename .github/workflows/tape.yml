@@ -64,7 +64,7 @@ jobs:
     concurrency:
       group: tape-data
       cancel-in-progress: false
-    timeout-minutes: 8   # a ~150s stream plus commit; generous backstop only
+    timeout-minutes: 14  # tape ~2 min, co-firing ~2.5 min, one treasury session up to ~6 min, commit
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -93,11 +93,15 @@ jobs:
       # Who does TREASURY work when he does (src/treasury_sessions.py): his
       # non-trading sessions read venue-wide from SQD's replica-command feed, each
       # account's chance measured on ±7-day control windows; his known wallets are
-      # the positive controls. Resumable by session key; a few sessions a run.
+      # the positive controls. Resumable by session key and checkpointed after
+      # each session. Measured 2026-10-15: a session's three window reads take
+      # 2-6 minutes (900-1,300 accounts a window, ~40% of requests refused and
+      # retried), so a run starts at most one or two sessions in its first
+      # minute and the step is bounded well above one session's worth.
       - name: Fold his treasury sessions into the co-occurrence census
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
-        timeout-minutes: 4
-        run: python scripts/census_treasury_sessions.py --max-sessions 3 --time-budget 150
+        timeout-minutes: 7
+        run: python scripts/census_treasury_sessions.py --max-sessions 2 --time-budget 60
       - name: Commit and push
         if: always()
         run: |
