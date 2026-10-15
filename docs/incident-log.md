@@ -2412,3 +2412,225 @@ needs a hit to calibrate against, and there is none).
 **Not built:** his own fills 2025-10 → 2026-02 by user filter (~2,000 requests at
 the measured 222K blocks per user-filtered request); PnL-series correlation off
 leaderboard snapshots (no series is kept).
+
+## 2026-10-15 — history moved out of CLAUDE.md (prompt audit)
+
+Moved verbatim; CLAUDE.md now keeps only the current rule each passage taught.
+Line numbers below are CLAUDE.md's before the move.
+
+### The "collected but not wired" section (every item since wired or removed) (CLAUDE.md lines 325-374)
+
+## Vectors collected but NOT wired into detection — pursue these
+
+- ~~`data/agents/`~~ — **wired 2026-09-10** (`d1a0de06b`), and this bullet went
+  on claiming otherwise until 2026-09-12 while the table above already listed
+  the vector as working. `agent_links.py` + `scripts/check_agents.py` run in
+  `trace.yml`, `roster.py` reads the result as `VECTOR_AGENT` — the one vector
+  that CONFIRMs alone — and the close watch asks `extraAgents` per wallet.
+  The live answer is a real and useful **no**: 120 wallets, 49 agents seen,
+  **0 shared, 0 naming-family hits, 0 linked to the target**. His frontend
+  agent `0x98cf3fee…` and the watched wallet's named bot agent `0x1e8695b7…`
+  each resolve by `userRole` to their own owner and to nobody else. Worth
+  keeping written down: the strongest vector in the project has been asked and
+  does not connect `0xdd53c529…` to him, which is evidence to weigh against the
+  amount/timing match rather than a gap still to be filled.
+  **Re-measured 2026-09-12 and the same numbers now mean something different.**
+  That reading was taken over a candidate set that did not CONTAIN
+  `0xdd53c529…` — it sorted 166th and the cap was 120, so `0x1e8695b7…` was
+  never in the index and the "no" was an absent read wearing the shape of an
+  answer. With the set fixed it is 120 wallets and 49 agents again, still 0
+  shared and 0 linked, and now it is an answer. `naming_families` is `{}`
+  correctly: `0xfc667adb…` runs 33 agents named `chip_oe02b…chip_oe33b`, but a
+  template used by ONE account is a habit with nothing to travel between, and
+  the vector looks for a scheme crossing accounts.
+- ~~`data/orders/`~~ — **wired 2026-09-10** as the `order_profile` dimension.
+  54,866 records were being collected and never read. It discriminates hard:
+  the target is 94.6% `Ioc` limit slices with **0% cancels and 0% client order
+  ids**, while all three correlation leads are ~100% cancels and **100% client
+  order ids** (bots). Now IN the backtest too, split by the same calendar days as
+  the fills (verified disjoint: 0 shared oids, 0 shared days), with strangers
+  given the same dimension so the target cannot score on one nobody else could
+  earn.
+  **Corrected 2026-09-29: not "manual TWAP".** His limit sits EXACTLY 5.0% through
+  the book on 99.4% of orders — the hyperliquid-python-sdk `market_open` default
+  (`DEFAULT_SLIPPAGE = 0.05`) — fired at one round base size per coin, ~1.7s
+  apart, in runs of tens to thousands, closing with `market_open` too. It is a
+  SCRIPT. That is a stronger fingerprint than `order_profile` captures, and it is
+  now its own vector (`execution_program`, below); the ~8% `FrontendMarket` orders
+  are his web-UI clicks.
+- ~~`data/twitter/`~~ — **removed 2026-09-10**. It was three empty directories
+  with no collector and no reference anywhere: scaffolding for an intention
+  never built, not data going unused. X's API is paid and scraping is fragile
+  and ToS-questionable, so it is not being built. The free equivalent of the
+  same idea — a human-chosen label that travels between accounts — is agent
+  NAMING SCHEMES, now in `agent_links.naming_families`.
+- ~~`data/vaults/`, `data/referral/`, `data/subaccounts/`~~ — **wired
+  2026-09-16** as the HL account surface (see `docs/incident-log.md`). They were asked about the
+  target alone, and for him all three are empty, so the scanner's overlap checks
+  returned early for every wallet — and `_check_referral_link` read
+  `referrerAddress`/`referredUsers`, keys the endpoint never sends, so it could
+  not have found a link anyway.
+
+### A flat wallet is unknown, not dissimilar (2026-09-12) (CLAUDE.md lines 434-449)
+
+- **A flat wallet is unknown, not dissimilar (fixed 2026-09-12).** Looking for
+  the above found rule 6 inside the scorer: `compare_leverage` returned **0.0**
+  when either side held no open positions, and leverage is computed FROM open
+  positions. Measured on the live scan, **69 of 174 candidates (40%)** carried
+  exactly 0.0 — median score 0.1531 against 0.2980 for the 105 with a real
+  reading — while every sibling dimension already renormalised (`hold_duration`
+  119 None; `timing_profile`, `loss_handling`, `order_profile` 174 None each).
+  It now returns `None`. Recomputed on those 69: median **+0.0433**, max
+  **+0.0719**, three then clear 0.55 and the top one goes 0.5247 → **0.5966**.
+  **Why this is a fix and not tuning:** a newly migrated wallet is
+  disproportionately likely to be FLAT at the moment it is scanned — just
+  deposited, no book open yet, or just closed out — so the artefact ran
+  precisely against the population this project hunts. It barely touches the
+  backtest (−0.0085 → −0.0082, still rank 2, still FAILING) because the
+  backtest's strangers are drawn from the scan's top scorers, who mostly hold
+  books. No weight and no threshold was changed.
+
+### Rule 4: the backtest run table and how the target entered his own lineup (2026-09-10 to 09-16) (CLAUDE.md lines 540-603)
+
+   **Read the margin from the file, not from here, and read it as a property of
+   the LINEUP.** Measured across three consecutive runs with the scorer
+   unchanged and his own windows identical (older 2026-05-25→08-04, recent
+   2026-08-05→09-06):
+
+   | run | self | best stranger | margin | top stranger | rank |
+   |---|---|---|---|---|---|
+   | 2026-09-10 09:51 | 0.5864 | 0.5503 | +0.0361 | `0x5b5d5120…` | 1 |
+   | 2026-09-10 09:58 | 0.5864 | 0.5495 | +0.0369 | `0x5b5d5120…` | 1 |
+   | 2026-09-11 02:11 | 0.5880 | 0.5783 | **+0.0097** | `0x97cc9bb5…` | 1 |
+   | 2026-09-12 00:06 | 0.5880 | 0.5965 | **−0.0085** | `0xe2ad3768…` | **2** |
+   | 2026-09-13 → 09-16 | 0.588-0.6593 | ~0.698 | negative | **the TARGET** | 2-3 |
+   | 2026-09-16 (fixed) | 0.6593 | 0.5924 | **+0.0669** | `0xc435249d…` | **1** |
+
+   His own score moved +0.0016 then stopped moving entirely. The margin fell by
+   two thirds and then **went negative** because a closer-matching stranger
+   turned up in the lineup each time — a different wallet on every run. So a
+   shrinking margin is not evidence the scorer got worse at recognising him, and
+   a single run's number is a snapshot of who happened to be drawn that day,
+   never a trend. That is exactly why chasing it with weights would be fitting
+   to the draw.
+
+   **It PASSES as of 2026-09-16, and it was the lineup all along — the target
+   was in it.** For four days the "closer-matching stranger" beating him was
+   **himself**, at ~0.698 against a windowed self-match of 0.588-0.6593. The
+   reading above that a shrinking margin says nothing about the scorer was
+   right, and understated: on 09-13 the margin stopped being a measurement at
+   all. Removing that one row — changing no weight and no threshold, which
+   rule 4 forbids — gives **self 0.6593, rank 1 of 20, margin +0.0669** against
+   the required +0.05. `passed: true` for the first time.
+
+   How he got in: `scan_priority_targets` had no target exclusion while the
+   leaderboard sweep one screen below it did. Six sources feed that priority
+   set and any can name him; what actually did was **three fund-flow findings
+   whose source and destination are both him, worth $0.00004 each**. The cost
+   was three deep, and none of it looked like a bug:
+
+   - `backtest.py` scores every row of `data/scans/latest.json` as a stranger,
+     so the validator ranked him behind himself and reported FAILING;
+   - `roster.behavioural_is_trustworthy()` reads that verdict, so **a whole
+     vector stopped casting a vote** while nothing said so;
+   - `risk.py` takes the top candidate's score, so he paid the **full 22 of 22
+     points for trading like himself** — a third of the 64.7 ELEVATED standing
+     on 09-16, and the `CRITICAL: Migration Risk 75/100` that fired on 09-15.
+
+   Three guards, because the contamination is durable at a different stage in
+   each: the priority set (where he gets in), `persist_candidate` (whose
+   per-wallet file outlives the scan that wrote it — `latest.json` is re-globbed
+   and sorted on a `best_score` that only ratchets, so one contaminated scan
+   pins him at the top for ever), and the backtest's stranger loop (the
+   instrument that validates the scorer must not be fooled by a file it did not
+   write). The stored `0x45d26f28….json` — 27 entries, every one 1.0 — was
+   deleted and the rollup rebuilt.
+
+   **A validator drawing its lineup from a shared file must be told who it is
+   looking for.** Nothing here was a scoring error; the scorer was being asked
+   to tell the target apart from the target. And the asymmetry was visible in
+   two adjacent loops for four days — **when one loop is guarded, ask what
+   guards the other**, the same rule `extraAgents` and `webData2` already cost.
+
+   Expect 7 wallets to move WATCH → POSSIBLE when the behavioural vector starts
+   voting again (one vector each, confidence 0.0). None reaches PROBABLE, so
+   none enters the close watch. Read the file, never this table, for the
+   current number.
+
+### The local dispatcher: install, eviction, battery and visible-window history (2026-09-12 to 09-17) (CLAUDE.md lines 1011-1085)
+
+- **A local dispatcher now drives the crons (2026-09-12).**
+  `scripts/dispatch_workflows.ps1` runs from Windows Task Scheduler on the
+  operator's machine every 5 minutes and dispatches `watch.yml` (10 min),
+  `collect.yml` (15 min) and `trace.yml` (30 min) whenever the newest run is
+  complete and older than the interval — never while one is queued or
+  running, and a cron-started run counts, so the two schedulers do not
+  double up. Measured at install: watch.yml's scheduled runs were 119-145
+  minutes apart, and collect.yml's last run was **240 minutes** old against
+  its 15-minute cron. Only while the machine is on; GitHub's crons remain
+  the fallback. Log at `%LOCALAPPDATA%\Ezekiel\dispatch.log`; remove with
+  `schtasks /Delete /F /TN "Ezekiel workflow dispatcher"`. The repo is public,
+  so the minutes are free.
+  **It must not queue behind a busy group, and now does not.** A dispatched
+  collect at 04:26 sat pending behind trace in `data-commit`; collect's own
+  cron fired at 04:35 and EVICTED it (run 34673027518, "cancelled") — a group
+  holds only one pending run. Nothing was lost, since the evicting run does the
+  same work, but the dispatch bought nothing. The script now checks every
+  workflow in the group first and skips instead. Splitting the group would be
+  the better fix and is deliberately NOT done: it needs a proven
+  single-writer map, and a wrong one is the lost-update bug this repo has
+  already paid for once.
+  **Nor may it send two runs into one group in the same tick (fixed
+  2026-09-17).** The busy check ran once, before any dispatch, so when collect,
+  trace and scan were all due it sent all three within four seconds (04:10:54
+  to 04:10:58): collect started, trace queued, and scan's arrival evicted
+  trace (run 35180941359, "cancelled" — a red mark in the Actions tab for work
+  that was never lost). Both schedulers now dispatch at most ONE workflow per
+  group per tick, the most overdue as a multiple of its interval; the rest go
+  on a later tick. `-DryRun` logs the decisions without dispatching. Measured
+  after the fix: 44 runs from 04:20 to 07:10, none cancelled or failed.
+  **`schtasks /Create` silently kills it on a laptop — install with `-Install`
+  (2026-09-12).** Registered with the documented `schtasks` line, the task
+  carried `DisallowStartIfOnBatteries` and `StopIfGoingOnBatteries`, both TRUE
+  by default. The machine went to battery and the dispatcher **stopped dead
+  after two runs**: measured at 06:05 UTC the log held six lines — 04:06 and
+  04:39 — against the ~36 lines an hour it writes when alive, and `watch.yml`
+  had last run 65 minutes earlier against its 10-minute cadence. So the
+  mitigation for GitHub's 198-minute blind spot spent its first two hours
+  dead, in exactly the way it was built to prevent, and nothing said so.
+  `schtasks /Query` was no help: it reported `Status: Ready`, `Last Run Time:
+  30/11/1999` and `Last Result: 267011`. The power state is what tells you —
+  `Get-CimInstance Win32_Battery`, `BatteryStatus=1` is discharging.
+  The registration is now a `-Install` switch on the script itself rather than
+  a comment, because settings that keep it alive belong in version control
+  next to the thing they keep alive: `-AllowStartIfOnBatteries`
+  `-DontStopIfGoingOnBatteries` (the defaults that killed it),
+  `-StartWhenAvailable` (run on wake instead of skipping every occurrence
+  missed while asleep) and `-ExecutionTimeLimit 10m` (with `IgnoreNew`, a hung
+  `gh` would otherwise hold the only permitted instance for the 72-hour
+  default — the same silent death by another route). Verified on battery at
+  36%: `LastTaskResult 0`, next run 3 minutes out, and it immediately
+  dispatched a `watch.yml` that was 111 minutes stale.
+  **A tripwire that can die quietly is worth what a dead tripwire is worth.**
+  **It also ran in a VISIBLE window until 2026-09-16.** The task runs as the
+  logged-on user ("Interactive only"), so Windows gave `powershell.exe` a
+  console: every five minutes a terminal opened over whatever the operator was
+  doing, showed nothing (the script logs to a file) and vanished. Reported as
+  "windows terminal keeps popping up randomly then closing". The action is now
+  `wscript.exe //nologo scripts\dispatch_hidden.vbs`, which has no console of
+  its own and starts PowerShell hidden from the first instant —
+  `-WindowStyle Hidden` alone does not fix it, because PowerShell applies that
+  only after the console already exists, which IS the flash.
+  Two things that look like simpler fixes and are not. Making the task "run
+  whether the user is logged on or not" removes the window completely, but
+  without a stored password that is an **S4U logon, whose token is denied
+  NETWORK access** — and calling the GitHub API with the user's `gh`
+  credentials is the script's entire job, so it would trade a visible
+  annoyance for a dispatcher that fails silently. And the launcher waits on
+  PowerShell (`Run(cmd, 0, True)`) rather than firing and forgetting: with
+  `False` the task would report finished immediately while the work continued,
+  defeating both `-ExecutionTimeLimit` (a hung `gh` no longer killed at ten
+  minutes) and `-MultipleInstances IgnoreNew` — the two settings `-Install`
+  exists for. **A cosmetic fix that reintroduces the silent death is not a
+  fix.**
+  Check the log's newest line, never the task's `Status`.
