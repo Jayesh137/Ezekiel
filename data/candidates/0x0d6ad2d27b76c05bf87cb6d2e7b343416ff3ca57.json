@@ -1,9 +1,9 @@
 {
   "wallet": "0x0d6ad2d27b76c05bf87cb6d2e7b343416ff3ca57",
   "first_seen": "2026-09-20T19:14:02.289244+00:00",
-  "last_seen": "2026-10-14T06:37:07.884060+00:00",
+  "last_seen": "2026-10-15T16:05:40.353284+00:00",
   "best_score": 0.3658,
-  "latest_score": 0.3524,
+  "latest_score": 0.3329,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -20,13 +20,13 @@
       "overlap": [],
       "target_only": [
         "BTC",
-        "FARTCOIN",
         "LIT",
         "MON",
         "xyz:MU"
       ],
       "candidate_only": [
         "ORDI",
+        "PENDLE",
         "ZEN"
       ],
       "overlap_count": 0,
@@ -40,7 +40,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3524,
+      "score_without_bonus": 0.3329,
       "explanations": [],
       "frequencies": {}
     },
@@ -49,13 +49,13 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.7151,
+        "relative_size_dispersion": 0.7496,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 1,
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -245,6 +245,28 @@
         "fill::ORDI:1791473674624:918158208437842",
         "fill::ORDI:1791473674624:950021880626561",
         "fill::ORDI:1791473674624:994347573224688",
+        "fill::PENDLE:1792030997820:1008633990730185",
+        "fill::PENDLE:1792030997820:1072319583640374",
+        "fill::PENDLE:1792030997820:1104166350983375",
+        "fill::PENDLE:1792030997820:1104431560528448",
+        "fill::PENDLE:1792030997820:1112740581610333",
+        "fill::PENDLE:1792030997820:251221074324820",
+        "fill::PENDLE:1792030997820:252932774320607",
+        "fill::PENDLE:1792030997820:281016304516846",
+        "fill::PENDLE:1792030997820:303191370129160",
+        "fill::PENDLE:1792030997820:315742976572359",
+        "fill::PENDLE:1792030997820:327877646097735",
+        "fill::PENDLE:1792030997820:336902163684257",
+        "fill::PENDLE:1792030997820:480545489023574",
+        "fill::PENDLE:1792030997820:500923106641118",
+        "fill::PENDLE:1792030997820:501303013941924",
+        "fill::PENDLE:1792030997820:668963359336298",
+        "fill::PENDLE:1792030997820:703018005723478",
+        "fill::PENDLE:1792030997820:845023320411520",
+        "fill::PENDLE:1792030997820:855323294227589",
+        "fill::PENDLE:1792030997820:920574262859092",
+        "fill::PENDLE:1792030997820:972728936256509",
+        "fill::PENDLE:1792030997820:98353486690247",
         "fill::ZEN:1791473740901:1083223194587356",
         "fill::ZEN:1791473740901:172405355168544",
         "fill::ZEN:1791473740901:182949427889335",
@@ -294,34 +316,12 @@
         "fill::ZEN:1791473743941:245434110411963",
         "fill::ZEN:1791473743941:278001251865010",
         "fill::ZEN:1791473743941:29696274239012",
-        "fill::ZEN:1791473743941:31940025013875",
-        "fill::ZEN:1791473743941:335312198419300",
-        "fill::ZEN:1791473743941:339527763782366",
-        "fill::ZEN:1791473743941:349295655725401",
-        "fill::ZEN:1791473743941:369022069603875",
-        "fill::ZEN:1791473743941:378654502136392",
-        "fill::ZEN:1791473743941:401555903096280",
-        "fill::ZEN:1791473743941:410452045188249",
-        "fill::ZEN:1791473743941:414077400725911",
-        "fill::ZEN:1791473743941:434298301704706",
-        "fill::ZEN:1791473743941:452000400716989",
-        "fill::ZEN:1791473743941:473709040535825",
-        "fill::ZEN:1791473743941:485167803486489",
-        "fill::ZEN:1791473743941:492978813768325",
-        "fill::ZEN:1791473743941:499721977001739",
-        "fill::ZEN:1791473743941:514002946052788",
-        "fill::ZEN:1791473743941:518407121346098",
-        "fill::ZEN:1791473743941:523803600486287",
-        "fill::ZEN:1791473743941:527385523608829",
-        "fill::ZEN:1791473743941:535037482428263",
-        "fill::ZEN:1791473743941:538889286022896",
-        "fill::ZEN:1791473743941:540392672358487",
-        "fill::ZEN:1791473743941:561945043058519"
+        "fill::ZEN:1791473743941:31940025013875"
       ]
     },
     "tooling": {
       "requests": 210.0,
-      "cum_volume_usd": 13450877.16,
+      "cum_volume_usd": 13494455.21,
       "requests_per_1k_usd": 0.0156
     }
   },
@@ -1081,17 +1081,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-15T16:05:40.353284+00:00",
+      "score": 0.3329,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.4247,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.4303,
+        "trade_sequencing": 0.2103,
+        "position_sizing": 0.4496,
+        "order_profile": 0.7367,
+        "activity": 0.6814,
+        "direction_bias": null,
+        "position_management": 0.7469,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3108,
-  "last_checked": "2026-10-14T06:37:07.884060+00:00",
+  "recent_avg_score": 0.3167,
+  "last_checked": "2026-10-15T16:05:40.353284+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-10-14T06:37:07.884060+00:00",
-  "last_positive_evidence": "2026-10-14T06:37:01.421369+00:00",
+  "last_successful_read": "2026-10-15T16:05:40.353284+00:00",
+  "last_positive_evidence": "2026-10-15T16:05:33.856381+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1456,20 +1477,43 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-14T06:37:01.421369+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1790265922082,
+      "coverage": {
+        "start_ms": 1790265922082,
+        "end_ms": 1792080322082,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790265922082,
+        "requested_start_ms": 1790265922082,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1792080322082,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-15T16:05:33.856381+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790145409960,
-    "end_ms": 1791959809960,
+    "start_ms": 1790265922082,
+    "end_ms": 1792080322082,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790145409960,
-    "requested_start_ms": 1790145409960,
+    "fetched_start_ms": 1790265922082,
+    "requested_start_ms": 1790265922082,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-10-14T06:37:07.884060+00:00",
+  "last_scored": "2026-10-15T16:05:40.353284+00:00",
   "last_investigated_ms": 1791596760110
 }
