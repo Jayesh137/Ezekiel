@@ -244,3 +244,13 @@ def test_replica_and_treasury_lines_appear_only_with_a_reading():
     assert "Action history: 1 wallets, 4 agents ever approved, 2 outside destinations, 1 agent(s) reused" in body
     assert "feed 2h behind, history 3 segments in" in body
     assert "Treasury sessions: 10/63 read, 900 accounts seen, 0 hit(s); known wallets present in 1/2, 0 hit." in body
+
+
+def test_venue_line_appears_only_with_a_reading():
+    from src import digest
+    assert digest.build(_readings(), {}, NOW)["venue"] is None
+    readings = _readings(venue={"summary": {"wallets": 1200, "outcome_traders": 40, "program_takers": 3},
+                                "outcome_in_his_sessions": [{"wallet": "0x" + "1" * 40}]},
+                         client_census={"base_rate": {"measured": 300, "his_class": 2, "upper": 0.024}})
+    _, body = digest.render(digest.build(readings, {}, NOW))
+    assert "Venue: 1200 takers sampled, 3 program-shaped, 40 outcome traders (1 in his sessions); clients: 2/300 in his class (ceiling 2.4%)." in body

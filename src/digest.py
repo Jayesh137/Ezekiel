@@ -213,6 +213,22 @@ def treasury_section(readings: dict) -> dict | None:
             "controls": len(known)}
 
 
+def venue_section(readings: dict) -> dict | None:
+    """The venue population sample and the client census (scripts/sample_venue.py,
+    scripts/census_client_fingerprint.py)."""
+    venue = readings.get("venue")
+    client = readings.get("client_census")
+    if not isinstance(venue, dict) and not isinstance(client, dict):
+        return None
+    vs = (venue or {}).get("summary") or {}
+    rate = (client or {}).get("base_rate") or {}
+    return {"takers": vs.get("wallets"), "outcome_traders": vs.get("outcome_traders"),
+            "program_takers": vs.get("program_takers"),
+            "outcome_in_sessions": len((venue or {}).get("outcome_in_his_sessions") or []),
+            "clients_measured": rate.get("measured"), "his_class": rate.get("his_class"),
+            "his_class_upper": rate.get("upper")}
+
+
 def discovery_section(readings: dict) -> dict:
     """What the L1 walk did on its last run: the one vector that reaches an
     address nobody has seen, and the one that was dead for a month while every
@@ -280,6 +296,7 @@ def build(readings: dict, config: dict | None, now: datetime | None = None) -> d
         "cofire_history": cofire_history_section(readings),
         "replica": replica_section(readings),
         "treasury": treasury_section(readings),
+        "venue": venue_section(readings),
         "health": health_section(readings, now),
     }
 
@@ -359,6 +376,14 @@ def render(digest: dict) -> tuple[str, str]:
         lines.append(f"Treasury sessions: {tr['sessions_read'] or 0}/{tr['sessions'] or 0} read, "
                      f"{tr['seen'] or 0} accounts seen, {tr['hits']} hit(s); known wallets present in "
                      f"{tr['controls_present']}/{tr['controls']}, {tr['controls_hit']} hit.")
+    vn = digest.get("venue")
+    if vn:
+        upper = (f"{100 * vn['his_class_upper']:.1f}%" if isinstance(vn.get("his_class_upper"), (int, float))
+                 else "unmeasured")
+        lines.append(f"Venue: {vn['takers'] or 0} takers sampled, {vn['program_takers'] or 0} program-shaped, "
+                     f"{vn['outcome_traders'] or 0} outcome traders ({vn['outcome_in_sessions']} in his sessions); "
+                     f"clients: {vn['his_class'] or 0}/{vn['clients_measured'] or 0} in his class "
+                     f"(ceiling {upper}).")
     d = digest["discovery"]
     if d.get("lookups") is None:
         lines.append("Discovery: no graph reading.")

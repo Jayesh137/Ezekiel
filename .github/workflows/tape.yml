@@ -64,7 +64,7 @@ jobs:
     concurrency:
       group: tape-data
       cancel-in-progress: false
-    timeout-minutes: 14  # tape ~2 min, co-firing ~2.5 min, one treasury session up to ~6 min, commit
+    timeout-minutes: 22  # tape ~2 min, co-firing ~2.5, one treasury session ≤6, venue ≤3, clients ≤5, commit
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -102,6 +102,21 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 7
         run: python scripts/census_treasury_sessions.py --max-sessions 2 --time-budget 60
+      # The venue's taker population from a few minutes of EVERY fill
+      # (src/venue_sample.py): outcome-market traders, program-shaped takers on
+      # any coin, and the population the client census reads. ~8 MB a run.
+      - name: Sample the venue's taker population
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 3
+        run: python scripts/sample_venue.py --minutes 3
+      # Which client each taker trades through (src/client_census.py): one
+      # historicalOrders read a wallet under the HL read budget, his script's
+      # class measured over the whole population; wallets in his class go to the
+      # execution-program detector through the registry.
+      - name: Census trading clients over the venue's takers
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 5
+        run: python scripts/census_client_fingerprint.py --time-budget 150 --max-wallets 40
       - name: Commit and push
         if: always()
         run: |
