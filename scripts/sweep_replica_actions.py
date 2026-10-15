@@ -34,8 +34,9 @@ from src.utils import (  # noqa: E402
 
 OUT_DIR = DATA_DIR / "replica"
 STATE_FILE = OUT_DIR / "state.json"
-DEFAULT_MAX_REQUESTS = 300
-DEFAULT_TIME_BUDGET = 240
+DEFAULT_MAX_REQUESTS = 200
+DEFAULT_TIME_BUDGET = 150
+CHUNK_REQUESTS = 25
 BACKFILL_SEGMENT = 2_000_000
 
 
@@ -116,8 +117,11 @@ def incremental(users: list[str], state: dict, *, max_requests: int, time_budget
     cursor = start
     while cursor <= head and requests_made < max_requests and clock() - t0 < time_budget:
         chunk = min(head, cursor + rc.BLOCKS_PER_REQUEST * 20)
+        # A chunk is bounded in REQUESTS as well as blocks, because the time budget
+        # is checked only between chunks: with ~40% of requests refused and waited
+        # on, 20 blocks' worth of pages can cost far more than 20 requests.
         out = stream_fn(cursor, chunk, users=users, action_types=rc.NON_TRADING_TYPES,
-                        max_requests=max(1, max_requests - requests_made))
+                        max_requests=max(1, min(CHUNK_REQUESTS, max_requests - requests_made)))
         requests_made += out["requests"]
         overloads += out["overloads"]
         if out["last_block"] is None:

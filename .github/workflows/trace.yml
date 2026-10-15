@@ -378,8 +378,12 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        timeout-minutes: 6          # internal budget 240s, checked between requests
-        run: python scripts/sweep_replica_actions.py --time-budget 240 --max-requests 300
+        # Measured 2026-10-15 (run 38699730686): 240s of reads plus the report and
+        # the agent-owner reads overran a 6-minute step. The budget is checked
+        # between chunks of at most 25 requests (~30-60s with refusals), so the
+        # reads end within ~200s and the report has minutes to spare.
+        timeout-minutes: 9
+        run: python scripts/sweep_replica_actions.py --time-budget 150 --max-requests 200
       - name: Resolve Hyperliquid identities
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
