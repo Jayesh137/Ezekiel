@@ -47,6 +47,13 @@
 	$: history = data?.cofireHistory;
 	$: historyHits = (history?.hits || []).slice(0, 15);
 	$: historyControls = history?.controls || [];
+	$: replica = data?.replica;
+	$: replicaWallets = Object.values(replica?.wallets || {}).filter((w) => (w.actions || 0) > 0)
+		.sort((a, b) => (b.actions || 0) - (a.actions || 0));
+	$: replicaReused = replica?.agent_reused || [];
+	$: treasury = data?.treasury;
+	$: treasuryKnown = Object.entries(treasury?.known_wallets || {});
+	$: treasuryTop = (treasury?.top || []).slice(0, 10);
 
 	function size(x) {
 		const v = Math.abs(Number(x) || 0);
@@ -265,6 +272,97 @@
 				</table>
 			{:else}
 				<p class="text-muted">No wallet opens his bursts with him beyond chance so far.</p>
+			{/if}
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>
+			His world's action history (SQD replica)
+			{#if replica?.dataset}<span class="badge badge-grey">{replica.dataset.behind_blocks != null ? `${Math.round(replica.dataset.behind_blocks / 50400)}h behind the dataset` : 'no cursor'}</span>{/if}
+		</h2>
+		<p class="text-muted">
+			Every non-trading action of every wallet in his world since 2026-01-21 — agents approved,
+			Circle recipients, builders, referral codes, failed attempts — from SQD's keyless
+			replica-command feed, which trails the chain by about ten days. The explorer shows 300
+			actions and rolls a payload out within a day. The one page here: an agent of his that
+			Hyperliquid now resolves to another account.
+		</p>
+		{#if !replica}
+			<p class="text-muted">No sweep yet — written by <code>scripts/sweep_replica_actions.py</code> on the trace job.</p>
+		{:else}
+			<p>
+				{replica.users?.length ?? 0} wallets asked · {replica.agents_total ?? 0} agents ever approved ·
+				{replica.outside_total ?? 0} destinations outside his perimeter ·
+				{replicaReused.length} agent{replicaReused.length === 1 ? '' : 's'} reused by another account
+				{#if replica.dataset?.backfill_complete}· history complete{:else}· history {replica.dataset?.backfill_segments_done ?? 0} segments in{/if}
+			</p>
+			{#each replicaReused as r}
+				<p class="text-danger">AGENT REUSED: <Addr address={r.agent} /> approved by <Addr address={r.approved_by} /> now resolves to <Addr address={r.owner} /></p>
+			{/each}
+			{#if replicaWallets.length}
+				<table>
+					<thead><tr><th>Wallet</th><th>Actions</th><th>Agents</th><th>Builders</th><th>Circle</th><th>Outside</th><th>Failed</th><th>Last</th></tr></thead>
+					<tbody>
+						{#each replicaWallets as w}
+							<tr>
+								<td><Addr address={w.address} /></td>
+								<td>{w.actions}</td>
+								<td>{(w.agents || []).length}</td>
+								<td>{(w.builders || []).length}</td>
+								<td>{Object.values(w.circle_recipients || {}).reduce((n, v) => n + v.length, 0)}</td>
+								<td>{(w.outside_destinations || []).length}</td>
+								<td>{Object.values(w.failed || {}).reduce((n, v) => n + v, 0)}</td>
+								<td>{w.last ? w.last.slice(0, 10) : '—'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>
+			Treasury-session co-occurrence
+			{#if treasury}<span class="badge badge-grey">{treasury.sessions_read ?? 0}/{treasury.sessions_total ?? 0} sessions</span>{/if}
+		</h2>
+		<p class="text-muted">
+			Who does treasury work when he does: every account with a send, withdrawal, Circle send,
+			class transfer or agent approval inside the padded window of one of his non-trading
+			sessions, counted once per session and only for actions that do not touch him, against
+			its own rate on ±7-day control windows. His known wallets are scored like strangers — the
+			positive controls. A hit is in ≥{treasury?.bar?.min_sessions ?? 4} sessions at lift ≥{treasury?.bar?.min_lift ?? 5}
+			and p ≤ {treasury?.bar?.max_p ?? 0.001}; a hit registers as a candidate and casts no vote.
+		</p>
+		{#if !treasury}
+			<p class="text-muted">No census yet — written by <code>scripts/census_treasury_sessions.py</code> on the tape job.</p>
+		{:else}
+			<p>
+				{treasury.summary?.wallets_seen ?? 0} accounts seen · {treasury.summary?.wallets_with_2plus ?? 0} in two or more of his sessions ·
+				{treasury.summary?.controls ?? 0} control windows · {(treasury.hits || []).length} hit(s)
+				{#each treasuryKnown as [w, r]}
+					· control <Addr address={w} />: {r.sessions_with} session(s), {r.controls_with} control(s){r.lift != null ? `, lift ${r.lift}` : ''}{r.hit ? ', HIT' : ''}
+				{/each}
+			</p>
+			{#if treasuryTop.length}
+				<table>
+					<thead><tr><th>Wallet</th><th>Sessions with him</th><th>Controls</th><th>Lift</th><th>p</th><th>What it did</th></tr></thead>
+					<tbody>
+						{#each treasuryTop as r}
+							<tr class:row-hit={r.hit}>
+								<td><Addr address={r.wallet} /></td>
+								<td>{r.sessions_with}/{r.sessions}</td>
+								<td>{r.controls_with}/{r.controls}</td>
+								<td>{r.lift ?? '—'}</td>
+								<td>{r.p ?? '—'}</td>
+								<td>{Object.entries(r.kinds || {}).map(([k, n]) => `${k} ×${n}`).join(', ')}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{:else}
+				<p class="text-muted">Nobody seen in his sessions yet.</p>
 			{/if}
 		{/if}
 	</section>

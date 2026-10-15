@@ -435,6 +435,12 @@ def record_key(directory_name: str, rec: dict):
     """
     if not isinstance(rec, dict):
         return None
+    if rec.get("_key"):
+        # Stores written through `append_records(..., key_field="_key")` (the
+        # per-wallet actions store): the key dedupes within a day file at write
+        # time, and here across day files at read time — measured 2026-10-15, one
+        # explorer action of the target's was stored on eleven different days.
+        return str(rec["_key"])
     if directory_name == "fills":
         return rec.get("tid")
     if directory_name == "ledger":

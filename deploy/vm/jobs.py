@@ -52,6 +52,8 @@ JOBS: dict[str, dict] = {
             (["python", "scripts/run_provenance.py"], 360),
             (["python", "src/correlator.py", "--pools", "bridge", "cctp", "--no-etherscan"], 240),
             (["python", "src/transfer_graph.py"], 600),
+            (["python", "scripts/sweep_replica_actions.py", "--time-budget", "240",
+              "--max-requests", "300"], 360),
             (["python", "scripts/check_identity.py"], 180),
             (["python", "scripts/check_agents.py"], 240),
             (["python", "scripts/check_hl_surface.py"], 360),

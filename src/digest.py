@@ -188,6 +188,31 @@ def cofire_history_section(readings: dict) -> dict | None:
             "controls": len(controls)}
 
 
+def replica_section(readings: dict) -> dict | None:
+    """His world's action history from the replica feed (scripts/sweep_replica_actions.py)."""
+    doc = readings.get("replica")
+    if not isinstance(doc, dict) or not isinstance(doc.get("dataset"), dict):
+        return None
+    ds = doc["dataset"]
+    return {"wallets": len(doc.get("users") or []), "agents": doc.get("agents_total"),
+            "outside": doc.get("outside_total"), "reused": len(doc.get("agent_reused") or []),
+            "behind_blocks": ds.get("behind_blocks"), "backfill_complete": bool(ds.get("backfill_complete")),
+            "segments_done": ds.get("backfill_segments_done")}
+
+
+def treasury_section(readings: dict) -> dict | None:
+    """The treasury-session census (scripts/census_treasury_sessions.py)."""
+    doc = readings.get("treasury")
+    if not isinstance(doc, dict) or not isinstance(doc.get("summary"), dict):
+        return None
+    known = doc.get("known_wallets") or {}
+    return {"sessions_read": doc.get("sessions_read"), "sessions": doc.get("sessions_total"),
+            "hits": len(doc.get("hits") or []), "seen": doc["summary"].get("wallets_seen"),
+            "controls_present": sum(1 for r in known.values() if (r or {}).get("sessions_with")),
+            "controls_hit": sum(1 for r in known.values() if (r or {}).get("hit")),
+            "controls": len(known)}
+
+
 def discovery_section(readings: dict) -> dict:
     """What the L1 walk did on its last run: the one vector that reaches an
     address nobody has seen, and the one that was dead for a month while every
@@ -253,6 +278,8 @@ def build(readings: dict, config: dict | None, now: datetime | None = None) -> d
         "execution": execution_section(readings),
         "discovery": discovery_section(readings),
         "cofire_history": cofire_history_section(readings),
+        "replica": replica_section(readings),
+        "treasury": treasury_section(readings),
         "health": health_section(readings, now),
     }
 
@@ -319,6 +346,19 @@ def render(digest: dict) -> tuple[str, str]:
         lines.append(f"History co-firing: {ch['sessions_read'] or 0}/{ch['sessions'] or 0} of his sessions "
                      f"read, {ch['hits']} hit(s), base rate {rate}; his known wallets: "
                      f"{ch['controls_seen']}/{ch['controls']} on his tape, {ch['controls_hit']} co-firing.")
+    rp = digest.get("replica")
+    if rp:
+        lag = (f"{rp['behind_blocks'] / 50_400:.0f}h behind" if isinstance(rp.get("behind_blocks"), (int, float))
+               else "no cursor")
+        hist = "complete" if rp.get("backfill_complete") else f"{rp.get('segments_done') or 0} segments in"
+        lines.append(f"Action history: {rp['wallets']} wallets, {rp['agents'] or 0} agents ever approved, "
+                     f"{rp['outside'] or 0} outside destinations, {rp['reused']} agent(s) reused by another "
+                     f"account; feed {lag}, history {hist}.")
+    tr = digest.get("treasury")
+    if tr:
+        lines.append(f"Treasury sessions: {tr['sessions_read'] or 0}/{tr['sessions'] or 0} read, "
+                     f"{tr['seen'] or 0} accounts seen, {tr['hits']} hit(s); known wallets present in "
+                     f"{tr['controls_present']}/{tr['controls']}, {tr['controls_hit']} hit.")
     d = digest["discovery"]
     if d.get("lookups") is None:
         lines.append("Discovery: no graph reading.")

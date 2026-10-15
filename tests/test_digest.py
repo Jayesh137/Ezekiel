@@ -224,3 +224,23 @@ def test_discovery_and_the_continuous_tape_are_in_the_digest():
     assert "Tape (20 min continuous)" in body and "2 co-firing hit(s)" in body
     d2 = digest.build(_readings(), CONFIG, now=NOW)
     assert "Discovery: no graph reading." in digest.render(d2)[1]
+
+
+def test_replica_and_treasury_lines_appear_only_with_a_reading():
+    from src import digest
+    readings = _readings()
+    assert digest.build(readings, {}, NOW)["replica"] is None
+    assert digest.build(readings, {}, NOW)["treasury"] is None
+    readings = _readings(
+        replica={"dataset": {"behind_blocks": 100_800, "backfill_complete": False,
+                             "backfill_segments_done": 3}, "users": ["0x" + "1" * 40],
+                 "agents_total": 4, "outside_total": 2, "agent_reused": [{"agent": "0x" + "a" * 40}]},
+        treasury={"summary": {"wallets_seen": 900}, "sessions_read": 10, "sessions_total": 63,
+                  "hits": [], "known_wallets": {"0x" + "2" * 40: {"sessions_with": 2, "hit": False},
+                                                "0x" + "3" * 40: {"sessions_with": 0}}})
+    built = digest.build(readings, {}, NOW)
+    assert built["replica"]["reused"] == 1 and built["treasury"]["controls_present"] == 1
+    _, body = digest.render(built)
+    assert "Action history: 1 wallets, 4 agents ever approved, 2 outside destinations, 1 agent(s) reused" in body
+    assert "feed 2h behind, history 3 segments in" in body
+    assert "Treasury sessions: 10/63 read, 900 accounts seen, 0 hit(s); known wallets present in 1/2, 0 hit." in body

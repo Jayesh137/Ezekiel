@@ -367,6 +367,19 @@ jobs:
       # its current frontend agent, staking link, validators and real birth.
       # Runs before the agent check so the frontend agents are on record, and
       # before the roster so an explicit link lands in the same run.
+      # His world's COMPLETE non-trading action history from SQD's keyless
+      # replica-command feed (src/replica_cmds.py): every agent he ever approved,
+      # every Circle recipient, builder and referral code, since 2026-01-21 — the
+      # explorer shows 300 actions and rolls a payload out within a day. Reads
+      # from a block cursor towards a head ~10 days behind the chain, bounded;
+      # the only page is an agent of his that Hyperliquid now resolves to another
+      # account. Before the identity step so a reused agent lands in this run.
+      - name: Sweep his world's actions (SQD replica)
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        timeout-minutes: 6          # internal budget 240s, checked between requests
+        run: python scripts/sweep_replica_actions.py --time-budget 240 --max-requests 300
       - name: Resolve Hyperliquid identities
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
