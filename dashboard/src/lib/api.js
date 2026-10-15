@@ -750,7 +750,7 @@ export function feedStatus(doc, feed, blind = {}, nowMs = Date.now()) {
 
 export async function fetchTripwires() {
 	const [feeds, sentinels, circle, watch, blindWatch, blindOther, census, tapeCensus, tape, execution, digest,
-		decisions, positions, cofireHistory, replica, treasury] =
+		decisions, positions, cofireHistory, replica, treasury, venue, clientCensus] =
 		await Promise.all([
 			Promise.all(DETECTOR_FEEDS.map((f) => fetchJSON(f.path))),
 			fetchJSON('data/deposit_sentinels/latest.json'),
@@ -767,7 +767,9 @@ export async function fetchTripwires() {
 			fetchJSON('data/watchlist/positions.json'),
 			fetchJSON('data/tape/cofire_history.json'),
 			fetchJSON('data/replica/latest.json'),
-			fetchJSON('data/replica/treasury_latest.json')
+			fetchJSON('data/replica/treasury_latest.json'),
+			fetchJSON('data/tape/venue_latest.json'),
+			fetchJSON('data/client_census/latest.json')
 		]);
 	const blind = blindSince(blindWatch, blindOther);
 	return {
@@ -783,7 +785,9 @@ export async function fetchTripwires() {
 		positions,
 		cofireHistory,
 		replica,
-		treasury
+		treasury,
+		venue,
+		clientCensus
 	};
 }
 

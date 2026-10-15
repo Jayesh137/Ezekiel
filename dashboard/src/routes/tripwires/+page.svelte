@@ -54,6 +54,12 @@
 	$: treasury = data?.treasury;
 	$: treasuryKnown = Object.entries(treasury?.known_wallets || {});
 	$: treasuryTop = (treasury?.top || []).slice(0, 10);
+	$: venue = data?.venue;
+	$: clientCensus = data?.clientCensus;
+	$: hisClassWallets = (clientCensus?.his_class_wallets || []).slice(0, 12);
+	$: outcomeInSessions = (venue?.outcome_in_his_sessions || []).slice(0, 10);
+	$: venueProgram = (venue?.program_takers || []).slice(0, 8);
+	$: knownClients = Object.entries(clientCensus?.controls?.known || {});
 
 	function size(x) {
 		const v = Math.abs(Number(x) || 0);
@@ -363,6 +369,58 @@
 				</table>
 			{:else}
 				<p class="text-muted">Nobody seen in his sessions yet.</p>
+			{/if}
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>
+			Venue population and trading clients
+			{#if venue?.summary}<span class="badge badge-grey">{venue.summary.wallets ?? 0} takers</span>{/if}
+		</h2>
+		<p class="text-muted">
+			A few minutes of EVERY fill on the venue each run: who trades at all, who trades HIP-4 outcome
+			contracts (the instrument his history favours and his main account has never touched), and who
+			runs program-shaped bursts on any coin at any clip. Each taker is then read once through
+			<code>historicalOrders</code> for the client it trades through; his script's class (mostly IOC,
+			no client id, scripted runs) is measured over the whole population. His known wallets are
+			controls — both trade by hand on the web UI, which bounds what a tooling census can find.
+		</p>
+		{#if !venue && !clientCensus}
+			<p class="text-muted">No sample yet — written by <code>scripts/sample_venue.py</code> and <code>scripts/census_client_fingerprint.py</code> on the tape job.</p>
+		{:else}
+			<p>
+				{venue?.summary?.wallets ?? 0} takers over {venue?.summary?.samples ?? 0} samples ·
+				{venue?.summary?.outcome_traders ?? 0} outcome traders ({outcomeInSessions.length} in his treasury sessions) ·
+				{venue?.summary?.program_takers ?? 0} program-shaped ·
+				clients: {clientCensus?.base_rate?.his_class ?? 0}/{clientCensus?.base_rate?.measured ?? 0} in his class
+				{#if typeof clientCensus?.base_rate?.upper === 'number'}(ceiling {(100 * clientCensus.base_rate.upper).toFixed(1)}%){/if}
+				{#each knownClients as [w, e]}
+					· control <Addr address={w} />: {e.lab ?? e.error ?? '—'}
+				{/each}
+			</p>
+			{#if hisClassWallets.length}
+				<table>
+					<thead><tr><th>In his client class</th><th>Orders</th><th>Span (d)</th><th>IOC no-cloid</th><th>Runs</th><th>Round sizes</th></tr></thead>
+					<tbody>
+						{#each hisClassWallets as r}
+							<tr><td><Addr address={r.wallet} /></td><td>{r.n}</td><td>{r.sd}</td><td>{r.ioc}</td><td>{r.runs}</td><td>{r.rd}</td></tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+			{#if outcomeInSessions.length}
+				<table>
+					<thead><tr><th>Outcome trader in his sessions</th><th>Outcome fills</th><th>Sessions with him</th><th>Controls</th></tr></thead>
+					<tbody>
+						{#each outcomeInSessions as r}
+							<tr><td><Addr address={r.wallet} /></td><td>{r.outcome_fills}</td><td>{r.sessions_with}</td><td>{r.controls_with}</td></tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+			{#if venueProgram.length}
+				<p class="text-muted">Program-shaped venue-wide: {#each venueProgram as r}<Addr address={r.wallet} /> ({(r.program_coins || []).join(', ')}) {/each}</p>
 			{/if}
 		{/if}
 	</section>

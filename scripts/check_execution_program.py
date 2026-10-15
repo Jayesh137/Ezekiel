@@ -84,7 +84,12 @@ def load_census():
 # must READ (real fills, the census gate) — left to roster order, a registry-only
 # wallet carries no vector and sorts below every wallet that has one.
 REGISTRY_SOURCES = ("tape_census", "execution_program_tape", "execution_program_census",
-                    "tape_handoff")
+                    "tape_handoff",
+                    # 2026-10-15: the client census (a wallet whose historicalOrders
+                    # show his script's class), program-shaped takers found in the
+                    # venue-wide sample, and outcome-market traders present in his
+                    # treasury sessions. Each is a lead the detector must READ.
+                    "client_census", "venue_program", "outcome_treasury")
 REGISTRY_RESERVE = 10
 
 

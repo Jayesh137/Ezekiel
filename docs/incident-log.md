@@ -2699,3 +2699,39 @@ Three accounts cleared the run's bar (then 1e-3) on `approveAgent` alone, in
 Retail-sized frontend logins coinciding with his sessions by chance at n=16;
 registered as candidates (the detectors read them, no vote), not leads. The
 bar is 1e-4 from the next run and the census is checkpointed per session.
+
+## 2026-10-15 (later) — the venue's taker population and a census of trading clients
+
+**Why.** Asked whether pattern recognition can find his other wallets: not as
+it stood. The style scorer has been voteless since 2026-09-26 (`passed: null`,
+0 of 20 controls ever accumulated) with features thousands share; the tape
+census reads `ratio_p99 = 1.0` on the takers of his markets — his exact clip
+table on majors is everyone's round numbers — so the execution signature lives
+only in his rare markets and in his TOOLING, which was tested on ~25 candidates
+a run. Reach, not resolution.
+
+**Measured.** A venue-wide fills sample (`fills: [{}]`) is 7.7 MB for five
+minutes in ONE request: 31,482 fills, 1,261 takers, 383 coins (79 `xyz:`, 8
+`para:`, 7 `io:`, 1 `mkts:`, 27 `@` spot pairs, dozens of `#<n>` HIP-4 outcome
+contracts — `outcomeMeta` lists 308 outcomes over 31 questions: NFL games, BTC
+and ETH dailies, `company:Anthropic`, `perp:xyz:XYZ100`). 0 of 1,261 takers ran
+a program-shaped burst in five minutes. `historicalOrders` names a wallet's
+client in one read: the target is 1,806 `Limit/Ioc` without client id + 194
+`FrontendMarket` over 21 days; **the treasury is 74 `FrontendMarket` + 2 `Gtc`
+and `0xf078969e…` 2 `FrontendMarket` with a `0xba5ed1…` client id (BasedApp) —
+his known wallets are operated by hand on the web UI, not by his script.** A
+tooling census therefore cannot find a wallet of his run that way; it can find
+one run with his script on any coin, and it measures the class's base rate.
+
+**Built** (branch `feat/venue-client-census`, spec
+`docs/superpowers/specs/2026-10-15-venue-population-and-client-census-design.md`):
+`src/venue_sample.py` + `scripts/sample_venue.py` (tape.yml, 3 min of every
+fill a run → `data/tape/venue_population.json`, 20,000 takers: outcome traders,
+program-shaped takers venue-wide, HIP-3 dex use; outcome traders in ≥2 of his
+treasury sessions → registry `outcome_treasury`, program-shaped → `venue_program`);
+`src/client_census.py` + `scripts/census_client_fingerprint.py` (tape.yml, ~40
+`historicalOrders` reads a run under `ReadBudget`, 14-day re-read; profiles in
+`data/client_census/profiles.json`; `his_class` = Ioc-no-cloid ≥0.8 with a
+scripted run → registry `client_census`; base rate with Wilson ceiling; known
+wallets' classes and the target's split-half as controls). The execution-program
+detector's registry sources accept all three. Digest line, Tripwires card.
