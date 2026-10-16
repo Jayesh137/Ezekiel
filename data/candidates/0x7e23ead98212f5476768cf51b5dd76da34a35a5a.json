@@ -1,18 +1,18 @@
 {
   "wallet": "0x7e23ead98212f5476768cf51b5dd76da34a35a5a",
   "first_seen": "2026-08-16T02:17:19.855825+00:00",
-  "last_seen": "2026-10-14T20:14:04.744338+00:00",
+  "last_seen": "2026-10-16T09:36:16.675097+00:00",
   "best_score": 0.6136,
-  "latest_score": 0.4284,
+  "latest_score": 0.3713,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
-      "Similar holding-duration profile"
+      "Similar market/limit execution style"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
@@ -21,7 +21,6 @@
       ],
       "target_only": [
         "BTC",
-        "FARTCOIN",
         "MON",
         "xyz:MU"
       ],
@@ -32,7 +31,7 @@
       ],
       "overlap_count": 1,
       "rare_overlap": [],
-      "jaccard": 0.125
+      "jaccard": 0.1429
     },
     "market_rarity": {
       "shared_markets": [],
@@ -41,16 +40,16 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4284,
+      "score_without_bonus": 0.3713,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
       "status": "research",
       "promotable": false,
-      "similarity": 0.9798,
+      "similarity": 0.9799,
       "features": {
-        "relative_size_dispersion": 0.8988,
+        "relative_size_dispersion": 0.8997,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
@@ -249,25 +248,6 @@
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-22T08:20:24.253979+00:00",
-      "score": 0.4605,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.4688,
-        "timing_profile": null,
-        "leverage_profile": 0.9947,
-        "entry_exit_style": 0.9961,
-        "hold_duration": 0.4642,
-        "account_size": 0.3433,
-        "trade_sequencing": 0.56,
-        "position_sizing": 0.0962,
-        "activity": 0.4896,
-        "direction_bias": null,
-        "position_management": 0.7801,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-22T09:20:07.695017+00:00",
       "score": 0.4606,
@@ -2188,17 +2168,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-16T09:36:16.675097+00:00",
+      "score": 0.3713,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": null,
+        "leverage_profile": 0.7693,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.375,
+        "trade_sequencing": 0.2474,
+        "position_sizing": 0.2263,
+        "order_profile": null,
+        "activity": 0.7192,
+        "direction_bias": null,
+        "position_management": 0.7589,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.404,
-  "last_checked": "2026-10-14T20:14:04.744338+00:00",
+  "recent_avg_score": 0.4006,
+  "last_checked": "2026-10-16T09:36:16.675097+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-10-14T20:14:04.744338+00:00",
-  "last_positive_evidence": "2026-10-14T20:14:01.680137+00:00",
+  "last_successful_read": "2026-10-16T09:36:16.675097+00:00",
+  "last_positive_evidence": "2026-10-16T09:36:13.454073+00:00",
   "observations": [
     {
       "status": "ok",
@@ -2521,21 +2522,44 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-10-14T20:14:01.680137+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1790328971453,
+      "coverage": {
+        "start_ms": 1790328971453,
+        "end_ms": 1792143371453,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790328971453,
+        "requested_start_ms": 1790328971453,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1792143371453,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-10-16T09:36:13.454073+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790194439525,
-    "end_ms": 1792008839525,
+    "start_ms": 1790328971453,
+    "end_ms": 1792143371453,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790194439525,
-    "requested_start_ms": 1790194439525,
+    "fetched_start_ms": 1790328971453,
+    "requested_start_ms": 1790328971453,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-10-14T20:14:04.744338+00:00",
+  "last_scored": "2026-10-16T09:36:16.675097+00:00",
   "latest_scoring_schema": "2026-09-26.2",
   "last_investigated_ms": 1791790705478
 }
