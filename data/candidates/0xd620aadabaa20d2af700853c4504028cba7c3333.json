@@ -1,13 +1,13 @@
 {
   "wallet": "0xd620aadabaa20d2af700853c4504028cba7c3333",
-  "last_checked": "2026-10-15T03:51:29.005111+00:00",
+  "last_checked": "2026-10-16T18:29:07.401199+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-27T15:01:32.926404+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-10-15T03:51:29.005111+00:00",
-  "last_positive_evidence": "2026-10-15T03:51:06.410872+00:00",
+  "last_successful_read": "2026-10-16T18:29:07.401199+00:00",
+  "last_positive_evidence": "2026-10-16T18:28:52.795213+00:00",
   "observations": [
     {
       "status": "ok",
@@ -395,24 +395,47 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-15T03:51:06.410872+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792129351763,
+      "coverage": {
+        "start_ms": 1790360871874,
+        "end_ms": 1792175271874,
+        "pages": 6,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790360871874,
+        "requested_start_ms": 1790360871874,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1792175271874,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-16T18:28:52.795213+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790221828828,
-    "end_ms": 1792036228828,
-    "pages": 4,
+    "start_ms": 1790360871874,
+    "end_ms": 1792175271874,
+    "pages": 6,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790221828828,
-    "requested_start_ms": 1790221828828,
+    "fetched_start_ms": 1790360871874,
+    "requested_start_ms": 1790360871874,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-10-15T03:51:29.005111+00:00",
-  "last_scored": "2026-10-15T03:51:29.005111+00:00",
+  "last_seen": "2026-10-16T18:29:07.401199+00:00",
+  "last_scored": "2026-10-16T18:29:07.401199+00:00",
   "best_score": 0.4601,
-  "latest_score": 0.3865,
+  "latest_score": 0.417,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -424,14 +447,14 @@
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
       "overlap": [],
       "target_only": [
         "BTC",
-        "FARTCOIN",
         "LIT",
         "MON",
         "xyz:MU"
@@ -450,22 +473,22 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3865,
+      "score_without_bonus": 0.417,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
       "status": "research",
       "promotable": false,
-      "similarity": 0.7968,
+      "similarity": 0.7963,
       "features": {
-        "relative_size_dispersion": 0.9838,
+        "relative_size_dispersion": 0.9814,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 0.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 7,
+      "independent_sessions": 6,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -730,9 +753,9 @@
       ]
     },
     "tooling": {
-      "requests": 11265.0,
-      "cum_volume_usd": 12912922.45,
-      "requests_per_1k_usd": 0.8724
+      "requests": 11754.0,
+      "cum_volume_usd": 13581516.27,
+      "requests_per_1k_usd": 0.8654
     }
   },
   "score_history": [
@@ -1092,9 +1115,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-16T18:29:07.401199+00:00",
+      "score": 0.417,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.4071,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.3104,
+        "trade_sequencing": 0.7221,
+        "position_sizing": 0.5,
+        "order_profile": 0.925,
+        "activity": 0.7688,
+        "direction_bias": 0.935,
+        "position_management": 0.9012,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4385,
+  "recent_avg_score": 0.4327,
   "last_investigated_ms": 1791981136896
 }
