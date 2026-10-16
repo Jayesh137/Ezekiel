@@ -1,9 +1,9 @@
 {
   "wallet": "0x16bf84af3f85f8c8a97597bf2be549dfe0dee637",
   "first_seen": "2026-09-13T07:07:09.166428+00:00",
-  "last_seen": "2026-10-14T17:02:55.308047+00:00",
+  "last_seen": "2026-10-16T04:29:44.462557+00:00",
   "best_score": 0.4494,
-  "latest_score": 0.4494,
+  "latest_score": 0.4128,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
@@ -17,13 +17,14 @@
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [],
+    "vetoes": [
+      "Incompatible hold style: 75% vs 0% of holds under 1h"
+    ],
     "asset_overlap": {
       "overlap": [
         "BTC"
       ],
       "target_only": [
-        "FARTCOIN",
         "LIT",
         "MON",
         "xyz:MU"
@@ -31,7 +32,7 @@
       "candidate_only": [],
       "overlap_count": 1,
       "rare_overlap": [],
-      "jaccard": 0.2
+      "jaccard": 0.25
     },
     "market_rarity": {
       "shared_markets": [],
@@ -40,7 +41,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4494,
+      "score_without_bonus": 0.4128,
       "explanations": [],
       "frequencies": {}
     },
@@ -49,13 +50,13 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8841,
+        "relative_size_dispersion": 0.8926,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 3,
+      "independent_sessions": 4,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -288,7 +289,35 @@
         "fill::BTC:1791126191833:968125874465029",
         "fill::BTC:1791126191833:987840529065997",
         "fill::BTC:1791126191833:994487026306337",
-        "fill::BTC:1791126191833:997274076212761"
+        "fill::BTC:1791126191833:997274076212761",
+        "fill::BTC:1792089604675:1000262278276992",
+        "fill::BTC:1792089604675:1003444250766082",
+        "fill::BTC:1792089604675:1012576201710513",
+        "fill::BTC:1792089604675:1014106487445488",
+        "fill::BTC:1792089604675:1026457605672124",
+        "fill::BTC:1792089604675:1032129729869039",
+        "fill::BTC:1792089604675:1034322644900554",
+        "fill::BTC:1792089604675:1042979181574476",
+        "fill::BTC:1792089604675:1049543738944313",
+        "fill::BTC:1792089604675:1054778576160739",
+        "fill::BTC:1792089604675:1066546537246304",
+        "fill::BTC:1792089604675:106798130761282",
+        "fill::BTC:1792089604675:1071601457417951",
+        "fill::BTC:1792089604675:109065439287886",
+        "fill::BTC:1792089604675:1095710236556727",
+        "fill::BTC:1792089604675:1097093554114670",
+        "fill::BTC:1792089604675:1098227591997422",
+        "fill::BTC:1792089604675:1111850197968299",
+        "fill::BTC:1792089604675:1125744608352097",
+        "fill::BTC:1792089604675:118711712667890",
+        "fill::BTC:1792089604675:121901798698268",
+        "fill::BTC:1792089604675:125957850427011",
+        "fill::BTC:1792089604675:13236036704590",
+        "fill::BTC:1792089604675:132927254131818",
+        "fill::BTC:1792089604675:13904127718396",
+        "fill::BTC:1792089604675:139272605299351",
+        "fill::BTC:1792089604675:146670646504093",
+        "fill::BTC:1792089604675:160767478294308"
       ]
     }
   },
@@ -904,18 +933,39 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-16T04:29:44.462557+00:00",
+      "score": 0.4128,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.25,
+        "timing_profile": null,
+        "leverage_profile": 0.4071,
+        "entry_exit_style": 0.979,
+        "hold_duration": null,
+        "account_size": 0.3579,
+        "trade_sequencing": 0.4705,
+        "position_sizing": 0.0782,
+        "order_profile": null,
+        "activity": 0.8725,
+        "direction_bias": 1.0,
+        "position_management": 0.9243,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3601,
+  "recent_avg_score": 0.3739,
   "last_investigated_ms": 1791614535224,
-  "last_checked": "2026-10-14T17:02:55.308047+00:00",
+  "last_checked": "2026-10-16T04:29:44.462557+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-10-14T17:02:55.308047+00:00",
-  "last_positive_evidence": "2026-10-14T17:02:52.086792+00:00",
+  "last_successful_read": "2026-10-16T04:29:44.462557+00:00",
+  "last_positive_evidence": "2026-10-16T04:29:39.249071+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1192,20 +1242,43 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-10-14T17:02:52.086792+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1790310577205,
+      "coverage": {
+        "start_ms": 1790310577205,
+        "end_ms": 1792124977205,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790310577205,
+        "requested_start_ms": 1790310577205,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1792124977205,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-10-16T04:29:39.249071+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790182969931,
-    "end_ms": 1791997369931,
+    "start_ms": 1790310577205,
+    "end_ms": 1792124977205,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790182969931,
-    "requested_start_ms": 1790182969931,
+    "fetched_start_ms": 1790310577205,
+    "requested_start_ms": 1790310577205,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-10-14T17:02:55.308047+00:00",
+  "last_scored": "2026-10-16T04:29:44.462557+00:00",
   "latest_scoring_schema": "2026-09-26.2"
 }
