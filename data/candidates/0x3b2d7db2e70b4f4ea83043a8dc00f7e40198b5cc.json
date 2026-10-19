@@ -1,13 +1,13 @@
 {
   "wallet": "0x3b2d7db2e70b4f4ea83043a8dc00f7e40198b5cc",
-  "last_checked": "2026-10-18T22:21:20.380718+00:00",
+  "last_checked": "2026-10-19T00:10:23.773672+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-06T07:32:31.765049+00:00",
   "discovery_sources": [
     "roster_lead"
   ],
-  "last_successful_read": "2026-10-18T22:21:20.380718+00:00",
-  "last_positive_evidence": "2026-10-18T22:21:05.544340+00:00",
+  "last_successful_read": "2026-10-19T00:10:23.773672+00:00",
+  "last_positive_evidence": "2026-10-19T00:10:09.040113+00:00",
   "observations": [
     {
       "status": "ok",
@@ -399,30 +399,54 @@
       "source": "roster_lead",
       "positive": true,
       "observed_at": "2026-10-18T22:21:05.544340+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1790554206918,
+      "coverage": {
+        "start_ms": 1790554206918,
+        "end_ms": 1792368606918,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1790554206918,
+        "requested_start_ms": 1790554206918,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1792368606918,
+      "source": "roster_lead",
+      "positive": true,
+      "observed_at": "2026-10-19T00:10:09.040113+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790547664596,
-    "end_ms": 1792362064596,
+    "start_ms": 1790554206918,
+    "end_ms": 1792368606918,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790547664596,
-    "requested_start_ms": 1790547664596,
+    "fetched_start_ms": 1790554206918,
+    "requested_start_ms": 1790554206918,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-10-18T22:21:20.380718+00:00",
-  "last_scored": "2026-10-18T22:21:20.380718+00:00",
+  "last_seen": "2026-10-19T00:10:23.773672+00:00",
+  "last_scored": "2026-10-19T00:10:23.773672+00:00",
   "best_score": 0.3467,
-  "latest_score": 0.2839,
+  "latest_score": 0.2876,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Similar market/limit execution style",
+      "Matching trade frequency and cadence",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
@@ -453,7 +477,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2839,
+      "score_without_bonus": 0.2876,
       "explanations": [],
       "frequencies": {}
     },
@@ -468,15 +492,12 @@
         "round_100_fraction": 1.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 2,
+      "independent_sessions": 1,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::XMR:1790550208972:211258550864125",
-        "fill::XMR:1790550208972:899955625592320",
-        "fill::XMR:1790550234559:559946193261654",
         "fill::XMR:1790590130942:326468506546013",
         "fill::XMR:1790590130942:417834436001687",
         "fill::XMR:1790590130942:50311954258515",
@@ -910,9 +931,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-19T00:10:23.773672+00:00",
+      "score": 0.2876,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.2714,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.0714,
+        "trade_sequencing": 0.3335,
+        "position_sizing": 0.1628,
+        "order_profile": 0.7089,
+        "activity": 0.7829,
+        "direction_bias": 0.0,
+        "position_management": 0.8382,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2896,
-  "last_investigated_ms": 1791682306262
+  "recent_avg_score": 0.2903,
+  "last_investigated_ms": 1792369084321
 }
