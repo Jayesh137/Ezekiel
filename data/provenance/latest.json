@@ -1,14 +1,14 @@
 {
-  "computed_at": "2026-10-20T08:53:14.745317+00:00",
-  "deposit_cursor": 516548862,
-  "blocks_read": 14716,
-  "deposits_read": 69,
+  "computed_at": "2026-10-20T09:37:46.681463+00:00",
+  "deposit_cursor": 516558721,
+  "blocks_read": 9859,
+  "deposits_read": 41,
   "read_error": null,
-  "queue": 1463,
-  "attempted": 4,
-  "deferred_accounts": 1459,
-  "elapsed_s": 185.3,
-  "resolved": 4,
+  "queue": 1462,
+  "attempted": 5,
+  "deferred_accounts": 1457,
+  "elapsed_s": 198.3,
+  "resolved": 5,
   "unreadable_accounts": [],
   "retrying": 3,
   "findings": [],
@@ -49,8 +49,36 @@
       ]
     }
   ],
-  "cctp_seen_ts": 1792479282,
+  "cctp_seen_ts": 1792485156,
   "recent": [
+    {
+      "account": "0x19251ef4717b94a68dea3e6f39b9fa4b10ed8069",
+      "verdict": "unrelated",
+      "reason": "circle deposit",
+      "routes": [
+        "circle"
+      ],
+      "usd": 1499999.6,
+      "hop1": [
+        {
+          "address": "0x564220f3f6f2d0ed28bf6a75f344fad7c6134a68",
+          "class": "unmeasured",
+          "role": null,
+          "family": null,
+          "usd": 1000000.0,
+          "chain": "arbitrum"
+        },
+        {
+          "address": "0x564220f3f6f2d0ed28bf6a75f344fad7c6134a68",
+          "class": "unmeasured",
+          "role": null,
+          "family": null,
+          "usd": 1500000.0,
+          "chain": "arbitrum"
+        }
+      ],
+      "resolved_at": 1792489066
+    },
     {
       "account": "0xa65e8ca77d2ccd61e1a57dddfd2ae2669b30a68c",
       "verdict": "unresolved",
@@ -96,7 +124,7 @@
           "chain": "hyperevm"
         }
       ],
-      "resolved_at": 1792486394
+      "resolved_at": 1792489066
     },
     {
       "account": "0xacee3f5bfdf6bfc8ac03f534059252b14204b330",
@@ -143,7 +171,7 @@
           "chain": "arbitrum"
         }
       ],
-      "resolved_at": 1792486394
+      "resolved_at": 1792489066
     },
     {
       "account": "0xb9b1dcc053e19bd411f93dd700cde2a5364262a0",
@@ -190,7 +218,27 @@
           "chain": "arbitrum"
         }
       ],
-      "resolved_at": 1792486394
+      "resolved_at": 1792489066
+    },
+    {
+      "account": "0xf26c30ceac72b95bd814d50a6fa456d321f95d2a",
+      "verdict": "exchange",
+      "reason": "circle deposit",
+      "routes": [
+        "circle"
+      ],
+      "usd": 1499999.8,
+      "hop1": [
+        {
+          "address": "0xf96d9b5ff9ddc67ffd58921398795b83a9e50001",
+          "class": "busy",
+          "role": null,
+          "family": null,
+          "usd": 1500000.0,
+          "chain": "arbitrum"
+        }
+      ],
+      "resolved_at": 1792489066
     },
     {
       "account": "0x98457d1034180910fceeadcf8173eb0c5be97d51",
@@ -1693,87 +1741,6 @@
       "routes": [],
       "usd": 0,
       "hop1": [],
-      "resolved_at": 1792398605
-    },
-    {
-      "account": "0x8802fdc33b133d36dbd70b774443bf40e89f0d93",
-      "verdict": "unrelated",
-      "reason": "circle deposit",
-      "routes": [
-        "circle",
-        "hl_send"
-      ],
-      "usd": 3473749.2,
-      "hop1": [
-        {
-          "address": "0xd4c7294dbb84a8bd5ee51d9fa33acf12300a1513",
-          "class": "unmeasured",
-          "role": null,
-          "family": null,
-          "usd": 2179999.01,
-          "chain": "arbitrum"
-        },
-        {
-          "address": "0xd4c7294dbb84a8bd5ee51d9fa33acf12300a1513",
-          "class": "unmeasured",
-          "role": null,
-          "family": null,
-          "usd": 772730.617418,
-          "chain": "hyperliquid"
-        },
-        {
-          "address": "0xd4c7294dbb84a8bd5ee51d9fa33acf12300a1513",
-          "class": "unmeasured",
-          "role": null,
-          "family": null,
-          "usd": 521019.77912,
-          "chain": "hyperliquid"
-        }
-      ],
-      "resolved_at": 1792398605
-    },
-    {
-      "account": "0xca4903c207a0df58bf37d4bc8bbc5210726f53c8",
-      "verdict": "exchange",
-      "reason": "bridge2 deposit",
-      "routes": [
-        "bridge2"
-      ],
-      "usd": 7300145.0,
-      "hop1": [
-        {
-          "address": "0xc333e80ef2dec2805f239e3f1e810612d294f771",
-          "class": "busy",
-          "role": null,
-          "family": null,
-          "usd": 8190721.799999997,
-          "chain": "arbitrum"
-        },
-        {
-          "address": "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",
-          "class": "service",
-          "role": null,
-          "family": null,
-          "usd": 4215736.0,
-          "chain": "arbitrum"
-        },
-        {
-          "address": "0xc333e9186999e4b6db05b6209eaa882789a7f771",
-          "class": "unmeasured",
-          "role": null,
-          "family": null,
-          "usd": 0.0,
-          "chain": "arbitrum"
-        },
-        {
-          "address": "0xc333e80ef2dec2805f239e3f1e810612d294f771",
-          "class": "busy",
-          "role": null,
-          "family": null,
-          "usd": 1300002.0,
-          "chain": "arbitrum"
-        }
-      ],
       "resolved_at": 1792398605
     }
   ],
