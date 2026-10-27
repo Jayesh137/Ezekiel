@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.chain.collect import read_records, substrate_files
+from src.chain.collect import substrate_files
 from src.chain.labels import SERVICE_CATEGORIES
 from src.utils import DATA_DIR, etherscan_get, load_config
 
@@ -272,15 +272,10 @@ def get_outbound_addresses(wallet: str, config: dict | None = None,
     scoring step.
     """
     from src.chain.collect import records_for
-    from src.chain.labels import load_registry, service_addresses
-
     config = config or load_config()
     wl = (wallet or "").lower()
 
-    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"),
-                                 categories=LINKAGE_EXCLUDED_CATEGORIES)
-    excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
-    excluded.add(config["hl_bridge_contract"].lower())
+    excluded = _outbound_exclusions(config)
     excluded.add(wl)
 
     # `records` lets a caller scoring many wallets read the substrate once and
@@ -302,6 +297,58 @@ def get_outbound_addresses(wallet: str, config: dict | None = None,
     # evidence the wallet was swept, only that it touched something that was.
     if wl not in swept_wallets(config):
         out |= _live_outbound_usdc(wl, excluded, limit)
+    return out
+
+
+def _outbound_exclusions(config: dict) -> set:
+    """What get_outbound_addresses never counts as a destination: labelled
+    infrastructure, configured services and the bridge."""
+    from src.chain.labels import load_registry, service_addresses
+
+    excluded = service_addresses(load_registry(DATA_DIR / "labels" / "entities.json"),
+                                 categories=LINKAGE_EXCLUDED_CATEGORIES)
+    excluded |= {a.lower() for a in config.get("known_service_addresses", [])}
+    bridge = (config.get("hl_bridge_contract") or "").lower()
+    if bridge:
+        excluded.add(bridge)
+    return excluded
+
+
+def outbound_destinations_by_wallet(wallets, excluded: set) -> dict[str, set]:
+    """`get_outbound_addresses`' substrate rule for many wallets in ONE walk,
+    keeping only each wallet's destination SET - never its records.
+
+    `records_by_wallet` over every swept wallet of the graph held most of the
+    substrate at once (a record touching two swept wallets sits in both
+    buckets): measured 2026-10-27 on the first trace run to finish in eight
+    days, the substrate-linkage phase peaked at 15,039 MB RSS against a
+    16 GB runner, with the whole walk before it at 5,589 MB. Only the
+    destinations were ever used, and those are O(wallets x destinations).
+    """
+    from src.chain.collect import TRANSFERS_DIR, _load_cached
+
+    wanted = {(w or "").lower() for w in wallets if w}
+    out: dict[str, set] = {w: set() for w in wanted}
+    root = Path(TRANSFERS_DIR)
+    if not wanted or not root.exists():
+        return out
+    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in substrate_files(chain_dir):
+            for rec in _load_cached(path):
+                if not isinstance(rec, dict) or rec.get("spam"):
+                    continue
+                src = (rec.get("src") or "").lower()
+                if src not in wanted:
+                    continue
+                usd = rec.get("amount_usd")
+                try:
+                    if usd is None or float(usd) <= 0:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                dst = (rec.get("dst") or "").lower()
+                if dst and dst != src and dst not in excluded:
+                    out[src].add(dst)
     return out
 
 
@@ -342,22 +389,30 @@ def high_fanin_addresses(threshold: int = 25) -> set:
 
     Counting distinct senders costs nothing: the substrate is already in memory.
     """
-    import collections
+    from src.chain.collect import _load_cached
 
-    senders: dict[str, set] = collections.defaultdict(set)
+    # Per destination, at most `threshold` distinct senders are remembered:
+    # the question is "at least this many", and a set that has reached it
+    # grows no further. Unbounded, the busiest destinations (exchange hot
+    # wallets with 10^5 senders) held sets the size of the substrate.
+    senders: dict[str, set] = {}
     root = DATA_DIR / "transfers"
     if not root.exists():
         return set()
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         for path in substrate_files(chain_dir):
-            rows = read_records(path)
-            for rec in rows if isinstance(rows, list) else []:
+            for rec in _load_cached(path):
                 if not isinstance(rec, dict) or rec.get("spam"):
                     continue
                 dst = (rec.get("dst") or "").lower()
                 src = (rec.get("src") or "").lower()
-                if dst and src:
-                    senders[dst].add(src)
+                if not dst or not src:
+                    continue
+                seen = senders.get(dst)
+                if seen is None:
+                    senders[dst] = {src}
+                elif len(seen) < threshold:
+                    seen.add(src)
     return {a for a, s in senders.items() if len(s) >= threshold}
 
 
@@ -501,26 +556,21 @@ def substrate_linkage(target: str, wallets, config: dict | None = None) -> dict:
               f"global-activity reading yet; they cannot count as shared "
               f"deposit addresses until measured")
 
-    # One walk of the substrate for every wallet scored, rather than one walk
-    # per wallet inside get_outbound_addresses. The loop below is unchanged in
-    # what it decides; only where the rows come from moved. See
-    # records_by_wallet for the measurement that forced it.
-    from src.chain.collect import records_by_wallet
+    # One walk of the substrate for every wallet scored, keeping each wallet's
+    # destination SET and nothing else - see outbound_destinations_by_wallet
+    # for the 15 GB that holding their records cost. Every scorable wallet is
+    # swept, so the live Etherscan union in get_outbound_addresses does not
+    # apply, exactly as before.
     scorable = sorted(
         ({(w or "").lower() for w in wallets} & swept) - {target, ""})
-    rows = records_by_wallet(scorable)
+    destinations = outbound_destinations_by_wallet(scorable, _outbound_exclusions(config))
 
     out: dict[str, dict] = {}
     for w in scorable:
         link = compute_linkage(
             w,
             funders.get(w),
-            # pop, not get: holding every wallet's rows at once pins records
-            # the LRU would otherwise evict, and the substrate is larger than
-            # the cache. Measured 2026-09-16 at 775 MB peak held against 740 MB
-            # still held at the end; draining as each wallet is scored lets the
-            # evicted ones be collected during the loop instead of after it.
-            get_outbound_addresses(w, config, records=rows.pop(w, [])),
+            destinations.pop(w, set()),
             target,
             target_funder,
             target_out,
