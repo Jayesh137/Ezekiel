@@ -2850,3 +2850,17 @@ duration tells them apart. A cache ceiling must count what the cache HOLDS,
 not what it read — a compressed file's size says nothing about its heap. And
 "the runner has received a shutdown signal" with no error line is memory: the
 phase line now carries peak RSS so the next one is read, not guessed.
+
+**Live after the merge (same day).** The keeper's first tick dispatched collect
+instead of analyze (loop broken); watch ran in 4.0 and 4.3 minutes (was failing
+past 8); heartbeat read "data is 23 min old"; trace **finished and committed at
+52 minutes**, its first completion since 2026-10-18: correlator 113s (had timed
+out at 240), graph 863s with 5,199,862 edges, lookups every ~20-25s instead of
+two or three a run. The phase lines paid for themselves at once: frontier
+expansion peaked at 5,589 MB, **substrate linkage at 15,039 MB** — one bad day
+from the runner's 16 GB. `records_by_wallet` over every swept wallet held most
+of the substrate as per-wallet record lists to extract each wallet's
+destinations. `linkage.outbound_destinations_by_wallet` now keeps only the
+destination SETS in one walk, `high_fanin_addresses` remembers at most
+`threshold` senders per destination, and the trace job ceiling is 75 (2,986s
+of steps measured against a 60 that cancels the commit).

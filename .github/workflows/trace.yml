@@ -154,8 +154,11 @@ jobs:
     # 2026-10-27: the last run that finished (2026-10-18) took 40 minutes at
     # 3.4M edges, the graph step's cap went 10 -> 20 and the correlator's
     # 4 -> 8, and a run that hits THIS ceiling is cancelled with its commit
-    # skipped - every reading lost - where a step cap loses one step.
-    timeout-minutes: 60
+    # skipped - every reading lost - where a step cap loses one step. 75 the
+    # same day: the first run after the fixes measured 2,986s (50 min) of
+    # steps - graph 863s, execution program 303s, engine 256s - and finished
+    # at 55, a margin too thin for a ceiling whose cost is the whole reading.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

@@ -119,3 +119,67 @@ def test_batching_does_not_change_the_evidence(monkeypatch, tmp_path):
     assert set(got) == set(six), "a wallet with real evidence went missing"
     for w in six:
         assert got[w]["shared_deposit_addresses"] == ["0xdeposit"]
+
+
+def test_linkage_holds_destination_sets_not_records(monkeypatch, tmp_path):
+    """2026-10-27: on the first trace run to finish in eight days the linkage
+    phase peaked at 15,039 MB RSS - `records_by_wallet` over every swept wallet
+    held most of the substrate at once. Only each wallet's destinations are
+    ever used, so the walk keeps those sets and never a record list."""
+    import src.chain.collect as collect
+
+    def never(*a, **k):
+        raise AssertionError("records_by_wallet holds every record; linkage must not call it")
+    monkeypatch.setattr(collect, "records_by_wallet", never)
+    six = [f"0x{i:040x}" for i in range(1, 7)]
+    reads, files, got = _count_substrate_reads(monkeypatch, tmp_path, six)
+    assert reads <= files
+    assert set(got) == set(six)
+    for w in six:
+        assert got[w]["shared_deposit_addresses"] == ["0xdeposit"]
+
+
+def test_outbound_destinations_by_wallet_follows_the_single_wallet_rule(monkeypatch, tmp_path):
+    import src.chain.collect as collect
+    import src.linkage as lk
+
+    a, b, c = "0x" + "a" * 40, "0x" + "b" * 40, "0x" + "c" * 40
+    root = tmp_path / "transfers" / "arbitrum"
+    root.mkdir(parents=True)
+    rows = [
+        {"id": "1", "src": a, "dst": "0xdep1", "amount_usd": "5.0"},
+        {"id": "2", "src": a, "dst": "0xrouter", "amount_usd": "5.0"},      # excluded
+        {"id": "3", "src": a, "dst": "0xdep2", "amount_usd": "0"},          # worthless
+        {"id": "4", "src": a, "dst": "0xdep3", "amount_usd": None},         # unpriced
+        {"id": "5", "src": a, "dst": "0xspam", "amount_usd": "9", "spam": True},
+        {"id": "6", "src": b, "dst": a, "amount_usd": "7"},                 # inbound to a
+        {"id": "7", "src": c, "dst": "0xdep9", "amount_usd": "7"},          # not asked for
+    ]
+    (root / "2026-10-01.json").write_text(json.dumps(rows))
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path / "transfers")
+    collect.clear_record_cache()
+    got = lk.outbound_destinations_by_wallet([a, b, "0x" + "d" * 40], {"0xrouter"})
+    assert got == {a: {"0xdep1"}, b: {a}, "0x" + "d" * 40: set()}
+    # And it agrees with the one-wallet reader on the same substrate.
+    rule = lk.get_outbound_addresses
+    monkeypatch.setattr(lk, "swept_wallets", lambda cfg: {a, b})
+    config = {"known_service_addresses": ["0xrouter"], "hl_bridge_contract": "0xbridge"}
+    monkeypatch.setattr("src.chain.labels.load_registry", lambda path: {})
+    monkeypatch.setattr("src.chain.labels.service_addresses", lambda r, categories=None: set())
+    assert rule(a, config, records=collect.records_for(a)) == got[a]
+    assert rule(b, config, records=collect.records_for(b)) == got[b]
+
+
+def test_high_fanin_remembers_at_most_threshold_senders(monkeypatch, tmp_path):
+    import src.chain.collect as collect
+    import src.linkage as lk
+
+    root = tmp_path / "transfers" / "arbitrum"
+    root.mkdir(parents=True)
+    rows = [{"id": f"h{i}", "src": f"0x{i:040x}", "dst": "0xhot", "amount_usd": "1"} for i in range(1, 31)]
+    rows += [{"id": f"q{i}", "src": f"0x{i:040x}", "dst": "0xquiet", "amount_usd": "1"} for i in range(1, 4)]
+    (root / "2026-10-01.json").write_text(json.dumps(rows))
+    monkeypatch.setattr(lk, "DATA_DIR", tmp_path)
+    collect.clear_record_cache()
+    assert lk.high_fanin_addresses(threshold=25) == {"0xhot"}
+    assert lk.high_fanin_addresses(threshold=3) == {"0xhot", "0xquiet"}

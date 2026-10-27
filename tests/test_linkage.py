@@ -55,8 +55,8 @@ def test_substrate_linkage_skips_wallets_that_were_never_swept(monkeypatch):
                         lambda wallets, **kw: {})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": None, "out_addrs": {"0xdeposit"}})
-    monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300, records=None: {"0xdeposit"})
+    monkeypatch.setattr(lk, "outbound_destinations_by_wallet",
+                        lambda wallets, excluded: {w: {"0xdeposit"} for w in wallets})
     # Measured quiet on the whole chain; an unmeasured destination is excluded
     # (see test_service_verification), which is not what this test is about.
     monkeypatch.setattr(lk, "activity_exclusions", lambda addrs, chains, cache: (set(), []))
@@ -81,8 +81,8 @@ def test_substrate_linkage_omits_wallets_with_no_evidence(monkeypatch):
                         lambda wallets, **kw: {})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": None, "out_addrs": {"0xaaa"}})
-    monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300, records=None: {"0xbbb"})
+    monkeypatch.setattr(lk, "outbound_destinations_by_wallet",
+                        lambda wallets, excluded: {w: {"0xbbb"} for w in wallets})
 
     assert lk.substrate_linkage("0xtarget", ["0xswept"],
                                 config={"excluded_addresses": [],
@@ -105,8 +105,8 @@ def test_substrate_linkage_never_claims_a_shared_funder(monkeypatch):
                         lambda wallets, **kw: {})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": "0xfunder", "out_addrs": {"0xdep"}})
-    monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300, records=None: {"0xdep"})
+    monkeypatch.setattr(lk, "outbound_destinations_by_wallet",
+                        lambda wallets, excluded: {w: {"0xdep"} for w in wallets})
     monkeypatch.setattr(lk, "activity_exclusions", lambda addrs, chains, cache: (set(), []))
 
     got = lk.substrate_linkage("0xtarget", ["0xswept"],
@@ -122,8 +122,8 @@ def test_substrate_linkage_excludes_the_target_itself(monkeypatch):
     monkeypatch.setattr(lk, "swept_wallets", lambda cfg: {"0xtarget"})
     monkeypatch.setattr(lk, "target_l1_profile",
                         lambda t: {"first_funder": None, "out_addrs": {"0xdep"}})
-    monkeypatch.setattr(lk, "get_outbound_addresses",
-                        lambda w, cfg=None, limit=300, records=None: {"0xdep"})
+    monkeypatch.setattr(lk, "outbound_destinations_by_wallet",
+                        lambda wallets, excluded: {w: {"0xdep"} for w in wallets})
 
     assert lk.substrate_linkage("0xtarget", ["0xtarget"],
                                 config={"excluded_addresses": [],
