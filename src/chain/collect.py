@@ -128,7 +128,15 @@ _FILE_CACHE: dict[str, tuple[int, int, list]] = {}
 # Ceiling on retained source bytes, evicting least-recently-used. Without it the
 # cache grows with data/transfers/ without bound; data/ is already ~142MB and
 # only compaction holds it down.
-_FILE_CACHE_MAX_BYTES = 256 * 1024 * 1024
+# The ceiling is on what the cache HOLDS IN MEMORY, charged per record, never
+# on file bytes. Until 2026-10-27 it counted `st_size`: a sealed day is gzipped
+# (measured 8.5x) and its records parse at 3.7x their text (2,074 B each on
+# the largest Arbitrum shard), so 268 MB of files was ~8 GB of heap. The first
+# `records_for` of every trace run from 2026-10-19 filled it on top of 5.2M
+# graph edges and the runner died ("received a shutdown signal") - at the
+# first frontier lookup, or in substrate linkage, whichever read first.
+_PARSED_BYTES_PER_RECORD = 2_100
+_FILE_CACHE_MAX_BYTES = 768 * 1024 * 1024
 
 
 # A sealed day is stored gzipped: `<date>.jsonl.gz` beside the `<date>.json`
@@ -341,15 +349,16 @@ def _load_cached(path: Path) -> list:
     records = read_records(path)
     if not records:
         return []
-    _FILE_CACHE[key] = (stat.st_mtime_ns, stat.st_size, records)
+    cost = max(stat.st_size, len(records) * _PARSED_BYTES_PER_RECORD)
+    _FILE_CACHE[key] = (stat.st_mtime_ns, stat.st_size, records, cost)
     # dict preserves insertion order and a hit re-inserts, so the first key is
     # the least recently used. Never evict the entry just added, even if it
     # alone exceeds the ceiling — returning it having dropped it would make the
     # next call re-parse the same file forever.
-    total = sum(entry[1] for entry in _FILE_CACHE.values())
+    total = sum(entry[3] for entry in _FILE_CACHE.values())
     while total > _FILE_CACHE_MAX_BYTES and len(_FILE_CACHE) > 1:
         oldest = next(iter(_FILE_CACHE))
-        total -= _FILE_CACHE.pop(oldest)[1]
+        total -= _FILE_CACHE.pop(oldest)[3]
     return records
 
 
@@ -358,8 +367,12 @@ def clear_record_cache() -> None:
     _FILE_CACHE.clear()
 
 
-def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
+def records_for(wallet: str, *, include_spam: bool = False,
+                paths: "list[Path] | None" = None) -> list[dict]:
     """Every stored record touching `wallet`, across every collected chain.
+
+    `paths` restricts the read to those stored files (a frontier lookup wants
+    only the files the sweep it just made wrote to); None means every file.
 
     The single reader. The graph frontier, the tracer and linkage all need
     exactly this, and defining it three times would guarantee three different
@@ -383,29 +396,31 @@ def records_for(wallet: str, *, include_spam: bool = False) -> list[dict]:
     """
     wl = (wallet or "").lower()
     root = Path(TRANSFERS_DIR)
-    if not root.exists():
-        return []
+    if paths is None:
+        if not root.exists():
+            return []
+        paths = [path for chain_dir in sorted(p for p in root.iterdir() if p.is_dir())
+                 for path in substrate_files(chain_dir)]
     out = []
     seen: set[str] = set()
-    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        for path in substrate_files(chain_dir):
-            for rec in _load_cached(path):
-                if not isinstance(rec, dict):
+    for path in paths:
+        for rec in _load_cached(Path(path)):
+            if not isinstance(rec, dict):
+                continue
+            if rec.get("spam") and not include_spam:
+                continue
+            if wl not in ((rec.get("src") or "").lower(),
+                          (rec.get("dst") or "").lower()):
+                continue
+            rid = rec.get("id")
+            if rid:
+                if rid in seen:
                     continue
-                if rec.get("spam") and not include_spam:
-                    continue
-                if wl not in ((rec.get("src") or "").lower(),
-                              (rec.get("dst") or "").lower()):
-                    continue
-                rid = rec.get("id")
-                if rid:
-                    if rid in seen:
-                        continue
-                    seen.add(rid)
-                # A record with no id cannot be judged a duplicate of anything,
-                # so it is kept: dropping it would silently lose real history to
-                # a missing field.
-                out.append(rec)
+                seen.add(rid)
+            # A record with no id cannot be judged a duplicate of anything,
+            # so it is kept: dropping it would silently lose real history to
+            # a missing field.
+            out.append(rec)
     return out
 
 

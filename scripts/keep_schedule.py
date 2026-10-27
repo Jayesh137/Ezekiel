@@ -184,8 +184,27 @@ def _session(token: str) -> requests.Session:
 # (cancelled) at 03:04, and as the newest run it told the keeper analyze had
 # run - so nothing would have re-dispatched it for 24 hours.
 NO_WORK_CONCLUSIONS = {"cancelled", "skipped"}
+# A cancelled run that RAN for this long did work and was stopped by its own
+# job ceiling, not evicted from its group. Measured 2026-10-27: analyze outgrew
+# its 30-minute ceiling, every run was cancelled at the ceiling after 30 minutes
+# of work, and "cancelled = never ran" re-dispatched it the moment data-commit
+# was free - 20 times a day - while collect, trace and scan starved behind it
+# (collect's data went 811 minutes stale). An eviction is cancelled within
+# seconds of being queued; a timed-out attempt restarts the interval exactly as
+# a failed one does.
+EVICTION_SECONDS = 180
 LOOKBACK = 10
 _no_work_cache: dict[int, bool] = {}
+
+
+def _ran_seconds(row: dict) -> float | None:
+    """How long a run was on a runner, None when the API did not say."""
+    try:
+        started = datetime.fromisoformat(str(row["run_started_at"]).replace("Z", "+00:00"))
+        ended = datetime.fromisoformat(str(row["updated_at"]).replace("Z", "+00:00"))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (ended - started).total_seconds()
 
 
 def did_no_work(s: requests.Session, repo: str, row: dict) -> bool:
@@ -195,11 +214,16 @@ def did_no_work(s: requests.Session, repo: str, row: dict) -> bool:
     run's own conclusion cannot tell; its jobs can. Only completed `schedule`
     runs are asked, once each. Unreadable counts as work done - the cautious
     side, since it can only delay a dispatch by one interval, never double one.
+
+    A cancelled run is an eviction only if it barely ran (EVICTION_SECONDS);
+    one cancelled after minutes of work hit its job ceiling and counts as an
+    attempt, or the keeper re-dispatches it for ever.
     """
     if row.get("status") != "completed":
         return False
     if row.get("conclusion") in NO_WORK_CONCLUSIONS:
-        return True
+        ran = _ran_seconds(row)
+        return ran is None or ran < EVICTION_SECONDS
     if row.get("event") != "schedule":
         return False
     run_id = row.get("id")

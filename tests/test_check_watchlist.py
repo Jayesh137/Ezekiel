@@ -70,6 +70,7 @@ def _stub(monkeypatch, *, extra_agents, frontend_agent=None, signers=None,
     monkeypatch.setattr(check, "account_activity", lambda addr: {"nonce": 0,
                                                                  "errors": []})
     monkeypatch.setattr(check, "records_for", lambda addr: [])
+    monkeypatch.setattr(check, "records_by_wallet", lambda ws: {w: [] for w in ws})
     return asked
 
 
@@ -281,7 +282,7 @@ def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
         calls.append(config)
         return 24_105_539.0
 
-    def fake_read_wallet(address, config, target_value=None):
+    def fake_read_wallet(address, config, target_value=None, **kw):
         given.append((address, target_value))
         return check.snapshot(address, account_value=1.0,
                               target_value=target_value), []
@@ -296,6 +297,7 @@ def test_the_target_is_priced_once_a_run_not_once_a_wallet(monkeypatch):
     monkeypatch.setattr(check, "_previous", lambda: {})
     monkeypatch.setattr(check, "_previous_doc", lambda: {})
     monkeypatch.setattr(check, "records_for", lambda addr: [])
+    monkeypatch.setattr(check, "records_by_wallet", lambda ws: {w: [] for w in ws})
     monkeypatch.setattr(check, "busy_flags", lambda hits: {})
     monkeypatch.setattr(check, "save", lambda report: None)
 
@@ -390,6 +392,7 @@ def _silent_loop(monkeypatch, tmp_path, entries, counterparties):
     # report and walked the real substrate.
     monkeypatch.setattr(check, "WATCHLIST_DIR", tmp_path / "watchlist")
     monkeypatch.setattr(check, "records_for", lambda addr: [])
+    monkeypatch.setattr(check, "records_by_wallet", lambda ws: {w: [] for w in ws})
     monkeypatch.setattr(check, "load_config", lambda: {"target_wallet": T})
     monkeypatch.setattr(check, "_roster", lambda: {})
     monkeypatch.setattr(check, "watched", lambda cfg, roster=None: entries)
@@ -402,7 +405,7 @@ def _silent_loop(monkeypatch, tmp_path, entries, counterparties):
     monkeypatch.setattr(check, "target_account_value", lambda c: 1.0)
     monkeypatch.setattr(check, "busy_flags", lambda hits: {})
     monkeypatch.setattr(check, "read_wallet",
-                        lambda a, c, target_value=None: (
+                        lambda a, c, target_value=None, **kw: (
                             wl.snapshot(a, account_value=1.0), counterparties))
     fired = []
     monkeypatch.setattr(check, "alert_watchlist_contact",
@@ -459,3 +462,28 @@ def test_the_watch_learns_a_plan_refusal_once_not_once_per_wallet(monkeypatch, t
     check.sweep("0x" + "a" * 40, {"target_wallet": T}, plan_refused=shared)
     check.sweep("0x" + "b" * 40, {"target_wallet": T}, plan_refused=shared)
     assert seen == [shared, shared], "both wallets share one refusal record"
+
+
+def test_main_walks_the_substrate_once_for_every_wallet(monkeypatch, tmp_path):
+    """2026-10-27: eight `records_for` calls per run each re-parsed a substrate
+    that had outgrown its file cache, and the step overran its cap after the
+    last wallet had printed. The sweeps run first, then ONE walk serves every
+    wallet read, every payee check and the seen-payee seed."""
+    walks, singles = [], []
+    A, B = "0x" + "a" * 40, "0x" + "b" * 40
+    monkeypatch.setattr(check, "WATCHLIST_DIR", tmp_path)
+    monkeypatch.setattr(check, "load_config", lambda: {
+        "target_wallet": T, "known_self_wallets": [A], "watch_wallets": [{"address": B, "why": "x"}],
+        "hip3_dexes": []})
+    monkeypatch.setattr(check, "_roster", lambda: {})
+    monkeypatch.setattr(check, "target_world", lambda c: {})
+    monkeypatch.setattr(check, "target_account_value", lambda c: 1.0)
+    monkeypatch.setattr(check, "sweep", lambda a, c, **kw: None)
+    monkeypatch.setattr(check, "records_by_wallet", lambda ws: walks.append(set(ws)) or {w: [] for w in ws})
+    monkeypatch.setattr(check, "records_for", lambda a: singles.append(a) or [])
+    monkeypatch.setattr(check, "read_wallet", lambda a, c, target_value=None, records=None:
+                        (check.snapshot(a, account_value=1.0), []))
+    monkeypatch.setattr(check, "notify_positions", lambda books, config: None)
+    monkeypatch.setattr(check, "save", lambda report: None)
+    assert check.main() == 0
+    assert walks == [{T, A, B}] and singles == []

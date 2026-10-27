@@ -105,7 +105,7 @@ def _main(monkeypatch, doc, records):
         "target_wallet": T, "known_self_wallets": [HIS], "watch_wallets": [HIS]})
     monkeypatch.setattr(check, "_roster", lambda: {})
     monkeypatch.setattr(check, "target_account_value", lambda cfg: 1.0)
-    monkeypatch.setattr(check, "read_wallet", lambda address, config, target_value=None:
+    monkeypatch.setattr(check, "read_wallet", lambda address, config, target_value=None, **kw:
                         (check.snapshot(address, account_value=1.0), []))
     monkeypatch.setattr(check, "sweep", lambda addr, cfg, **kw: None)
     monkeypatch.setattr(check, "target_world", lambda cfg: {})
@@ -113,6 +113,8 @@ def _main(monkeypatch, doc, records):
     monkeypatch.setattr(check, "_previous_doc", lambda: doc)
     monkeypatch.setattr(check, "busy_flags", lambda hits: {})
     monkeypatch.setattr(check, "records_for", lambda addr: records.get(addr, []))
+    monkeypatch.setattr(check, "records_by_wallet",
+                        lambda wallets: {w: records.get(w, []) for w in wallets})
     monkeypatch.setattr(check, "save", lambda report: saved.append(report))
     return saved
 
@@ -128,7 +130,7 @@ def test_the_first_run_seeds_history_and_alerts_nothing(monkeypatch):
 
 
 def test_a_later_run_checks_settled_wallets_and_keeps_held_payees_unseen(monkeypatch):
-    monkeypatch.setattr(check, "check_new_payees", lambda address, seen, cluster, readings: {FRESH})
+    monkeypatch.setattr(check, "check_new_payees", lambda address, seen, cluster, readings, **kw: {FRESH})
     saved = _main(monkeypatch, {"l1_seen": [OLD]}, {HIS: [rec(OLD), rec(FRESH)]})
     assert check.main() == 0
     assert FRESH not in saved[0]["l1_seen"], "a held payee was marked seen and would never be retried"

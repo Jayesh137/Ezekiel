@@ -194,10 +194,16 @@ class _Session:
         return _Resp({"workflow_runs": self.rows})
 
 
-def _row(run_id, minutes_ago, conclusion="success", event="workflow_dispatch", status="completed"):
+def _row(run_id, minutes_ago, conclusion="success", event="workflow_dispatch", status="completed",
+         ran_minutes=None):
     stamp = (NOW - timedelta(minutes=minutes_ago)).isoformat().replace("+00:00", "Z")
-    return {"id": run_id, "status": status, "conclusion": conclusion, "event": event,
-            "created_at": stamp}
+    row = {"id": run_id, "status": status, "conclusion": conclusion, "event": event,
+           "created_at": stamp}
+    if ran_minutes is not None:
+        row["run_started_at"] = stamp
+        row["updated_at"] = (NOW - timedelta(minutes=minutes_ago - ran_minutes)
+                             ).isoformat().replace("+00:00", "Z")
+    return row
 
 
 def test_an_evicted_run_does_not_restart_the_interval():
@@ -205,6 +211,20 @@ def test_an_evicted_run_does_not_restart_the_interval():
     s = _Session([_row(2, 60, "cancelled"), _row(1, 1500)])
     newest = ks.newest_run(s, "o/r", "analyze.yml")
     assert newest["created_at"] == NOW - timedelta(minutes=1500)
+
+
+def test_a_short_cancelled_run_is_an_eviction():
+    s = _Session([_row(2, 60, "cancelled", ran_minutes=1), _row(1, 1500)])
+    assert ks.newest_run(s, "o/r", "analyze.yml")["created_at"] == NOW - timedelta(minutes=1500)
+
+
+def test_a_run_cancelled_after_doing_work_counts_as_an_attempt():
+    # 2026-10-27: analyze outgrew its 30-minute job ceiling, every run was
+    # CANCELLED at the ceiling after 30 minutes of work, and a cancelled run
+    # read as "never ran" - so the keeper re-dispatched it the moment the
+    # group was free, 20 times a day, and collect/trace/scan starved behind it.
+    s = _Session([_row(2, 60, "cancelled", ran_minutes=30), _row(1, 1500)])
+    assert ks.newest_run(s, "o/r", "analyze.yml")["created_at"] == NOW - timedelta(minutes=60)
 
 
 def test_a_gated_off_cron_run_does_not_restart_the_interval():

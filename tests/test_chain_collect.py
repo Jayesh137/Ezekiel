@@ -1123,3 +1123,41 @@ def test_a_transient_error_on_one_kind_still_tries_the_others(tmp_path, monkeypa
     result = collect.sweep_wallet("0xone", [ARB], budget(), cluster=True)
     assert kinds == list(collect.KINDS)
     assert "arbitrum" in result["degraded_sources"]
+
+
+def test_the_cache_is_bounded_by_what_it_holds_in_memory_not_by_file_bytes(tmp_path, monkeypatch):
+    """2026-10-27: the ceiling counted FILE bytes while holding PARSED objects.
+    A sealed day is gzipped (8.5x) and parses at 3.7x its text, so 268 MB of
+    files was ~8 GB of heap: the first `records_for` of every trace run filled
+    it and the runner died ("received a shutdown signal") - at the first
+    frontier lookup or in substrate linkage, whichever read the substrate
+    first - on every run from 2026-10-19."""
+    import gzip
+
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    monkeypatch.setattr(collect, "_FILE_CACHE_MAX_BYTES", 15 * collect._PARSED_BYTES_PER_RECORD)
+    d = tmp_path / "arbitrum"
+    d.mkdir()
+    for day in ("2026-06-10", "2026-06-11"):
+        with gzip.open(d / f"{day}.jsonl.gz", "wt", encoding="utf-8") as gz:
+            for i in range(10):
+                gz.write(json.dumps(_rec("0xa", f"{day}-{i}")) + "\n")
+    collect.clear_record_cache()
+    assert len(collect.records_for("0xa")) == 20
+    # Each file is a few hundred bytes on disk but ten records in memory; two
+    # of them exceed a fifteen-record ceiling, so only the newest stays.
+    assert len(collect._FILE_CACHE) == 1
+    assert sum(entry[3] for entry in collect._FILE_CACHE.values()) == 10 * collect._PARSED_BYTES_PER_RECORD
+
+
+def test_records_for_can_be_restricted_to_named_files(tmp_path, monkeypatch):
+    """A frontier lookup only needs the records the sweep it just made wrote
+    (today's files); the rest of the substrate is already in the graph's edges."""
+    monkeypatch.setattr(collect, "TRANSFERS_DIR", tmp_path)
+    old = _write_records(tmp_path, "2026-06-10", [_rec("0xa", "old")])
+    new = _write_records(tmp_path, "2026-06-11", [_rec("0xa", "new")])
+    collect.clear_record_cache()
+    assert {r["id"] for r in collect.records_for("0xa")} == {"old", "new"}
+    assert [r["id"] for r in collect.records_for("0xa", paths=[new])] == ["new"]
+    assert collect.records_for("0xa", paths=[]) == []
+    assert [r["id"] for r in collect.records_for("0xa", paths=[old])] == ["old"]

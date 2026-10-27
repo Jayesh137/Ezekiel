@@ -150,8 +150,12 @@ jobs:
     # could not reach; src/chain/collect.py flushes cursors per chain, so the
     # next dispatch of this same workflow resumes rather than restarts.
     # 45 since 2026-10-06: the perimeter (<= 5) and provenance (<= 6) steps
-    # joined; healthy runs measured 21-25 minutes before them.
-    timeout-minutes: 45
+    # joined; healthy runs measured 21-25 minutes before them. 60 since
+    # 2026-10-27: the last run that finished (2026-10-18) took 40 minutes at
+    # 3.4M edges, the graph step's cap went 10 -> 20 and the correlator's
+    # 4 -> 8, and a run that hits THIS ceiling is cancelled with its commit
+    # skipped - every reading lost - where a step cap loses one step.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -320,7 +324,11 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
-        timeout-minutes: 4          # Circle pool 120s budget; the bridge pool is a file read
+        # Circle pool 120s budget; the bridge pool is a file read. Observed
+        # 253s+ (timed out at 4) on every run from 2026-10-25: the cluster's
+        # substrate rows were read per wallet, each a whole re-parse. One walk
+        # now, and the cap set at ~3x the Circle budget rather than at the hope.
+        timeout-minutes: 8
         run: python src/correlator.py --pools bridge cctp --no-etherscan
       # Rebuild the transfer graph from everything the tracer/correlator just
       # collected. Runs here because it shares the same Etherscan budget.
@@ -354,7 +362,13 @@ jobs:
         # bound that matters is the ORDER — lookup slice < walk budget < this —
         # and `test_the_slice_is_smaller_than_the_walk_and_the_walk_fits_the_step`
         # pins it, because the three numbers live in three different files.
-        timeout-minutes: 10
+        #
+        # 20 since 2026-10-27: at 5.2M edges (3.4M on 2026-10-18, the last run
+        # that finished its graph in ~9.5 minutes) the load, linkage and build
+        # phases alone need ~14. The cause of the runner deaths was the
+        # substrate cache charging file bytes for parsed objects (~8 GB), fixed
+        # in src/chain/collect._load_cached; the cap follows the measurement.
+        timeout-minutes: 20
         run: python src/transfer_graph.py
       # Last, because it only merges what the detectors above just wrote. Pure
       # file reads, no network, no budget.

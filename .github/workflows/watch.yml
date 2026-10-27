@@ -87,8 +87,10 @@ jobs:
     # CANCELLED and the commit step never persists what the others read.
     # Raised again to 25 for the Circle-flow step (8 + 3 + 5 + 4 + 2 = 22), and
     # the boundary-attribution step keeps it inside 30 (8 + 3 + 5 + 4 + 4 + 2 + 2 = 28),
-    # and the digest step (2) lifts it to 32.
-    timeout-minutes: 32
+    # and the digest step (2) lifts it to 32. The watchlist step's cap went
+    # 8 -> 15 on 2026-10-27 (three wallets at ~7s per Hyperliquid call on the
+    # runner overran 8 on most runs), which lifts this to 39.
+    timeout-minutes: 39
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -116,8 +118,12 @@ jobs:
         # Bounded so one hung endpoint cannot cost the whole run: a STEP
         # timeout fails only the step, leaving `if: always()` on the commit to
         # persist what was read, where a JOB timeout cancels and commits
-        # nothing. Observed 60-73s for one wallet.
-        timeout-minutes: 8
+        # nothing. Observed 60-73s for one wallet in September; 90-110s a
+        # wallet plus a 90s target read by 2026-10-27, when three wallets and
+        # eight whole-substrate reads overran 8 minutes on most runs. The
+        # reads are now made side by side and the substrate walked once, but
+        # the cap is set from the measurement, not the hope.
+        timeout-minutes: 15
         run: python scripts/check_watchlist.py
       # The tripwire that cannot be reconstructed after the fact: HyperEVM
       # history is unsweepable, so a nonce that moves has to be caught live.

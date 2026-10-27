@@ -110,7 +110,7 @@ trading style. Never promote a wallet on one vector alone.
 | Solana | `solana_watch.py`, `scripts/check_solana.py` | The CCTP recipient of $22.75M of his, watched by signature |
 | Co-movement | `comovement.py`, `scripts/check_comovement.py` | Who moves first. A copier follows; a second hand leads or ties. Evidence, and the one behavioural reading a copy-trader cannot fake |
 | Global activity | `chain/activity.py` | Whole-chain transaction counts from Blockscout decide what is infrastructure; fan degree inside the substrate cannot overrule a quiet EOA |
-| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets` **plus every roster CONFIRMED/PROBABLE wallet** (capped at `MAX_WATCHED` = 6), read every run — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts **only for a wallet still in question** — a settled one records it without buzzing; a CHANGE is reported once, on the transition |
+| Close watch | `watchlist.py`, `scripts/check_watchlist.py`, `.github/workflows/watch.yml` | `config.watch_wallets` **plus every roster CONFIRMED/PROBABLE wallet** (capped at `MAX_WATCHED` = 6), read every run (independent reads of a wallet side by side, `HL_PARALLEL`; the substrate walked once for every wallet) — value, agents, sub-accounts, withdrawal destinations, HyperEVM nonce, its size **relative to the target's own account**, and a bounded L1 sweep. A CONTACT with his world alerts **only for a wallet still in question** — a settled one records it without buzzing; a CHANGE is reported once, on the transition |
 | Deposit-address sentinels | `deposit_sentinels.py`, `scripts/check_deposit_sentinels.py` (watch.yml) | His private exchange deposit addresses read from **their own** side: conduit/inferred deposit addresses the config cluster paid ≥$1K, measured quiet (rule 9), sticky in their own file. A new outside sender measured quiet alerts **CRITICAL** (unmeasured HIGH, busy recorded); first sight of a sentinel is a baseline. Quiet senders carry `linkage` in the roster from this file. Live at build: sentinels `0x8570c2ae…` and `0x499662e0…`; outside senders `0xda0932d2…` (2024) and `0xf078969e…` |
 | New payee of his | `watchlist.outbound_payments`/`novel_payments`, `check_watchlist.check_new_payees` | A settled watched wallet (CONFIRMED or config) paying an address **no cluster wallet has ever transacted with**: native value at any amount (gas funds a fresh wallet), tokens ≥$100, never spam. Contract/busy is seen silently, unmeasured is held for the next run, a quiet EOA alerts HIGH — CRITICAL if Hyperliquid already shows the address in use. The target's own L1 is the tracer's; this covers the treasury and `0xf078969e…`, which had nothing. Seeded from history (615 addresses) so nothing old is announced |
 | Circle flows, both ends | `circle_flows.py`, `scripts/check_circle_flows.py` (watch.yml) | Circle's MessageTransmitterV2 events on HyperEVM name BOTH ends of every Circle transfer into and out of Hyperliquid: `MessageReceived` carries the source domain, the source `messageSender` (EVM or Solana bytes32) and the credited account in `cctp-forward` hook data; `MessageSent` carries the withdrawing account, destination domain and recipient. Chain-agnostic and it cannot roll out of an explorer window. CRITICAL when a wallet of his funds an account outside the cluster, when an outside account pays one of his addresses (incl. private deposit addresses and his Solana wallet), or when his account withdraws to an outside address; such accounts carry `transfer` in the roster. Etherscan V2 (chainid 999) in CI, the public RPC (≈1 getLogs/min) as fallback; a cursor that never skips an unread range. First sample: 56 deposits in 1,000 blocks, from Arbitrum, Solana, Polygon, Base, Ethereum and Monad |
@@ -209,10 +209,22 @@ standing state and the rule each incident taught.
   with `python scripts/casebook.py rule`. On 2026-10-14 the queue held
   `0x793a3e8a…`, `0xda0932d2…`, `0x160f6ef9…`, `0x41ba52ee…` and the
   `0xdd53c529…` watch question.
-- **Open:** `_load_cached`'s 256 MiB ceiling counts file bytes while holding
-  parsed objects (~1.5x); recovering unpriced records lost across the frontier
-  is an API-budget decision for the operator (target re-sweeps, never
-  wholesale); `data/transfers/` still grows daily.
+- **Every scheduled workflow was failing on 2026-10-27, and trace had not
+  finished since 2026-10-18** (eight days of no roster/casebook/accounting).
+  Four causes, each measured and replayed: the keeper re-dispatching a
+  job-ceiling-cancelled analyze run every 30 min (holding `data-commit`,
+  starving collect/trace/scan); the graph step killing the runner on memory
+  (substrate cache charging file bytes for parsed objects: 268 MB of gzipped
+  files ≈ 8 GB of heap, on top of 5.2M edges); the scan checkpoint over its
+  artifact budget on 88,678 never-folded agent snapshots; the watch's 8-minute
+  cap against ~7s per Hyperliquid call on the runner. `docs/incident-log.md`
+  2026-10-27 has the numbers.
+- **Open:** recovering unpriced records lost across the frontier is an
+  API-budget decision for the operator (target re-sweeps, never wholesale);
+  `data/transfers/` grows 20-60 MB a day from the walk and the graph holds
+  every record as an edge (5.2M on 2026-10-26, ~4 GB interned) — the next
+  memory step is an edge representation smaller than a dict, or a load that
+  skips records between two services.
 
 ## Design rules each incident taught
 
@@ -316,6 +328,23 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   before pushing.
 - **A number measured under one access pattern does not size another**, and
   check a commit landed with `merge-base --is-ancestor`, not a log window.
+- **A cache ceiling counts what the cache HOLDS, never what it read.**
+  `_load_cached` charged `st_size` for a gzipped day (8.5x) whose records
+  parse at 3.7x their text, so a 268 MB ceiling was ~8 GB of heap and the
+  first `records_for` of every trace run killed the runner for eight days
+  (2026-10-19 to 10-27) with no error line — "the runner has received a
+  shutdown signal" is memory. Charge per record; print peak RSS per phase.
+- **`cancelled` means two things, and only duration tells them apart.** An
+  eviction from a concurrency group is cancelled within seconds; a run
+  cancelled at its JOB ceiling did minutes of work. The keeper read both as
+  "never ran" and re-dispatched a 30-minute analyze every 30 minutes for two
+  days (`keep_schedule.EVICTION_SECONDS`). And a job ceiling must stay above
+  the sum of its steps — it cancels the commit and loses every reading, where
+  a step cap loses one step.
+- **A per-run snapshot that nothing folds is unbounded growth** (one agent
+  snapshot per wallet per trace run, 88,678 rows in 20 days, exempt from
+  every trim). Store a series by its CHANGES: identical consecutive readings
+  carry nothing `index_authority` can derive, and are collapsed.
 - **A detector's latest.json is a reading, not a memory.** Each is rewritten whole and the roster is rebuilt from scratch, so a lapsed lead becomes indistinguishable from strangers: on 2026-10-08 the four best September leads sat at WATCH with no vectors and no reasons. What must survive a lapse goes in the casebook, which records whether a detector refuted it or only stopped looking. Backfilled history counts only in the ceiling (early votes were retracted). **A backfill inherits every fault its history held:** every 2026-09-10 roster predates that day's pricing fixes, so money, linkage and correlation evidence only they reported no longer counts (`cases.void_pre_fix`; it had shown a $1.03B MAX quantity as a transfer).
 - **An address with no key is never a suspect** (`src/not_wallets.py`): token contracts, precompiles and HyperCore system addresses held detector slots (USDC on Base was #12 of 40). `0x2222…2222` is HYPE's system address and `0x5555…5555` WHYPE: never use them as test wallets. **Nor is a forgery of his declared wallets that moved no real money with him** (`spam.lookalike_of`: same first and last four hex characters; one that moved ≥ $1K stays a lead — it might be his own vanity wallet): the look-alike rule anchored only on the swept batch's volume, so a daily sweep holding spoofed fake-USDC transfers to `0xf078170f…f19e` and nothing with `0xf078969e…f19e` stored them as clean, and the forgery reached POSSIBLE and casebook #3 (2026-10-08). His declared wallets now anchor the rule at collection for records that carry nothing (a price that could not be fetched proves nothing), the roster grades such forgeries INFRASTRUCTURE, and the casebook excludes them every run.
 - **A reference that cannot produce a statistic is unmeasured, never a

@@ -42,7 +42,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.cctp_feed import refresh_pool, strict_post
-from src.chain.collect import records_for
+from src.chain.collect import records_by_wallet
 from src.utils import (
     DATA_DIR,
     load_all_records,
@@ -209,7 +209,11 @@ def collect_target_movements(target: str, min_amount: float = 0, *,
     config = config if config is not None else load_config()
     directory = Path(data_dir) if data_dir is not None else DATA_DIR
     cluster = {target.lower()} | {str(w).lower() for w in config.get("known_self_wallets", []) if w}
-    records = [record for wallet in sorted(cluster) for record in records_for(wallet)]
+    # ONE walk of the substrate for the whole cluster: per-wallet `records_for`
+    # re-parses a substrate that has outgrown its file cache (measured
+    # 2026-10-27: the step timed out at 4 minutes on every trace run).
+    by_wallet = records_by_wallet(cluster)
+    records = [record for wallet in sorted(cluster) for record in by_wallet.get(wallet, [])]
     ledger = load_all_records(str(directory / "ledger"))
     try:
         decodes = json.loads((directory / "labels" / "bridge_decodes.json").read_text())
@@ -308,8 +312,9 @@ def unpaired_cctp_exits(target: str, ledger: list[dict], min_amount: float, *,
     if not circle:
         return []
     inbound = []
+    by_wallet = records_by_wallet(cluster)
     for w in sorted(cluster):
-        inbound.extend(cctp_inbound(records_for(w), {w}))
+        inbound.extend(cctp_inbound(by_wallet.get(w, []), {w}))
     inbound.sort(key=lambda r: r["ts"])
     m = match(circle, inbound)
     return [{"amount": float(w["gross_usd"]), "ts": int(w["time_s"]),

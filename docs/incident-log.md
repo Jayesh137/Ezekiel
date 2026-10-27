@@ -2765,3 +2765,88 @@ people (392,214 → 392,279 between two reads minutes apart), so they notify onl
 
 **Rule it re-teaches:** a mirror's "not found" is a read result, not a fact — ask how
 often it lies before it is allowed to alert (rule 5, applied to someone else's API).
+
+
+## 2026-10-27 — every scheduled run failing: four outages, one of them eight days old
+
+**Ask (operator):** "the runs are failing, fix permanently." Measured from the
+Actions history before touching anything; each cause below was replayed against
+production data before its fix was trusted.
+
+**What the Actions tab showed.** Watch Wallets: failure on 10 of the last 14
+runs. Daily Analysis: `cancelled` every ~32 minutes since at least 05:06 UTC.
+Collection Heartbeat: `failure` (data 811 minutes stale). Trace Fund Flows:
+not one run had finished since **2026-10-18 21:31 UTC** — eight days with no
+roster, casebook, accounting, perimeter, provenance or graph refresh — every
+run `cancelled` after exactly 55 minutes or `failure` at 25-32 with "The runner
+has received a shutdown signal". Scan: `failure` at the discovery checkpoint
+since 2026-10-21.
+
+**1. The keeper loop (analyze → data-commit starvation → stale data).**
+analyze.yml's job ceiling was 30 minutes while its steps summed to ~30
+(2026-10-24, the last real success: census 898s, reprice 323s, correlate 274s,
+the rest ~5 min). From 2026-10-25 every run hit the ceiling and concluded
+`cancelled`. `keep_schedule.did_no_work` read ANY cancelled run as "never ran"
+(it was written for an evicted run, 2026-09-30), so the keeper re-dispatched
+analyze the moment `data-commit` was free — it held the group 30 of every 32
+minutes, and collect ("due, but group data-commit is busy — not queueing"),
+trace and scan starved behind it. The heartbeat's 811-minute reading was the
+alarm working. Fix: a cancelled run that RAN ≥ `EVICTION_SECONDS` (180s, from
+`run_started_at`/`updated_at`) counts as an attempt, exactly as a failure
+does; an eviction is cancelled within seconds. analyze's ceiling is 55 with
+step caps on reprice (12) and correlate (10) so a slow step fails alone.
+
+**2. Trace: the runner died of memory, and the log could not say so.** The
+graph step reads every stored substrate record into an edge — 3,416,600 on
+2026-10-18, 5,199,848 by 2026-10-26 (the frontier walk adds 20-60 MB of
+records a day) — and then the first `records_for` of the run (lookup 1, or
+substrate linkage, whichever came first; both death sites were observed)
+filled `src/chain/collect._FILE_CACHE`. Its 268 MB ceiling counted FILE bytes
+while holding PARSED objects: a sealed day is gzipped (measured 8.5x) and
+parses at 3.7x its text (2,074 B per record on the largest Arbitrum shard), so
+the ceiling admitted ~8 GB of heap on top of the edges. Reproduced locally on
+the production substrate: the process's committed memory passed **11.3 GB**
+before it was stopped. Fixes: the cache is charged per record it holds
+(`_PARSED_BYTES_PER_RECORD` 2,100; ceiling 768 MiB of parsed objects); edge
+strings are interned (`transfer_graph._shared`: 1,047 → 756 B per edge, 5.44 →
+3.93 GB at 5.2M edges, measured on 60K real records); a frontier lookup reads
+only the files this run's sweeps wrote (`files_touched_since`) instead of
+re-parsing the whole substrate per lookup (60-90s each, which was why the 150s
+walk managed two or three lookups a run against a 213,759-wallet frontier);
+each phase now prints peak RSS. The graph step's cap is 20 (its phases need
+~14 at this size), the correlator's 8 (it timed out at 4 on every run; the
+cluster's rows are now read in one walk), and the job ceiling 60 — a job
+ceiling cancels the commit and loses every reading, a step cap loses one step.
+
+**3. Scan: the checkpoint outgrew its artifact budget on 2026-10-21.** The
+last checkpoint that uploaded was 50.31 MB against a 48 MiB (50.33 MB) budget;
+every snapshot since was refused after eight trim rounds, because what the
+byte-trimmer may touch (fills outside active backfills, generic observations)
+was <10% of the bytes: 171,710 of 193,041 fills sat under 14 backfills open
+since September, and `authority_actions` held **88,678 rows (50 MB)** of
+`agent_snapshot` — `check_agents.py` writes one per wallet per trace run and
+nothing ever folded them, while retention keeps authority rows 700 days.
+`authority_history._snapshot_changes` reads them as a series, so a snapshot
+identical to its predecessor for that account (same agents, expiries,
+completeness) adds no approval, revocation or state. `discovery_state.
+collapse_agent_snapshots` drops exactly those, in `compact()` before every
+snapshot; replayed on the real checkpoint: 87,010 of 88,678 rows collapse and
+the compressed checkpoint is **35.1 MB** against the 50.3 MB budget. The
+derived authority changes are asserted equal before and after.
+
+**4. Watch: an 8-minute cap against 90-110 seconds a wallet.** From the runner
+one Hyperliquid `info` call takes ~6.8s (1.1s from a home line, same calls
+measured the same minute), so the twelve reads behind one account value took
+88s and each watched wallet 90-110s; and `records_for` was called eight times
+a run (three watched wallets plus five of his), each a whole re-parse of a
+substrate that had outgrown its cache, which is why the step died AFTER the
+last wallet had printed. Now the independent reads of a wallet go out side by
+side (`HL_PARALLEL` 4; the venue limits by weight per minute, not
+concurrency), the sweeps run first and the substrate is walked once for every
+wallet (`records_by_wallet`), and the cap is 15 with the job at 39.
+
+**Rules these re-teach.** A `cancelled` conclusion has two meanings and only
+duration tells them apart. A cache ceiling must count what the cache HOLDS,
+not what it read — a compressed file's size says nothing about its heap. And
+"the runner has received a shutdown signal" with no error line is memory: the
+phase line now carries peak RSS so the next one is read, not guessed.

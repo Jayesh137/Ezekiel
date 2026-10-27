@@ -20,6 +20,7 @@ evidence about what it is doing, reported once, on the transition.
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -35,7 +36,7 @@ from src.alerts import (
 )
 from src.chain.budget import CallBudget
 from src.chain.chains import enabled_chains
-from src.chain.collect import records_for, sweep_wallet
+from src.chain.collect import records_by_wallet, records_for, sweep_wallet
 from src.chain.hyperevm import account_activity
 from src.hl_actions import fetch_actions, own_actions, record
 from src.hl_identity import probe
@@ -81,6 +82,27 @@ CONTACT_SECONDS = 60.0
 # they supplied 29 of the 39 contact alerts fired on 2026-09-12 — an inference
 # this system made, echoed back to the operator as though it were a finding.
 WORLD_TIERS = ("CONFIRMED", "PROBABLE")
+# Independent Hyperliquid reads of one wallet are made side by side. Measured
+# 2026-10-27 on the runner: ~6.8s per `info` call (1.1s from a home line), so
+# the twelve reads behind one account value took 88s and a wallet 90-110s;
+# with three wallets the step overran its 8-minute cap on most runs. The venue
+# limits by weight per minute (1,200; these calls weigh 2-20), not by
+# concurrency, and a watch run makes a few dozen.
+HL_PARALLEL = 4
+
+
+def _side_by_side(tasks: dict) -> dict:
+    """Run no-argument callables together; each answer is the value or the
+    exception it raised, keyed as the caller keyed them."""
+    out = {}
+    with ThreadPoolExecutor(max_workers=HL_PARALLEL) as pool:
+        futures = {name: pool.submit(fn) for name, fn in tasks.items()}
+        for name, fut in futures.items():
+            try:
+                out[name] = fut.result()
+            except Exception as exc:                  # noqa: BLE001 - handed back
+                out[name] = exc
+    return out
 
 
 def _deposit_addresses(config: dict) -> set:
@@ -218,11 +240,20 @@ def account_value(address: str, dexes: list) -> tuple[float, dict]:
     def is_state(resp) -> bool:
         return isinstance(resp, dict) and isinstance(resp.get("marginSummary"), dict)
 
-    perp = answer({"type": "clearinghouseState", "user": address}, is_state)
-    hip3 = {dex: answer({"type": "clearinghouseState", "user": address, "dex": dex},
-                        is_state) for dex in dexes or []}
-    spot = answer({"type": "spotClearinghouseState", "user": address},
-                  lambda r: isinstance(r, dict) and isinstance(r.get("balances"), list))
+    def is_spot(resp) -> bool:
+        return isinstance(resp, dict) and isinstance(resp.get("balances"), list)
+
+    reads = {"perp": lambda: answer({"type": "clearinghouseState", "user": address}, is_state),
+             "spot": lambda: answer({"type": "spotClearinghouseState", "user": address}, is_spot)}
+    for dex in dexes or []:
+        reads[f"dex:{dex}"] = (lambda d=dex: answer(
+            {"type": "clearinghouseState", "user": address, "dex": d}, is_state))
+    got = _side_by_side(reads)
+    for key in ("perp", *(f"dex:{d}" for d in dexes or []), "spot"):
+        if isinstance(got[key], Exception):
+            raise got[key]
+    perp, spot = got["perp"], got["spot"]
+    hip3 = {dex: got[f"dex:{dex}"] for dex in dexes or []}
     value = utils.account_value_components({"perp": perp, "hip3": hip3, "spot": spot})["total"]
     if value is None:
         raise RuntimeError("clearinghouseState: account value unparseable")
@@ -256,18 +287,44 @@ def target_account_value(config: dict) -> float | None:
         return None
 
 
-def read_wallet(address: str, config: dict, target_value: float | None = None
-                ) -> tuple[dict, list]:
-    """One reading, plus every counterparty it has been seen with."""
+def read_wallet(address: str, config: dict, target_value: float | None = None,
+                *, records: list | None = None) -> tuple[dict, list]:
+    """One reading, plus every counterparty it has been seen with.
+
+    `records` is this wallet's substrate rows when the caller already walked
+    the substrate once for every wallet (main does, after the sweeps); absent,
+    they are read here.
+    """
     errors, counterparties = [], set()
 
-    ident = probe(address, hl_post, sleep=time.sleep)
+    # The reads that do not depend on one another go out together (HL_PARALLEL).
+    dexes_now = live_hip3_dexes()
+    got = _side_by_side({
+        "ident": lambda: probe(address, hl_post, sleep=time.sleep),
+        "value": lambda: account_value(address, dexes_now),
+        "fills": lambda: hl_post({"type": "userFills", "user": address}),
+        "subs": lambda: hl_post({"type": "subAccounts", "user": address}),
+        "actions": lambda: fetch_actions(address),
+        "named": lambda: hl_post({"type": "extraAgents", "user": address}),
+        "signers": lambda: hl_post({"type": "userToMultiSigSigners", "user": address}),
+        "activity": lambda: account_activity(address),
+    })
+
+    def _got(key):
+        if isinstance(got[key], Exception):
+            raise got[key]
+        return got[key]
+
+    try:
+        ident = _got("ident")
+    except Exception as exc:                          # noqa: BLE001 - transport
+        ident = {"read_ok": False, "errors": [f"identity: {type(exc).__name__}: {exc}"]}
     if not ident.get("read_ok"):
         errors.extend(ident.get("errors") or [])
 
     value, dexes, book = None, [], None
     try:
-        value, state = account_value(address, live_hip3_dexes())
+        value, state = _got("value")
         book = positions_watch.book(state)
         # Which venues it actually has a book on. A position opening on a dex
         # it has never used is what a migration INSIDE Hyperliquid looks like,
@@ -280,7 +337,7 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
 
     last_fill = None
     try:
-        fills = hl_post({"type": "userFills", "user": address})
+        fills = _got("fills")
         if isinstance(fills, list) and fills:
             last_fill = max(int(f.get("time") or 0) for f in fills)
     except Exception as exc:                          # noqa: BLE001 - transport
@@ -288,7 +345,7 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
 
     subaccounts = []
     try:
-        subs = hl_post({"type": "subAccounts", "user": address})
+        subs = _got("subs")
         # A real answer is a list or null; `hl_post` answers {} when every
         # retry fails, which read as "no sub-accounts" until 2026-09-17.
         if subs is not None and not isinstance(subs, list):
@@ -300,7 +357,10 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
 
     # Its own L1 actions: withdrawal destinations, agent approvals, sends.
     withdrawals, agents = [], []
-    rows, err = fetch_actions(address)
+    try:
+        rows, err = _got("actions")
+    except Exception as exc:                          # noqa: BLE001 - transport
+        rows, err = [], f"{type(exc).__name__}: {exc}"
     if err:
         errors.append(f"explorer: {err}")
     else:
@@ -325,7 +385,7 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
     # rolled out of it. `extraAgents` is the only endpoint that still answers.
     # Measured on the watched wallet: agentAddress None, extraAgents one entry.
     try:
-        named = hl_post({"type": "extraAgents", "user": address})
+        named = _got("named")
         # Always a list when it answers; `hl_post` answers {} on failure, and
         # normalise_agents({}) is [] — an outage wearing "no agents" (rule 5).
         if not isinstance(named, list):
@@ -338,20 +398,23 @@ def read_wallet(address: str, config: dict, target_value: float | None = None
     # address allowed to sign for it, so a signer is control handed out
     # exactly as an agent is, and it is reported as one.
     try:
-        signers = multisig_signers(hl_post({"type": "userToMultiSigSigners", "user": address}))
+        signers = multisig_signers(_got("signers"))
         if signers is None:
             raise RuntimeError("no answer")
         agents.extend(signers)
     except Exception as exc:                          # noqa: BLE001 - transport
         errors.append(f"userToMultiSigSigners: {type(exc).__name__}: {exc}")
 
-    activity = account_activity(address)
+    try:
+        activity = _got("activity")
+    except Exception as exc:                          # noqa: BLE001 - transport
+        activity = {"nonce": None, "errors": [f"hyperevm: {type(exc).__name__}: {exc}"]}
     if activity.get("errors"):
         errors.extend(activity["errors"])
 
     # Its on-chain counterparties, from whatever the substrate holds. The sweep
     # below is what puts them there.
-    for rec in records_for(address):
+    for rec in (records if records is not None else records_for(address)):
         for side in ("src", "dst"):
             other = (rec.get(side) or "").lower()
             if other and other != address:
@@ -501,10 +564,20 @@ def main() -> int:
     if target in TARGET_BOOK:
         books[target] = TARGET_BOOK.pop(target)
 
+    # Every sweep first, then ONE walk of the substrate for every wallet this
+    # run reads. `records_for` per wallet re-parses a substrate that has
+    # outgrown its file cache (src/chain/collect.records_by_wallet): measured
+    # 2026-10-27, the eight per-wallet reads here cost the run more than the
+    # Hyperliquid calls did, and the step overran its cap after the last
+    # wallet had printed.
+    for entry in wallets:
+        sweep(entry["address"], config, plan_refused=plan_refused)
+    rows_by_wallet = records_by_wallet({w["address"] for w in wallets} | his)
+
     for entry in wallets:
         address = entry["address"]
-        sweep(address, config, plan_refused=plan_refused)
-        snap, counterparties = read_wallet(address, config, target_value=his_value)
+        snap, counterparties = read_wallet(address, config, target_value=his_value,
+                                           records=rows_by_wallet.get(address, []))
         snap["why"] = entry.get("why")
         snap["source"] = entry.get("source") or "config"
         snapshots.append(snap)
@@ -512,7 +585,8 @@ def main() -> int:
             books[address] = snap["book"]
 
         if entry.get("settled") and not seeding:
-            held_payees |= check_new_payees(address, seen_payees, his, payee_readings)
+            held_payees |= check_new_payees(address, seen_payees, his, payee_readings,
+                                            records=rows_by_wallet.get(address, []))
 
         seen = contacts(counterparties, world, wallet=address)
         hits, infra = shared_infrastructure(seen, busy_flags(seen))
@@ -563,7 +637,7 @@ def main() -> int:
             print("[watchlist]   first reading — baseline recorded, nothing alerted")
 
     for wallet in sorted(his):
-        seen_payees |= counterparties_of(records_for(wallet), wallet) - held_payees
+        seen_payees |= counterparties_of(rows_by_wallet.get(wallet, []), wallet) - held_payees
     report = build_report(snapshots, {"changes": found_changes, "contacts": found_contacts})
     report["l1_seen"] = sorted(seen_payees)
     report["l1_pending"] = sorted(held_payees)

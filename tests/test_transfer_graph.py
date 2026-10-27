@@ -404,3 +404,44 @@ def test_self_flow_is_zero_without_config_wallets():
     graph = build_graph(edges_from(l1(T, W1, 500_000, BASE_TS),
                                    l1(W1, W2, 100_000, BASE_TS + 60)), T)
     assert node_for(graph, W2)["evidence"]["self_flow_usd"] == 0.0
+
+
+def test_edge_strings_are_shared_between_edges():
+    """5.2M edges held two fresh 42-character strings each for addresses that
+    repeat across millions of edges, and fresh copies of the same chain, asset
+    and source names (2026-10-27). Interned, equal strings are one object."""
+    rec = {"src": "0xAAAA" + "a" * 36, "dst": "0xbbbb" + "b" * 36, "chain": "arbitrum",
+           "asset": "USDC", "kind": "erc20", "tx_hash": "0x1", "ts": 1, "amount_usd": 5.0}
+    a = tg.normalise_transfer_record(dict(rec))
+    b = tg.normalise_transfer_record({**rec, "tx_hash": "0x2", "src": "0xaaaa" + "a" * 36})
+    assert a["src"] == b["src"] and a["src"] is b["src"]
+    assert a["chain"] is b["chain"] and a["asset"] is b["asset"] and a["kind"] is b["kind"]
+    assert a["discovery_source"] is b["discovery_source"]
+    tx = {"from": rec["src"], "to": rec["dst"], "value": "1000000", "timeStamp": "1",
+          "hash": "0x3", "tokenSymbol": "USDC"}
+    c = tg.normalise_l1_transfer(tx)
+    assert c["src"] is a["src"] and c["asset"] is a["asset"]
+
+
+def test_files_touched_since_names_only_files_modified_during_the_run(tmp_path):
+    """A lookup used to read the WHOLE substrate for the wallet it had just swept
+    - a full re-parse per lookup, 60-90s each by 2026-10-27, so the 150s walk
+    managed two or three lookups a run against a 213,759-wallet frontier. The
+    records a sweep adds land in today's files; everything older is already an
+    edge."""
+    import os
+
+    root = tmp_path / "transfers"
+    for chain, day, age in (("arbitrum", "2026-06-10", 3600), ("arbitrum", "2026-06-11", 0),
+                            ("ethereum", "2026-06-11", 7200)):
+        d = root / chain
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / f"{day}.json"
+        path.write_text("[]")
+        stamp = 1_800_000_000 - age
+        os.utime(path, (stamp, stamp))
+    (root / "arbitrum" / "latest.json").write_text("{}")
+    touched = tg.files_touched_since(root, 1_800_000_000 - 60)
+    assert [p.name for p in touched] == ["2026-06-11.json"]
+    assert touched[0].parent.name == "arbitrum"
+    assert tg.files_touched_since(tmp_path / "absent", 0) == []
