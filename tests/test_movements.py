@@ -94,7 +94,8 @@ def test_collector_reads_known_cluster_and_existing_bridge_decodes(tmp_path, mon
     monkeypatch.setattr(correlator, "load_config", lambda: {"known_self_wallets": [TREASURY]})
     rows = {TARGET: [transfer("self", dst=ROUTER), transfer("internal", dst=TREASURY)],
             TREASURY: [transfer("onward", src=TREASURY)]}
-    monkeypatch.setattr(correlator, "records_for", lambda wallet: rows.get(wallet, []))
+    monkeypatch.setattr(correlator, "records_by_wallet",
+                        lambda wallets: {w: rows.get(w, []) for w in wallets})
     monkeypatch.setattr(correlator, "load_all_records", lambda path: [])
     (tmp_path / "labels").mkdir()
     (tmp_path / "labels" / "bridge_decodes.json").write_text(json.dumps({"self": {"hl_account": TARGET}}))

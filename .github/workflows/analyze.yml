@@ -54,7 +54,13 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-    timeout-minutes: 30
+    # The job ceiling is a BACKSTOP above the sum of the step timeouts. It was
+    # 30 while the steps summed to ~30 (measured 2026-10-24: census 898s,
+    # reprice 323s, correlate 274s, the rest ~5 min), so every run from
+    # 2026-10-25 was CANCELLED at the ceiling - after its commit on a good day,
+    # before it on a slow one - and the keeper, reading "cancelled" as "never
+    # ran", re-dispatched it every 30 minutes and starved the data-commit group.
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -113,6 +119,9 @@ jobs:
       # not a wrong one. This one loses CORRECTNESS, so it keeps the gate that
       # the implicit `success()` used to give it for free.
       - name: Reprice stored transfers
+        # Observed 323s (2026-10-24) on a substrate that grows daily; a STEP
+        # timeout fails only this step and the commit still persists the rest.
+        timeout-minutes: 12
         if: ${{ !cancelled() && steps.deps.conclusion == 'success'
             && steps.quarantine.conclusion == 'success' }}
         env:
@@ -122,6 +131,7 @@ jobs:
       # that job's 600s ceiling (see src/tracer.py's main). Runs after repricing
       # so exits are valued, and budgeted at 300s of this 30-minute job.
       - name: Correlate deposits and withdrawals
+        timeout-minutes: 10          # observed 274s (2026-10-24)
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         env:
           DISCOVERY_OBSERVATION_DB: data/.local/analysis-observations.sqlite3

@@ -223,6 +223,51 @@ def _iso(ts_seconds: float | int | None) -> str | None:
         return None
 
 
+def _shared(value: str) -> str:
+    """One string object per distinct value.
+
+    Measured 2026-10-27: 5.2M edges (3.4M on 2026-10-18, the last run that
+    finished) held two fresh 42-character address strings each plus fresh
+    copies of the chain, asset and kind names, since `.lower()` and the JSON
+    decoder mint a new string per occurrence. `sys.intern` makes equal strings
+    one object, which is also what makes the graph's per-wallet dict lookups
+    cheap. Addresses are already lowercased by the callers.
+    """
+    return sys.intern(value) if isinstance(value, str) else value
+
+
+def files_touched_since(root, since_ts: float) -> list:
+    """The stored substrate files modified at or after `since_ts`, oldest chain
+    first - what a sweep made during this run can have written to. `root`
+    None means the substrate the sweeps write to (`collect.TRANSFERS_DIR`,
+    read at call time so a redirected substrate is the one read).
+
+    A frontier lookup used to read the WHOLE substrate for the wallet it had
+    just swept (`records_for`), a full re-parse per lookup once the substrate
+    outgrew its cache: 60-90s each by 2026-10-27, so the walk's 150s managed
+    two or three lookups a run against a 213,759-wallet frontier. The sweep's
+    new records land in today's file per chain; every older record is already
+    an edge from `collect_known_edges`. (One class is deferred a run by this:
+    an UNPRICED record stored earlier whose sender was first swept in this
+    run becomes an edge at the next run's load, when that sender is in
+    `_swept_for_graph`.)
+    """
+    from src.chain import collect
+
+    root = Path(collect.TRANSFERS_DIR if root is None else root)
+    if not root.exists():
+        return []
+    touched = []
+    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in collect.substrate_files(chain_dir):
+            try:
+                if path.stat().st_mtime >= since_ts:
+                    touched.append(path)
+            except OSError:
+                continue
+    return touched
+
+
 def edge_id(src: str, dst: str, chain: str, ref: str, ts: int = 0) -> str:
     """Stable identity so re-ingesting the same transfer never double-counts.
 
@@ -257,10 +302,10 @@ def normalise_l1_transfer(tx: dict, decimals: int = 6) -> dict | None:
     ref = tx.get("hash", "")
     return {
         "id": edge_id(src, dst, CHAIN_ARBITRUM, ref, ts),
-        "src": src,
-        "dst": dst,
+        "src": _shared(src),
+        "dst": _shared(dst),
         "chain": CHAIN_ARBITRUM,
-        "asset": tx.get("tokenSymbol") or "USDC",
+        "asset": _shared(tx.get("tokenSymbol") or "USDC"),
         "amount_usd": round(amount, 2),
         "ref": ref,
         "ts": ts,
@@ -343,12 +388,15 @@ def normalise_transfer_record(rec: dict, swept: set | None = None) -> dict | Non
         ts = int(rec.get("ts", 0) or 0)
     except (TypeError, ValueError):
         ts = 0
+    kind = rec.get("kind")
     return {
         "id": edge_id(src, dst, chain, ref, ts),
-        "src": src,
-        "dst": dst,
-        "chain": chain,
-        "asset": rec.get("asset") or "UNKNOWN",
+        # Interned (see _shared): millions of edges repeat the same addresses
+        # and names, and `.lower()` / json each mint a fresh string.
+        "src": _shared(src),
+        "dst": _shared(dst),
+        "chain": _shared(chain),
+        "asset": _shared(rec.get("asset") or "UNKNOWN"),
         # None stays None. A 0.0 here would read as a real transfer worth
         # nothing and sink below every threshold silently (rule 6).
         "amount_usd": None if amount_usd is None else round(float(amount_usd), 2),
@@ -356,7 +404,7 @@ def normalise_transfer_record(rec: dict, swept: set | None = None) -> dict | Non
         "ts": ts,
         "timestamp": _iso(ts),
         "discovery_source": SRC_L1,
-        "kind": rec.get("kind"),
+        "kind": _shared(kind) if isinstance(kind, str) else kind,
     }
 
 
@@ -407,8 +455,8 @@ def normalise_hl_ledger_entry(entry: dict) -> dict | None:
         return 0.0
 
     if dtype in ("send", "internalTransfer", "spotTransfer"):
-        src = (delta.get("user") or "").lower()
-        dst = (delta.get("destination") or "").lower()
+        src = _shared((delta.get("user") or "").lower())
+        dst = _shared((delta.get("destination") or "").lower())
         if not src or not dst or src == dst:
             return None
         return {
@@ -2169,6 +2217,9 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
     import os
 
     now_ts = now_ts if now_ts is not None else time.time()
+    # Wall clock at the start of the walk, minus the filesystem's timestamp
+    # granularity: a file a sweep writes during this walk has mtime >= this.
+    run_started_wall = time.time() - 2.0
     diag = {
         "status": "not_attempted",
         "attempted_at": utc_now(),
@@ -2454,7 +2505,10 @@ def expand_frontier(edges: list[dict], target: str, budget: dict,
                         plan_refused=plan_refused,
                         protected=spam_ground_truth(load_config()),
                         par_contracts=_par_contracts())
-                    rows = records_for(wallet)
+                    # Only the files this run's sweeps wrote to; see
+                    # files_touched_since for why not the whole substrate.
+                    rows = records_for(wallet, paths=files_touched_since(
+                        None, run_started_wall))
                 except Exception as exc:
                     record_refresh(refreshes, wallet, now_ts, d, error=str(exc))
                     # One address failing must not abandon the rest of the walk.
@@ -3045,6 +3099,20 @@ def verify_fan_services(edges: list[dict], known_services: set, cfg: dict,
     return {**on_record, **busy}, persons | persons_on_record()
 
 
+def _peak_rss_mb() -> float | None:
+    """Peak resident memory of this process, where the platform can say (Linux
+    runners). The graph died of memory on every trace run from 2026-10-19 and
+    no line in the log said so; now each phase reports it."""
+    try:
+        import resource
+    except ImportError:
+        return None
+    try:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def _phase(name: str):
     """Time one phase of the graph run and say so, however it ends.
 
@@ -3070,8 +3138,9 @@ def _phase(name: str):
         try:
             yield
         finally:
-            print(f"[graph] <- {name} [{time.monotonic() - start:.1f}s]",
-                  flush=True)
+            peak = _peak_rss_mb()
+            print(f"[graph] <- {name} [{time.monotonic() - start:.1f}s]"
+                  + (f" peak rss {peak:,.0f} MB" if peak else ""), flush=True)
     return _timed()
 
 

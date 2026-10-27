@@ -198,9 +198,63 @@ def import_observations(shard_path, db_path, artifact_id):
         return counts
 
 
+def _snapshot_identity(row: dict):
+    """What an agent snapshot SAYS, independent of when it was taken."""
+    from src.agent_links import normalise_agents
+    agents = tuple(sorted((a["address"], a.get("valid_until"))
+                          for a in normalise_agents(row.get("agents"))))
+    return agents, bool(row.get("complete"))
+
+
+def collapse_agent_snapshots(db_path) -> int:
+    """Drop every agent snapshot that repeats the one before it for its account.
+
+    `check_agents.py` writes one `agent_snapshot` per wallet per trace run and
+    `authority_history._snapshot_changes` reads them as a SERIES: a snapshot
+    identical to its predecessor (same agents, same expiries, same
+    completeness) adds no approval, no revocation and no change of state, so
+    removing it changes nothing `index_authority` can derive. Measured
+    2026-10-27 on the live checkpoint: 88,678 authority rows (50 MB raw) in 20
+    days, exempt from every trim, had pushed the compressed checkpoint over its
+    48 MiB artifact budget on 2026-10-21 and discovery froze there. The FIRST
+    snapshot of a run of identical readings is kept (it dates the state), the
+    first differing one starts the next run. Returns the rows removed.
+    """
+    removed = 0
+    with DiscoveryStore(db_path) as store:
+        rows = store.db.execute("SELECT rowid, id, data FROM discovery_observations "
+                                "WHERE source='authority_actions'").fetchall()
+        snapshots = []
+        for rowid, identity, raw in rows:
+            try:
+                doc = json.loads(raw)
+            except ValueError:
+                continue
+            if (isinstance(doc, dict) and doc.get("kind") == "agent_snapshot"
+                    and doc.get("success") is True and isinstance(doc.get("agents"), list)
+                    and isinstance(doc.get("ts_ms"), int)):
+                snapshots.append((doc.get("account"), doc["ts_ms"], str(identity), rowid, doc))
+        # The same order _snapshot_changes reads them in: by time, then event id.
+        snapshots.sort(key=lambda s: (s[1], s[2]))
+        previous: dict = {}
+        doomed = []
+        for account, _ts, _identity, rowid, doc in snapshots:
+            state = _snapshot_identity(doc)
+            if previous.get(account) == state:
+                doomed.append((rowid,))
+            else:
+                previous[account] = state
+        if doomed:
+            with store.db:
+                store.db.executemany("DELETE FROM discovery_observations WHERE rowid=?", doomed)
+            removed = len(doomed)
+    return removed
+
+
 def compact(db_path, now_ms=None):
     """Global storage bounds, with explicit retention metadata and cache reset."""
     now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+    collapsed = collapse_agent_snapshots(db_path)
     with DiscoveryStore(db_path) as store:
         store.prune(now_ms - 30 * 86400_000, max_events=100_000)
         tables = {r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -240,5 +294,5 @@ def compact(db_path, now_ms=None):
         store.set_meta('storage_retention', {'at_ms': now_ms, 'market_events': 100000, 'market_days': 30,
             'fill_rows': MAX_FILL_ROWS, 'fill_days': 90, 'generic_observations': 100000,
             'pending_fill_row_budget': PENDING_FILL_ROWS, 'protected_fill_wallets': len(protected),
-            'protected_fill_rows': protected_rows,
+            'protected_fill_rows': protected_rows, 'collapsed_snapshots': collapsed,
             'authority_days': 730, 'complete_history': False})

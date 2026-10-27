@@ -276,3 +276,52 @@ def test_a_budget_that_cannot_be_met_still_fails_loudly(tmp_path, monkeypatch):
     monkeypatch.setattr(state, 'MAX_ARCHIVE_BYTES', 512)
     with pytest.raises(state.OverBudget):
         state.snapshot_within_budget(db, tmp_path / 'out')
+
+
+def _agent_snapshot(account, ts, agents, *, complete=True):
+    return {"event_id": f"agents:{account}:{ts}", "kind": "agent_snapshot", "account": account,
+            "ts_ms": ts, "success": True, "complete": complete,
+            "agents": [{"address": a, "name": None, "validUntil": None} for a in agents]}
+
+
+def test_identical_consecutive_agent_snapshots_collapse_without_changing_authority(tmp_path):
+    # 2026-10-27: check_agents wrote one agent_snapshot per wallet per trace run
+    # and nothing ever folded them: 88,678 authority rows (50 MB) in 20 days, all
+    # exempt from byte trimming, so every checkpoint since 2026-10-21 was over
+    # its artifact budget and discovery froze on a six-day-old checkpoint.
+    from src import discovery_state as state
+    from src.authority_history import _snapshot_changes
+    db = tmp_path / 'scan.sqlite3'
+    agent, other = '0x' + 'a' * 40, '0x' + 'b' * 40
+    rows = [_agent_snapshot(A, 1, [agent]), _agent_snapshot(A, 2, [agent]),
+            _agent_snapshot(A, 3, [agent]), _agent_snapshot(A, 4, [agent, other]),
+            _agent_snapshot(A, 5, [agent, other]), _agent_snapshot(A, 6, [agent]),
+            _agent_snapshot(A, 7, [agent], complete=False),
+            _agent_snapshot(B, 1, [other]), _agent_snapshot(B, 2, [other]),
+            {"event_id": "approve-1", "kind": "approve_agent", "account": B, "authority": agent,
+             "ts_ms": 3, "success": True}]
+    with DiscoveryStore(db) as store:
+        store.ingest_observations('authority_actions', rows, 9)
+        before = _snapshot_changes(store.observations('authority_actions'), 10**12)
+    assert state.collapse_agent_snapshots(db) == 4            # A@2, A@3, A@5, B@2
+    with DiscoveryStore(db) as store:
+        kept = store.observations('authority_actions')
+        after = _snapshot_changes(kept, 10**12)
+    assert sorted(r['event_id'] for r in kept) == sorted(
+        [f'agents:{A}:1', f'agents:{A}:4', f'agents:{A}:6', f'agents:{A}:7', f'agents:{B}:1', 'approve-1'])
+    key = lambda r: (r['event_id'], r['kind'], r['account'], r.get('authority'))  # noqa: E731
+    assert sorted(map(key, after)) == sorted(map(key, before))
+    assert state.collapse_agent_snapshots(db) == 0            # idempotent
+
+
+def test_compact_collapses_snapshots_and_records_it(tmp_path):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    agent = '0x' + 'a' * 40
+    with DiscoveryStore(db) as store:
+        store.ingest_observations('authority_actions',
+                                  [_agent_snapshot(A, t, [agent]) for t in range(1, 6)], 9)
+    state.compact(db, now_ms=10)
+    with DiscoveryStore(db) as store:
+        assert len(store.observations('authority_actions')) == 1
+        assert store.meta('storage_retention', {}).get('collapsed_snapshots') == 4

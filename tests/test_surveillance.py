@@ -14,7 +14,7 @@ def test_due_recipient_is_reswept_and_later_forwarding_is_discovered(monkeypatch
     monkeypatch.setattr(graph, "_swept_for_graph", set)
     calls = []
     monkeypatch.setattr(collect, "sweep_wallet", lambda wallet, *a, **k: calls.append(wallet) or {"status": "ok"})
-    monkeypatch.setattr(collect, "records_for", lambda wallet: [{
+    monkeypatch.setattr(collect, "records_for", lambda wallet, **kw: [{
         "id": "later", "chain": "arbitrum", "src": RELAY, "dst": NEXT, "ts": 99_000,
         "amount_usd": 900_000, "amount": 900_000, "asset": "USDC", "kind": "erc20", "tx_hash": "later"}])
     edge = graph.normalise_l1_transfer({"from": TARGET, "to": RELAY, "value": "1000000000000",
