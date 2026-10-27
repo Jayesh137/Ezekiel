@@ -1,7 +1,7 @@
 {
   "wallet": "0x4fd04553468610e5a88a2cffa38e057c954312da",
-  "last_checked": "2026-10-27T14:59:58.550348+00:00",
-  "last_read_status": "partial",
+  "last_checked": "2026-10-27T17:36:36.585833+00:00",
+  "last_read_status": "ok",
   "first_seen": "2026-10-01T01:04:42.428846+00:00",
   "discovery_sources": [
     "bridge_depositor",
@@ -746,6 +746,29 @@
       "observed_at": "2026-10-24T16:49:14.489665+00:00"
     },
     {
+      "status": "ok",
+      "next_cursor_ms": 1793106523007,
+      "coverage": {
+        "start_ms": 1791308175779,
+        "end_ms": 1793122575779,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793106523007,
+        "requested_start_ms": 1791308175779,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793122575779,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-27T17:36:17.118963+00:00"
+    },
+    {
       "status": "partial",
       "next_cursor_ms": 1792837782035,
       "coverage": {
@@ -1307,24 +1330,24 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1791298726864,
-    "end_ms": 1793113126864,
-    "pages": 6,
-    "complete_available_window": false,
+    "start_ms": 1791308175779,
+    "end_ms": 1793122575779,
+    "pages": 1,
+    "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792585694462,
-    "requested_start_ms": 1791298726864,
+    "fetched_start_ms": 1793106523007,
+    "requested_start_ms": 1791308175779,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1792112591515,
-  "last_successful_read": "2026-10-24T16:49:34.972085+00:00",
-  "last_positive_evidence": "2026-10-24T16:49:14.489665+00:00",
-  "last_seen": "2026-10-24T16:49:34.972085+00:00",
-  "last_scored": "2026-10-24T16:49:34.972085+00:00",
-  "best_score": 0.3031,
-  "latest_score": 0.2945,
+  "last_successful_read": "2026-10-27T17:36:36.585833+00:00",
+  "last_positive_evidence": "2026-10-27T17:36:17.118963+00:00",
+  "last_seen": "2026-10-27T17:36:36.585833+00:00",
+  "last_scored": "2026-10-27T17:36:36.585833+00:00",
+  "best_score": 0.3034,
+  "latest_score": 0.3034,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -1334,11 +1357,10 @@
     ],
     "warnings": [
       "Weak asset overlap",
-      "Very different trading frequency",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 9x apart (1.25 vs 0.14 position episodes/day)"
+      "Decision frequency 7x apart (1.25 vs 0.17 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -1363,7 +1385,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2945,
+      "score_without_bonus": 0.3034,
       "explanations": [],
       "frequencies": {}
     },
@@ -1378,7 +1400,7 @@
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 3,
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -1643,9 +1665,9 @@
       ]
     },
     "tooling": {
-      "requests": 385621.0,
-      "cum_volume_usd": 14982553.74,
-      "requests_per_1k_usd": 25.738
+      "requests": 411726.0,
+      "cum_volume_usd": 15993591.29,
+      "requests_per_1k_usd": 25.7432
     }
   },
   "score_history": [
@@ -2320,8 +2342,29 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-27T17:36:36.585833+00:00",
+      "score": 0.3034,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.731,
+        "entry_exit_style": 0.0004,
+        "hold_duration": null,
+        "account_size": 0.458,
+        "trade_sequencing": 0.4689,
+        "position_sizing": 0.8301,
+        "order_profile": 0.6986,
+        "activity": 0.4384,
+        "direction_bias": 0.9878,
+        "position_management": 0.6284,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.29
+  "recent_avg_score": 0.2919
 }
