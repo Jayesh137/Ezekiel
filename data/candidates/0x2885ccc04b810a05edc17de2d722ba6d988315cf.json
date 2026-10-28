@@ -1,13 +1,13 @@
 {
   "wallet": "0x2885ccc04b810a05edc17de2d722ba6d988315cf",
-  "last_checked": "2026-10-20T08:33:33.878886+00:00",
+  "last_checked": "2026-10-28T02:01:55.588341+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-27T15:01:26.476138+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-10-20T08:33:33.878886+00:00",
-  "last_positive_evidence": "2026-10-20T08:33:13.973680+00:00",
+  "last_successful_read": "2026-10-28T02:01:55.588341+00:00",
+  "last_positive_evidence": "2026-10-28T02:01:35.165781+00:00",
   "observations": [
     {
       "status": "ok",
@@ -487,24 +487,47 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-20T08:33:13.973680+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1791338494001,
+      "coverage": {
+        "start_ms": 1791338494001,
+        "end_ms": 1793152894001,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1791338494001,
+        "requested_start_ms": 1791338494001,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793152894001,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-28T02:01:35.165781+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790670791682,
-    "end_ms": 1792485191682,
+    "start_ms": 1791338494001,
+    "end_ms": 1793152894001,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790670791682,
-    "requested_start_ms": 1790670791682,
+    "fetched_start_ms": 1791338494001,
+    "requested_start_ms": 1791338494001,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-10-20T08:33:33.878886+00:00",
-  "last_scored": "2026-10-20T08:33:33.878886+00:00",
+  "last_seen": "2026-10-28T02:01:55.588341+00:00",
+  "last_scored": "2026-10-28T02:01:55.588341+00:00",
   "best_score": 0.3988,
-  "latest_score": 0.3262,
+  "latest_score": 0.394,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -514,7 +537,7 @@
       "Matching trade frequency and cadence",
       "Matching long/short bias",
       "Similar scaling/TWAP/clip-size habits",
-      "xyz:MU: traded by ~11.2% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      "xyz:MU: traded by ~1.42% of scanned wallets \u2014 rarity bonus +0.0469"
     ],
     "warnings": [
       "Weak asset overlap"
@@ -525,15 +548,15 @@
         "xyz:MU"
       ],
       "target_only": [
-        "BTC",
+        "ADA",
         "ENA",
-        "LIT",
-        "MON"
+        "LIT"
       ],
       "candidate_only": [
         "ZEC",
         "xyz:CBRS",
         "xyz:CRCL",
+        "xyz:NFLX",
         "xyz:SPCX",
         "xyz:TSLA"
       ],
@@ -549,52 +572,36 @@
       ],
       "rare_markets": [],
       "classification": {
-        "xyz:MU": "COMMON"
+        "xyz:MU": "UNUSUAL"
       },
-      "description": "xyz:MU (common, ~11.2% of wallets)",
+      "description": "xyz:MU (unusual, ~1.4% of wallets)",
       "sample_sufficient": true,
-      "bonus_applied": 0.0,
-      "score_without_bonus": 0.3262,
+      "bonus_applied": 0.0469,
+      "score_without_bonus": 0.3471,
       "explanations": [
-        "xyz:MU: traded by ~11.2% of scanned wallets \u2014 too common to be evidence (no bonus)"
+        "xyz:MU: traded by ~1.42% of scanned wallets \u2014 rarity bonus +0.0469"
       ],
       "frequencies": {
-        "xyz:MU": 0.11197
+        "xyz:MU": 0.01422
       }
     },
     "episodes": {
-      "status": "research",
+      "status": "insufficient_data",
       "promotable": false,
-      "similarity": 0.7944,
+      "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9718,
+        "relative_size_dispersion": 0.8775,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 7,
+      "independent_sessions": 4,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::ZEC:1791223319295:507929353064387",
-        "fill::ZEC:1791223320037:261076150844861",
-        "fill::ZEC:1791223320037:869157950684989",
-        "fill::ZEC:1791223320099:275421448224279",
-        "fill::ZEC:1791223320574:501642631046402",
-        "fill::ZEC:1791223320776:578931890864281",
-        "fill::ZEC:1791223320844:1077944698158376",
-        "fill::ZEC:1791223320844:216631509431416",
-        "fill::ZEC:1791293650075:336151167813803",
-        "fill::ZEC:1791293650075:382395753928442",
-        "fill::ZEC:1791293650075:409704733123551",
-        "fill::ZEC:1791293650075:429726136383511",
-        "fill::ZEC:1791293650075:819257973369633",
-        "fill::ZEC:1791293650075:911148744857464",
-        "fill::ZEC:1791293650075:922732722438523",
-        "fill::ZEC:1791293650075:946062116991957",
         "fill::ZEC:1791401649029:190228958874836",
         "fill::ZEC:1791401649766:273068129786064",
         "fill::ZEC:1791401650453:354609460493716",
@@ -645,30 +652,6 @@
         "fill::ZEC:1791473093411:770873800380272",
         "fill::ZEC:1791473093411:827186032847671",
         "fill::ZEC:1791473093411:921170437936602",
-        "fill::xyz:CBRS:1791206850996:1032943268864561",
-        "fill::xyz:CBRS:1791206860056:396151639680456",
-        "fill::xyz:CBRS:1791206860374:1026286306417108",
-        "fill::xyz:CBRS:1791206860374:153857264772737",
-        "fill::xyz:CBRS:1791206860374:554304176747265",
-        "fill::xyz:CBRS:1791206860374:703485202643520",
-        "fill::xyz:CBRS:1791206860374:709431262290176",
-        "fill::xyz:CBRS:1791206860374:906848239149622",
-        "fill::xyz:CBRS:1791206860437:1102756869570416",
-        "fill::xyz:CBRS:1791206860437:129705515162357",
-        "fill::xyz:CBRS:1791206860437:138621202718543",
-        "fill::xyz:CBRS:1791206860437:186237895088383",
-        "fill::xyz:CBRS:1791206860437:188253366174504",
-        "fill::xyz:CBRS:1791206860437:255846560391386",
-        "fill::xyz:CBRS:1791206860437:295897838316017",
-        "fill::xyz:CBRS:1791206860437:40976587524158",
-        "fill::xyz:CBRS:1791206860437:622931864519963",
-        "fill::xyz:CBRS:1791206860437:638699287245475",
-        "fill::xyz:CBRS:1791206860437:648002237414049",
-        "fill::xyz:CBRS:1791206860437:740326844658479",
-        "fill::xyz:CBRS:1791206860437:765070977186688",
-        "fill::xyz:CBRS:1791206860437:815043542061072",
-        "fill::xyz:CBRS:1791206860437:857323578930619",
-        "fill::xyz:CBRS:1791206860437:961244743822141",
         "fill::xyz:CBRS:1791399270046:1005030598014383",
         "fill::xyz:CBRS:1791399300009:993571683076210",
         "fill::xyz:CBRS:1791399311199:779876390429543",
@@ -834,13 +817,53 @@
         "fill::xyz:CBRS:1791815405374:455914966646450",
         "fill::xyz:CBRS:1791815405374:467442885363435",
         "fill::xyz:CBRS:1791815405374:488668946219652",
-        "fill::xyz:CBRS:1791815405374:491642304534947"
+        "fill::xyz:CBRS:1791815405374:491642304534947",
+        "fill::xyz:CBRS:1791815405374:500461208842271",
+        "fill::xyz:CBRS:1791815405374:531705999663279",
+        "fill::xyz:CBRS:1791815405374:550911884329835",
+        "fill::xyz:CBRS:1791815405374:565308446540878",
+        "fill::xyz:CBRS:1791815405374:597289200290637",
+        "fill::xyz:CBRS:1791815405374:600312544016462",
+        "fill::xyz:CBRS:1791815405374:661034789219705",
+        "fill::xyz:CBRS:1791815405374:664145130174785",
+        "fill::xyz:CBRS:1791815405374:713104458762405",
+        "fill::xyz:CBRS:1791815405374:715589155771768",
+        "fill::xyz:CBRS:1791815405374:723610781207588",
+        "fill::xyz:CBRS:1791815405374:732139009889914",
+        "fill::xyz:CBRS:1791815405374:732390876014686",
+        "fill::xyz:CBRS:1791815405374:742455096824668",
+        "fill::xyz:CBRS:1791815405374:757755860709948",
+        "fill::xyz:CBRS:1791815405374:782766519364204",
+        "fill::xyz:CBRS:1791815405374:785002098011373",
+        "fill::xyz:CBRS:1791815405374:838581708553338",
+        "fill::xyz:CBRS:1791815405374:842651604686943",
+        "fill::xyz:CBRS:1791815405374:851842773779512",
+        "fill::xyz:CBRS:1791815405374:879370846717494",
+        "fill::xyz:CBRS:1791815405374:883698633183734",
+        "fill::xyz:CBRS:1791815405374:884924971888278",
+        "fill::xyz:CBRS:1791815405374:886901067650630",
+        "fill::xyz:CBRS:1791815405374:901706742831141",
+        "fill::xyz:CBRS:1791815405374:925687792545918",
+        "fill::xyz:CBRS:1791815405374:930283910227170",
+        "fill::xyz:CBRS:1791815405374:944688639790683",
+        "fill::xyz:CBRS:1791815405374:991290142856626",
+        "fill::xyz:CBRS:1791815405374:991691555942495",
+        "fill::xyz:CBRS:1792417559697:615031548409687",
+        "fill::xyz:CBRS:1792417561187:546181572600155",
+        "fill::xyz:CBRS:1792417561387:938674266023258",
+        "fill::xyz:CBRS:1792417567955:497341688304925",
+        "fill::xyz:CBRS:1792417569080:1090817634081480",
+        "fill::xyz:CBRS:1792417569569:442993372888838",
+        "fill::xyz:CBRS:1792417569622:644541776238553",
+        "fill::xyz:CBRS:1792417570497:444551163424625",
+        "fill::xyz:CBRS:1792417570836:170613188281366",
+        "fill::xyz:CBRS:1792417570836:584612773583176"
       ]
     },
     "tooling": {
-      "requests": 2970.0,
-      "cum_volume_usd": 169775578.87,
-      "requests_per_1k_usd": 0.0175
+      "requests": 3123.0,
+      "cum_volume_usd": 170041672.88,
+      "requests_per_1k_usd": 0.0184
     }
   },
   "score_history": [
@@ -1284,9 +1307,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-28T02:01:55.588341+00:00",
+      "score": 0.394,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1,
+        "timing_profile": null,
+        "leverage_profile": 0.1368,
+        "entry_exit_style": 0.8073,
+        "hold_duration": 0.5422,
+        "account_size": 0.6665,
+        "trade_sequencing": 0.6669,
+        "position_sizing": 0.5,
+        "order_profile": 0.5328,
+        "activity": 0.8761,
+        "direction_bias": 0.9684,
+        "position_management": 0.8277,
+        "loss_handling": 0.042
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3689,
+  "recent_avg_score": 0.3684,
   "last_investigated_ms": 1792289537040
 }
