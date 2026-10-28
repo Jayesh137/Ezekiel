@@ -1,13 +1,13 @@
 {
   "wallet": "0x5b50ae16ecab17b16a63eb60ebb4d55f8b785378",
-  "last_checked": "2026-10-17T17:01:43.786986+00:00",
+  "last_checked": "2026-10-28T08:06:46.690898+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-13T17:33:20.925075+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-10-17T17:01:43.786986+00:00",
-  "last_positive_evidence": "2026-10-17T17:01:37.429145+00:00",
+  "last_successful_read": "2026-10-28T08:06:46.690898+00:00",
+  "last_positive_evidence": "2026-10-28T08:06:39.679236+00:00",
   "observations": [
     {
       "status": "ok",
@@ -100,24 +100,47 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-17T17:01:37.429145+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1791360387969,
+      "coverage": {
+        "start_ms": 1791360387969,
+        "end_ms": 1793174787969,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1791360387969,
+        "requested_start_ms": 1791360387969,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793174787969,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-10-28T08:06:39.679236+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1790442096055,
-    "end_ms": 1792256496055,
+    "start_ms": 1791360387969,
+    "end_ms": 1793174787969,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1790442096055,
-    "requested_start_ms": 1790442096055,
+    "fetched_start_ms": 1791360387969,
+    "requested_start_ms": 1791360387969,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-10-17T17:01:43.786986+00:00",
-  "last_scored": "2026-10-17T17:01:43.786986+00:00",
+  "last_seen": "2026-10-28T08:06:46.690898+00:00",
+  "last_scored": "2026-10-28T08:06:46.690898+00:00",
   "best_score": 0.5037,
-  "latest_score": 0.45,
+  "latest_score": 0.5001,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -125,32 +148,32 @@
     "reasons": [
       "Shares rare HIP-3 markets: xyz:MU",
       "Similar market/limit execution style",
+      "Matching trade frequency and cadence",
       "Similar scaling/TWAP/clip-size habits",
-      "xyz:MU: traded by ~12.8% of scanned wallets \u2014 too common to be evidence (no bonus)",
-      "Market bonus withheld: style veto in force"
+      "xyz:MU: traded by ~2.96% of scanned wallets \u2014 rarity bonus +0.0196"
     ],
     "warnings": [
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [
-      "Incompatible hold style: 75% vs 0% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
       "overlap": [
         "xyz:MU"
       ],
       "target_only": [
-        "BTC",
-        "LIT",
-        "MON"
+        "ADA",
+        "ENA",
+        "LIT"
       ],
-      "candidate_only": [],
+      "candidate_only": [
+        "xyz:INTC"
+      ],
       "overlap_count": 1,
       "rare_overlap": [
         "xyz:MU"
       ],
-      "jaccard": 0.25
+      "jaccard": 0.2
     },
     "market_rarity": {
       "shared_markets": [
@@ -158,18 +181,17 @@
       ],
       "rare_markets": [],
       "classification": {
-        "xyz:MU": "COMMON"
+        "xyz:MU": "UNUSUAL"
       },
-      "description": "xyz:MU (common, ~12.8% of wallets)",
+      "description": "xyz:MU (unusual, ~3.0% of wallets)",
       "sample_sufficient": true,
-      "bonus_applied": 0.0,
-      "score_without_bonus": 0.45,
+      "bonus_applied": 0.0196,
+      "score_without_bonus": 0.4805,
       "explanations": [
-        "xyz:MU: traded by ~12.8% of scanned wallets \u2014 too common to be evidence (no bonus)",
-        "Market bonus withheld: style veto in force"
+        "xyz:MU: traded by ~2.96% of scanned wallets \u2014 rarity bonus +0.0196"
       ],
       "frequencies": {
-        "xyz:MU": 0.12752
+        "xyz:MU": 0.02956
       }
     },
     "episodes": {
@@ -177,18 +199,84 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9892,
+        "relative_size_dispersion": 0.9424,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 2,
+      "independent_sessions": 3,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
+        "fill::xyz:INTC:1792689117097:1003936737582977",
+        "fill::xyz:INTC:1792689117097:101671621166082",
+        "fill::xyz:INTC:1792689117097:102612379545336",
+        "fill::xyz:INTC:1792689117097:1049053770571644",
+        "fill::xyz:INTC:1792689117097:1053580145037854",
+        "fill::xyz:INTC:1792689117097:1057585188351063",
+        "fill::xyz:INTC:1792689117097:1066725293120489",
+        "fill::xyz:INTC:1792689117097:1068712033392035",
+        "fill::xyz:INTC:1792689117097:1069396118328861",
+        "fill::xyz:INTC:1792689117097:1075936655559363",
+        "fill::xyz:INTC:1792689117097:1102545429867666",
+        "fill::xyz:INTC:1792689117097:1117962454637150",
+        "fill::xyz:INTC:1792689117097:1118726691676160",
+        "fill::xyz:INTC:1792689117097:12565315742241",
+        "fill::xyz:INTC:1792689117097:126755543016919",
+        "fill::xyz:INTC:1792689117097:139135837067364",
+        "fill::xyz:INTC:1792689117097:151253784421038",
+        "fill::xyz:INTC:1792689117097:156619082966192",
+        "fill::xyz:INTC:1792689117097:156661305051461",
+        "fill::xyz:INTC:1792689117097:167624768711146",
+        "fill::xyz:INTC:1792689117097:173121709244753",
+        "fill::xyz:INTC:1792689117097:195849793543719",
+        "fill::xyz:INTC:1792689117097:203557097079083",
+        "fill::xyz:INTC:1792689117097:208755697262110",
+        "fill::xyz:INTC:1792689117097:236191684813759",
+        "fill::xyz:INTC:1792689117097:263210333341593",
+        "fill::xyz:INTC:1792689117097:271639075323658",
+        "fill::xyz:INTC:1792689117097:276202944710984",
+        "fill::xyz:INTC:1792689117097:306664932012968",
+        "fill::xyz:INTC:1792689117097:311970187074033",
+        "fill::xyz:INTC:1792689117097:457751523877845",
+        "fill::xyz:INTC:1792689117097:469208056800601",
+        "fill::xyz:INTC:1792689117097:507737588753884",
+        "fill::xyz:INTC:1792689117097:524916737106126",
+        "fill::xyz:INTC:1792689117097:525477450861953",
+        "fill::xyz:INTC:1792689117097:544530229732006",
+        "fill::xyz:INTC:1792689117097:581030529612416",
+        "fill::xyz:INTC:1792689117097:584091771611037",
+        "fill::xyz:INTC:1792689117097:592321027899676",
+        "fill::xyz:INTC:1792689117097:607819203090942",
+        "fill::xyz:INTC:1792689117097:609082611642769",
+        "fill::xyz:INTC:1792689117097:613684281732880",
+        "fill::xyz:INTC:1792689117097:636765051315885",
+        "fill::xyz:INTC:1792689117097:651428837906554",
+        "fill::xyz:INTC:1792689117097:659996222257304",
+        "fill::xyz:INTC:1792689117097:667296160329688",
+        "fill::xyz:INTC:1792689117097:669402375495192",
+        "fill::xyz:INTC:1792689117097:691835900081444",
+        "fill::xyz:INTC:1792689117097:694476937582066",
+        "fill::xyz:INTC:1792689117097:710656617188143",
+        "fill::xyz:INTC:1792689117097:726046741119032",
+        "fill::xyz:INTC:1792689117097:728404311407948",
+        "fill::xyz:INTC:1792689117097:759723369052960",
+        "fill::xyz:INTC:1792689117097:762706245938566",
+        "fill::xyz:INTC:1792689117097:804521723905052",
+        "fill::xyz:INTC:1792689117097:80901076222168",
+        "fill::xyz:INTC:1792689117097:824640763442177",
+        "fill::xyz:INTC:1792689117097:831622837581748",
+        "fill::xyz:INTC:1792689117097:844388737522593",
+        "fill::xyz:INTC:1792689117097:846725046311407",
+        "fill::xyz:INTC:1792689117097:850266225143283",
+        "fill::xyz:INTC:1792689117097:866782339911260",
+        "fill::xyz:INTC:1792689117097:888110537062262",
+        "fill::xyz:INTC:1792689117097:916964021179603",
+        "fill::xyz:INTC:1792689117097:936569037024783",
+        "fill::xyz:INTC:1792689117097:947405909073384",
         "fill::xyz:MU:1791909141422:1021466206256114",
         "fill::xyz:MU:1791909141422:1026637818747059",
         "fill::xyz:MU:1791909141422:1034389206774924",
@@ -378,79 +466,13 @@
         "fill::xyz:MU:1791909725934:126803505464399",
         "fill::xyz:MU:1791909725934:131319834503201",
         "fill::xyz:MU:1791909725934:142726038539025",
-        "fill::xyz:MU:1791909725934:147508474572300",
-        "fill::xyz:MU:1791909725934:157394566823794",
-        "fill::xyz:MU:1791909725934:161519314914333",
-        "fill::xyz:MU:1791909725934:167012961332085",
-        "fill::xyz:MU:1791909725934:176939715201049",
-        "fill::xyz:MU:1791909725934:183621409914131",
-        "fill::xyz:MU:1791909725934:21352350588112",
-        "fill::xyz:MU:1791909725934:219159778986184",
-        "fill::xyz:MU:1791909725934:245134582501914",
-        "fill::xyz:MU:1791909725934:2519495089102",
-        "fill::xyz:MU:1791909725934:256487956435589",
-        "fill::xyz:MU:1791909725934:258120345637367",
-        "fill::xyz:MU:1791909725934:26343472369377",
-        "fill::xyz:MU:1791909725934:267488175644709",
-        "fill::xyz:MU:1791909725934:267697757066253",
-        "fill::xyz:MU:1791909725934:270192440943062",
-        "fill::xyz:MU:1791909725934:297988794537414",
-        "fill::xyz:MU:1791909725934:300091896649924",
-        "fill::xyz:MU:1791909725934:33532378646153",
-        "fill::xyz:MU:1791909725934:340845547406124",
-        "fill::xyz:MU:1791909725934:341464618025576",
-        "fill::xyz:MU:1791909725934:345495962526714",
-        "fill::xyz:MU:1791909725934:347832617642189",
-        "fill::xyz:MU:1791909725934:367492861553404",
-        "fill::xyz:MU:1791909725934:370888521698360",
-        "fill::xyz:MU:1791909725934:411394288485397",
-        "fill::xyz:MU:1791909725934:439639257434908",
-        "fill::xyz:MU:1791909725934:460708818317984",
-        "fill::xyz:MU:1791909725934:481783728506922",
-        "fill::xyz:MU:1791909725934:489685165819947",
-        "fill::xyz:MU:1791909725934:492555919307598",
-        "fill::xyz:MU:1791909725934:494458509365207",
-        "fill::xyz:MU:1791909725934:507996367481788",
-        "fill::xyz:MU:1791909725934:516672816920265",
-        "fill::xyz:MU:1791909725934:51784094316926",
-        "fill::xyz:MU:1791909725934:52606357450981",
-        "fill::xyz:MU:1791909725934:535899457173759",
-        "fill::xyz:MU:1791909725934:550889809350394",
-        "fill::xyz:MU:1791909725934:556337182864091",
-        "fill::xyz:MU:1791909725934:56680250503277",
-        "fill::xyz:MU:1791909725934:569594761005344",
-        "fill::xyz:MU:1791909725934:589906077920674",
-        "fill::xyz:MU:1791909725934:596703084919395",
-        "fill::xyz:MU:1791909725934:60093050549488",
-        "fill::xyz:MU:1791909725934:602997997675318",
-        "fill::xyz:MU:1791909725934:623065427638505",
-        "fill::xyz:MU:1791909725934:625813605285182",
-        "fill::xyz:MU:1791909725934:627984728241829",
-        "fill::xyz:MU:1791909725934:657397528833567",
-        "fill::xyz:MU:1791909725934:66096414111637",
-        "fill::xyz:MU:1791909725934:683581815138435",
-        "fill::xyz:MU:1791909725934:690187850229128",
-        "fill::xyz:MU:1791909725934:695056703991643",
-        "fill::xyz:MU:1791909725934:718179331491027",
-        "fill::xyz:MU:1791909725934:722784898010442",
-        "fill::xyz:MU:1791909725934:725780737749609",
-        "fill::xyz:MU:1791909725934:727820537103743",
-        "fill::xyz:MU:1791909725934:735230485185706",
-        "fill::xyz:MU:1791909725934:740613388666507",
-        "fill::xyz:MU:1791909725934:743884852354695",
-        "fill::xyz:MU:1791909725934:755903623228454",
-        "fill::xyz:MU:1791909725934:756257329846161",
-        "fill::xyz:MU:1791909725934:757037559677329",
-        "fill::xyz:MU:1791909725934:757107503529257",
-        "fill::xyz:MU:1791909725934:75986430926880",
-        "fill::xyz:MU:1791909725934:77351059162976",
-        "fill::xyz:MU:1791909725934:790601957010790"
+        "fill::xyz:MU:1791909725934:147508474572300"
       ]
     },
     "tooling": {
-      "requests": 38.0,
-      "cum_volume_usd": 1037315.81,
-      "requests_per_1k_usd": 0.0366
+      "requests": 39.0,
+      "cum_volume_usd": 1095598.19,
+      "requests_per_1k_usd": 0.0356
     }
   },
   "score_history": [
@@ -534,6 +556,27 @@
         "activity": 0.6974,
         "direction_bias": 0.0,
         "position_management": 0.9478,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-10-28T08:06:46.690898+00:00",
+      "score": 0.5001,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.2,
+        "timing_profile": null,
+        "leverage_profile": 0.9747,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.5334,
+        "trade_sequencing": 0.5413,
+        "position_sizing": 0.5,
+        "order_profile": 0.747,
+        "activity": 0.7857,
+        "direction_bias": 0.0122,
+        "position_management": 0.9398,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
