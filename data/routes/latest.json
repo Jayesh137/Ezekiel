@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "id": "polygon:0x70d2315cf0ee4ea0244f1c9818142f6f77b9ce5cf4e42c6d8e1eb30bd7c95163:erc20:0",
+      "original_funder": "0xdab197a5e335fcd6de6b96b5e000aa6199c84fd8",
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "source_chain": "polygon",
+      "source_tx": "0x70d2315cf0ee4ea0244f1c9818142f6f77b9ce5cf4e42c6d8e1eb30bd7c95163",
+      "amount_usd": null,
+      "ts_ms": 1793538295000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "polygon:0x70d2315cf0ee4ea0244f1c9818142f6f77b9ce5cf4e42c6d8e1eb30bd7c95163:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "arbitrum:0x4a210fda1d65db415af313869ed4677b4ed505fa92b5dc06b04c491ae9e230d9:erc20:0",
       "original_funder": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "source_chain": "arbitrum",
@@ -14377,20 +14391,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "base:0x2b7ea3c164d70768021f0edc1699dd5529e0c6f6f55672ed06055bf0dc7bbf14:erc20:40"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "base:0x2b7ea3c164d70768021f0edc1699dd5529e0c6f6f55672ed06055bf0dc7bbf14:erc20:43",
-      "original_funder": "0xb1a851b8c70a4749408754d398702153a61dfc78",
-      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "base",
-      "source_tx": "0x2b7ea3c164d70768021f0edc1699dd5529e0c6f6f55672ed06055bf0dc7bbf14",
-      "amount_usd": null,
-      "ts_ms": 1753697547000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "base:0x2b7ea3c164d70768021f0edc1699dd5529e0c6f6f55672ed06055bf0dc7bbf14:erc20:43"
       ],
       "confirms_owner": false
     }
@@ -34399,6 +34399,17 @@
   ],
   "discoveries": [
     {
+      "wallet": "0xdab197a5e335fcd6de6b96b5e000aa6199c84fd8",
+      "source": "funding_route",
+      "positive": true,
+      "event_id": "polygon:0x70d2315cf0ee4ea0244f1c9818142f6f77b9ce5cf4e42c6d8e1eb30bd7c95163:erc20:0",
+      "parent_event_ids": [
+        "polygon:0x70d2315cf0ee4ea0244f1c9818142f6f77b9ce5cf4e42c6d8e1eb30bd7c95163:erc20:0"
+      ],
+      "assertion": "observed_transfer",
+      "confirms_owner": false
+    },
+    {
       "wallet": "0x89587ebe7cff64c6527fe2deccc3521d75763e8d",
       "source": "funding_route",
       "positive": true,
@@ -45386,29 +45397,18 @@
       ],
       "assertion": "observed_transfer",
       "confirms_owner": false
-    },
-    {
-      "wallet": "0x79056e21502bbd62918d12ccbb5d6653439ba207",
-      "source": "funding_route",
-      "positive": true,
-      "event_id": "ethereum:0x541f3c71e3f735f3150ee31def052c969ed987d6ddd620d7a7e9b480324500c3:erc20:0",
-      "parent_event_ids": [
-        "ethereum:0x541f3c71e3f735f3150ee31def052c969ed987d6ddd620d7a7e9b480324500c3:erc20:0"
-      ],
-      "assertion": "observed_transfer",
-      "confirms_owner": false
     }
   ],
   "coverage": {
-    "transfer_records": 5758,
-    "circle_events": 5566
+    "transfer_records": 5759,
+    "circle_events": 6056
   },
   "counts": {
-    "routes": 3250,
+    "routes": 3251,
     "unresolved": 2516,
-    "discoveries": 2167
+    "discoveries": 2168
   },
-  "computed_at_ms": 1793533957784,
+  "computed_at_ms": 1793542414120,
   "authority": {
     "intervals": [
       {
@@ -57816,6 +57816,10 @@
     "queries": 20,
     "errors": [
       {
+        "tx": "0x803886beddd19a104dde3adf58621d226c6f00f4d8242da9c013c668db1006ea",
+        "reason": "no validated complete V2 message"
+      },
+      {
         "tx": "0xe4247a1c84c49a55e085bd225a6807aa00b06e232e1d04b238f4a36dc00a9d72",
         "reason": "no validated complete V2 message"
       },
@@ -57890,15 +57894,11 @@
       {
         "tx": "0xbe4e4a42b8c51f70ba152169bad810e3479aedba5d55efe83c5c0a956a2522ee",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0x0204e24dacd5dc1753718f2ccc6dcbde6b0b11a24b9182644e543a97c8c56508",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 5566,
+    "circle_rows_read": 6056,
     "store_read_limit": 100000
   }
 }
