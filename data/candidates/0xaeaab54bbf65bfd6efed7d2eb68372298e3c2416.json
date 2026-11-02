@@ -1,9 +1,9 @@
 {
   "wallet": "0xaeaab54bbf65bfd6efed7d2eb68372298e3c2416",
   "first_seen": "2026-07-27T20:08:40.144196+00:00",
-  "last_seen": "2026-10-30T10:26:04.604076+00:00",
+  "last_seen": "2026-11-02T06:11:42.720990+00:00",
   "best_score": 0.5526,
-  "latest_score": 0.3316,
+  "latest_score": 0.3867,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -14,7 +14,8 @@
       "Matching long/short bias"
     ],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Very different account-size bracket"
     ],
     "vetoes": [],
     "asset_overlap": {
@@ -42,7 +43,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3316,
+      "score_without_bonus": 0.3867,
       "explanations": [],
       "frequencies": {}
     },
@@ -51,7 +52,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8988,
+        "relative_size_dispersion": 0.8966,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
@@ -322,8 +323,8 @@
       ]
     },
     "tooling": {
-      "requests": 3797.0,
-      "cum_volume_usd": 1505022651.54,
+      "requests": 3835.0,
+      "cum_volume_usd": 1526746156.72,
       "requests_per_1k_usd": 0.0025
     }
   },
@@ -1075,11 +1076,32 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-02T06:11:42.720990+00:00",
+      "score": 0.3867,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.5888,
+        "account_size": 0.1748,
+        "trade_sequencing": 0.5004,
+        "position_sizing": 0.5,
+        "order_profile": 0.6331,
+        "activity": 0.8443,
+        "direction_bias": 0.9878,
+        "position_management": 0.7837,
+        "loss_handling": 0.4246
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3621,
-  "last_checked": "2026-10-30T10:26:04.604076+00:00",
+  "recent_avg_score": 0.3554,
+  "last_checked": "2026-11-02T06:11:42.720990+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor",
@@ -1315,6 +1337,29 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-30T10:25:45.954885+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792928242122,
+      "coverage": {
+        "start_ms": 1791785443863,
+        "end_ms": 1793599843863,
+        "pages": 3,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1791785443863,
+        "requested_start_ms": 1791785443863,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793599843863,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-02T06:11:19.927577+00:00"
     },
     {
       "status": "partial",
@@ -1674,19 +1719,19 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1791541521003,
-    "end_ms": 1793355921003,
+    "start_ms": 1791785443863,
+    "end_ms": 1793599843863,
     "pages": 3,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1791541521003,
-    "requested_start_ms": 1791541521003,
+    "fetched_start_ms": 1791785443863,
+    "requested_start_ms": 1791785443863,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1792877465553,
-  "last_successful_read": "2026-10-30T10:26:04.604076+00:00",
-  "last_positive_evidence": "2026-10-30T10:25:45.954885+00:00",
-  "last_scored": "2026-10-30T10:26:04.604076+00:00"
+  "last_successful_read": "2026-11-02T06:11:42.720990+00:00",
+  "last_positive_evidence": "2026-11-02T06:11:19.927577+00:00",
+  "last_scored": "2026-11-02T06:11:42.720990+00:00"
 }
