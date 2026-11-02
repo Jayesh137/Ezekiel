@@ -1,40 +1,33 @@
 {
   "wallet": "0x88b2448328f4335ad2a8cac06485c378ebe66fe3",
   "first_seen": "2026-08-13T15:49:09.889164+00:00",
-  "last_seen": "2026-08-16T00:35:36.216474+00:00",
+  "last_seen": "2026-11-02T20:39:04.060384+00:00",
   "best_score": 0.2033,
-  "latest_score": 0.2033,
+  "latest_score": 0.1796,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [
-      "Matching trade frequency and cadence"
-    ],
+    "reasons": [],
     "warnings": [
       "Weak asset overlap",
-      "Very different account-size bracket",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [
-      "Incompatible hold style: 80% vs 0% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
-      "overlap": [
-        "BTC"
-      ],
+      "overlap": [],
       "target_only": [
-        "@107",
-        "CASHCAT",
-        "MON",
-        "XPL",
-        "xyz:SKHX"
+        "ADA",
+        "ENA",
+        "LIT",
+        "xyz:MU"
       ],
       "candidate_only": [
+        "BTC",
         "SOL"
       ],
-      "overlap_count": 1,
+      "overlap_count": 0,
       "rare_overlap": [],
-      "jaccard": 0.1429
+      "jaccard": 0.0
     },
     "market_rarity": {
       "shared_markets": [],
@@ -43,9 +36,50 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2033,
+      "score_without_bonus": 0.1796,
       "explanations": [],
       "frequencies": {}
+    },
+    "episodes": {
+      "status": "insufficient_data",
+      "promotable": false,
+      "similarity": null,
+      "features": {
+        "relative_size_dispersion": 0.8909,
+        "partial_fills_per_order": 1.0,
+        "pacing_seconds": 0.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 3,
+      "confounders": [
+        "shared_execution_software",
+        "market_conditions"
+      ],
+      "parent_event_ids": [
+        "fill::BTC:1793368070185:1092708030259049",
+        "fill::BTC:1793368070185:909566289575886",
+        "fill::BTC:1793368070383:1113366923250756",
+        "fill::BTC:1793368267707:71661021739108",
+        "fill::BTC:1793368316940:985676505057791",
+        "fill::BTC:1793368317069:46476945585065",
+        "fill::BTC:1793386343026:572109708362017",
+        "fill::BTC:1793386350659:1121434333826439",
+        "fill::SOL:1793640623398:11225806679039",
+        "fill::SOL:1793641527353:571975532732620",
+        "fill::SOL:1793641527353:760926248927804",
+        "fill::SOL:1793641588337:304994761089840",
+        "fill::SOL:1793641589068:1115135616210018",
+        "fill::SOL:1793641589068:119006218767823",
+        "fill::SOL:1793641589068:720965617550267",
+        "fill::SOL:1793641589068:891990891251531",
+        "fill::SOL:1793641671379:444452055612193",
+        "fill::SOL:1793648212533:852229189633110",
+        "fill::SOL:1793648212945:414552819018813",
+        "fill::SOL:1793648212945:85962026574437",
+        "fill::SOL:1793648408380:420912572084806",
+        "fill::SOL:1793648408380:970056054575779"
+      ]
     }
   },
   "score_history": [
@@ -941,16 +975,37 @@
         "position_management": 0.7408,
         "loss_handling": null
       }
+    },
+    {
+      "scan_time": "2026-11-02T20:39:04.060384+00:00",
+      "score": 0.1796,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.3655,
+        "entry_exit_style": 0.0,
+        "hold_duration": null,
+        "account_size": 0.3111,
+        "trade_sequencing": 0.6276,
+        "position_sizing": 0.0642,
+        "order_profile": null,
+        "activity": 0.7118,
+        "direction_bias": 0.0122,
+        "position_management": 0.7824,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2033,
-  "last_checked": "2026-11-01T01:19:01.620648+00:00",
+  "recent_avg_score": 0.1999,
+  "last_checked": "2026-11-02T20:39:04.060384+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-01T01:19:01.620648+00:00",
+  "last_successful_read": "2026-11-02T20:39:04.060384+00:00",
   "observations": [
     {
       "status": "ok",
@@ -974,6 +1029,29 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-01T01:19:01.620648+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1791837539535,
+      "coverage": {
+        "start_ms": 1791837539535,
+        "end_ms": 1793651939535,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1791837539535,
+        "requested_start_ms": 1791837539535,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793651939535,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-02T20:39:01.540388+00:00"
     },
     {
       "status": "ok",
@@ -1391,17 +1469,19 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1791681539616,
-    "end_ms": 1793495939616,
+    "start_ms": 1791837539535,
+    "end_ms": 1793651939535,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793333746909,
-    "requested_start_ms": 1791681539616,
+    "fetched_start_ms": 1791837539535,
+    "requested_start_ms": 1791837539535,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1792723378900,
-  "last_positive_evidence": "2026-11-01T01:19:01.620648+00:00"
+  "last_positive_evidence": "2026-11-02T20:39:01.540388+00:00",
+  "last_scored": "2026-11-02T20:39:04.060384+00:00",
+  "latest_scoring_schema": "2026-09-26.2"
 }
