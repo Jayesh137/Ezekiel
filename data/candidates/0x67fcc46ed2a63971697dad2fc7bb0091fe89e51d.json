@@ -1,35 +1,35 @@
 {
   "wallet": "0x67fcc46ed2a63971697dad2fc7bb0091fe89e51d",
   "first_seen": "2026-08-22T00:31:03.507927+00:00",
-  "last_seen": "2026-10-30T19:16:52.921795+00:00",
+  "last_seen": "2026-11-02T13:37:59.033440+00:00",
   "best_score": 0.5589,
-  "latest_score": 0.4762,
+  "latest_score": 0.389,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
+      "Matching trade frequency and cadence",
       "Similar scaling/TWAP/clip-size habits"
     ],
-    "warnings": [],
+    "warnings": [
+      "Weak asset overlap"
+    ],
     "vetoes": [],
     "asset_overlap": {
       "overlap": [
-        "ADA",
         "ENA",
         "LIT"
       ],
       "target_only": [
+        "ADA",
         "xyz:MU"
       ],
       "candidate_only": [
         "BNB",
         "BTC",
         "CHIP",
-        "CRV",
         "FARTCOIN",
         "HBAR",
-        "MET",
-        "MON",
         "NEAR",
         "ONDO",
         "STRK",
@@ -44,11 +44,12 @@
         "xyz:CRCL",
         "xyz:GOOGL",
         "xyz:INTC",
+        "xyz:NVDA",
         "xyz:TSLA"
       ],
-      "overlap_count": 3,
+      "overlap_count": 2,
       "rare_overlap": [],
-      "jaccard": 0.1111
+      "jaccard": 0.08
     },
     "market_rarity": {
       "shared_markets": [],
@@ -57,7 +58,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4762,
+      "score_without_bonus": 0.389,
       "explanations": [],
       "frequencies": {}
     },
@@ -66,7 +67,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9326,
+        "relative_size_dispersion": 0.9676,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 0.0,
@@ -78,12 +79,6 @@
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::ADA:1791790416294:1061081378514834",
-        "fill::ADA:1791790416294:293906377159583",
-        "fill::ADA:1791790416294:371731811298938",
-        "fill::ADA:1791790416294:735618303940412",
-        "fill::ADA:1791790416294:766371359683715",
-        "fill::ADA:1791790416294:775991849295480",
         "fill::BNB:1793306941717:715571902602017",
         "fill::BNB:1793306943546:833811007301431",
         "fill::BNB:1793306953757:828750765913030",
@@ -333,13 +328,19 @@
         "fill::BNB:1793311104132:318401646339438",
         "fill::BNB:1793312654601:990828904464990",
         "fill::BNB:1793312654664:200882884719099",
-        "fill::BNB:1793312664527:752936058948775"
+        "fill::BNB:1793312664527:752936058948775",
+        "fill::BNB:1793312671040:657288547906027",
+        "fill::BNB:1793312672073:193503988027872",
+        "fill::BNB:1793312743232:684610759855395",
+        "fill::BNB:1793312790872:639190504900427",
+        "fill::BNB:1793312791005:75777594196665",
+        "fill::BNB:1793312791005:949752716758809"
       ]
     },
     "tooling": {
-      "requests": 3118634.0,
-      "cum_volume_usd": 968470239.3,
-      "requests_per_1k_usd": 3.2202
+      "requests": 3121450.0,
+      "cum_volume_usd": 969194247.41,
+      "requests_per_1k_usd": 3.2207
     }
   },
   "score_history": [
@@ -518,12 +519,33 @@
         "loss_handling": 0.1348
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-02T13:37:59.033440+00:00",
+      "score": 0.389,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.3802,
+        "timing_profile": null,
+        "leverage_profile": 0.776,
+        "entry_exit_style": 0.0,
+        "hold_duration": 0.3389,
+        "account_size": 0.5137,
+        "trade_sequencing": 0.7406,
+        "position_sizing": 0.2418,
+        "order_profile": 0.4555,
+        "activity": 0.796,
+        "direction_bias": 0.597,
+        "position_management": 0.9202,
+        "loss_handling": 0.3653
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.4974,
+  "recent_avg_score": 0.474,
   "last_investigated_ms": 1792637758368,
-  "last_checked": "2026-10-30T19:16:52.921795+00:00",
+  "last_checked": "2026-11-02T13:37:59.033440+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor"
@@ -574,6 +596,29 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-10-30T19:16:38.803571+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1793341739368,
+      "coverage": {
+        "start_ms": 1791812218819,
+        "end_ms": 1793626618819,
+        "pages": 4,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1791812218819,
+        "requested_start_ms": 1791812218819,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793626618819,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-02T13:37:37.453578+00:00"
     },
     {
       "status": "partial",
@@ -1137,19 +1182,19 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1791573349874,
-    "end_ms": 1793387749874,
-    "pages": 5,
+    "start_ms": 1791812218819,
+    "end_ms": 1793626618819,
+    "pages": 4,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1791573349874,
-    "requested_start_ms": 1791573349874,
+    "fetched_start_ms": 1791812218819,
+    "requested_start_ms": 1791812218819,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_successful_read": "2026-10-30T19:16:52.921795+00:00",
-  "last_positive_evidence": "2026-10-30T19:16:38.803571+00:00",
-  "last_scored": "2026-10-30T19:16:52.921795+00:00",
+  "last_successful_read": "2026-11-02T13:37:59.033440+00:00",
+  "last_positive_evidence": "2026-11-02T13:37:37.453578+00:00",
+  "last_scored": "2026-11-02T13:37:59.033440+00:00",
   "latest_scoring_schema": "2026-09-26.2"
 }
