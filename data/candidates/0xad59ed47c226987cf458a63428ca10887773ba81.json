@@ -1,14 +1,14 @@
 {
   "wallet": "0xad59ed47c226987cf458a63428ca10887773ba81",
-  "last_checked": "2026-11-03T19:51:16.485409+00:00",
+  "last_checked": "2026-11-05T23:56:30.614683+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-27T15:04:04.066767+00:00",
   "discovery_sources": [
     "bridge_depositor",
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-03T19:51:16.485409+00:00",
-  "last_positive_evidence": "2026-11-03T19:51:13.999252+00:00",
+  "last_successful_read": "2026-11-05T23:56:30.614683+00:00",
+  "last_positive_evidence": "2026-11-05T23:56:28.227519+00:00",
   "observations": [
     {
       "status": "ok",
@@ -649,32 +649,57 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-03T19:51:13.999252+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792108586190,
+      "coverage": {
+        "start_ms": 1792108586190,
+        "end_ms": 1793922986190,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792108586190,
+        "requested_start_ms": 1792108586190,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793922986190,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-05T23:56:28.227519+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1791921071933,
-    "end_ms": 1793735471933,
+    "start_ms": 1792108586190,
+    "end_ms": 1793922986190,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1791921071933,
-    "requested_start_ms": 1791921071933,
+    "fetched_start_ms": 1792108586190,
+    "requested_start_ms": 1792108586190,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-03T19:51:16.485409+00:00",
-  "last_scored": "2026-11-03T19:51:16.485409+00:00",
+  "last_seen": "2026-11-05T23:56:30.614683+00:00",
+  "last_scored": "2026-11-05T23:56:30.614683+00:00",
   "best_score": 0.4603,
-  "latest_score": 0.3049,
+  "latest_score": 0.2983,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Similar market/limit execution style"
+    ],
     "warnings": [
       "Weak asset overlap",
-      "Very different account-size bracket"
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
@@ -682,15 +707,13 @@
       "target_only": [
         "ADA",
         "ENA",
-        "LIT",
-        "xyz:MU"
+        "LIT"
       ],
       "candidate_only": [
         "BNB",
-        "DASH",
+        "BTC",
         "ETH",
         "POL",
-        "XRP",
         "xyz:BRENTOIL"
       ],
       "overlap_count": 0,
@@ -704,7 +727,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3049,
+      "score_without_bonus": 0.2983,
       "explanations": [],
       "frequencies": {}
     },
@@ -713,13 +736,13 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9604,
+        "relative_size_dispersion": 0.7978,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 4,
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -727,35 +750,25 @@
       "parent_event_ids": [
         "fill::BNB:1793306772474:263388635210184",
         "fill::BNB:1793306783124:406343764880941",
-        "fill::DASH:1792003880859:10694576515614",
-        "fill::DASH:1792003880859:1103837580564262",
-        "fill::DASH:1792003880859:358895613788429",
-        "fill::DASH:1792003880859:686942409150834",
-        "fill::DASH:1792003880859:7669484392252",
-        "fill::DASH:1792003881342:233005815161340",
-        "fill::DASH:1792003881342:412450244619589",
-        "fill::DASH:1792003980865:580558849083048",
-        "fill::DASH:1792003980865:739887697234328",
+        "fill::BNB:1793904083529:104161515946965",
+        "fill::BNB:1793904083529:1062109426530960",
+        "fill::BNB:1793904083529:11291542808453",
+        "fill::BNB:1793904083529:123062395564602",
+        "fill::BNB:1793904083529:214674921292331",
+        "fill::BNB:1793904083529:362838350735316",
+        "fill::BNB:1793904083529:573204843292440",
+        "fill::BNB:1793904083529:638121446869492",
+        "fill::BNB:1793904083529:844694215493174",
+        "fill::BNB:1793904083529:902816901067721",
+        "fill::BNB:1793904083529:925911791395681",
+        "fill::BTC:1793761724216:1083632568383845",
+        "fill::BTC:1793761724216:848089998587724",
         "fill::ETH:1792343983072:1004167593525708",
         "fill::ETH:1792796030760:834753822288711",
         "fill::ETH:1793343213252:406024499066887",
         "fill::ETH:1793343213252:433329727634729",
         "fill::ETH:1793343213252:605035742941629",
         "fill::ETH:1793343213252:879182031181107",
-        "fill::POL:1792003905196:1077715090638417",
-        "fill::POL:1792003905196:1082568228245265",
-        "fill::POL:1792003905196:263030507371011",
-        "fill::POL:1792003905196:30134409189974",
-        "fill::POL:1792003905196:336874581995921",
-        "fill::POL:1792003905196:492484037220864",
-        "fill::POL:1792003905196:67156913011269",
-        "fill::POL:1792003905196:855759059162049",
-        "fill::POL:1792003905196:880013943364477",
-        "fill::POL:1792003905196:995619898900076",
-        "fill::POL:1792003923043:928326991310080",
-        "fill::POL:1792003923381:617759659620869",
-        "fill::POL:1792003923707:160232028567416",
-        "fill::POL:1792003923843:647426496526712",
         "fill::POL:1793343977537:1071044957563376",
         "fill::POL:1793343977537:161756990881720",
         "fill::POL:1793343977537:226664402491356",
@@ -766,17 +779,12 @@
         "fill::POL:1793343977537:698238123038267",
         "fill::POL:1793343977537:717891075609154",
         "fill::POL:1793343977952:120435766364763",
-        "fill::XRP:1791990525080:254944080441160",
-        "fill::XRP:1791990525080:857797265826427",
-        "fill::XRP:1791990529018:120663127629825",
-        "fill::XRP:1791990529460:1027985255518112",
-        "fill::XRP:1791990529838:460086968402941",
-        "fill::XRP:1791990547399:114837976948053",
-        "fill::XRP:1791990547399:204613909337841",
-        "fill::XRP:1791993403874:984373764760270",
         "fill::xyz:BRENTOIL:1792195921306:847648033840809",
         "fill::xyz:BRENTOIL:1792763114676:387566648693033",
-        "fill::xyz:BRENTOIL:1792763114676:513602649391514"
+        "fill::xyz:BRENTOIL:1792763114676:513602649391514",
+        "fill::xyz:BRENTOIL:1793810253089:954826510033116",
+        "fill::xyz:BRENTOIL:1793904130000:418100609893511",
+        "fill::xyz:BRENTOIL:1793904130000:430398949080201"
       ]
     }
   },
@@ -1368,9 +1376,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-05T23:56:30.614683+00:00",
+      "score": 0.2983,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.6717,
+        "entry_exit_style": 0.921,
+        "hold_duration": null,
+        "account_size": 0.3841,
+        "trade_sequencing": 0.5366,
+        "position_sizing": 0.0623,
+        "order_profile": null,
+        "activity": 0.5673,
+        "direction_bias": null,
+        "position_management": 0.7433,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3089,
+  "recent_avg_score": 0.3033,
   "last_investigated_ms": 1792877465553
 }

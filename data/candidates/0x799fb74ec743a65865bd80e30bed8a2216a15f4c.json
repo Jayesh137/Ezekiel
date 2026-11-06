@@ -1,13 +1,13 @@
 {
   "wallet": "0x799fb74ec743a65865bd80e30bed8a2216a15f4c",
-  "last_checked": "2026-11-02T15:58:25.718688+00:00",
+  "last_checked": "2026-11-05T23:51:01.934403+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-03T18:53:56.834960+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-11-02T15:58:25.718688+00:00",
-  "last_positive_evidence": "2026-11-02T15:58:17.298977+00:00",
+  "last_successful_read": "2026-11-05T23:51:01.934403+00:00",
+  "last_positive_evidence": "2026-11-05T23:50:53.672780+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1227,24 +1227,47 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-11-02T15:58:17.298977+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792108252297,
+      "coverage": {
+        "start_ms": 1792108252297,
+        "end_ms": 1793922652297,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792108252297,
+        "requested_start_ms": 1792108252297,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793922652297,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-05T23:50:53.672780+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1791820685641,
-    "end_ms": 1793635085641,
+    "start_ms": 1792108252297,
+    "end_ms": 1793922652297,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1791820685641,
-    "requested_start_ms": 1791820685641,
+    "fetched_start_ms": 1792108252297,
+    "requested_start_ms": 1792108252297,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-02T15:58:25.718688+00:00",
-  "last_scored": "2026-11-02T15:58:25.718688+00:00",
+  "last_seen": "2026-11-05T23:51:01.934403+00:00",
+  "last_scored": "2026-11-05T23:51:01.934403+00:00",
   "best_score": 0.4364,
-  "latest_score": 0.3518,
+  "latest_score": 0.331,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -1255,6 +1278,7 @@
     ],
     "warnings": [
       "Weak asset overlap",
+      "Very different account-size bracket",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
@@ -1263,8 +1287,7 @@
       "target_only": [
         "ADA",
         "ENA",
-        "LIT",
-        "xyz:MU"
+        "LIT"
       ],
       "candidate_only": [
         "BTC",
@@ -1281,7 +1304,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3518,
+      "score_without_bonus": 0.331,
       "explanations": [],
       "frequencies": {}
     },
@@ -1290,7 +1313,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9472,
+        "relative_size_dispersion": 0.9788,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
@@ -2679,9 +2702,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-05T23:51:01.934403+00:00",
+      "score": 0.331,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.5415,
+        "entry_exit_style": 0.5757,
+        "hold_duration": null,
+        "account_size": 0.207,
+        "trade_sequencing": 0.9442,
+        "position_sizing": 0.0368,
+        "order_profile": 0.789,
+        "activity": 0.7657,
+        "direction_bias": 0.0122,
+        "position_management": 0.8327,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3946,
+  "recent_avg_score": 0.3838,
   "last_investigated_ms": 1793123265909
 }
