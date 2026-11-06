@@ -1,14 +1,14 @@
 {
   "wallet": "0x029bf0485e2d10bece043bd6b27caf486ee4acc3",
-  "last_checked": "2026-11-05T12:31:24.760988+00:00",
+  "last_checked": "2026-11-06T20:03:26.896216+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-26T14:29:15.989294+00:00",
   "discovery_sources": [
     "bridge_depositor",
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-05T12:31:24.760988+00:00",
-  "last_positive_evidence": "2026-11-05T12:31:17.170359+00:00",
+  "last_successful_read": "2026-11-06T20:03:26.896216+00:00",
+  "last_positive_evidence": "2026-11-06T20:03:15.390671+00:00",
   "observations": [
     {
       "status": "ok",
@@ -262,24 +262,47 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-05T12:31:17.170359+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1793602662646,
+      "coverage": {
+        "start_ms": 1792180958285,
+        "end_ms": 1793995358285,
+        "pages": 4,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792180958285,
+        "requested_start_ms": 1792180958285,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793995358285,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-06T20:03:15.390671+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792067440691,
-    "end_ms": 1793881840691,
+    "start_ms": 1792180958285,
+    "end_ms": 1793995358285,
     "pages": 4,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792067440691,
-    "requested_start_ms": 1792067440691,
+    "fetched_start_ms": 1792180958285,
+    "requested_start_ms": 1792180958285,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-05T12:31:24.760988+00:00",
-  "last_scored": "2026-11-05T12:31:24.760988+00:00",
+  "last_seen": "2026-11-06T20:03:26.896216+00:00",
+  "last_scored": "2026-11-06T20:03:26.896216+00:00",
   "best_score": 0.2295,
-  "latest_score": 0.1345,
+  "latest_score": 0.2244,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -291,7 +314,7 @@
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 8x apart (2.00 vs 0.25 position episodes/day)"
+      "Incompatible hold style: 75% vs 0% of holds under 1h"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -315,7 +338,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.1345,
+      "score_without_bonus": 0.2244,
       "explanations": [],
       "frequencies": {}
     },
@@ -324,7 +347,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9153,
+        "relative_size_dispersion": 0.9157,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 0.0,
@@ -593,6 +616,11 @@
         "fill::@107:1793019736741:731665300440950",
         "fill::@107:1793019736741:73678773153185"
       ]
+    },
+    "tooling": {
+      "requests": 331.0,
+      "cum_volume_usd": 78638950.56,
+      "requests_per_1k_usd": 0.0042
     }
   },
   "score_history": [
@@ -826,9 +854,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-06T20:03:26.896216+00:00",
+      "score": 0.2244,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.0393,
+        "hold_duration": null,
+        "account_size": 0.1464,
+        "trade_sequencing": 0.6068,
+        "position_sizing": 0.5,
+        "order_profile": 0.6748,
+        "activity": 0.6759,
+        "direction_bias": null,
+        "position_management": 0.505,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.1881,
+  "recent_avg_score": 0.1886,
   "last_investigated_ms": 1793025342610
 }

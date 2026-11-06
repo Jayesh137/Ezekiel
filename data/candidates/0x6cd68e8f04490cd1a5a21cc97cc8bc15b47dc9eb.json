@@ -1,12 +1,12 @@
 {
   "wallet": "0x6cd68e8f04490cd1a5a21cc97cc8bc15b47dc9eb",
   "first_seen": "2026-10-14T20:12:25.226623+00:00",
-  "last_seen": "2026-11-04T19:01:13.758365+00:00",
-  "last_checked": "2026-11-04T19:01:13.758365+00:00",
-  "last_successful_read": "2026-11-04T19:01:13.758365+00:00",
-  "last_scored": "2026-11-04T19:01:13.758365+00:00",
+  "last_seen": "2026-11-06T20:09:41.053190+00:00",
+  "last_checked": "2026-11-06T20:09:41.053190+00:00",
+  "last_successful_read": "2026-11-06T20:09:41.053190+00:00",
+  "last_scored": "2026-11-06T20:09:41.053190+00:00",
   "best_score": 0.2004,
-  "latest_score": 0.1329,
+  "latest_score": 0.1317,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -14,11 +14,10 @@
     "reasons": [],
     "warnings": [
       "Weak asset overlap",
-      "Very different account-size bracket",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Incompatible hold style: 75% vs 0% of holds under 1h"
+      "Decision frequency 14x apart (2.00 vs 0.14 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -28,6 +27,7 @@
         "LIT"
       ],
       "candidate_only": [
+        "@166",
         "@85"
       ],
       "overlap_count": 0,
@@ -41,7 +41,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.1329,
+      "score_without_bonus": 0.1317,
       "explanations": [],
       "frequencies": {}
     },
@@ -50,8 +50,9 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.0587,
+        "relative_size_dispersion": 0.0459,
         "partial_fills_per_order": 1.0,
+        "pacing_seconds": 0.0,
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
@@ -61,27 +62,13 @@
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::@85:1792077828443:258032223781365",
-        "fill::@85:1792077828443:260980412184455",
-        "fill::@85:1792077828443:823156796206595",
-        "fill::@85:1792077828443:88336233418266",
-        "fill::@85:1792077832763:33020731223950",
-        "fill::@85:1792077855055:1078736796606501",
-        "fill::@85:1792077855055:120714032264977",
-        "fill::@85:1792077855055:126904843695617",
-        "fill::@85:1792077855055:738862036139909",
-        "fill::@85:1792077855055:892532360047250",
-        "fill::@85:1792078798074:670276190900152",
-        "fill::@85:1792078799696:321476504031386",
-        "fill::@85:1792078799696:418002269476001",
-        "fill::@85:1792078800622:794022946296546",
-        "fill::@85:1792078802021:867166578054473",
-        "fill::@85:1792078802083:296853080942687",
-        "fill::@85:1792078802817:620070648158490",
-        "fill::@85:1792078803576:262325258648506",
-        "fill::@85:1792078811256:363818076489605",
-        "fill::@85:1792078811923:94276091402261",
-        "fill::@85:1792078863215:737050607075699",
+        "fill::@166:1793887972684:1074441302752259",
+        "fill::@166:1793887972684:151095477824687",
+        "fill::@166:1793887972684:238242220713931",
+        "fill::@166:1793887972684:765347712760241",
+        "fill::@166:1793887972684:770045288678811",
+        "fill::@166:1793887978669:39701573689327",
+        "fill::@166:1793923200025:0",
         "fill::@85:1792352377283:1064261818842790",
         "fill::@85:1792352680168:169382994717004",
         "fill::@85:1792516863092:989726675979269",
@@ -94,7 +81,17 @@
         "fill::@85:1793147793731:1008496039162831",
         "fill::@85:1793147793731:18767378796648",
         "fill::@85:1793147793731:687952673038784",
-        "fill::@85:1793147793731:910651011466331"
+        "fill::@85:1793147793731:910651011466331",
+        "fill::@85:1793920369123:1063221798584447",
+        "fill::@85:1793920369123:1094154853880885",
+        "fill::@85:1793920369123:1119220759429737",
+        "fill::@85:1793920369123:115376389802900",
+        "fill::@85:1793920369123:443597920299516",
+        "fill::@85:1793920369123:633896523508491",
+        "fill::@85:1793920369123:648527934897061",
+        "fill::@85:1793920369123:713853483744013",
+        "fill::@85:1793920369123:829940467449604",
+        "fill::@85:1793920369123:944693261166686"
       ]
     }
   },
@@ -266,16 +263,37 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-06T20:09:41.053190+00:00",
+      "score": 0.1317,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.2911,
+        "hold_duration": null,
+        "account_size": 0.2561,
+        "trade_sequencing": 0.544,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.4038,
+        "direction_bias": null,
+        "position_management": 0.4177,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.1554,
+  "recent_avg_score": 0.1473,
   "last_investigated_ms": 1793211811356,
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_positive_evidence": "2026-11-04T19:01:11.259555+00:00",
+  "last_positive_evidence": "2026-11-06T20:09:38.433729+00:00",
   "observations": [
     {
       "status": "ok",
@@ -437,17 +455,40 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-04T19:01:11.259555+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792181376449,
+      "coverage": {
+        "start_ms": 1792181376449,
+        "end_ms": 1793995776449,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792181376449,
+        "requested_start_ms": 1792181376449,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1793995776449,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-06T20:09:38.433729+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792004469260,
-    "end_ms": 1793818869260,
+    "start_ms": 1792181376449,
+    "end_ms": 1793995776449,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792004469260,
-    "requested_start_ms": 1792004469260,
+    "fetched_start_ms": 1792181376449,
+    "requested_start_ms": 1792181376449,
     "cached": true,
     "local_retention_fills": 50000
   }
