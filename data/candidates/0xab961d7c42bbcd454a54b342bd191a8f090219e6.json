@@ -1252,11 +1252,12 @@
   ],
   "status": "COOLING",
   "recent_avg_score": 0.3281,
-  "last_checked": "2026-11-05T12:27:14.026379+00:00",
-  "last_read_status": "ok",
+  "last_checked": "2026-11-06T11:03:35.345930+00:00",
+  "last_read_status": "partial",
   "discovery_sources": [
     "bridge_depositor",
-    "correlation"
+    "correlation",
+    "leaderboard"
   ],
   "observations": [
     {
@@ -1945,17 +1946,45 @@
       "source": "bridge_depositor",
       "positive": false,
       "observed_at": "2026-11-02T03:55:53.770339+00:00"
+    },
+    {
+      "status": "partial",
+      "next_cursor_ms": 1793882688329,
+      "coverage": {
+        "start_ms": 1792148554621,
+        "end_ms": 1793962954621,
+        "pages": 6,
+        "complete_available_window": false,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792148554621,
+        "requested_start_ms": 1792148554621,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [
+        {
+          "start_ms": 1793882688329,
+          "reason": "page_budget"
+        }
+      ],
+      "error": null,
+      "last_successful_end_ms": null,
+      "source": "leaderboard",
+      "positive": false,
+      "observed_at": "2026-11-06T11:03:35.345930+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792067149409,
-    "end_ms": 1793881549409,
+    "start_ms": 1792148554621,
+    "end_ms": 1793962954621,
     "pages": 6,
-    "complete_available_window": true,
+    "complete_available_window": false,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792067149409,
-    "requested_start_ms": 1792067149409,
+    "fetched_start_ms": 1792148554621,
+    "requested_start_ms": 1792148554621,
     "cached": true,
     "local_retention_fills": 50000
   },
