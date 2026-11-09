@@ -1,13 +1,13 @@
 {
   "wallet": "0xb64f7943732e3ec599edcd1d12f0dcebd8fbf4a4",
-  "last_checked": "2026-11-05T23:50:32.708314+00:00",
+  "last_checked": "2026-11-09T00:18:38.847634+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-15T06:59:23.569214+00:00",
   "discovery_sources": [
     "roster_lead"
   ],
-  "last_successful_read": "2026-11-05T23:50:32.708314+00:00",
-  "last_positive_evidence": "2026-11-05T23:50:18.770730+00:00",
+  "last_successful_read": "2026-11-09T00:18:38.847634+00:00",
+  "last_positive_evidence": "2026-11-09T00:18:24.808158+00:00",
   "observations": [
     {
       "status": "ok",
@@ -169,39 +169,64 @@
       "source": "roster_lead",
       "positive": true,
       "observed_at": "2026-11-05T23:50:18.770730+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792369103955,
+      "coverage": {
+        "start_ms": 1792369103955,
+        "end_ms": 1794183503955,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792369103955,
+        "requested_start_ms": 1792369103955,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794183503955,
+      "source": "roster_lead",
+      "positive": true,
+      "observed_at": "2026-11-09T00:18:24.808158+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792108206814,
-    "end_ms": 1793922606814,
+    "start_ms": 1792369103955,
+    "end_ms": 1794183503955,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792108206814,
-    "requested_start_ms": 1792108206814,
+    "fetched_start_ms": 1792369103955,
+    "requested_start_ms": 1792369103955,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-05T23:50:32.708314+00:00",
-  "last_scored": "2026-11-05T23:50:32.708314+00:00",
-  "best_score": 0.3326,
-  "latest_score": 0.3257,
+  "last_seen": "2026-11-09T00:18:38.847634+00:00",
+  "last_scored": "2026-11-09T00:18:38.847634+00:00",
+  "best_score": 0.3537,
+  "latest_score": 0.3537,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style"
+      "Shares rare HIP-3 markets: xyz:SP500",
+      "Similar market/limit execution style",
+      "xyz:SP500: traded by ~6.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
-      "Weak asset overlap",
-      "Very different account-size bracket",
-      "Too few position episodes to compare holding style"
+      "Weak asset overlap"
     ],
     "vetoes": [],
     "asset_overlap": {
-      "overlap": [],
+      "overlap": [
+        "xyz:SP500"
+      ],
       "target_only": [
         "ADA",
         "ENA",
@@ -217,7 +242,6 @@
         "NEAR",
         "PUMP",
         "SOL",
-        "STRK",
         "XPL",
         "ZEC",
         "xyz:AAPL",
@@ -227,71 +251,52 @@
         "xyz:INTC",
         "xyz:NFLX",
         "xyz:NVDA",
-        "xyz:SP500",
         "xyz:SPCX",
         "xyz:TSLA",
         "xyz:XYZ100"
       ],
-      "overlap_count": 0,
-      "rare_overlap": [],
-      "jaccard": 0.0
+      "overlap_count": 1,
+      "rare_overlap": [
+        "xyz:SP500"
+      ],
+      "jaccard": 0.04
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:SP500"
+      ],
       "rare_markets": [],
-      "classification": {},
-      "description": "no shared markets",
+      "classification": {
+        "xyz:SP500": "COMMON"
+      },
+      "description": "xyz:SP500 (common, ~6.5% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3257,
-      "explanations": [],
-      "frequencies": {}
+      "score_without_bonus": 0.3537,
+      "explanations": [
+        "xyz:SP500: traded by ~6.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      ],
+      "frequencies": {
+        "xyz:SP500": 0.06452
+      }
     },
     "episodes": {
       "status": "insufficient_data",
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8307,
+        "relative_size_dispersion": 0.8424,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 0.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 2,
+      "independent_sessions": 3,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::BTC:1792286713957:1066286298901364",
-        "fill::BTC:1792288142138:1121680255691006",
-        "fill::BTC:1792288142138:1125065655825900",
-        "fill::BTC:1792288142138:11975767142760",
-        "fill::BTC:1792288142138:213868704015967",
-        "fill::BTC:1792288142138:339458650497357",
-        "fill::BTC:1792288142138:34659881134954",
-        "fill::BTC:1792320925101:25902998568302",
-        "fill::BTC:1792320925101:294918852207803",
-        "fill::BTC:1792320925101:31359305640345",
-        "fill::BTC:1792320925101:398499380017402",
-        "fill::BTC:1792320925101:419790185366858",
-        "fill::BTC:1792320925101:530539078663240",
-        "fill::BTC:1792320925101:719415749609071",
-        "fill::BTC:1792320925101:887171159157941",
-        "fill::BTC:1792320925101:951571858823518",
-        "fill::BTC:1792320976926:688314093009722",
-        "fill::BTC:1792320976926:737922622873538",
-        "fill::BTC:1792334850845:261461938434698",
-        "fill::BTC:1792344815166:1072061562087790",
-        "fill::BTC:1792344815166:117012214788704",
-        "fill::BTC:1792344815166:266364729580409",
-        "fill::BTC:1792344815166:307908543926205",
-        "fill::BTC:1792344815166:426624106987813",
-        "fill::BTC:1792344815166:721496347433743",
-        "fill::BTC:1792344815166:918177185398643",
-        "fill::BTC:1792344815166:946490752090414",
-        "fill::BTC:1792344815166:966280272216965",
         "fill::BTC:1792370075662:116333300494962",
         "fill::BTC:1792370075662:383655314941256",
         "fill::BTC:1792370075662:442944817815265",
@@ -519,13 +524,41 @@
         "fill::BTC:1793752407105:292370672033793",
         "fill::BTC:1793752407105:376736710725709",
         "fill::BTC:1793752407105:378088241222524",
-        "fill::BTC:1793752407105:385290004473963"
+        "fill::BTC:1793752407105:385290004473963",
+        "fill::BTC:1793752407105:419704289264013",
+        "fill::BTC:1793752407105:468899325844663",
+        "fill::BTC:1793752407105:48572809721541",
+        "fill::BTC:1793752407105:550532631768806",
+        "fill::BTC:1793752407105:594565081815438",
+        "fill::BTC:1793752407105:599875755510754",
+        "fill::BTC:1793752407105:635496169874700",
+        "fill::BTC:1793752407105:655366923359030",
+        "fill::BTC:1793752407105:6911209673485",
+        "fill::BTC:1793752407105:758571106560637",
+        "fill::BTC:1793752407105:782247444825442",
+        "fill::BTC:1793752407105:839886213237243",
+        "fill::BTC:1793752407105:912021129727094",
+        "fill::BTC:1793752407105:94515180774127",
+        "fill::BTC:1793752407105:957539973960203",
+        "fill::BTC:1793752407105:958987825651679",
+        "fill::BTC:1793752492744:670017568751410",
+        "fill::BTC:1793752498159:339034878127175",
+        "fill::BTC:1793752530295:1094071201921611",
+        "fill::BTC:1793752530295:540526833069757",
+        "fill::BTC:1793752530295:779938945628157",
+        "fill::BTC:1793752829933:142673038751873",
+        "fill::BTC:1793752829933:181318474583215",
+        "fill::BTC:1793752829933:834936424760181",
+        "fill::BTC:1793752829933:835577940155101",
+        "fill::BTC:1793752829933:95726623107577",
+        "fill::BTC:1793753138396:376390458169602",
+        "fill::BTC:1793753138396:481765749852117"
       ]
     },
     "tooling": {
-      "requests": 619.0,
-      "cum_volume_usd": 6014006.63,
-      "requests_per_1k_usd": 0.1029
+      "requests": 634.0,
+      "cum_volume_usd": 6099167.38,
+      "requests_per_1k_usd": 0.1039
     }
   },
   "score_history": [
@@ -675,9 +708,30 @@
         "loss_handling": 0.4145
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-09T00:18:38.847634+00:00",
+      "score": 0.3537,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.04,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.5146,
+        "account_size": 0.5823,
+        "trade_sequencing": 0.8391,
+        "position_sizing": 0.5,
+        "order_profile": 0.6083,
+        "activity": 0.4786,
+        "direction_bias": 0.7459,
+        "position_management": 0.7789,
+        "loss_handling": 0.4114
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2985,
+  "recent_avg_score": 0.3083,
   "last_investigated_ms": 1793288992804
 }
