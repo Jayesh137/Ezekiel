@@ -1,18 +1,18 @@
 {
   "wallet": "0xebe837cd345469cbc5d6e1fd3d15ee5079ac885f",
   "first_seen": "2026-08-13T03:24:29.347488+00:00",
-  "last_seen": "2026-11-07T23:43:17.270080+00:00",
-  "best_score": 0.4633,
-  "latest_score": 0.4633,
+  "last_seen": "2026-11-09T16:37:37.146374+00:00",
+  "best_score": 0.5184,
+  "latest_score": 0.5184,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Shares rare HIP-3 markets: xyz:SP500",
       "Similar market/limit execution style",
-      "Matching trade frequency and cadence",
+      "Matching long/short bias",
       "Similar scaling/TWAP/clip-size habits",
-      "xyz:SP500: traded by ~6.9% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      "xyz:SP500: traded by ~6.2% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
       "Weak asset overlap",
@@ -24,9 +24,7 @@
         "xyz:SP500"
       ],
       "target_only": [
-        "ADA",
-        "ENA",
-        "LIT"
+        "ADA"
       ],
       "candidate_only": [
         "BTC",
@@ -36,7 +34,7 @@
       "rare_overlap": [
         "xyz:SP500"
       ],
-      "jaccard": 0.1667
+      "jaccard": 0.25
     },
     "market_rarity": {
       "shared_markets": [
@@ -46,15 +44,15 @@
       "classification": {
         "xyz:SP500": "COMMON"
       },
-      "description": "xyz:SP500 (common, ~6.9% of wallets)",
+      "description": "xyz:SP500 (common, ~6.2% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4633,
+      "score_without_bonus": 0.5184,
       "explanations": [
-        "xyz:SP500: traded by ~6.9% of scanned wallets \u2014 too common to be evidence (no bonus)"
+        "xyz:SP500: traded by ~6.2% of scanned wallets \u2014 too common to be evidence (no bonus)"
       ],
       "frequencies": {
-        "xyz:SP500": 0.06855
+        "xyz:SP500": 0.06178
       }
     },
     "episodes": {
@@ -62,13 +60,13 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8691,
+        "relative_size_dispersion": 0.8317,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 3,
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -331,6 +329,11 @@
         "fill::xyz:BRENTOIL:1793884018976:496422129431076",
         "fill::xyz:BRENTOIL:1793884018976:601649586080831"
       ]
+    },
+    "tooling": {
+      "requests": 3085.0,
+      "cum_volume_usd": 969518150.43,
+      "requests_per_1k_usd": 0.0032
     }
   },
   "score_history": [
@@ -1073,18 +1076,39 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-09T16:37:37.146374+00:00",
+      "score": 0.5184,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.25,
+        "timing_profile": null,
+        "leverage_profile": 0.9747,
+        "entry_exit_style": 0.9992,
+        "hold_duration": null,
+        "account_size": 0.2785,
+        "trade_sequencing": 0.9618,
+        "position_sizing": 0.1401,
+        "order_profile": 0.7758,
+        "activity": 0.7105,
+        "direction_bias": 1.0,
+        "position_management": 0.8609,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.386,
-  "last_checked": "2026-11-07T23:43:17.270080+00:00",
+  "recent_avg_score": 0.4056,
+  "last_checked": "2026-11-09T16:37:37.146374+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor",
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-07T23:43:17.270080+00:00",
-  "last_positive_evidence": "2026-11-07T23:43:05.365413+00:00",
+  "last_successful_read": "2026-11-09T16:37:37.146374+00:00",
+  "last_positive_evidence": "2026-11-09T16:37:17.206130+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1732,6 +1756,29 @@
     },
     {
       "status": "ok",
+      "next_cursor_ms": 1794185550627,
+      "coverage": {
+        "start_ms": 1792427824454,
+        "end_ms": 1794242224454,
+        "pages": 2,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792427824454,
+        "requested_start_ms": 1792427824454,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794242224454,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-09T16:37:17.206130+00:00"
+    },
+    {
+      "status": "ok",
       "next_cursor_ms": 1791420692928,
       "coverage": {
         "start_ms": 1791420692928,
@@ -1755,18 +1802,18 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792280585014,
-    "end_ms": 1794094985014,
-    "pages": 1,
+    "start_ms": 1792427824454,
+    "end_ms": 1794242224454,
+    "pages": 2,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792280585014,
-    "requested_start_ms": 1792280585014,
+    "fetched_start_ms": 1792427824454,
+    "requested_start_ms": 1792427824454,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-11-07T23:43:17.270080+00:00",
+  "last_scored": "2026-11-09T16:37:37.146374+00:00",
   "latest_scoring_schema": "2026-09-26.2",
   "last_investigated_ms": 1793288992804
 }
