@@ -1,30 +1,29 @@
 {
   "wallet": "0x4c3d48cbe2186beeafecc6723630ab8eda4117fc",
   "first_seen": "2026-09-14T08:21:31.432059+00:00",
-  "last_seen": "2026-11-08T08:39:34.307063+00:00",
+  "last_seen": "2026-11-10T14:49:08.122388+00:00",
   "best_score": 0.471,
-  "latest_score": 0.3382,
+  "latest_score": 0.3377,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar holding-duration profile",
+      "Matching long/short bias",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Very different account-size bracket"
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
       "overlap": [],
       "target_only": [
         "ADA",
-        "ENA",
-        "LIT",
         "xyz:SP500"
       ],
       "candidate_only": [
+        "@107",
         "AAVE",
         "ARB",
         "FET",
@@ -32,7 +31,10 @@
         "LINK",
         "MORPHO",
         "WLFI",
+        "xyz:AAOI",
         "xyz:AAPL",
+        "xyz:AMAT",
+        "xyz:AMD",
         "xyz:CRWV",
         "xyz:NBIS",
         "xyz:SOXL",
@@ -49,7 +51,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3382,
+      "score_without_bonus": 0.3377,
       "explanations": [],
       "frequencies": {}
     },
@@ -58,18 +60,26 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8754,
+        "relative_size_dispersion": 0.8692,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 3,
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
+        "fill::@107:1794281144926:1051690122976090",
+        "fill::@107:1794281144926:136174680772205",
+        "fill::@107:1794281144926:609688484007621",
+        "fill::@107:1794281144926:765891440821047",
+        "fill::@107:1794281144926:841427934857318",
+        "fill::@107:1794281144926:841677163569006",
+        "fill::@107:1794281144926:875415261958498",
+        "fill::@107:1794281144926:978914045694688",
         "fill::AAVE:1793319701612:325971646814418",
         "fill::AAVE:1793319701612:582666391052474",
         "fill::AAVE:1793319701612:620865894084710",
@@ -176,6 +186,8 @@
         "fill::WLFI:1793319669620:969587610016838",
         "fill::WLFI:1793319669744:68590741945498",
         "fill::WLFI:1793319669744:802043250529310",
+        "fill::xyz:AAOI:1794306058939:104399650791226",
+        "fill::xyz:AAOI:1794306058939:482658009812578",
         "fill::xyz:AAPL:1793658591854:1074147948531575",
         "fill::xyz:AAPL:1793658593870:157267557805138",
         "fill::xyz:AAPL:1793658644441:848578130762337",
@@ -287,6 +299,27 @@
         "fill::xyz:AAPL:1793899307667:783707813035187",
         "fill::xyz:AAPL:1793899307667:842817969435646",
         "fill::xyz:AAPL:1793899307667:914433654664892",
+        "fill::xyz:AMAT:1794257927462:621356944702837",
+        "fill::xyz:AMAT:1794257946239:292476994911813",
+        "fill::xyz:AMAT:1794257946308:441664042005103",
+        "fill::xyz:AMAT:1794257946308:892753469461142",
+        "fill::xyz:AMAT:1794257946308:929016542135975",
+        "fill::xyz:AMAT:1794257947002:132635388096322",
+        "fill::xyz:AMAT:1794257947002:27597786420212",
+        "fill::xyz:AMAT:1794306058939:643376432975937",
+        "fill::xyz:AMAT:1794306058939:688268737921376",
+        "fill::xyz:AMAT:1794306059008:1013832308770147",
+        "fill::xyz:AMAT:1794306059008:283744773333577",
+        "fill::xyz:AMD:1794306060951:122167506217990",
+        "fill::xyz:AMD:1794306060951:522364384148405",
+        "fill::xyz:AMD:1794306060951:824799338874560",
+        "fill::xyz:AMD:1794306060951:899380399883657",
+        "fill::xyz:AMD:1794306061823:22220473273160",
+        "fill::xyz:AMD:1794306065683:1022260707457240",
+        "fill::xyz:AMD:1794306065811:267907792834444",
+        "fill::xyz:AMD:1794306065811:512763013910640",
+        "fill::xyz:AMD:1794306065811:554168068571442",
+        "fill::xyz:AMD:1794306065811:950872067166108",
         "fill::xyz:CRWV:1793839133275:704900143625032",
         "fill::xyz:CRWV:1793839133275:837705164613578",
         "fill::xyz:CRWV:1793839133336:648691341617569",
@@ -294,38 +327,7 @@
         "fill::xyz:CRWV:1793839133472:944477994359092",
         "fill::xyz:CRWV:1793839133593:951392393200323",
         "fill::xyz:CRWV:1793839133673:866350557146261",
-        "fill::xyz:CRWV:1793839133737:1022775520667910",
-        "fill::xyz:CRWV:1793839133869:653505249964746",
-        "fill::xyz:CRWV:1793839133869:830497621988503",
-        "fill::xyz:CRWV:1793839133937:585301873974484",
-        "fill::xyz:NBIS:1793836336834:1003255925768630",
-        "fill::xyz:NBIS:1793836336834:1049246142418273",
-        "fill::xyz:NBIS:1793836336834:405722799748695",
-        "fill::xyz:NBIS:1793836336834:484849739694887",
-        "fill::xyz:NBIS:1793836336834:901307578528766",
-        "fill::xyz:NBIS:1793836336901:1010369808639171",
-        "fill::xyz:NBIS:1793836336901:146666467612497",
-        "fill::xyz:NBIS:1793836336901:636656978935322",
-        "fill::xyz:NBIS:1793836336901:722796620293550",
-        "fill::xyz:NBIS:1793836336901:90721518123757",
-        "fill::xyz:NBIS:1793836336901:971722371856913",
-        "fill::xyz:NBIS:1793836336969:1076287617682348",
-        "fill::xyz:NBIS:1793836336969:371491337650912",
-        "fill::xyz:NBIS:1793836336969:425845653253109",
-        "fill::xyz:NBIS:1793836336969:551781896077021",
-        "fill::xyz:NBIS:1793836336969:760631031507763",
-        "fill::xyz:NBIS:1793836336969:810307958438477",
-        "fill::xyz:NBIS:1793836336969:827456717615591",
-        "fill::xyz:SOXL:1793653184839:317739875369435",
-        "fill::xyz:SOXL:1793653184839:37390300969987",
-        "fill::xyz:SOXL:1793653184839:43295363783669",
-        "fill::xyz:SOXL:1793653184839:596022749501649",
-        "fill::xyz:SOXL:1793653184901:132129896558800",
-        "fill::xyz:SOXL:1793653184901:248313095934254",
-        "fill::xyz:SOXL:1793653184901:355586245651799",
-        "fill::xyz:SOXL:1793653184901:361672878427952",
-        "fill::xyz:SOXL:1793653184971:1023574160926596",
-        "fill::xyz:SOXL:1793653184971:1102210963260892"
+        "fill::xyz:CRWV:1793839133737:1022775520667910"
       ]
     }
   },
@@ -990,18 +992,39 @@
         "loss_handling": 0.2036
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-10T14:49:08.122388+00:00",
+      "score": 0.3377,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.9576,
+        "entry_exit_style": 0.1149,
+        "hold_duration": null,
+        "account_size": 0.4643,
+        "trade_sequencing": 0.7797,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.6599,
+        "direction_bias": 1.0,
+        "position_management": 0.8261,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3062,
-  "last_checked": "2026-11-08T08:39:34.307063+00:00",
+  "recent_avg_score": 0.3066,
+  "last_checked": "2026-11-10T14:49:08.122388+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard",
     "newborn"
   ],
-  "last_successful_read": "2026-11-08T08:39:34.307063+00:00",
-  "last_positive_evidence": "2026-11-08T08:39:28.540616+00:00",
+  "last_successful_read": "2026-11-10T14:49:08.122388+00:00",
+  "last_positive_evidence": "2026-11-10T14:49:02.142237+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1485,21 +1508,44 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-08T08:39:28.540616+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792507741558,
+      "coverage": {
+        "start_ms": 1792507741558,
+        "end_ms": 1794322141558,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792507741558,
+        "requested_start_ms": 1792507741558,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794322141558,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-10T14:49:02.142237+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792312757939,
-    "end_ms": 1794127157939,
+    "start_ms": 1792507741558,
+    "end_ms": 1794322141558,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792312757939,
-    "requested_start_ms": 1792312757939,
+    "fetched_start_ms": 1792507741558,
+    "requested_start_ms": 1792507741558,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-11-08T08:39:34.307063+00:00",
+  "last_scored": "2026-11-10T14:49:08.122388+00:00",
   "latest_scoring_schema": "2026-09-26.2",
   "last_investigated_ms": 1793890028982
 }

@@ -1,26 +1,23 @@
 {
   "wallet": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
   "first_seen": "2026-08-18T09:19:59.270255+00:00",
-  "last_seen": "2026-11-07T07:47:43.218003+00:00",
+  "last_seen": "2026-11-10T14:44:08.370449+00:00",
   "best_score": 0.6875,
-  "latest_score": 0.21,
+  "latest_score": 0.2396,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [],
     "warnings": [
-      "Weak asset overlap"
+      "Weak asset overlap",
+      "Too few position episodes to compare holding style"
     ],
-    "vetoes": [
-      "Incompatible hold style: 80% vs 0% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
       "overlap": [],
       "target_only": [
         "ADA",
-        "ENA",
-        "LIT",
         "xyz:SP500"
       ],
       "candidate_only": [
@@ -29,6 +26,7 @@
         "CASHCAT",
         "FARTCOIN",
         "GRASS",
+        "HMSTR",
         "LINK",
         "PONS",
         "STRK",
@@ -48,7 +46,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.21,
+      "score_without_bonus": 0.2396,
       "explanations": [],
       "frequencies": {}
     },
@@ -57,7 +55,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8458,
+        "relative_size_dispersion": 0.9414,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 0.0,
@@ -69,7 +67,6 @@
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::AERO:1793635101721:730800323785950",
         "fill::AERO:1793751756696:642787660271541",
         "fill::AERO:1793751756905:991671576174109",
         "fill::AERO:1793751756959:975680122486923",
@@ -324,35 +321,17 @@
         "fill::AERO:1793960060705:1086513801502470",
         "fill::AERO:1793960060705:476861121406254",
         "fill::AERO:1793960060705:729181326474217",
-        "fill::AERO:1793960060705:972810496522043"
+        "fill::AERO:1793960060705:972810496522043",
+        "fill::AERO:1793960061263:135446291665018"
       ]
     },
     "tooling": {
-      "requests": 59989382.0,
-      "cum_volume_usd": 428819601.2,
-      "requests_per_1k_usd": 139.8942
+      "requests": 61363510.0,
+      "cum_volume_usd": 430662291.1,
+      "requests_per_1k_usd": 142.4864
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-18T16:17:17.200893+00:00",
-      "score": 0.4445,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.4567,
-        "timing_profile": null,
-        "leverage_profile": 0.462,
-        "entry_exit_style": 0.0047,
-        "hold_duration": 0.8154,
-        "account_size": 0.5269,
-        "trade_sequencing": 0.7411,
-        "position_sizing": 0.7071,
-        "activity": 0.6157,
-        "direction_bias": 0.9956,
-        "position_management": 0.8041,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-20T00:31:17.813772+00:00",
       "score": 0.2913,
@@ -2331,12 +2310,33 @@
         "loss_handling": 0.2545
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-10T14:44:08.370449+00:00",
+      "score": 0.2396,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.4104,
+        "entry_exit_style": 0.0321,
+        "hold_duration": null,
+        "account_size": 0.4586,
+        "trade_sequencing": 0.5405,
+        "position_sizing": 0.7695,
+        "order_profile": 0.4321,
+        "activity": 0.6301,
+        "direction_bias": 0.0,
+        "position_management": 0.7979,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3231,
-  "last_checked": "2026-11-10T12:30:06.745766+00:00",
-  "last_read_status": "partial",
+  "recent_avg_score": 0.2947,
+  "last_checked": "2026-11-10T14:44:08.370449+00:00",
+  "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor",
     "correlation",
@@ -2504,6 +2504,29 @@
       "source": "roster_lead",
       "positive": true,
       "observed_at": "2026-11-07T07:47:23.403275+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1794254140437,
+      "coverage": {
+        "start_ms": 1792507403746,
+        "end_ms": 1794321803746,
+        "pages": 2,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1794174887335,
+        "requested_start_ms": 1792507403746,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794321803746,
+      "source": "roster_lead",
+      "positive": true,
+      "observed_at": "2026-11-10T14:43:47.585100+00:00"
     },
     {
       "status": "partial",
@@ -3067,19 +3090,19 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792499335743,
-    "end_ms": 1794313735743,
-    "pages": 6,
-    "complete_available_window": false,
+    "start_ms": 1792507403746,
+    "end_ms": 1794321803746,
+    "pages": 2,
+    "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792499335743,
-    "requested_start_ms": 1792499335743,
+    "fetched_start_ms": 1794174887335,
+    "requested_start_ms": 1792507403746,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1793203877884,
-  "last_successful_read": "2026-11-07T07:47:43.218003+00:00",
-  "last_positive_evidence": "2026-11-07T07:47:23.403275+00:00",
-  "last_scored": "2026-11-07T07:47:43.218003+00:00"
+  "last_successful_read": "2026-11-10T14:44:08.370449+00:00",
+  "last_positive_evidence": "2026-11-10T14:43:47.585100+00:00",
+  "last_scored": "2026-11-10T14:44:08.370449+00:00"
 }
