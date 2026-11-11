@@ -1,19 +1,17 @@
 {
   "wallet": "0x9a1500b41519868039b1f95c447ba50b76d837e6",
   "first_seen": "2026-08-26T13:47:09.695999+00:00",
-  "last_seen": "2026-11-09T03:04:42.491285+00:00",
+  "last_seen": "2026-11-11T09:52:06.855538+00:00",
   "best_score": 0.5302,
-  "latest_score": 0.2648,
+  "latest_score": 0.265,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style",
-      "Matching long/short bias"
+      "Similar market/limit execution style"
     ],
     "warnings": [
       "Weak asset overlap",
-      "Very different account-size bracket",
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
@@ -39,7 +37,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2648,
+      "score_without_bonus": 0.265,
       "explanations": [],
       "frequencies": {}
     },
@@ -48,7 +46,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.8777,
+        "relative_size_dispersion": 0.8041,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 1.0,
         "round_100_fraction": 1.0,
@@ -60,14 +58,13 @@
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::BTC:1792554213661:298254511488395",
-        "fill::BTC:1792554213921:1078696520417423",
-        "fill::BTC:1792554213921:152700091277905",
-        "fill::BTC:1792554213921:240346700700064",
-        "fill::BTC:1792554213990:215346175006451",
         "fill::BTC:1792653359082:594360824867975",
         "fill::BTC:1794179654933:753705990502244",
-        "fill::HYPE:1792556499111:81820364901616",
+        "fill::BTC:1794325053704:392711317365923",
+        "fill::BTC:1794325053704:776724920866949",
+        "fill::BTC:1794325053704:786452820939441",
+        "fill::BTC:1794325053704:830637976540948",
+        "fill::BTC:1794325053704:998950205614325",
         "fill::HYPE:1792637506034:1060301407355289",
         "fill::HYPE:1792637506034:1103854829446352",
         "fill::HYPE:1792637506034:135963790123694",
@@ -76,10 +73,6 @@
         "fill::HYPE:1792637506034:899815900826969",
         "fill::HYPE:1792637506034:958847109330378",
         "fill::HYPE:1792637506034:994727468822430",
-        "fill::SOL:1792554171052:563368595211162",
-        "fill::SOL:1792554171052:616479447892308",
-        "fill::SOL:1792554171052:709711988610922",
-        "fill::SOL:1792554171052:954683072649676",
         "fill::SOL:1792653096816:338463475101592",
         "fill::SOL:1792653096816:571597048921925",
         "fill::SOL:1792653096816:593823606796052",
@@ -92,25 +85,6 @@
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-08-27T02:24:04.050371+00:00",
-      "score": 0.2328,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.04,
-        "timing_profile": null,
-        "leverage_profile": 0.737,
-        "entry_exit_style": 0.5242,
-        "hold_duration": null,
-        "account_size": 0.0183,
-        "trade_sequencing": 0.276,
-        "position_sizing": 0.5,
-        "activity": 0.4333,
-        "direction_bias": 0.0,
-        "position_management": 0.7254,
-        "loss_handling": null
-      }
-    },
     {
       "scan_time": "2026-08-27T13:17:52.981860+00:00",
       "score": 0.2306,
@@ -2051,17 +2025,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-11T09:52:06.855538+00:00",
+      "score": 0.265,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.9955,
+        "hold_duration": null,
+        "account_size": 0.3251,
+        "trade_sequencing": 0.1207,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.7344,
+        "direction_bias": null,
+        "position_management": 0.7154,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2654,
-  "last_checked": "2026-11-09T03:04:42.491285+00:00",
+  "recent_avg_score": 0.2635,
+  "last_checked": "2026-11-11T09:52:06.855538+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-09T03:04:42.491285+00:00",
-  "last_positive_evidence": "2026-11-09T03:04:40.103519+00:00",
+  "last_successful_read": "2026-11-11T09:52:06.855538+00:00",
+  "last_positive_evidence": "2026-11-11T09:52:04.470593+00:00",
   "observations": [
     {
       "status": "ok",
@@ -2612,21 +2607,44 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-09T03:04:40.103519+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792576322437,
+      "coverage": {
+        "start_ms": 1792576322437,
+        "end_ms": 1794390722437,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792576322437,
+        "requested_start_ms": 1792576322437,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794390722437,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-11T09:52:04.470593+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792379078103,
-    "end_ms": 1794193478103,
+    "start_ms": 1792576322437,
+    "end_ms": 1794390722437,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792379078103,
-    "requested_start_ms": 1792379078103,
+    "fetched_start_ms": 1792576322437,
+    "requested_start_ms": 1792576322437,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-11-09T03:04:42.491285+00:00",
+  "last_scored": "2026-11-11T09:52:06.855538+00:00",
   "latest_scoring_schema": "2026-09-26.2",
-  "last_investigated_ms": 1792801068678
+  "last_investigated_ms": 1794390796338
 }
