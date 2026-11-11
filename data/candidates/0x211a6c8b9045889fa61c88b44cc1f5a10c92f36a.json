@@ -1,13 +1,13 @@
 {
   "wallet": "0x211a6c8b9045889fa61c88b44cc1f5a10c92f36a",
-  "last_checked": "2026-11-07T21:19:38.649553+00:00",
+  "last_checked": "2026-11-11T02:44:37.270683+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-28T05:59:56.227656+00:00",
   "discovery_sources": [
     "roster_lead"
   ],
-  "last_successful_read": "2026-11-07T21:19:38.649553+00:00",
-  "last_positive_evidence": "2026-11-07T21:19:25.065393+00:00",
+  "last_successful_read": "2026-11-11T02:44:37.270683+00:00",
+  "last_positive_evidence": "2026-11-11T02:44:23.662757+00:00",
   "observations": [
     {
       "status": "ok",
@@ -123,24 +123,47 @@
       "source": "roster_lead",
       "positive": true,
       "observed_at": "2026-11-07T21:19:25.065393+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792550652700,
+      "coverage": {
+        "start_ms": 1792550652700,
+        "end_ms": 1794365052700,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792550652700,
+        "requested_start_ms": 1792550652700,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794365052700,
+      "source": "roster_lead",
+      "positive": true,
+      "observed_at": "2026-11-11T02:44:23.662757+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792271953494,
-    "end_ms": 1794086353494,
+    "start_ms": 1792550652700,
+    "end_ms": 1794365052700,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792271953494,
-    "requested_start_ms": 1792271953494,
+    "fetched_start_ms": 1792550652700,
+    "requested_start_ms": 1792550652700,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-07T21:19:38.649553+00:00",
-  "last_scored": "2026-11-07T21:19:38.649553+00:00",
+  "last_seen": "2026-11-11T02:44:37.270683+00:00",
+  "last_scored": "2026-11-11T02:44:37.270683+00:00",
   "best_score": 0.4622,
-  "latest_score": 0.4369,
+  "latest_score": 0.2968,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -150,14 +173,12 @@
     ],
     "warnings": [
       "Weak asset overlap",
-      "Very different account-size bracket"
+      "Very different account-size bracket",
+      "Too few position episodes to compare holding style"
     ],
     "vetoes": [],
     "asset_overlap": {
-      "overlap": [
-        "ENA",
-        "LIT"
-      ],
+      "overlap": [],
       "target_only": [
         "ADA",
         "xyz:SP500"
@@ -168,12 +189,14 @@
         "ANIME",
         "BTC",
         "CASHCAT",
+        "ENA",
         "ETH",
         "FARTCOIN",
         "HYPE",
         "INIT",
         "INJ",
         "LINK",
+        "LIT",
         "NEAR",
         "PONS",
         "PUMP",
@@ -191,9 +214,9 @@
         "ZRO",
         "kPEPE"
       ],
-      "overlap_count": 2,
+      "overlap_count": 0,
       "rare_overlap": [],
-      "jaccard": 0.0645
+      "jaccard": 0.0
     },
     "market_rarity": {
       "shared_markets": [],
@@ -202,7 +225,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.4369,
+      "score_without_bonus": 0.2968,
       "explanations": [],
       "frequencies": {}
     },
@@ -211,13 +234,13 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.9004,
+        "relative_size_dispersion": 0.9076,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 1.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 3,
+      "independent_sessions": 2,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -515,6 +538,27 @@
         "direction_bias": 0.8073,
         "position_management": 0.7364,
         "loss_handling": 0.2246
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-11T02:44:37.270683+00:00",
+      "score": 0.2968,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.0654,
+        "trade_sequencing": 0.8069,
+        "position_sizing": 0.0107,
+        "order_profile": 0.7299,
+        "activity": 0.385,
+        "direction_bias": 0.6598,
+        "position_management": 0.739,
+        "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
     }
