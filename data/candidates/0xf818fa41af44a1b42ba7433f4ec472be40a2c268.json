@@ -1,15 +1,15 @@
 {
   "wallet": "0xf818fa41af44a1b42ba7433f4ec472be40a2c268",
   "first_seen": "2026-08-13T03:26:40.302676+00:00",
-  "last_seen": "2026-11-10T10:15:15.946374+00:00",
+  "last_seen": "2026-11-12T18:33:47.968645+00:00",
   "best_score": 0.45,
-  "latest_score": 0.3369,
+  "latest_score": 0.3338,
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
       "Similar market/limit execution style",
-      "Similar scaling/TWAP/clip-size habits"
+      "Matching trade frequency and cadence"
     ],
     "warnings": [
       "Weak asset overlap",
@@ -23,19 +23,16 @@
         "xyz:SP500"
       ],
       "candidate_only": [
-        "@107",
-        "@4",
         "DASH",
         "UNI",
         "WLD",
         "XMR",
         "ZEC",
+        "xyz:ANT",
         "xyz:BABA",
         "xyz:CRCL",
-        "xyz:DRAM",
         "xyz:INTC",
         "xyz:NFLX",
-        "xyz:NVDA",
         "xyz:SMH",
         "xyz:XBI"
       ],
@@ -50,7 +47,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3369,
+      "score_without_bonus": 0.3338,
       "explanations": [],
       "frequencies": {}
     },
@@ -59,7 +56,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.5181,
+        "relative_size_dispersion": 0.4574,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 1.0,
@@ -71,12 +68,6 @@
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::@107:1792501778776:637686782718575",
-        "fill::@107:1792501781466:196307630080634",
-        "fill::@107:1792501852562:681271374644706",
-        "fill::@107:1792501857626:480770414774458",
-        "fill::@107:1792501857626:562768938741390",
-        "fill::@4:1792501796314:924883263043935",
         "fill::DASH:1793360712273:40683655405333",
         "fill::DASH:1793360712273:967340408039628",
         "fill::UNI:1792766905458:1017779778026465",
@@ -326,32 +317,17 @@
         "fill::UNI:1792967915297:499755786159896",
         "fill::UNI:1792967916597:271963063845444",
         "fill::UNI:1792967917948:1085042919145110",
-        "fill::UNI:1792967919284:581141613209805"
+        "fill::UNI:1792967919284:581141613209805",
+        "fill::UNI:1792967926460:1056111388935376",
+        "fill::UNI:1792967927733:387670905611312",
+        "fill::UNI:1792967928890:713152970563297",
+        "fill::UNI:1792967935017:917561089902051",
+        "fill::UNI:1792967936427:931482595816501",
+        "fill::UNI:1792967937815:761552861694828"
       ]
     }
   },
   "score_history": [
-    {
-      "scan_time": "2026-10-08T10:03:57.233833+00:00",
-      "score": 0.4059,
-      "tier": "BACKGROUND",
-      "dimensions": {
-        "asset_preferences": 0.1667,
-        "timing_profile": null,
-        "leverage_profile": 0.9827,
-        "entry_exit_style": 0.9062,
-        "hold_duration": null,
-        "account_size": 0.0711,
-        "trade_sequencing": 0.6247,
-        "position_sizing": 0.0797,
-        "order_profile": null,
-        "activity": 0.5877,
-        "direction_bias": 1.0,
-        "position_management": 0.6559,
-        "loss_handling": null
-      },
-      "scoring_schema": "2026-09-26.2"
-    },
     {
       "scan_time": "2026-10-08T12:21:07.868595+00:00",
       "score": 0.4225,
@@ -2430,19 +2406,40 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-12T18:33:47.968645+00:00",
+      "score": 0.3338,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.853,
+        "entry_exit_style": 0.9085,
+        "hold_duration": null,
+        "account_size": 0.2624,
+        "trade_sequencing": 0.394,
+        "position_sizing": 0.3011,
+        "order_profile": null,
+        "activity": 0.7724,
+        "direction_bias": 0.0044,
+        "position_management": 0.7902,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.3884,
-  "last_checked": "2026-11-10T10:15:15.946374+00:00",
+  "recent_avg_score": 0.3806,
+  "last_checked": "2026-11-12T18:33:47.968645+00:00",
   "last_read_status": "ok",
   "discovery_sources": [
     "bridge_depositor",
     "execution_program_tape",
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-10T10:15:15.946374+00:00",
-  "last_positive_evidence": "2026-11-10T10:15:08.630756+00:00",
+  "last_successful_read": "2026-11-12T18:33:47.968645+00:00",
+  "last_positive_evidence": "2026-11-12T18:33:42.419893+00:00",
   "observations": [
     {
       "status": "ok",
@@ -5142,21 +5139,44 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-10T10:15:08.630756+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1792694020118,
+      "coverage": {
+        "start_ms": 1792694020118,
+        "end_ms": 1794508420118,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1792694020118,
+        "requested_start_ms": 1792694020118,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794508420118,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-12T18:33:42.419893+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792491306404,
-    "end_ms": 1794305706404,
+    "start_ms": 1792694020118,
+    "end_ms": 1794508420118,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1792491306404,
-    "requested_start_ms": 1792491306404,
+    "fetched_start_ms": 1792694020118,
+    "requested_start_ms": 1792694020118,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_scored": "2026-11-10T10:15:15.946374+00:00",
+  "last_scored": "2026-11-12T18:33:47.968645+00:00",
   "latest_scoring_schema": "2026-09-26.2",
   "last_investigated_ms": 1793404472952
 }
