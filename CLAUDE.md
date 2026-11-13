@@ -348,6 +348,11 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   days (`keep_schedule.EVICTION_SECONDS`). And a job ceiling must stay above
   the sum of its steps — it cancels the commit and loses every reading, where
   a step cap loses one step.
+- **A table inside a byte-budgeted artifact needs a bound of its own.** The scan
+  checkpoint's `deposit_seeds` (264,669 wallets, 706 ever read, a third of the
+  48 MiB artifact) was touched by no retention and no trimmer, and the scan
+  failed once trace delivered deposits again (2026-11-13). Bound a queue by the
+  order it is READ in (`prune_deposit_seeds`: newest 60,000, checked rows kept).
 - **A per-run snapshot that nothing folds is unbounded growth** (one agent
   snapshot per wallet per trace run, 88,678 rows in 20 days, exempt from
   every trim). Store a series by its CHANGES: identical consecutive readings

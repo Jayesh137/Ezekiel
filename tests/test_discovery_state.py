@@ -325,3 +325,77 @@ def test_compact_collapses_snapshots_and_records_it(tmp_path):
     with DiscoveryStore(db) as store:
         assert len(store.observations('authority_actions')) == 1
         assert store.meta('storage_retention', {}).get('collapsed_snapshots') == 4
+
+
+# --- deposit seeds are bounded by what the queue can reach (2026-11-13) -------
+# 264,669 seeds, 706 ever checked, about a third of the 48 MiB checkpoint, and
+# no trimmer could touch them: the scan failed five runs in eight once trace
+# began delivering deposits again.
+
+DAY_MS = 86400_000
+
+
+def _seed(store, wallet, last_seen, checked=0):
+    store.db.execute('INSERT INTO deposit_seeds(wallet,first_seen_ms,last_seen_ms,last_checked_ms,next_check_ms) '
+                     'VALUES (?,?,?,?,?)', (wallet, last_seen, last_seen, checked, checked))
+
+
+def _w(i):
+    return '0x' + f'{i:040x}'
+
+
+def test_seeds_the_queue_cannot_select_are_dropped_and_checked_ones_kept(tmp_path):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    now = 100 * DAY_MS
+    with DiscoveryStore(db) as store:
+        _seed(store, _w(1), now - 40 * DAY_MS)                    # too old to be selected
+        _seed(store, _w(2), now - 40 * DAY_MS, checked=now - 39 * DAY_MS)   # old but checked: state
+        _seed(store, _w(3), now - 2 * DAY_MS)
+        store.db.commit()
+    state.compact(db, now_ms=now)
+    with DiscoveryStore(db) as store:
+        assert [r[0] for r in store.db.execute('SELECT wallet FROM deposit_seeds ORDER BY wallet')] == [_w(2), _w(3)]
+        retention = store.meta('storage_retention', {})
+        assert retention['deposit_seeds_dropped'] == 1 and retention['deposit_seed_days'] == 30
+
+
+def test_the_seed_cap_keeps_the_newest_which_is_the_order_the_queue_reads():
+    import sqlite3
+
+    from src import discovery_state as state
+    from src.discovery_store import DiscoveryStore as Store
+    db = sqlite3.connect(':memory:')
+    db.execute('CREATE TABLE deposit_seeds (wallet TEXT PRIMARY KEY, first_seen_ms INTEGER, last_seen_ms INTEGER, '
+               'last_checked_ms INTEGER DEFAULT 0, next_check_ms INTEGER DEFAULT 0)')
+    now = 100 * DAY_MS
+    for i in range(10):
+        db.execute('INSERT INTO deposit_seeds(wallet,first_seen_ms,last_seen_ms) VALUES (?,?,?)',
+                   (_w(i), now - i * 1000, now - i * 1000))
+    db.execute('UPDATE deposit_seeds SET last_checked_ms=5 WHERE wallet=?', (_w(9),))   # oldest, but checked
+    dropped = state.prune_deposit_seeds(db, {'deposit_seeds'}, now, keep=3)
+    kept = [r[0] for r in db.execute('SELECT wallet FROM deposit_seeds ORDER BY last_seen_ms DESC')]
+    assert kept == [_w(0), _w(1), _w(2), _w(9)] and dropped == 6
+    assert state.prune_deposit_seeds(db, {'deposit_seeds'}, now, keep=3) == 0     # idempotent
+    assert Store is not None
+
+
+def test_what_the_scanner_would_read_next_survives_the_prune(tmp_path):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    now = 100 * DAY_MS
+    with DiscoveryStore(db) as store:
+        for i in range(50):
+            _seed(store, _w(i), now - i * 60_000)
+        store.db.commit()
+        before = [r['wallet'] for r in store.deposit_candidates(limit=5, now_ms=now)]
+    state.compact(db, now_ms=now)
+    with DiscoveryStore(db) as store:
+        assert [r['wallet'] for r in store.deposit_candidates(limit=5, now_ms=now)] == before
+
+
+def test_a_store_without_the_table_is_left_alone():
+    import sqlite3
+
+    from src import discovery_state as state
+    assert state.prune_deposit_seeds(sqlite3.connect(':memory:'), set(), 0) == 0
