@@ -465,3 +465,24 @@ def test_protection_goes_to_the_backfill_attempted_most_recently(tmp_path, monke
         assert store.db.execute('SELECT count(*) FROM fills WHERE wallet=?', (working,)).fetchone()[0] == 4
         assert store.db.execute('SELECT * FROM fill_progress WHERE wallet=?', (working,)).fetchone()
         assert not store.db.execute('SELECT * FROM fill_progress WHERE wallet=?', (stale,)).fetchone()
+
+
+def test_circle_deposit_observations_are_bounded_by_rows_and_their_seeds_survive(tmp_path, monkeypatch):
+    """They do their work at ingestion (seeding); 70,006 raw rows, all imported
+    within a day, held the checkpoint at 46.9 of 50.3 MB on 2026-11-13."""
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    monkeypatch.setattr(state, 'CCTP_OBSERVATION_ROWS', 3)
+    now = 100 * DAY_MS
+    with DiscoveryStore(db) as store:
+        for i in range(8):
+            store.ingest_observations('cctp_deposits', [{'event_id': f'd{i}', 'wallet': _w(i), 'ts': (now - DAY_MS) / 1000}],
+                                      now - 1000 + i)
+        store.ingest_observations('circle', [{'event_id': 'c1'}], now - 5000)
+    state.compact(db, now_ms=now)
+    with DiscoveryStore(db) as store:
+        kept = [o['event_id'] for o in store.observations('cctp_deposits')]
+        assert kept == ['d7', 'd6', 'd5']
+        assert store.db.execute('SELECT count(*) FROM deposit_seeds').fetchone()[0] == 8
+        assert len(store.observations('circle')) == 1
+        assert store.meta('storage_retention', {})['cctp_observations_dropped'] == 5
