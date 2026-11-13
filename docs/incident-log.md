@@ -2996,3 +2996,39 @@ green). Two more faults showed on the way, both older than this outage:
   scratch remote, where `-X no-renames` settles it with both shards and the
   pushing run's files kept. All nine workflows carry it and
   `tests/test_workflow_rebase.py` pins it.
+
+## 2026-11-13 (evening) — the scan checkpoint over its budget again, on a table nothing bounded
+
+With trace committing again, each run delivered ~19,000 Circle deposits it had
+been unable to hand over for sixteen days (4 MB observation shards), and the
+scan failed five runs in eight at "compressed discovery checkpoint exceeds
+artifact budget". The checkpoint had been living at 49.6-50.0 MB against
+50.33 for weeks, with seven of the byte-trimmer's eight rounds already spent.
+
+Measured on the last checkpoint that uploaded (run 43363416440): the rows
+compress to ~31 MB and the other ~18 MB is index and page overhead. `fills`
+14.9 MB (145,874 of 179,253 rows held by 13 open backfills, untrimmable by
+design), and **`deposit_seeds` 8.5 MB plus an index over the same
+incompressible addresses — about a third of the artifact.** It held 264,669
+wallets, 706 of them ever checked: the scanner reads 5 a run, never-checked
+and newest first, among wallets seen in the last 30 days, while the feed adds
+~4,400 a day. Nothing removed a row and no trimmer could touch the table.
+
+`discovery_state.prune_deposit_seeds` (in `compact()`): a never-checked seed
+last seen over 30 days ago is dropped (the queue cannot select it), and of the
+rest the newest 60,000 are kept — the order the queue reads them in. A checked
+seed is always kept (its re-check clock is state). Replayed on the production
+checkpoint: 264,669 -> 60,706 seeds and **49.63 -> 36.37 MB**, no fill
+trimmed; the next five wallets the scanner would read are unchanged.
+
+**Left open, on purpose.** Eight backfills opened 2026-09-07/08 have sat at a
+cursor of 09-23..29 with ~12,000 fills each ever since; they hold 10 MB of the
+artifact and the 90-day fill retention reaches their start on 2026-12-06. Why
+they stopped advancing is not diagnosed here. And 5 seeds a run against 4,400
+arrivals a day means the Circle-depositor seed queue reads about 1 wallet in
+90: it is a sample, not a sweep — large deposits reach the correlator and
+provenance by their own route (`cctp_feed`, `run_provenance.py`).
+
+**Rule.** A table inside a byte-budgeted artifact needs a bound of its own, or
+it is the one that fills the budget: the 2026-10-06 trimmer and the 2026-10-27
+snapshot collapse each bounded what was large THAT day.

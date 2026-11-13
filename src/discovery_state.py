@@ -26,6 +26,18 @@ PENDING_FILL_ROWS = 100_000
 # oldest replayable bulk first, until it fits.
 TRIM_FRACTION = 0.15
 TRIM_ROUNDS = 8
+# Circle depositors waiting to be looked at (`DiscoveryStore.deposit_candidates`).
+# The scanner takes 5 a run, never-checked and newest first, and only among
+# wallets seen in the last SEED_DAYS; the feed adds ~4,400 a day. Nothing ever
+# removed a row, so on 2026-11-13 the table held 264,669 wallets (706 ever
+# checked) and, with the index over the same incompressible addresses, about a
+# third of the 48 MiB checkpoint — no trimmer could touch it, and the scan
+# failed five runs in eight once trace began delivering sixteen days of
+# deposits again. Kept: every seed already checked (its re-check clock) and the
+# newest MAX_DEPOSIT_SEEDS others, which is the order the queue reads them in
+# and three months of reads at its rate.
+SEED_DAYS = 30
+MAX_DEPOSIT_SEEDS = 60_000
 
 
 class OverBudget(ValueError):
@@ -251,6 +263,26 @@ def collapse_agent_snapshots(db_path) -> int:
     return removed
 
 
+def prune_deposit_seeds(db, tables, now_ms, *, days=SEED_DAYS, keep=MAX_DEPOSIT_SEEDS) -> int:
+    """Drop the seeds the queue can never reach. Returns how many went.
+
+    A seed last seen more than `days` ago is not selectable at all. Of the
+    rest, the queue reads never-checked wallets newest first, so beyond the
+    newest `keep` a row waits behind more arrivals than the scanner reads.
+    A checked seed is always kept: its `next_check_ms` is state. A wallet that
+    deposits again is seeded again by the feed.
+    """
+    if 'deposit_seeds' not in tables:
+        return 0
+    before = db.execute('SELECT count(*) FROM deposit_seeds').fetchone()[0]
+    db.execute('DELETE FROM deposit_seeds WHERE last_seen_ms<? AND last_checked_ms=0',
+               (now_ms - days * 86400_000,))
+    db.execute('DELETE FROM deposit_seeds WHERE last_checked_ms=0 AND wallet NOT IN '
+               '(SELECT wallet FROM deposit_seeds WHERE last_checked_ms=0 '
+               'ORDER BY last_seen_ms DESC, wallet LIMIT ?)', (keep,))
+    return before - db.execute('SELECT count(*) FROM deposit_seeds').fetchone()[0]
+
+
 def compact(db_path, now_ms=None):
     """Global storage bounds, with explicit retention metadata and cache reset."""
     now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
@@ -290,9 +322,12 @@ def compact(db_path, now_ms=None):
                                      [(w,) for w, count in before.items() if after.get(w, 0) != count])
         store.db.execute('DELETE FROM discovery_observations WHERE rowid NOT IN '
                          '(SELECT rowid FROM discovery_observations ORDER BY observed_at_ms DESC LIMIT 100000)')
+        seeds_dropped = prune_deposit_seeds(store.db, tables, now_ms)
         store.db.commit()
         store.set_meta('storage_retention', {'at_ms': now_ms, 'market_events': 100000, 'market_days': 30,
             'fill_rows': MAX_FILL_ROWS, 'fill_days': 90, 'generic_observations': 100000,
             'pending_fill_row_budget': PENDING_FILL_ROWS, 'protected_fill_wallets': len(protected),
             'protected_fill_rows': protected_rows, 'collapsed_snapshots': collapsed,
+            'deposit_seed_days': SEED_DAYS, 'deposit_seed_rows': MAX_DEPOSIT_SEEDS,
+            'deposit_seeds_dropped': seeds_dropped,
             'authority_days': 730, 'complete_history': False})
