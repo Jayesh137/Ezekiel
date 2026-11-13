@@ -263,7 +263,7 @@ jobs:
           for i in 1 2 3 4 5; do
             if git push origin main; then exit 0; fi
             git fetch origin main || true
-            if ! git rebase -X theirs --autostash FETCH_HEAD; then
+            if ! git rebase -X theirs -X no-renames --autostash FETCH_HEAD; then
               git rebase --abort || true
               echo "attempt $i: rebase could not be settled automatically"
             fi

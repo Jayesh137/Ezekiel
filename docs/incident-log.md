@@ -2981,3 +2981,18 @@ and hits are stored (`data/tape/program_screen.json`).
 **What it cannot see.** A second account he trades by hand, or with other
 sizes on other coins. His known wallets trade by hand (2026-10-15), so this is
 a net for the script, not for him.
+
+**After the merge (same day).** The size guard read "no file within 20 MiB of
+the limit" and trace committed again (run 43372272803, 54 minutes, every step
+green). Two more faults showed on the way, both older than this outage:
+
+- *The bridge-destinations step* now takes 113-174 s against a 3-minute cap
+  written when it took 34 s, and was cut at 3:02 (run 43356385437). Cap 8.
+- *A rename/delete conflict `-X theirs` cannot settle* (run 43365752896): the
+  trace run and a concurrent watch each pruned the same expired
+  `data/alerts/runs/<id>.json` and wrote a shard of their own; git read
+  "deleted here, a similar file added there" as a rename, all five retries met
+  the same tree conflict, and the hour's reading was dropped. Reproduced in a
+  scratch remote, where `-X no-renames` settles it with both shards and the
+  pushing run's files kept. All nine workflows carry it and
+  `tests/test_workflow_rebase.py` pins it.

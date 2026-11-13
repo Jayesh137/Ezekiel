@@ -882,7 +882,9 @@ that it is.
   `data/*/latest.json` files). All seven now rebase with **`-X theirs`** — in a
   rebase that means the commit being replayed, i.e. this run's newer reading —
   which keeps our files and leaves untouched every file only the other side
-  changed. Verified both ways against a simulated race before it was pushed.
+  changed. **And `-X no-renames` (2026-11-13):** two runs pruning the same
+  expired alert shard read as a rename, and a rename/delete conflict is one
+  `-X theirs` cannot settle — an hour's trace reading was dropped to it. Verified both ways against a simulated race before it was pushed.
 - **A STEP timeout is survivable; a JOB timeout is not (2026-09-12).** Run
   34673026019 died on trace.yml's 15-minute job ceiling with
   `transfer_graph.py` stuck at **699s having printed nothing at all** — so it
