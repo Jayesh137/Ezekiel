@@ -718,6 +718,17 @@ def alert_behavioral_match(candidate: str, score: float, dimensions: dict) -> bo
     return _send_with_cooldown(f"behavioral_{candidate.lower()}", 24, subject, body)
 
 
+def _edge_time(e: dict) -> str | None:
+    """An edge's ISO time. In-memory graph edges carry only `ts`."""
+    if e.get("timestamp"):
+        return e["timestamp"]
+    ts = e.get("ts")
+    try:
+        return datetime.fromtimestamp(float(ts), tz=UTC).isoformat() if ts else None
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
 def alert_execution_program_match(wallet: str, match: dict, severity: str) -> bool:
     """Fire when a wallet reproduces the target's execution program (his slicer).
 
@@ -1896,7 +1907,7 @@ def alert_transfer_graph_discovery(node: dict, trigger_reasons: list,
     triggers = "\n".join(f"  - {r}" for r in trigger_reasons) or "  (none)"
 
     edge_lines = [
-        f"  {e.get('timestamp') or 'unknown time'}  "
+        f"  {_edge_time(e) or 'unknown time'}  "
         f"{e.get('chain')}/{e.get('asset')}  "
         f"{_edge_value(e)}\n"
         f"      {e.get('src')} -> {e.get('dst')}\n"

@@ -399,3 +399,69 @@ def test_a_store_without_the_table_is_left_alone():
 
     from src import discovery_state as state
     assert state.prune_deposit_seeds(sqlite3.connect(':memory:'), set(), 0) == 0
+
+
+# --- paused backfills: expiry and who gets protected (2026-11-13) --------------
+# Eight backfills last attempted 2026-09-28/29 held 97,915 of the 100,000
+# protected fill rows six weeks later, while the five being worked held none.
+
+def _backfill_store(db, rows):
+    """rows: (wallet, n_fills, cursor_ms, last_attempt_ms)."""
+    with DiscoveryStore(db) as store:
+        store.db.execute('CREATE TABLE IF NOT EXISTS fills (wallet TEXT, event_id TEXT PRIMARY KEY, ts INTEGER, raw TEXT)')
+        store.db.execute('CREATE TABLE IF NOT EXISTS fill_progress (wallet TEXT PRIMARY KEY, start_ms INTEGER, cursor_ms INTEGER)')
+        store.db.execute('CREATE TABLE IF NOT EXISTS fill_coverage (wallet TEXT PRIMARY KEY, start_ms INTEGER, end_ms INTEGER)')
+        attempts = {}
+        for wallet, n, cursor, attempt in rows:
+            for i in range(n):
+                store.db.execute('INSERT INTO fills VALUES (?,?,?,?)', (wallet, f'{wallet}:{i}', cursor - i, '{}'))
+            store.db.execute('INSERT INTO fill_progress VALUES (?,?,?)', (wallet, cursor - 21 * DAY_MS, cursor))
+            attempts[wallet] = attempt
+        store.db.commit()
+        store.set_meta('scan_attempts:priority', attempts)
+
+
+def test_a_backfill_no_scanner_read_can_resume_is_expired_and_its_fills_stay(tmp_path):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    now = 200 * DAY_MS
+    dead, live = _w(1), _w(2)
+    _backfill_store(db, [(dead, 5, now - 46 * DAY_MS, now - 45 * DAY_MS),
+                         (live, 5, now - 1 * DAY_MS, now - 1 * DAY_MS)])
+    state.compact(db, now_ms=now)
+    with DiscoveryStore(db) as store:
+        pending = {r[0] for r in store.db.execute('SELECT wallet FROM fill_progress')}
+        assert pending == {live}
+        assert store.db.execute('SELECT count(*) FROM fills WHERE wallet=?', (dead,)).fetchone()[0] == 5
+        retention = store.meta('storage_retention', {})
+        assert retention['backfills_expired'] == 1 and retention['backfill_expiry_days'] == 42
+
+
+def test_a_backfill_inside_the_widest_read_window_is_kept():
+    import sqlite3
+
+    from src import discovery_state as state
+    db = sqlite3.connect(':memory:')
+    db.execute('CREATE TABLE fill_progress (wallet TEXT PRIMARY KEY, start_ms INTEGER, cursor_ms INTEGER)')
+    now = 200 * DAY_MS
+    db.execute('INSERT INTO fill_progress VALUES (?,?,?)', ('a', 0, now - 41 * DAY_MS))
+    db.execute('INSERT INTO fill_progress VALUES (?,?,?)', ('b', 0, now - 43 * DAY_MS))
+    assert state.expire_backfills(db, {'fill_progress'}, now) == 1
+    assert [r[0] for r in db.execute('SELECT wallet FROM fill_progress')] == ['a']
+
+
+def test_protection_goes_to_the_backfill_attempted_most_recently(tmp_path, monkeypatch):
+    from src import discovery_state as state
+    db = tmp_path / 'scan.sqlite3'
+    now = 200 * DAY_MS
+    stale, working = _w(3), _w(4)
+    # Both inside the read window; the budget protects only one of them.
+    _backfill_store(db, [(stale, 4, now - 20 * DAY_MS, now - 20 * DAY_MS),
+                         (working, 4, now - 1 * DAY_MS, now - 1 * DAY_MS)])
+    monkeypatch.setattr(state, 'PENDING_FILL_ROWS', 4)
+    monkeypatch.setattr(state, 'MAX_FILL_ROWS', 5)
+    state.compact(db, now_ms=now)
+    with DiscoveryStore(db) as store:
+        assert store.db.execute('SELECT count(*) FROM fills WHERE wallet=?', (working,)).fetchone()[0] == 4
+        assert store.db.execute('SELECT * FROM fill_progress WHERE wallet=?', (working,)).fetchone()
+        assert not store.db.execute('SELECT * FROM fill_progress WHERE wallet=?', (stale,)).fetchone()

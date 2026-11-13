@@ -309,10 +309,27 @@ def normalise_l1_transfer(tx: dict, decimals: int = 6) -> dict | None:
         "amount_usd": round(amount, 2),
         "ref": ref,
         "ts": ts,
-        "timestamp": _iso(ts),
         "discovery_source": SRC_L1,
     }
 
+
+
+# An in-memory edge carries at most TEN keys. CPython sizes a dict's table by
+# key count and steps from 272 to 464 bytes at the eleventh key (3.12): with
+# 6.23M edges on 2026-11-13 and the runner's graph step peaking at 6.8 GB,
+# that one key was ~1.2 GB. The ISO `timestamp` every constructor used to add
+# is `ts` rendered as text, so it is derived where text is needed
+# (`edge_time`: stored edges, hop records, alert bodies) and never held.
+# `tests/test_graph_memory.py` pins the bound for every constructor.
+MAX_EDGE_KEYS = 10
+
+
+def edge_time(edge: dict) -> str | None:
+    """The edge's time as ISO text, from `ts`. None when undated."""
+    if edge.get("timestamp"):
+        return edge["timestamp"]
+    ts = edge.get("ts")
+    return _iso(ts) if ts else None
 
 
 def edge_passes_dust(edge: dict, dust_usd: float) -> bool:
@@ -402,7 +419,6 @@ def normalise_transfer_record(rec: dict, swept: set | None = None) -> dict | Non
         "amount_usd": None if amount_usd is None else round(float(amount_usd), 2),
         "ref": ref,
         "ts": ts,
-        "timestamp": _iso(ts),
         "discovery_source": SRC_L1,
         "kind": _shared(kind) if isinstance(kind, str) else kind,
     }
@@ -468,7 +484,6 @@ def normalise_hl_ledger_entry(entry: dict) -> dict | None:
             "amount_usd": round(_usd(), 2),
             "ref": ref,
             "ts": ts // 1000,
-            "timestamp": _iso(ts // 1000),
             "discovery_source": SRC_HL_LEDGER,
             "ledger_type": dtype,
         }
@@ -485,10 +500,10 @@ def normalise_hl_ledger_entry(entry: dict) -> dict | None:
             "amount_usd": round(_usd(), 2),
             "ref": ref,
             "ts": ts // 1000,
-            "timestamp": _iso(ts // 1000),
             "discovery_source": (SRC_BRIDGE_DEPOSIT if dtype == "deposit"
                                  else SRC_BRIDGE_WITHDRAW),
-            "ledger_type": dtype,
+            # No `ledger_type`: it repeated `src` and took the edge to eleven keys
+            # (see MAX_EDGE_KEYS). Nothing read it.
             "bridge_event": True,
         }
     return None
@@ -512,7 +527,6 @@ def normalise_gas_funding(wallet: str, funder: str, ts: int,
         "amount_native": amount_eth,
         "ref": f"gas:{dst}",
         "ts": ts,
-        "timestamp": _iso(ts),
         "discovery_source": SRC_GAS_FUNDING,
     }
 
@@ -525,15 +539,26 @@ def dedupe_edges(edges: list[dict]) -> list[dict]:
     transfers would inflate from a single real movement.
     """
     by_id: dict[str, dict] = {}
+    # Copy-on-write. Copying every edge up front (`dict(e)`) held a second copy
+    # of all of them while the caller's list was still alive — ~2.9 GB at 6.2M
+    # edges, at the graph step's peak. Only an edge that a duplicate actually
+    # changes is copied, so the caller's edges are still never mutated.
+    copied: set = set()
     for e in edges:
         if not e:
             continue
         prev = by_id.get(e["id"])
         if prev is None:
-            by_id[e["id"]] = dict(e)
+            by_id[e["id"]] = e
             continue
-        prev["ts"] = min(prev["ts"], e["ts"]) if prev["ts"] and e["ts"] else (prev["ts"] or e["ts"])
-        prev["timestamp"] = _iso(prev["ts"])
+        ts = min(prev["ts"], e["ts"]) if prev["ts"] and e["ts"] else (prev["ts"] or e["ts"])
+        if ts == prev["ts"]:
+            continue
+        if e["id"] not in copied:
+            prev = by_id[e["id"]] = dict(prev)
+            prev.pop("timestamp", None)
+            copied.add(e["id"])
+        prev["ts"] = ts
     return sorted(by_id.values(), key=lambda e: (e["ts"], e["id"]))
 
 
@@ -923,7 +948,7 @@ def build_chains(target: str, nodes: list, edges: list, parents: dict,
             hops.append({
                 "src": e["src"], "dst": e["dst"], "chain": e["chain"],
                 "asset": e.get("asset"), "amount_usd": e.get("amount_usd"),
-                "ts": e.get("ts"), "timestamp": e.get("timestamp"),
+                "ts": e.get("ts"), "timestamp": edge_time(e),
                 "ref": e.get("ref"), "discovery_source": e.get("discovery_source"),
             })
             if b in services:
@@ -1774,7 +1799,7 @@ def collect_known_edges() -> list[dict]:
                         "asset": asset,
                         "amount_usd": round(float(finding.get("amount_usdc_raw", 0) or 0), 2),
                         "ref": finding.get("tx_hash", ""),
-                        "ts": ts, "timestamp": _iso(ts),
+                        "ts": ts,
                         "discovery_source": SRC_L1,
                         "hop_count": finding.get("hop_count", 1),
                     })
@@ -1959,7 +1984,6 @@ def correlation_edges(target: str, correlations: dict) -> list[dict]:
             "amount_usd": round(float(corr.get("deposit_amount_usd") or 0), 2),
             "ref": f"corr:{dst}",
             "ts": ts,
-            "timestamp": _iso(ts) if ts else None,
             "discovery_source": SRC_CORRELATION,
             # Never an observed transfer. Read by _expandable_edges to keep the
             # frontier from walking through an inference, and by anything else
@@ -2818,7 +2842,8 @@ def trim_edges_for_storage(graph: dict, cap: int = PERSISTED_EDGES_PER_NODE) -> 
             ids.sort(key=lambda i: by_id[i].get("ts") or 0, reverse=True)
             ids = ids[:cap]
         for i in ids:
-            keep[i] = by_id[i]
+            # Stored edges keep the text time readers of the file have always had.
+            keep[i] = {**by_id[i], "timestamp": edge_time(by_id[i])}
         total = len(node.get("edge_ids") or [])
         nodes.append({**node, "edge_ids": ids, "edge_ids_total": total}
                      if len(ids) < total else node)
