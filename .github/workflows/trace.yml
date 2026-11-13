@@ -200,7 +200,7 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
-        timeout-minutes: 3          # observed 34s
+        timeout-minutes: 8          # observed 113-174s on 2026-11-12/13 (was 34s when the cap was 3, and it was cut at 3:02)
         run: python scripts/check_bridge_destinations.py
       # Every Hyperliquid withdrawal paired with the bridge payout at his own
       # address; an unpaired one is a withdrawal to a foreign address, which
@@ -559,7 +559,7 @@ jobs:
           for i in 1 2 3 4 5; do
             if git push origin main; then exit 0; fi
             git fetch origin main || true
-            if ! git rebase -X theirs --autostash FETCH_HEAD; then
+            if ! git rebase -X theirs -X no-renames --autostash FETCH_HEAD; then
               git rebase --abort || true
               echo "attempt $i: rebase could not be settled automatically"
             fi

@@ -2936,3 +2936,63 @@ one `STALE:` line (oldest first) above the target line.
 A fact kept "whole" in a file is only a fact if a reader can resolve it. And a
 detector is not measured until it has been asked to find HIM in his own later
 history — the clip table's 6 of 15 had never been run.
+
+## 2026-11-13 (later) — the venue asked, day by day, who ran his script
+
+**The question the detector could not ask.** The execution-program detector
+reads a few dozen candidates a run and the tape sketch keeps sizes but no
+timing. SQD serves every fill on his coins for any past day (measured: one hour
+of all 43 clip coins = 111,054 fills, 30 MB, 2.6 s; BTC and ZEC are 40% of
+that), so `src/program_screen.py` folds a whole day's taker orders per wallet
+into sizes per coin and loop pauses and judges EVERY wallet on two things:
+its constant size on a coin is one he has used there (dominant size of any
+EARLIER calendar month of his), on three or more coins; and its loop is paced
+like his. Everything is built from his fills before the day judged.
+
+**Control (2026-08-21..23, two days he placed 57,506 fills).** 67,044 wallets
+on his markets, 1,632 judgeable, 32 paced like him, 2 with three or more of his
+sizes, and **one with both: his own wallet, 18 of 18 clips, ranked first.**
+The 13 cadence-only wallets above $1M of notional were each put to Hyperliquid:
+three sub-accounts of one firm (`0x68bd85dc…`), `0xb83de012…` ($167M, agent
+"IMS", 186 deposits — the $177M referrer of `0x5b5d5120…`; a firm, and its
+loop is p25 1.477 s), and small referral-code accounts. **The venue holds a
+separate cluster pacing at p25 1.48-1.50 s** (eight wallets in that window);
+his is 1.55-1.68, and with his current reference (1.61) the band excludes it.
+A first trial used a reference of only his prior 60 days: 4 coins, and it did
+not see him at all on a day he traded other coins — hence every size he EVER
+used, per coin.
+
+**His current silence (2026-11-07..13).** 97,493 wallets, 2,026 judgeable, 25
+paced like him, **0 with both.** The largest cadence-only wallet,
+`0x303729b5…` ($157.6M of taker notional in six days, p25 1.612 s / median
+1.705 s against his 1.617 / 1.745, no constant size on any of his coins), is a
+sub-account of `0x6355f7cf…`, whose agents are named `NLTMM-TKA06` and `Key_1`
+to `Key_24+` — a desk, $10.5B of volume. Not him. So while he has been silent
+since 2026-11-06, nobody on his markets is running his script.
+
+**Wired.** `scripts/screen_program_history.py` (tape.yml, one unread day a
+run, ~2 GB and a few minutes): his silent days first, newest first, then his
+active days as the control, whose found/measurable count is the screen's
+recall, reported in the digest. A hit (both, not his wallet) becomes a
+`program_screen` registry candidate the detector reads, and pages HIGH once a
+week. A day that cannot be read whole is left unread and retried. Only counts
+and hits are stored (`data/tape/program_screen.json`).
+
+**What it cannot see.** A second account he trades by hand, or with other
+sizes on other coins. His known wallets trade by hand (2026-10-15), so this is
+a net for the script, not for him.
+
+**After the merge (same day).** The size guard read "no file within 20 MiB of
+the limit" and trace committed again (run 43372272803, 54 minutes, every step
+green). Two more faults showed on the way, both older than this outage:
+
+- *The bridge-destinations step* now takes 113-174 s against a 3-minute cap
+  written when it took 34 s, and was cut at 3:02 (run 43356385437). Cap 8.
+- *A rename/delete conflict `-X theirs` cannot settle* (run 43365752896): the
+  trace run and a concurrent watch each pruned the same expired
+  `data/alerts/runs/<id>.json` and wrote a shard of their own; git read
+  "deleted here, a similar file added there" as a rename, all five retries met
+  the same tree conflict, and the hour's reading was dropped. Reproduced in a
+  scratch remote, where `-X no-renames` settles it with both shards and the
+  pushing run's files kept. All nine workflows carry it and
+  `tests/test_workflow_rebase.py` pins it.

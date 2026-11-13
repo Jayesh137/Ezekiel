@@ -77,6 +77,7 @@ def load_readings(data_dir: Path = DATA_DIR) -> dict:
         "scans": _read(data_dir / "scans" / "latest.json"),
         "graph": _read(data_dir / "transfer_graph" / "latest.json"),
         "stale_feeds": stale_feeds(data_dir),
+        "program_screen": _read(data_dir / "tape" / "program_screen.json"),
     }
 
 

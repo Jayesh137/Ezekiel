@@ -287,3 +287,22 @@ def test_a_digest_with_every_feed_fresh_still_says_feeds_fresh():
     _, body = digest.render(digest.build(_readings(feed_other={}, feed_watch={}),
                                          {"target_wallet": "0xabc"}, NOW))
     assert body.splitlines()[0].startswith("Target:") and "feeds fresh" in body
+
+
+def test_the_script_screen_line_names_wallets_seen_on_his_silent_days():
+    readings = _readings(program_screen={
+        "pending_days": 40,
+        "summary": {"days_read": 12, "silent_days_read": 9, "hit_wallets": 2,
+                    "target_found_days": 2, "target_measurable_days": 3},
+        "hits": {"0x1111111111111111111111111111111111111111": {"silent_days": ["2026-09-08"]},
+                 "0x2222222222222222222222222222222222222222": {"silent_days": []}}})
+    _, body = digest.render(digest.build(readings, {"target_wallet": "0xabc"}, NOW))
+    line = next(row for row in body.splitlines() if row.startswith("Script screen:"))
+    assert "9 silent + 3 active day(s) read (40 to go)" in line
+    assert "2 other wallet(s) with his sizes and cadence; on his SILENT days: 0x11111111" in line
+    assert "found him on 2/3 of his own days" in line
+
+
+def test_no_script_screen_line_before_the_first_day_is_read():
+    _, body = digest.render(digest.build(_readings(), {"target_wallet": "0xabc"}, NOW))
+    assert "Script screen:" not in body

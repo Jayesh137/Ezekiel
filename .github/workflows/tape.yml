@@ -64,7 +64,7 @@ jobs:
     concurrency:
       group: tape-data
       cancel-in-progress: false
-    timeout-minutes: 25  # tape ~2 min, co-firing ~2.5, treasury ≤9 (hard deadline 400s), venue ≤3, clients ≤5, commit
+    timeout-minutes: 34  # tape ~2 min, co-firing ~2.5, treasury ≤9 (hard deadline 400s), venue ≤3, clients ≤5, screen ≤8, commit
     env:
       PYTHONUNBUFFERED: "1"
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -117,6 +117,16 @@ jobs:
         if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
         timeout-minutes: 5
         run: python scripts/census_client_fingerprint.py --time-budget 150 --max-wallets 40
+      # Who ran HIS script on his markets on a past day (src/program_screen.py):
+      # one unread day a run from SQD, his silent days first, his active days as
+      # the control (2026-11-13: of 67,044 wallets only his own showed both his
+      # sizes and his cadence). A day that cannot be read whole inside the budget
+      # is left unread and retried; the step cap sits above the budget so a slow
+      # day fails alone and never the commit.
+      - name: Screen a past day of his markets for his script
+        if: ${{ !cancelled() && steps.deps.conclusion == 'success' }}
+        timeout-minutes: 8
+        run: python scripts/screen_program_history.py --max-days 1 --time-budget 390
       - name: Commit and push
         if: always()
         run: |
@@ -130,7 +140,7 @@ jobs:
           for i in 1 2 3 4 5; do
             if git push origin main; then exit 0; fi
             git fetch origin main || true
-            if ! git rebase -X theirs --autostash FETCH_HEAD; then
+            if ! git rebase -X theirs -X no-renames --autostash FETCH_HEAD; then
               git rebase --abort || true
               echo "attempt $i: rebase could not be settled automatically"
             fi

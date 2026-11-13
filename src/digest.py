@@ -234,6 +234,22 @@ def venue_section(readings: dict) -> dict | None:
             "his_class_upper": rate.get("upper")}
 
 
+def screen_section(readings: dict) -> dict:
+    """The day-by-day venue screen for his script (`src/program_screen.py`)."""
+    doc = readings.get("program_screen") or {}
+    summary = doc.get("summary") if isinstance(doc.get("summary"), dict) else {}
+    hits = doc.get("hits") if isinstance(doc.get("hits"), dict) else {}
+    silent = sorted((w for w, h in hits.items() if isinstance(h, dict) and h.get("silent_days")),
+                    key=lambda w: -len(hits[w]["silent_days"]))
+    return {"days_read": summary.get("days_read"),
+            "silent_days_read": summary.get("silent_days_read"),
+            "pending_days": doc.get("pending_days"),
+            "hit_wallets": summary.get("hit_wallets"),
+            "silent_hit_wallets": silent[:3],
+            "target_found_days": summary.get("target_found_days"),
+            "target_measurable_days": summary.get("target_measurable_days")}
+
+
 def discovery_section(readings: dict) -> dict:
     """What the L1 walk did on its last run: the one vector that reaches an
     address nobody has seen, and the one that was dead for a month while every
@@ -305,6 +321,7 @@ def build(readings: dict, config: dict | None, now: datetime | None = None) -> d
         "replica": replica_section(readings),
         "treasury": treasury_section(readings),
         "venue": venue_section(readings),
+        "screen": screen_section(readings),
         "health": health_section(readings, now),
     }
 
@@ -422,6 +439,16 @@ def render(digest: dict) -> tuple[str, str]:
                      f"clients: {vn['his_class'] or 0}/{vn['clients_measured'] or 0} in his class "
                      f"(ceiling {upper}).")
     d = digest["discovery"]
+    sc = digest.get("screen") or {}
+    if sc.get("days_read"):
+        named = ("; on his SILENT days: " + ", ".join(_short(w) for w in sc["silent_hit_wallets"])
+                 if sc.get("silent_hit_wallets") else "")
+        lines.append(f"Script screen: {sc['silent_days_read'] or 0} silent + "
+                     f"{(sc['days_read'] or 0) - (sc['silent_days_read'] or 0)} active day(s) read "
+                     f"({sc.get('pending_days') or 0} to go); {sc.get('hit_wallets') or 0} other "
+                     f"wallet(s) with his sizes and cadence{named}; found him on "
+                     f"{sc.get('target_found_days') or 0}/{sc.get('target_measurable_days') or 0} "
+                     f"of his own days.")
     if d.get("lookups") is None:
         lines.append("Discovery: no graph reading.")
     else:

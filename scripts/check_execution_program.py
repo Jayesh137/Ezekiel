@@ -89,7 +89,10 @@ REGISTRY_SOURCES = ("tape_census", "execution_program_tape", "execution_program_
                     # show his script's class), program-shaped takers found in the
                     # venue-wide sample, and outcome-market traders present in his
                     # treasury sessions. Each is a lead the detector must READ.
-                    "client_census", "venue_program", "outcome_treasury")
+                    "client_census", "venue_program", "outcome_treasury",
+                    # 2026-11-13: a wallet the day-by-day venue screen saw with his
+                    # sizes AND his cadence (src/program_screen.py).
+                    "program_screen")
 REGISTRY_RESERVE = 10
 
 
