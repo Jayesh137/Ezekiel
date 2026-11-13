@@ -38,6 +38,15 @@ TRIM_ROUNDS = 8
 # and three months of reads at its rate.
 SEED_DAYS = 30
 MAX_DEPOSIT_SEEDS = 60_000
+# A paused fill backfill (`fill_progress`) is resumed only by a read whose
+# window still contains its cursor. The scanner reads 21 days
+# (`fills_lookback_days`), 42 for a thin history, so a cursor older than that
+# can never move again. On 2026-11-13 eight backfills last attempted on
+# 2026-09-28/29 (the scanner stopped choosing those wallets) sat at cursors of
+# 09-23..29 for six weeks, and because protection went oldest attempt first
+# they held 97,915 of the 100,000 protected fill rows while the five backfills
+# being worked that day held none.
+BACKFILL_EXPIRY_DAYS = 42
 
 
 class OverBudget(ValueError):
@@ -263,6 +272,19 @@ def collapse_agent_snapshots(db_path) -> int:
     return removed
 
 
+def expire_backfills(db, tables, now_ms, *, days=BACKFILL_EXPIRY_DAYS) -> int:
+    """Drop paused backfills no scanner read can resume. Returns how many.
+
+    Only the continuation is dropped: its fills stay as ordinary cache under
+    the usual retention, and a wallet the scanner returns to starts a fresh
+    walk from its window, exactly as it would have resumed.
+    """
+    if 'fill_progress' not in tables:
+        return 0
+    return db.execute('DELETE FROM fill_progress WHERE cursor_ms<?',
+                      (now_ms - days * 86400_000,)).rowcount
+
+
 def prune_deposit_seeds(db, tables, now_ms, *, days=SEED_DAYS, keep=MAX_DEPOSIT_SEEDS) -> int:
     """Drop the seeds the queue can never reach. Returns how many went.
 
@@ -290,21 +312,24 @@ def compact(db_path, now_ms=None):
     with DiscoveryStore(db_path) as store:
         store.prune(now_ms - 30 * 86400_000, max_events=100_000)
         tables = {r[0] for r in store.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        protected, protected_rows = [], 0
+        protected, protected_rows, expired = [], 0, 0
         if 'fills' in tables:
             before = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
             store.db.execute('DELETE FROM fills WHERE ts<?', (now_ms - 90 * 86400_000,))
             aged = dict(store.db.execute('SELECT wallet,count(*) FROM fills GROUP BY wallet'))
+            expired = expire_backfills(store.db, tables, now_ms)
             if 'fill_progress' in tables:
                 attempts = {}
                 for phase in ('priority', 'leaderboard'):
                     for wallet, stamp in store.meta('scan_attempts:' + phase, {}).items():
                         attempts[wallet] = max(attempts.get(wallet, 0), stamp)
                 pending = [r[0] for r in store.db.execute('SELECT wallet FROM fill_progress')]
-                # Retain whole prefixes, oldest waiting attempt first. Keeping
-                # only the newest fill timestamps erased every active backfill
-                # in production, forcing the same pages to be fetched forever.
-                for wallet in sorted(pending, key=lambda w: (attempts.get(w, 0), w)):
+                # Retain whole prefixes (keeping only the newest fill
+                # timestamps erased every active backfill in production,
+                # forcing the same pages to be fetched forever), the MOST
+                # RECENTLY attempted first: those are the ones the scanner is
+                # working. Oldest-first gave the budget to abandoned ones.
+                for wallet in sorted(pending, key=lambda w: (-attempts.get(w, 0), w)):
                     size = aged.get(wallet, 0)
                     if size and size == before[wallet] and protected_rows + size <= min(PENDING_FILL_ROWS, MAX_FILL_ROWS):
                         protected.append(wallet)
@@ -330,4 +355,5 @@ def compact(db_path, now_ms=None):
             'protected_fill_rows': protected_rows, 'collapsed_snapshots': collapsed,
             'deposit_seed_days': SEED_DAYS, 'deposit_seed_rows': MAX_DEPOSIT_SEEDS,
             'deposit_seeds_dropped': seeds_dropped,
+            'backfill_expiry_days': BACKFILL_EXPIRY_DAYS, 'backfills_expired': expired,
             'authority_days': 730, 'complete_history': False})

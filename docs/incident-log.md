@@ -3032,3 +3032,39 @@ provenance by their own route (`cctp_feed`, `run_provenance.py`).
 **Rule.** A table inside a byte-budgeted artifact needs a bound of its own, or
 it is the one that fills the budget: the 2026-10-06 trimmer and the 2026-10-27
 snapshot collapse each bounded what was large THAT day.
+
+## 2026-11-13 (night) — the stalled backfills, and the graph's edges cut by 40%
+
+**The eight backfills were abandoned, not stuck.** Each was last attempted on
+2026-09-28/29 — the scanner stopped choosing those wallets — and its cursor sat
+at 09-23..29 for six weeks. A paused backfill is resumed only by a read whose
+window contains its cursor; the scanner reads 21 days (42 for a thin history),
+so none could ever move again. Worse, `compact()` protected paused backfills
+**oldest attempt first**, so the eight dead ones held 97,915 of the 100,000
+protected fill rows while the five the scanner was working that day held none.
+Now `expire_backfills` drops a continuation whose cursor is older than 42 days
+(its fills stay as ordinary cache), and protection goes most-recently-attempted
+first. Replayed on the production checkpoint: 8 expired, the 5 live ones
+protected (51,960 rows), no fill lost, 36.57 MB.
+(They were all HFT accounts: 12,000 fills covered two hours. The venue serves a
+wallet's newest 10,000 fills, so for such a wallet a 21-day backfill can never
+complete — each read lands on the newest available fills.)
+
+**Graph memory.** The trace runner's graph step held 6.23M edges and peaked at
+6.8 GB of 16 (2026-11-13), growing ~1M edges every few weeks. Two causes, both
+in the edge dicts:
+- CPython sizes a dict's table by key count, and at the eleventh key it goes
+  from 272 to 464 bytes (3.12). Every substrate edge carried eleven, one of
+  them `timestamp` — `ts` rendered as ISO text. It is no longer held: derived by
+  `edge_time` where text is needed (stored edges, hop records, alert bodies).
+  Hyperliquid deposit/withdraw edges also dropped `ledger_type` (it repeated
+  `src`; nothing read it). `MAX_EDGE_KEYS` = 10, pinned for every constructor by
+  `tests/test_graph_memory.py`.
+- `dedupe_edges` copied EVERY edge (`dict(e)`) while the caller's list was
+  alive. It is copy-on-write now: only an edge a duplicate changes is copied.
+Measured on 295,516 production substrate records, scaled to 6.23M edges:
+**edges held 3.98 -> 2.37 GB; peak while deduping 6.92 -> 3.01 GB.**
+
+**Rule.** A per-record container has a size cliff: count keys, don't guess. And
+a sort order on a protection budget means "who gets it": oldest-first protected
+the abandoned.

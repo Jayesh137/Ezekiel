@@ -228,9 +228,11 @@ standing state and the rule each incident taught.
 - **Open:** recovering unpriced records lost across the frontier is an
   API-budget decision for the operator (target re-sweeps, never wholesale);
   `data/transfers/` grows 20-60 MB a day from the walk and the graph holds
-  every record as an edge (5.2M on 2026-10-26, ~4 GB interned) — the next
-  memory step is an edge representation smaller than a dict, or a load that
-  skips records between two services.
+  every record as an edge (6.23M on 2026-11-13). Edges are kept at ≤10 keys
+  (`MAX_EDGE_KEYS`: CPython's dict jumps 272 → 464 B at the eleventh) and
+  dedupe is copy-on-write: held 3.98 → 2.37 GB, peak 6.92 → 3.01 GB at that
+  size. The next step, when growth needs it, is a load that skips records
+  between two services.
 
 ## Design rules each incident taught
 
@@ -348,6 +350,10 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   days (`keep_schedule.EVICTION_SECONDS`). And a job ceiling must stay above
   the sum of its steps — it cancels the commit and loses every reading, where
   a step cap loses one step.
+- **A paused backfill outlives its usefulness when its cursor leaves every read
+  window** (`expire_backfills`, 42 days), and a protection budget goes to the
+  most recently ATTEMPTED: oldest-first handed 97,915 of 100,000 protected rows
+  to eight backfills the scanner had abandoned six weeks earlier.
 - **A table inside a byte-budgeted artifact needs a bound of its own.** The scan
   checkpoint's `deposit_seeds` (264,669 wallets, 706 ever read, a third of the
   48 MiB artifact) was touched by no retention and no trimmer, and the scan
