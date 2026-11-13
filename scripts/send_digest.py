@@ -76,7 +76,16 @@ def load_readings(data_dir: Path = DATA_DIR) -> dict:
         "risk": _read(data_dir / "risk" / "latest.json"),
         "scans": _read(data_dir / "scans" / "latest.json"),
         "graph": _read(data_dir / "transfer_graph" / "latest.json"),
+        "stale_feeds": stale_feeds(data_dir),
     }
+
+
+def stale_feeds(data_dir: Path = DATA_DIR) -> list[dict]:
+    """Every detector feed past its age limit, oldest first."""
+    from src import feed_health
+    feeds = {name: spec for group in feed_health.GROUPS.values() for name, spec in group.items()}
+    problems = feed_health.assess(feeds, data_dir)
+    return sorted(problems, key=lambda p: -(p.get("age_minutes") or float("inf")))
 
 
 def write_decisions(now: datetime, data_dir: Path = DATA_DIR) -> dict:

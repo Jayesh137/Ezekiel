@@ -114,7 +114,70 @@ def test_merge_ignores_an_unmeasured_population_and_survives_missing_files():
 
 def test_a_merged_bound_above_the_cap_closes_the_vote_even_if_one_source_is_rare():
     leaderboard = _census(attempted=252, comparable=2)      # 2.85%
-    tape = _census(attempted=300, comparable=30)            # ~13%
+    tape = _census(attempted=300, comparable=19)            # ~9.7%, and no p99 yet
     merged = ep.merge_census(leaderboard, tape)
     strong = {"clip_match_ratio": 1.0, "clips_compared": 5, "clips_matched": 5}
     assert ep.is_discriminating(strong, merged) is False
+    # Twenty measured controls later the tape has a p99 of its own, and the
+    # match is judged against THAT (the bounded path stays shut).
+    ready = ep.merge_census(leaderboard, _census(attempted=300, comparable=30))
+    assert ep.bounded_rare(strong, ready) is False
+    assert ep.rarity_path(strong, ready) == "exact"
+
+
+# --- the p99 comes from the harshest READY population (2026-11-13) -----------
+# The leaderboard census sat at 16 comparable controls while the tape census had
+# measured 279; the merge read p99 from the leaderboard alone, so no match could
+# vote however exact.
+
+def _dist(population, ratio_p99, rho_population=0, rho_p99=None, source=None, **bound):
+    out = {"population": population, "ratio_p99": ratio_p99, "ratio_max": ratio_p99,
+           "ratio_mean": 0.02, "min_clips": 3, "rho_population": rho_population,
+           "rho_p99": rho_p99, "rho_max": rho_p99, "rho_mean": 0.1}
+    if source:
+        out["source"] = source
+    out.update(ep.comparable_bound(bound.get("attempted", 0), population))
+    return out
+
+
+def test_a_ready_tape_distribution_opens_the_exact_path_the_leaderboard_could_not():
+    leaderboard = _dist(16, 0.5, attempted=1289)
+    tape = _dist(279, 0.5, rho_population=119, rho_p99=1.0, source="tape", attempted=406)
+    merged = ep.merge_census(leaderboard, tape)
+    assert merged["population"] == 279 and merged["ratio_p99_source"] == "tape"
+    exact = {"clip_match_ratio": 0.8, "clips_compared": 5, "clips_matched": 4}
+    assert ep.is_discriminating(exact, merged) is True
+    assert ep.rarity_path(exact, merged) == "exact"
+    assert ep.bounded_rare(exact, merged) is False    # the tape's ceiling still shuts that path
+
+
+def test_what_the_tape_measured_common_stays_shut():
+    """Half his clips is what strangers reach, and his rank structure over four
+    coins is something takers of his markets hit by chance (rho p99 1.0)."""
+    merged = ep.merge_census(_dist(16, 0.5, attempted=1289),
+                             _dist(279, 0.5, rho_population=119, rho_p99=1.0,
+                                   source="tape", attempted=406))
+    half = {"clip_match_ratio": 0.5, "clips_compared": 6, "clips_matched": 3}
+    structure = {"clip_match_ratio": 0.0, "clips_compared": 4, "clips_matched": 0,
+                 "notional_structure_rho": 1.0, "notional_coins_compared": 4}
+    two = {"clip_match_ratio": 1.0, "clips_compared": 2, "clips_matched": 2}
+    assert ep.is_discriminating(half, merged) is False
+    assert ep.is_discriminating(structure, merged) is False
+    assert ep.is_discriminating(two, merged) is False
+
+
+def test_two_ready_populations_give_the_larger_p99():
+    merged = ep.merge_census(_dist(40, 0.3, attempted=900),
+                             _dist(279, 0.6, source="tape", attempted=406))
+    assert merged["ratio_p99"] == 0.6
+    merged = ep.merge_census(_dist(40, 0.7, attempted=900),
+                             _dist(279, 0.6, source="tape", attempted=406))
+    assert merged["ratio_p99"] == 0.7 and merged["ratio_p99_source"] == "leaderboard"
+
+
+def test_a_population_that_is_not_ready_lends_no_p99():
+    merged = ep.merge_census(_dist(16, 0.5, attempted=1289),
+                             _dist(19, 0.0, source="tape", attempted=300))
+    assert merged["population"] == 16
+    exact = {"clip_match_ratio": 1.0, "clips_compared": 5, "clips_matched": 5}
+    assert ep.is_discriminating(exact, merged) is False
