@@ -3068,3 +3068,14 @@ Measured on 295,516 production substrate records, scaled to 6.23M edges:
 **Rule.** A per-record container has a size cliff: count keys, don't guess. And
 a sort order on a protection budget means "who gets it": oldest-first protected
 the abandoned.
+
+**Verified live, and one more bound (same night).** The first trace run on the
+merged code (43483407734) succeeded with the graph step's peak RSS at
+**5,089 MB, down from 6,768**, on 6.28M edges (6.23M before). The first scan
+(43491134024) expired the 8 backfills and capped the seeds, but uploaded a
+46.9 MB checkpoint: Circle-deposit observations had grown from 22K to 70,006
+rows as trace shipped ~19,000 a run. Nothing reads those rows after ingestion
+(they seed `deposit_seeds`, which keeps its own times), so they are now bounded
+to the newest `CCTP_OBSERVATION_ROWS` = 5,000. By rows, because `observed_at_ms`
+is the import time — a 3-day bound replayed on that checkpoint dropped nothing.
+Replayed: 46.99 -> 36.93 MB, all 60,710 seeds kept.

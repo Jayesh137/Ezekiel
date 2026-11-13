@@ -47,6 +47,16 @@ MAX_DEPOSIT_SEEDS = 60_000
 # they held 97,915 of the 100,000 protected fill rows while the five backfills
 # being worked that day held none.
 BACKFILL_EXPIRY_DAYS = 42
+# A Circle-deposit observation does its work when it is ingested: it seeds
+# `deposit_seeds`, which keeps its own first/last-seen times. Nothing reads the
+# raw row again (`observations('cctp_deposits')` has no caller), yet trace
+# ships ~19,000 a run and on 2026-11-13 they were 70,006 of 72,285
+# observations, pushing the checkpoint back to 46.9 of 50.3 MB a day after the
+# seed bound. Bounded by ROWS, not days: `observed_at_ms` is when a shard was
+# imported, so every one of those 70,006 rows was under a day old (a 3-day
+# bound was tried on that checkpoint and dropped nothing). The newest few
+# thousand are kept for diagnosis.
+CCTP_OBSERVATION_ROWS = 5_000
 
 
 class OverBudget(ValueError):
@@ -348,6 +358,10 @@ def compact(db_path, now_ms=None):
         store.db.execute('DELETE FROM discovery_observations WHERE rowid NOT IN '
                          '(SELECT rowid FROM discovery_observations ORDER BY observed_at_ms DESC LIMIT 100000)')
         seeds_dropped = prune_deposit_seeds(store.db, tables, now_ms)
+        cctp_dropped = store.db.execute(
+            "DELETE FROM discovery_observations WHERE source='cctp_deposits' AND rowid NOT IN "
+            "(SELECT rowid FROM discovery_observations WHERE source='cctp_deposits' "
+            "ORDER BY observed_at_ms DESC, rowid DESC LIMIT ?)", (CCTP_OBSERVATION_ROWS,)).rowcount
         store.db.commit()
         store.set_meta('storage_retention', {'at_ms': now_ms, 'market_events': 100000, 'market_days': 30,
             'fill_rows': MAX_FILL_ROWS, 'fill_days': 90, 'generic_observations': 100000,
@@ -356,4 +370,5 @@ def compact(db_path, now_ms=None):
             'deposit_seed_days': SEED_DAYS, 'deposit_seed_rows': MAX_DEPOSIT_SEEDS,
             'deposit_seeds_dropped': seeds_dropped,
             'backfill_expiry_days': BACKFILL_EXPIRY_DAYS, 'backfills_expired': expired,
+            'cctp_observation_rows': CCTP_OBSERVATION_ROWS, 'cctp_observations_dropped': cctp_dropped,
             'authority_days': 730, 'complete_history': False})
