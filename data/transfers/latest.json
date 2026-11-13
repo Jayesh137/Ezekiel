@@ -1,19 +1,19 @@
 {
-  "computed_at": "2026-11-13T18:33:53.880120+00:00",
+  "computed_at": "2026-11-13T19:42:27.289747+00:00",
   "wallets": 1,
   "records": 4,
-  "spam_suppressed": 4,
+  "spam_suppressed": 5,
   "unpriced": 2,
   "spam_by_reason": {
     "lookalike": 2,
-    "zero_value": 2
+    "zero_value": 2,
+    "symbol_forgery": 1
   },
-  "calls": 33,
+  "calls": 34,
   "possible_gaps": 0,
   "incomplete": {},
   "degraded_sources": [
-    "base",
-    "polygon"
+    "base"
   ],
   "unsupported_sources": [
     "bsc"
@@ -119,25 +119,28 @@
         },
         "polygon": {
           "records": 0,
-          "spam": 0,
-          "calls": 5,
+          "spam": 1,
+          "calls": 6,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
-          "error": "HTTPSConnectionPool(host='api.etherscan.io', port=443): Read timed out. (read timeout=30)",
+          "error": null,
           "probed_inactive": false,
           "unpriced": 0,
-          "spam_by_reason": {},
-          "errors_by_kind": {
-            "erc20": "HTTPSConnectionPool(host='api.etherscan.io', port=443): Read timed out. (read timeout=30)"
+          "spam_by_reason": {
+            "symbol_forgery": 1
           },
+          "errors_by_kind": {},
           "cursor_by_kind": {
             "erc20": 79283383,
             "native": 0,
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "HTTPSConnectionPool(host='api.etherscan.io', port=443): Read timed out. (read timeout=30)",
+            "internal": "HTTPSConnectionPool(host='api.etherscan.io', port=443): Read timed out. (read timeout=30)"
+          },
           "reader": "etherscan"
         },
         "bsc": {
@@ -182,8 +185,7 @@
         }
       },
       "degraded_sources": [
-        "base",
-        "polygon"
+        "base"
       ],
       "unsupported_sources": [
         "bsc"
