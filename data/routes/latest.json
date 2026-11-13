@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "id": "monad:0x85c0157bfdc1c94a637d0eb61778e64d43b1f8d54f456c8bacc399dbdf912144:erc20:0",
+      "original_funder": "0x89587ebe7cff64c6527fe2deccc3521d75763e8d",
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "source_chain": "monad",
+      "source_tx": "0x85c0157bfdc1c94a637d0eb61778e64d43b1f8d54f456c8bacc399dbdf912144",
+      "amount_usd": null,
+      "ts_ms": 1794547079000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "monad:0x85c0157bfdc1c94a637d0eb61778e64d43b1f8d54f456c8bacc399dbdf912144:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "ethereum:0xd731df035040e10bcd42aa5061c38ec1fc988c25fc4361116bb4f4bd810b5d89:erc20:0",
       "original_funder": "0x690c3eebf6ee237f00fc96f9766282f096c191cc",
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
@@ -14272,20 +14286,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "arbitrum:0x32164b8c73c78c020e123fd5dfda81cd8e3fc57e8b4245fb537626ae89602be7:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "arbitrum:0x94ea4688c8c2c7ea0a9682f66667c5f529975b3c920044d1f7f66506495cf795:erc20:0",
-      "original_funder": "0x0000000000000000000000000000000000000000",
-      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
-      "source_chain": "arbitrum",
-      "source_tx": "0x94ea4688c8c2c7ea0a9682f66667c5f529975b3c920044d1f7f66506495cf795",
-      "amount_usd": 999999.6,
-      "ts_ms": 1753614945000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "arbitrum:0x94ea4688c8c2c7ea0a9682f66667c5f529975b3c920044d1f7f66506495cf795:erc20:0"
       ],
       "confirms_owner": false
     }
@@ -34294,6 +34294,17 @@
   ],
   "discoveries": [
     {
+      "wallet": "0x89587ebe7cff64c6527fe2deccc3521d75763e8d",
+      "source": "funding_route",
+      "positive": true,
+      "event_id": "monad:0x85c0157bfdc1c94a637d0eb61778e64d43b1f8d54f456c8bacc399dbdf912144:erc20:0",
+      "parent_event_ids": [
+        "monad:0x85c0157bfdc1c94a637d0eb61778e64d43b1f8d54f456c8bacc399dbdf912144:erc20:0"
+      ],
+      "assertion": "observed_transfer",
+      "confirms_owner": false
+    },
+    {
       "wallet": "0x690c3eebf6ee237f00fc96f9766282f096c191cc",
       "source": "funding_route",
       "positive": true,
@@ -45281,29 +45292,18 @@
       ],
       "assertion": "observed_transfer",
       "confirms_owner": false
-    },
-    {
-      "wallet": "0x632203c1b5baa0e38b37d0ff24d07ac3e770ff52",
-      "source": "funding_route",
-      "positive": true,
-      "event_id": "ethereum:0xe2640469aad31bd068a55d8fbba5c672ff8a4af12527f983d2826ac698b7b247:erc20:0",
-      "parent_event_ids": [
-        "ethereum:0xe2640469aad31bd068a55d8fbba5c672ff8a4af12527f983d2826ac698b7b247:erc20:0"
-      ],
-      "assertion": "observed_transfer",
-      "confirms_owner": false
     }
   ],
   "coverage": {
-    "transfer_records": 5781,
-    "circle_events": 3119
+    "transfer_records": 5782,
+    "circle_events": 4618
   },
   "counts": {
-    "routes": 3241,
+    "routes": 3242,
     "unresolved": 2548,
-    "discoveries": 2173
+    "discoveries": 2174
   },
-  "computed_at_ms": 1794551264010,
+  "computed_at_ms": 1794558695150,
   "authority": {
     "intervals": [
       {
@@ -57865,7 +57865,7 @@
     ]
   },
   "retention": {
-    "circle_rows_read": 3119,
+    "circle_rows_read": 4618,
     "store_read_limit": 100000
   }
 }
