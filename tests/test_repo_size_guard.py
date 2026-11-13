@@ -107,3 +107,48 @@ def test_local_discovery_database_and_ignored_test_artifacts_are_not_git_blobs(t
         with path.open('wb') as handle:
             handle.truncate(101 * 1024 * 1024)
     assert scan(tmp_path)['ok'] is True
+
+
+# --- hold-back: one oversized file must not cost the run every other file ----
+# 2026-10-28 to 2026-11-13: the transfer graph sat at 100.39 MiB and each trace
+# run computed the roster, casebook, dormancy and provenance, then committed
+# none of them, because the guard refused the whole push.
+
+def test_hold_back_restores_a_tracked_file_and_leaves_the_rest(tmp_path):
+    _write(tmp_path, "data/graph/latest.json", 101)
+    _write(tmp_path, "data/roster/latest.json", 1)
+    restored, excluded = [], []
+    held = rs.hold_back(tmp_path, rs.scan(tmp_path)["over_limit"],
+                        restore=lambda root, rel: restored.append(rel) or True,
+                        exclude=lambda root, rel: excluded.append(rel))
+    assert restored == ["data/graph/latest.json"]
+    assert excluded == []
+    assert [h["held"] for h in held] == ["restored"]
+    assert (tmp_path / "data/roster/latest.json").exists()
+
+
+def test_hold_back_excludes_a_file_that_was_never_committed(tmp_path):
+    _write(tmp_path, "data/new/big.json", 101)
+    excluded = []
+    held = rs.hold_back(tmp_path, rs.scan(tmp_path)["over_limit"],
+                        restore=lambda root, rel: False,
+                        exclude=lambda root, rel: excluded.append(rel))
+    assert excluded == ["data/new/big.json"]
+    assert held[0]["held"] == "excluded"
+
+
+def test_main_holding_back_lets_the_commit_proceed(tmp_path, monkeypatch, capsys):
+    _write(tmp_path, "data/graph/latest.json", 101)
+    monkeypatch.setattr(rs, "_git_restore", lambda root, rel: True)
+    monkeypatch.setattr(rs, "hold_back",
+                        lambda root, findings: [{**f, "held": "restored"} for f in findings])
+    paged = []
+    monkeypatch.setattr(rs, "_page", lambda held: paged.extend(held))
+    assert rs.main([str(tmp_path), "--hold-back"]) == 0
+    assert "held back" in capsys.readouterr().out
+    assert [p["path"] for p in paged] == ["data/graph/latest.json"]
+
+
+def test_without_the_flag_the_guard_still_refuses(tmp_path):
+    _write(tmp_path, "data/graph/latest.json", 101)
+    assert rs.main([str(tmp_path)]) == 1

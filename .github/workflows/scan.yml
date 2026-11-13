@@ -155,7 +155,7 @@ jobs:
           # graph crossed that line and 12 consecutive trace runs died here,
           # with the one sentence naming the file buried among five identical
           # retry rejections. Said plainly, first, and nothing is committed.
-          python scripts/check_repo_size.py .
+          python scripts/check_repo_size.py . --hold-back
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # data/calibration/ MUST be here: the scanner writes the rolling score
