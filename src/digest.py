@@ -164,6 +164,11 @@ def execution_section(readings: dict) -> dict:
         "candidates": report.get("candidates"),
         "sketch_wallets": tape_census.get("sketch_wallets"),
         "tape_ceiling": tape_census.get("comparable_upper"),
+        "cadence_matches": len(report.get("cadence_matches") or []),
+        "p99": (census or {}).get("ratio_p99")
+        if ((census or {}).get("population") or 0) >= ep.MIN_CENSUS_POPULATION else None,
+        "p99_population": (census or {}).get("population"),
+        "p99_source": (census or {}).get("ratio_p99_source"),
         "tape_hits": len(tape_census.get("hits") or []),
         "newcomer_handoffs": len(tape.get("newcomer_handoffs") or []),
         "tape_source": tape.get("source"),
@@ -270,6 +275,9 @@ def health_section(readings: dict, now: datetime) -> dict:
         "undelivered": alerts.get("undelivered"),
         "paged_24h": paged,
         "blind_feeds": blind,
+        "stale_feeds": [{"feed": p.get("feed"), "problem": p.get("problem"),
+                         "age_minutes": p.get("age_minutes")}
+                        for p in (readings.get("stale_feeds") or []) if isinstance(p, dict)],
         "data_age": _age((readings.get("index") or {}).get("last_updated"), now),
         "risk": (readings.get("risk") or {}).get("level"),
         "risk_score": (readings.get("risk") or {}).get("score"),
@@ -301,6 +309,23 @@ def build(readings: dict, config: dict | None, now: datetime | None = None) -> d
     }
 
 
+def _stale_line(stale: list[dict]) -> str | None:
+    """One line naming what is not updating, oldest first. None when all fresh."""
+    if not stale:
+        return None
+    parts = []
+    for row in stale[:4]:
+        age = row.get("age_minutes")
+        if isinstance(age, (int, float)):
+            parts.append(f"{row.get('feed')} {age / 1440:.1f}d" if age >= 2880
+                         else f"{row.get('feed')} {age / 60:.0f}h")
+        else:
+            parts.append(f"{row.get('feed')} ({row.get('problem')})")
+    more = f", +{len(stale) - 4} more" if len(stale) > 4 else ""
+    return (f"STALE: {len(stale)} feed(s) not updating - {', '.join(parts)}{more}. "
+            f"What follows from them is that old.")
+
+
 def digest_now(digest: dict) -> datetime:
     try:
         return datetime.fromisoformat(digest["computed_at"])
@@ -320,6 +345,13 @@ def render(digest: dict) -> tuple[str, str]:
     lines = [
         f"Target: last fill {t['last_fill']}; {silence}; value {_money(t['value'])}.",
     ]
+    stale_line = _stale_line(s.get("stale_feeds") or [])
+    if stale_line:
+        # First, above the target: every line below that comes from one of these
+        # feeds is as old as the feed. From 2026-10-28 to 2026-11-13 the roster,
+        # casebook, dormancy and six more were 16 days stale while this digest
+        # said "feeds fresh" every morning — it looked only for BLIND feeds.
+        lines.insert(0, stale_line)
     if h.get("his_wallets"):
         parts = []
         for row in h["his_wallets"]:
@@ -345,9 +377,14 @@ def render(digest: dict) -> tuple[str, str]:
         lines.append(ruling)
     gate = "OPEN" if e["gate_open"] else "closed"
     ceiling = f"{100 * e['ceiling']:.1f}%" if isinstance(e["ceiling"], (int, float)) else "unmeasured"
+    measured = ""
+    if e.get("p99_population") and e.get("p99") is not None:
+        measured = (f"; strangers' p99 match {100 * e['p99']:.0f}% of shared clips over "
+                    f"{e['p99_population']} controls ({e.get('p99_source') or 'leaderboard'})")
     lines.append(f"Execution vote gate {gate}: false-match ceiling {ceiling} "
-                 f"({e['attempted'] or 0} read, {e['comparable'] or 0} comparable); "
-                 f"{e['discriminating']} rare match(es) among {e['read'] or 0} candidates read.")
+                 f"({e['attempted'] or 0} read, {e['comparable'] or 0} comparable){measured}; "
+                 f"{e['discriminating']} rare match(es) among {e['read'] or 0} candidates read; "
+                 f"{e.get('cadence_matches') or 0} paced like his script.")
     tape_ceiling = (f"{100 * e['tape_ceiling']:.1f}%" if isinstance(e["tape_ceiling"], (int, float))
                     else "unmeasured")
     covered = (f"{e['tape_seconds'] / 60:.0f} min continuous" if e.get("tape_source") == "sqd"
@@ -392,7 +429,13 @@ def render(digest: dict) -> tuple[str, str]:
                      f"wallet(s) walked, {d['refreshed']} re-read, {d['new_edges'] or 0} new "
                      f"edge(s), {d['pending'] or 0} pending.")
     health = "healthy" if s["alerts_healthy"] else "FAILING"
-    blind = f"; BLIND: {', '.join(s['blind_feeds'])}" if s["blind_feeds"] else "; feeds fresh"
+    stale = s.get("stale_feeds") or []
+    if s["blind_feeds"]:
+        blind = f"; BLIND: {', '.join(s['blind_feeds'])}"
+    elif stale:
+        blind = f"; {len(stale)} feed(s) STALE"
+    else:
+        blind = "; feeds fresh"
     lines.append(f"System: alerts {health} ({s['undelivered'] or 0} undelivered){blind}; "
                  f"data {s['data_age']}; risk {s['risk']} {s['risk_score']}; "
                  f"behaviour policy {s['scan_policy']}.")

@@ -70,8 +70,66 @@ def scan(root: Path | str = ".") -> dict:
     return {"over_limit": over_limit, "warning": warning, "ok": not over_limit}
 
 
+def _git_restore(root: Path, rel: str) -> bool:
+    """Put the committed version of `rel` back. False when it has none."""
+    import subprocess
+    done = subprocess.run(["git", "checkout", "HEAD", "--", rel], cwd=root,
+                          capture_output=True, text=True)
+    return done.returncode == 0
+
+
+def _git_exclude(root: Path, rel: str) -> None:
+    """Keep a never-committed file out of `git add` without deleting it."""
+    info = root / ".git" / "info"
+    info.mkdir(parents=True, exist_ok=True)
+    with open(info / "exclude", "a", encoding="utf-8") as fh:
+        fh.write(os.linesep + "/" + rel + os.linesep)
+
+
+def _page(findings: list[dict]) -> None:
+    """HIGH, once a day per file: a capability of ours, not a fact about him."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from src import alerts
+        for f in findings:
+            alerts._send_with_cooldown(
+                f"repo_oversize:{f['path']}", 24,
+                f"HIGH: Output file too large to store ({f['path']})",
+                f"{f['path']} is {f['mib']} MiB, above GitHub's "
+                f"{HARD_LIMIT_MIB} MiB limit. This run kept the previous "
+                f"committed version of that ONE file and committed everything "
+                f"else. The file stays stale until its writer is given a byte "
+                f"budget.")
+    except Exception as exc:  # the commit matters more than the page
+        print(f"[size] could not page about the held-back file(s): {exc}")
+
+
+def hold_back(root: Path | str, findings: list[dict], restore=_git_restore,
+              exclude=_git_exclude) -> list[dict]:
+    """Take each over-limit file out of THIS commit, and nothing else.
+
+    Refusing the whole push because one file is too big threw away every
+    other reading of the run: from 2026-10-28 to 2026-11-13 the transfer graph
+    sat at 100.39 MiB and each trace run computed the roster, the casebook,
+    dormancy, provenance, the execution program and accounting, then committed
+    none of them. One file's size is that file's failure. A tracked file is put
+    back to its committed version (stale, and its feed-staleness alarm says
+    so); a file never committed is excluded from `git add`.
+    """
+    root = Path(root)
+    held = []
+    for f in findings:
+        how = "restored" if restore(root, f["path"]) else "excluded"
+        if how == "excluded":
+            exclude(root, f["path"])
+        held.append({**f, "held": how})
+    return held
+
+
 def main(argv=None) -> int:
-    argv = argv if argv is not None else sys.argv[1:]
+    argv = list(argv if argv is not None else sys.argv[1:])
+    holding = "--hold-back" in argv
+    argv = [a for a in argv if a != "--hold-back"]
     report = scan(argv[0] if argv else ".")
 
     for f in report["warning"]:
@@ -82,6 +140,13 @@ def main(argv=None) -> int:
               f"above GitHub's {HARD_LIMIT_MIB} MiB limit — this push WILL be "
               f"rejected and the run's reading lost")
 
+    if not report["ok"] and holding:
+        held = hold_back(argv[0] if argv else ".", report["over_limit"])
+        for f in held:
+            print(f"::error::[size] {f['path']} ({f['mib']} MiB) held back from "
+                  f"this commit ({f['held']}); every other file is committed")
+        _page(held)
+        return 0
     if not report["ok"]:
         print("[size] refusing to push: shrink the file(s) above first. "
               "Nothing is committed, so this run's data is still on the runner.")

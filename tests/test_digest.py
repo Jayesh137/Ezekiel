@@ -254,3 +254,36 @@ def test_venue_line_appears_only_with_a_reading():
                          client_census={"base_rate": {"measured": 300, "his_class": 2, "upper": 0.024}})
     _, body = digest.render(digest.build(readings, {}, NOW))
     assert "Venue: 1200 takers sampled, 3 program-shaped, 40 outcome traders (1 in his sessions); clients: 2/300 in his class (ceiling 2.4%)." in body
+
+
+# --- stale feeds lead the digest (2026-11-13) --------------------------------
+# Nine feeds were 16 days stale while the digest said "feeds fresh" every
+# morning: it only looked for BLIND feeds.
+
+def test_stale_line_names_the_oldest_feeds_first_and_counts_the_rest():
+    stale = [{"feed": "roster", "age_minutes": 16 * 1440}, {"feed": "casebook", "age_minutes": 16 * 1440},
+             {"feed": "dormancy handoff", "age_minutes": 900}, {"feed": "identities", "age_minutes": 800},
+             {"feed": "his perimeter", "problem": "never written"}]
+    line = digest._stale_line(stale)
+    assert line.startswith("STALE: 5 feed(s) not updating - roster 16.0d, casebook 16.0d, "
+                           "dormancy handoff 15h, identities 13h, +1 more")
+    assert digest._stale_line([]) is None
+
+
+def test_a_feed_without_an_age_says_why():
+    assert "roster (never written)" in digest._stale_line(
+        [{"feed": "roster", "problem": "never written"}])
+
+
+def test_a_digest_with_stale_feeds_says_so_on_its_first_line_and_not_feeds_fresh():
+    readings = _readings(feed_other={}, feed_watch={}, stale_feeds=[{"feed": "roster", "problem": "last reading 384h ago",
+                                       "age_minutes": 23040.0, "path": "roster/latest.json"}])
+    _, body = digest.render(digest.build(readings, {"target_wallet": "0xabc"}, NOW))
+    assert body.splitlines()[0].startswith("STALE: 1 feed(s) not updating - roster 16.0d")
+    assert "feeds fresh" not in body and "1 feed(s) STALE" in body
+
+
+def test_a_digest_with_every_feed_fresh_still_says_feeds_fresh():
+    _, body = digest.render(digest.build(_readings(feed_other={}, feed_watch={}),
+                                         {"target_wallet": "0xabc"}, NOW))
+    assert body.splitlines()[0].startswith("Target:") and "feeds fresh" in body

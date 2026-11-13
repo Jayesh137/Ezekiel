@@ -211,6 +211,63 @@ def program_runs(orders: list[dict]) -> list[dict]:
     return programs
 
 
+# --- cadence: the script's own timing constant --------------------------------
+#
+# His clip sizes are an INPUT he retypes every campaign (@107 went 40, 20, 100,
+# 150, 100 between March and August; HYPE 500, 40, 20), so against his own later
+# trading the clip table clears the gate in 6 of 15 thirty-day windows. The pause
+# between two orders is the script's: from 2026-04 to 2026-11 the gap between
+# consecutive same-coin, same-side taker orders had a 25th percentile of
+# 1.58-1.68 s and a median of 1.65-2.01 s in every one of eight months
+# (measured 2026-11-13 over 93,121 of his orders). Among the 106 measurable
+# wallets of his client class (IOC, no client id, scripted runs: itself 129 of
+# 18,688 venue takers) 2 sat in the band below, and both were small bots.
+#
+# EVIDENCE, not a vote (rule 4): 2 of 106 has a Wilson ceiling of 6.6%, above
+# MAX_FALSE_MATCH_RATE. It is recorded on every comparison, it keeps a wallet
+# that shares none of his coins in the report instead of dropping it as
+# `insufficient_data`, and `scripts/census_cadence.py` re-measures the rate.
+CADENCE_PAIR_MAX_S = 10.0       # a longer pause is a new decision, not the loop
+MIN_CADENCE_GAPS = 50
+CADENCE_WINDOW_DAYS = 120       # the script as it runs NOW: Feb-Mar 2026 ran a faster loop
+CADENCE_P25_TOL_S = 0.10        # his eight monthly p25s span 0.10 s
+CADENCE_P50_TOL_S = 0.40        # his eight monthly medians span 0.36 s
+
+
+def cadence(orders: list[dict]) -> dict | None:
+    """Quantiles of the pause between consecutive same-coin, same-side taker
+    orders over the newest CADENCE_WINDOW_DAYS. None when too few to read."""
+    taker = [o for o in orders if o.get("taker") and o.get("coin")]
+    if not taker:
+        return None
+    newest = max(o["t"] for o in taker)
+    floor = newest - CADENCE_WINDOW_DAYS * 86_400_000
+    by_stream: dict = defaultdict(list)
+    for order in taker:
+        if order["t"] >= floor:
+            by_stream[(order["coin"], order["side"])].append(order["t"])
+    gaps = []
+    for stamps in by_stream.values():
+        stamps.sort()
+        gaps.extend((b - a) / 1000 for a, b in zip(stamps, stamps[1:], strict=False)
+                    if 0 < b - a < CADENCE_PAIR_MAX_S * 1000)
+    if len(gaps) < MIN_CADENCE_GAPS:
+        return None
+    gaps.sort()
+    return {"gaps": len(gaps), "p25": round(gaps[len(gaps) // 4], 3),
+            "p50": round(gaps[len(gaps) // 2], 3)}
+
+
+def cadence_match(target: dict | None, candidate: dict | None) -> bool | None:
+    """Whether the candidate's loop is paced like his. None when either side has
+    no readable cadence: unmeasured, never a mismatch (rule 5)."""
+    t, c = (target or {}).get("cadence"), (candidate or {}).get("cadence")
+    if not t or not c:
+        return None
+    return bool(abs(c["p25"] - t["p25"]) <= CADENCE_P25_TOL_S
+                and abs(c["p50"] - t["p50"]) <= CADENCE_P50_TOL_S)
+
+
 def _order_index(orders):
     index = {}
     for record in orders or []:
@@ -236,6 +293,7 @@ def signature(fills: list[dict], orders: list[dict] | None = None) -> dict:
         "clip_table": table,
         "clip_notionals": clip_notionals(reconstructed, table),
         "program_runs": len(program_runs(reconstructed)),
+        "cadence": cadence(reconstructed),
         "ioc_5pct_share": None,
         "cloid_share": None,
         "ioc_share": None,
@@ -282,7 +340,9 @@ def compare(target: dict, candidate: dict) -> dict:
               "clips_compared": 0, "clips_matched_coins": [],
               "cadence_agreement": None, "offset_agreement": None,
               "notional_structure_rho": None, "notional_coins_compared": 0,
-              "strength": None, "promotable": False}
+              "strength": None, "promotable": False,
+              "cadence_match": cadence_match(target, candidate),
+              "cadence": candidate.get("cadence")}
     t_table = target.get("clip_table") or {}
     c_table = candidate.get("clip_table") or {}
     # Scale-invariant structure: the rank correlation of per-coin clip notionals
@@ -335,7 +395,11 @@ def rank_matches(target: dict, candidates: list[dict]) -> list[dict]:
     for candidate in candidates:
         result = compare(target, candidate.get("signature") or {})
         if result["status"] != "measured":
-            continue
+            if not result.get("cadence_match"):
+                continue
+            # His timing on none of his coins: no clip comparison exists, and
+            # dropping the row would hide the one thing that was measured.
+            result["status"] = "cadence_only"
         extra = {k: v for k, v in candidate.items() if k not in ("signature",)}
         ranked.append({**extra, **result})
     ranked.sort(key=lambda r: (-(r["strength"] or 0), -r["clips_matched"], str(r.get("wallet"))))
@@ -459,6 +523,28 @@ def merge_census(primary: dict | None, *others: dict | None) -> dict | None:
     if not parts:
         return None
     out = dict(parts[0]) if isinstance(primary, dict) else {"population": 0, "rho_population": 0}
+    # Each p99 comes from the HARSHEST population that has measured it over
+    # MIN_CENSUS_POPULATION controls. It used to come from `primary` alone, so
+    # while the leaderboard census sat at 16 comparable controls (of 1,289 read,
+    # 2026-11-11) the exact path stayed shut although the tape census had
+    # measured 279 clip-comparable takers of his own markets, 119 of them on
+    # three or more of his coins, none matching more than two of his clips
+    # (replayed on the sketches, 2026-11-13). The tape's ceiling had also shut
+    # the bounded path (comparability is 69% among takers of his markets), so
+    # the vector could not vote on any match however exact. No bar moves: the
+    # same p99 rule reads a distribution that had been measured and ignored,
+    # and where two populations are ready the larger p99 wins.
+    for p99_key, population_key, max_key, mean_key in (
+            ("ratio_p99", "population", "ratio_max", "ratio_mean"),
+            ("rho_p99", "rho_population", "rho_max", "rho_mean")):
+        ready = [c for c in parts
+                 if (c.get(population_key) or 0) >= MIN_CENSUS_POPULATION
+                 and c.get(p99_key) is not None]
+        if ready:
+            harshest = max(ready, key=lambda c: (c[p99_key], c.get(population_key) or 0))
+            for key in (p99_key, population_key, max_key, mean_key):
+                out[key] = harshest.get(key)
+            out[p99_key + "_source"] = harshest.get("source") or "leaderboard"
     bounds = [(c.get("comparable_upper"), c.get("attempted") or 0) for c in parts
               if c.get("comparable_upper") is not None
               and (c.get("attempted") or 0) >= MIN_CENSUS_ATTEMPTS]

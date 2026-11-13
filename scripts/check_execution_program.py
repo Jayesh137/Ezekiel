@@ -277,6 +277,11 @@ def build_report(target_sig, candidate_rows, census, roster_vectors, *, target_w
         "census_population": (census or {}).get("population"),
         "census_comparable_upper": (census or {}).get("comparable_upper"),
         "census_attempted": (census or {}).get("attempted"),
+        "target_cadence": target_sig.get("cadence"),
+        # Evidence, never a vote: see `execution_program.cadence`.
+        "cadence_matches": [{"wallet": m.get("wallet"), "cadence": m.get("cadence"),
+                             "clips_matched": m.get("clips_matched")}
+                            for m in matches if m.get("cadence_match") and not m.get("known_self")],
         "matches": matches,
     }
 

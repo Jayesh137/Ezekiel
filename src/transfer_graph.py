@@ -2785,19 +2785,29 @@ def trim_edges_for_storage(graph: dict, cap: int = PERSISTED_EDGES_PER_NODE) -> 
     Keeps, per node, the `cap` most RECENT of its edges — newest-first is the
     order the dashboard shows — and drops any edge no node references at all.
 
-    Three things are deliberately left ALONE, because they are facts rather than
-    storage decisions: `edge_count`, each node's `totals.edge_count`, and each
-    node's full `edge_ids`. A reader asking "how many transfers were observed"
-    must get the true answer, and only the list of edge DETAIL is abridged.
-    That the abridgement happened is stated in the file — a truncated list that
-    looks complete is rule 5, and this one would understate a wallet's activity,
-    which is the direction that loses a migration.
+    Two things are deliberately left ALONE, because they are facts rather than
+    storage decisions: `edge_count` and each node's `totals.edge_count`. A
+    reader asking "how many transfers were observed" must get the true answer,
+    and only the list of edge DETAIL is abridged. That the abridgement happened
+    is stated in the file — a truncated list that looks complete is rule 5, and
+    this one would understate a wallet's activity, which is the direction that
+    loses a migration.
+
+    A node's stored `edge_ids` name only the edges that ARE stored (the true
+    number stays in `totals.edge_count`, and `edge_ids_total` says how many
+    ids there were). They used to be kept whole "as a fact", but an id whose
+    edge is not in the file can be resolved by nobody — the dashboard maps ids
+    through the stored edges and drops the rest — and the ids alone were
+    53.9 MB of a 96 MB file on 2026-10-27 (299 nodes, up to hundreds of
+    thousands of ids each). The file crossed 100 MiB on 2026-10-28 and every
+    trace run lost its whole reading at the push for sixteen days.
 
     Never mutates the input: `fire_alerts` runs before the save and builds its
     alert bodies from the full in-memory graph.
     """
     by_id = {e.get("id"): e for e in graph.get("edges") or [] if isinstance(e, dict)}
     keep: dict[str, dict] = {}
+    nodes: list[dict] = []
     truncated = False
     for node in graph.get("nodes") or []:
         ids = [i for i in (node.get("edge_ids") or []) if i in by_id]
@@ -2809,9 +2819,13 @@ def trim_edges_for_storage(graph: dict, cap: int = PERSISTED_EDGES_PER_NODE) -> 
             ids = ids[:cap]
         for i in ids:
             keep[i] = by_id[i]
+        total = len(node.get("edge_ids") or [])
+        nodes.append({**node, "edge_ids": ids, "edge_ids_total": total}
+                     if len(ids) < total else node)
     if len(keep) < len(by_id):
         truncated = True
     return {**graph,
+            "nodes": nodes,
             "edges": list(keep.values()),
             "edges_stored": len(keep),
             "edges_per_node_cap": cap,

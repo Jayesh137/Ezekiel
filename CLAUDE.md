@@ -96,7 +96,7 @@ trading style. Never promote a wallet on one vector alone.
 | New dex | `collector.new_dexes` (collector step) | A book on a HIP-3 dex he has never traded — a migration INSIDE Hyperliquid, with no L1 trace, no transfer and no new address. He uses only `xyz` of the ten the venue lists. CRITICAL, and the set was collected every run from 2026-09-11 with nothing diffing it until 2026-09-12 |
 | Referral | `referral.py` (collector step) | He has no code today. Creating one, referring an account through it, or being referred alerts HIGH with the addresses — a referred account is one he chose to link to himself |
 | Behavioural | `scanner.py`, `fingerprint.py` | Trading style. **Currently unvalidated, so it casts no vote** — the backtest is inconclusive until its fixed held-out cohort accumulates (rule 4); read `thresholds.policy` in `data/scans/latest.json` |
-| Execution program | `execution_program.py`, `scripts/check_execution_program.py`, `scripts/census_execution_program.py` | His SDK slicer, recognised by his CLIP TABLE — the exact base size he fires per coin (ZEC 1, SILVER 20, NEAR 250, BTC 0.1) through `market_open` (5% IOC, ~1.7s, no client id). A behaviour vote (`execution_program`), so it corroborates and never reaches PROBABLE without a financial/protocol vector (rule 9), and casts NO vote until the census has MEASURED the match rare — `data/execution_program/census.json`, `ratio_p99` (rule 4). Match + independent vector → CRITICAL; census-rare match alone → HIGH; a match on a KNOWN wallet of his (`config.known_self_wallets`) is capped at HIGH — he trading from a known wallet is worth knowing, not a new identification. Measured 2026-09-28: 0 of 248 large accounts carry the full signature. **The vote gate has a third, measured path since 2026-10-12:** the census could not reach 20 COMPARABLE controls (2 of 252 reads carried a clip table on two of his coins), so a strong match (ratio ≥0.75 over ≥3 clips, or rho ≥0.9 over ≥4 coins) votes when the Wilson 95% ceiling on P(comparable) is ≤5% (live 2.85%; LR ≥20; `bounded_rare`, `rarity_path`); `merge_census` takes the LARGER ceiling of the leaderboard and tape censuses. **Scale-invariant too:** `notional_structure_rho` (Spearman rank correlation of per-coin clip notionals) survives him RESCALING every clip — a uniform rescale keeps rank order (rho 1.0), and his structure is stable across drift (recent-window rho ~0.9 vs exact-size ~0.5); `is_discriminating` clears on EITHER a census-rare `ratio_p99` (exact) OR `rho_p99` (structure) |
+| Execution program | `execution_program.py`, `scripts/check_execution_program.py`, `scripts/census_execution_program.py` | His SDK slicer, recognised by his CLIP TABLE — the exact base size he fires per coin (ZEC 1, SILVER 20, NEAR 250, BTC 0.1) through `market_open` (5% IOC, ~1.7s, no client id). A behaviour vote (`execution_program`), so it corroborates and never reaches PROBABLE without a financial/protocol vector (rule 9), and casts NO vote until the census has MEASURED the match rare — `data/execution_program/census.json`, `ratio_p99` (rule 4). Match + independent vector → CRITICAL; census-rare match alone → HIGH; a match on a KNOWN wallet of his (`config.known_self_wallets`) is capped at HIGH — he trading from a known wallet is worth knowing, not a new identification. Measured 2026-09-28: 0 of 248 large accounts carry the full signature. **The vote gate has a third, measured path since 2026-10-12:** the census could not reach 20 COMPARABLE controls (2 of 252 reads carried a clip table on two of his coins), so a strong match (ratio ≥0.75 over ≥3 clips, or rho ≥0.9 over ≥4 coins) votes when the Wilson 95% ceiling on P(comparable) is ≤5% (live 2.85%; LR ≥20; `bounded_rare`, `rarity_path`); `merge_census` takes the LARGER ceiling of the leaderboard and tape censuses. **Since 2026-11-13 each p99 is read from the harshest census with ≥20 measured controls** (the tape: 279 clip-comparable takers of his markets, none matching more than 2 of his clips, so ratio >0.5 over ≥3 clips votes; his rank structure is NOT rare there — rho p99 1.0 — so that path stays shut). **Measured on him: the clip table clears the gate in 6 of 15 chronological 30-day holdouts** — he retypes sizes every campaign — so `cadence` (pause between same-coin same-side taker orders; his p25 1.58-1.68 s for eight months) is recorded on every comparison as EVIDENCE (`cadence_match`, `cadence_only` rows, `scripts/census_cadence.py`: 2 of 106 of his client class, ceiling 6.6%, no vote). **Scale-invariant too:** `notional_structure_rho` (Spearman rank correlation of per-coin clip notionals) survives him RESCALING every clip — a uniform rescale keeps rank order (rho 1.0), and his structure is stable across drift (recent-window rho ~0.9 vs exact-size ~0.5); `is_discriminating` clears on EITHER a census-rare `ratio_p99` (exact) OR `rho_p99` (structure) |
 | HL-native | `ledger_analyzer.py` | Two-way flow entirely inside Hyperliquid, invisible to L1 |
 | Shared agent | `agent_links.py` | An agent is authorised BY the account — two accounts sharing one are the same operator. Strong enough to CONFIRM alone |
 | HL account surface | `hl_surface.py`, `scripts/check_hl_surface.py` | `subAccounts`, `referral`, `userVaultEquities` for every detector candidate. A sub-account on either side of a cluster wallet CONFIRMs alone; a master and its sub-accounts are ONE operator in the roster; a quiet referral (≤10 accounts on the code) with the cluster is one vote (`referral`) |
@@ -219,6 +219,11 @@ standing state and the rule each incident taught.
   artifact budget on 88,678 never-folded agent snapshots; the watch's 8-minute
   cap against ~7s per Hyperliquid call on the runner. `docs/incident-log.md`
   2026-10-27 has the numbers.
+- **Trace committed nothing from 2026-10-28 to 2026-11-13** (graph file over
+  100 MiB; the size guard refused the whole push). Fixed: stored `edge_ids`
+  name only stored edges, and the guard holds back the one file
+  (`check_repo_size.py --hold-back`). Every roster/casebook figure dated inside
+  that window does not exist. `docs/incident-log.md` 2026-11-13.
 - **Open:** recovering unpriced records lost across the frontier is an
   API-budget decision for the operator (target re-sweeps, never wholesale);
   `data/transfers/` grows 20-60 MB a day from the walk and the graph holds
@@ -305,7 +310,8 @@ Each one cost a real finding or a real outage. The story is in the incident log.
 - **Read the substrate once for many wallets** (`collect.records_by_wallet`);
   raising a cache ceiling only buys one step against a growing store.
 - **The repo has a size budget — GitHub refuses any blob over 100 MiB** after
-  the run's work is done. Graph edges are trimmed to 200/node at SAVE (counts
+  the run's work is done. **A guard that protects one file must fail one file**
+  (`--hold-back`): refusing the whole push cost sixteen days of every reading. Graph edges are trimmed to 200/node at SAVE (counts
   never trimmed; truncation declared); sealed substrate days roll to
   `.jsonl.gz` in place (a day with both reads the `.json`); a day's substrate
   shards at 40 MiB with day-wide dedupe; the spam ledger keeps the 2,000
@@ -347,6 +353,10 @@ Each one cost a real finding or a real outage. The story is in the incident log.
   carry nothing `index_authority` can derive, and are collapsed.
 - **A detector's latest.json is a reading, not a memory.** Each is rewritten whole and the roster is rebuilt from scratch, so a lapsed lead becomes indistinguishable from strangers: on 2026-10-08 the four best September leads sat at WATCH with no vectors and no reasons. What must survive a lapse goes in the casebook, which records whether a detector refuted it or only stopped looking. Backfilled history counts only in the ceiling (early votes were retracted). **A backfill inherits every fault its history held:** every 2026-09-10 roster predates that day's pricing fixes, so money, linkage and correlation evidence only they reported no longer counts (`cases.void_pre_fix`; it had shown a $1.03B MAX quantity as a transfer).
 - **An address with no key is never a suspect** (`src/not_wallets.py`): token contracts, precompiles and HyperCore system addresses held detector slots (USDC on Base was #12 of 40). `0x2222…2222` is HYPE's system address and `0x5555…5555` WHYPE: never use them as test wallets. **Nor is a forgery of his declared wallets that moved no real money with him** (`spam.lookalike_of`: same first and last four hex characters; one that moved ≥ $1K stays a lead — it might be his own vanity wallet): the look-alike rule anchored only on the swept batch's volume, so a daily sweep holding spoofed fake-USDC transfers to `0xf078170f…f19e` and nothing with `0xf078969e…f19e` stored them as clean, and the forgery reached POSSIBLE and casebook #3 (2026-10-08). His declared wallets now anchor the rule at collection for records that carry nothing (a price that could not be fetched proves nothing), the roster grades such forgeries INFRASTRUCTURE, and the casebook excludes them every run.
+- **A detector is unmeasured until it has been asked to find HIM in his own
+  later history** (chronological holdout, reference before the cut). The clip
+  table's 6 of 15 had never been run; neither had a census merge that could
+  not open on any match.
 - **A reference that cannot produce a statistic is unmeasured, never a
   non-match.** The candidate study counted strangers with no rhythm as
   non-matches; 73 of 74 ran no slicer, so T2 measured only "runs a slicer" and
@@ -428,6 +438,11 @@ the next session rebuilding them:
   `liquidation_distance`, the one check that can DISconfirm.
 - **Rare-market co-presence** — already partly used via `xyz:` markets; extend to
   any market with few participants.
+- ~~**Month-aligned clip tables**~~ and ~~**activity complement**~~ —
+  **measured 2026-11-13 and rejected.** Aligning his clip table by month does
+  not beat the cumulative table on his own holdouts (5 v 6 of 15; 4 v 5 of 8).
+  "Trades on the days he is silent" has no positive control: his known other
+  wallets have 2 and 37 fills ever — they are treasury accounts, not traders.
 - ~~**The explorer websocket as a venue-wide program screen**~~ — **measured
   2026-10-13 and rejected** (`scripts/probe_explorer_stream.py`, two 40-60 s
   windows). `wss://rpc.hyperliquid.xyz/ws` `explorerTxs` streams every L1

@@ -2864,3 +2864,75 @@ destinations. `linkage.outbound_destinations_by_wallet` now keeps only the
 destination SETS in one walk, `high_fanin_addresses` remembers at most
 `threshold` senders per destination, and the trace job ceiling is 75 (2,986s
 of steps measured against a 60 that cancels the commit).
+
+## 2026-11-13 — sixteen days of trace readings lost at the push; a muted execution vote; a digest that said "feeds fresh"
+
+**1. Trace computed everything and committed nothing, 2026-10-28 to 11-13.**
+`data/transfer_graph/latest.json` reached 100.39 MiB and
+`scripts/check_repo_size.py` refused the push — the WHOLE push, so the roster,
+casebook, dormancy, provenance, the execution program and accounting were
+computed on every run (50-60 minutes each) and discarded. The 2026-09-12 fix
+had capped stored EDGES at 200 a node and left every node's `edge_ids` whole
+"as a fact": 53.9 MB of ids for 299 nodes whose edges were not in the file,
+which no reader can resolve (the dashboard maps ids through the stored edges
+and drops the rest). Two changes: a node's stored `edge_ids` name only stored
+edges (`edge_ids_total` and `totals.edge_count` keep the true numbers; replayed
+on the production file: 103 to 19 MiB), and the guard has `--hold-back` (all
+nine committing workflows): an oversized file is restored to its committed
+version, a HIGH alert goes out once a day per file, and every other file
+commits. One file's size is that file's failure.
+Side effects of the same outage, both ended by the fix: dormancy cooldown
+cursors were never committed, so the same handoffs paged CRITICAL several
+times a day; and nine "Detector Feed Stale" HIGHs paged daily for sixteen days
+without the one line that named the cause.
+
+**2. The execution-program vote could not be cast on any match.**
+`merge_census` read both p99 distributions from the leaderboard census alone
+(16 comparable controls of 1,289 read — not ready) and the comparability
+ceiling from the tape (73%: most takers of his markets carry a clip table on
+two of his coins), so both the measured and the bounded path were shut. The
+tape census had meanwhile measured what the gate was waiting for. Replayed on
+the live sketches: 279 clip-comparable takers of his markets, 119 on three or
+more of his coins, **none matching more than two of his clips** (ratio p99
+0.5); his rank structure over four coins is NOT rare there (rho p99 1.0, three
+hits at rho 1.0), so that path honestly stays shut. Each p99 now comes from the
+harshest population that has at least 20 measured controls. No bar moved. No
+stored match changes verdict (none exceeds 0.5).
+
+**3. What the gate can find, measured on him (chronological holdouts).**
+Reference = everything before a cut, probe = his next 30 days: the clip table
+clears the gate in **6 of 15** windows. His sizes are inputs he retypes each
+campaign (@107 40/20/100/150/100 by month, HYPE 500/40/20, BRENTOIL 60/1000/50).
+*Month-aligned clip tables were prototyped and rejected:* 5 of 15 (migration)
+and 4 of 8 (concurrent, odd-vs-even days) against 6 and 5 for the cumulative
+table — sizes change inside a month and thin months hold under three coins.
+What holds is the loop's timing: the pause between consecutive same-coin,
+same-side taker orders had p25 1.58-1.68 s and median 1.65-2.01 s in each of
+eight months from 2026-04 (Feb-Mar ran a faster loop, p25 0.4-0.6 s — one
+script change in nine months). `execution_program.cadence` records it;
+`cadence_match` compares a candidate with his newest 120 days. Holdout: 6 of
+14 overall, 6 of 6 once the reference post-dates the April change; with the
+clip table the union is 10 of 15. Base rate (`scripts/census_cadence.py`): of
+129 wallets in his client class, 106 measurable, **2 in his band** (ceiling
+6.6%) — so it is EVIDENCE and casts no vote (rule 4). A wallet paced like him
+on none of his coins now stays in the report (`cadence_only`) instead of being
+dropped as `insufficient_data`.
+Both in-band wallets were put to Hyperliquid's whole surface and are not him:
+`0x4c4fb430…` ($7.8K, open since 2025-07, referred by CCXT, agent "my bot",
+$500-$1,000 deposits) and `0x29667237…` (io:/para: equities, dexes he has never
+used). **Trap met again (rule 12):** `0x4c4fb430…` looked born on 2026-11-06,
+the day he went silent; that was the oldest of its newest 2,000 fills.
+
+**4. An activity-complement screen cannot be validated.** The idea: a second
+account worked on the days this one is silent. His known other wallets are not
+traders — `0xf078969e…` has 2 fills ever and the treasury 37 on one day — so
+there is no labelled second TRADING wallet and no positive control. Not built.
+
+**5. The digest said "feeds fresh" for sixteen mornings.** It looked only for
+BLIND feeds. It now reads `feed_health.assess` over every feed and leads with
+one `STALE:` line (oldest first) above the target line.
+
+**Rules these re-teach.** A guard that protects one file must fail one file.
+A fact kept "whole" in a file is only a fact if a reader can resolve it. And a
+detector is not measured until it has been asked to find HIM in his own later
+history — the clip table's 6 of 15 had never been run.

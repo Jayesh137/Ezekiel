@@ -57,7 +57,32 @@ def test_the_true_edge_count_is_never_trimmed_with_the_list():
     out = tg.trim_edges_for_storage(g, cap=2)
     assert out["edge_count"] == 10
     assert out["nodes"][0]["totals"]["edge_count"] == 10
-    assert len(out["nodes"][0]["edge_ids"]) == 10
+    assert out["nodes"][0]["edge_ids_total"] == 10
+
+
+def test_a_node_stores_only_the_ids_of_edges_that_are_stored():
+    """An id whose edge is not in the file resolves to nothing, and the ids
+    alone took the file past GitHub's limit (2026-10-28, sixteen days of trace
+    readings lost at the push)."""
+    edges = [_edge(f"e{i}", ts=i) for i in range(10)]
+    node = {"wallet": "0xa", "edge_ids": [e["id"] for e in edges],
+            "totals": {"edge_count": 10}}
+    g = _graph([node], edges)
+    out = tg.trim_edges_for_storage(g, cap=3)
+    assert sorted(out["nodes"][0]["edge_ids"]) == ["e7", "e8", "e9"]
+    stored = {e["id"] for e in out["edges"]}
+    assert set(out["nodes"][0]["edge_ids"]) <= stored
+    assert len(node["edge_ids"]) == 10          # the caller's node is untouched
+
+
+def test_stored_size_no_longer_grows_with_a_nodes_edge_count():
+    import json
+    def size(n):
+        edges = [_edge(f"e{i:07d}", ts=i) for i in range(n)]
+        g = _graph([{"wallet": "0xa", "edge_ids": [e["id"] for e in edges],
+                     "totals": {"edge_count": n}}], edges)
+        return len(json.dumps(tg.trim_edges_for_storage(g, cap=50)))
+    assert size(20_000) < size(200) * 1.05
 
 
 def test_a_truncated_file_says_so():
