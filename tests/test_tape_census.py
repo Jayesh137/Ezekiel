@@ -178,6 +178,8 @@ def test_judge_newcomers_reads_real_births_registers_handoffs_and_alerts(tmp_pat
     births = {born_in: 142 * DAY + 5, born_out: 50 * DAY}
 
     def fetch(body):
+        if body["type"] == "userRole":
+            return {"ok": True, "data": {"role": "user"}}
         return {"ok": True, "data": [["allTime", {"accountValueHistory": [[births[body["user"]], "1000"]]}]]}
 
     alerted = []
@@ -218,6 +220,8 @@ def test_fold_and_census_end_to_end_with_a_fake_portfolio(tmp_path):
     reads = []
 
     def fetch(body):
+        if body["type"] == "userRole":
+            return {"ok": True, "data": {"role": "user"}}
         reads.append(body)
         return {"ok": True, "data": [["allTime", {"accountValueHistory": [[141 * DAY, "5"]]}]]}
 

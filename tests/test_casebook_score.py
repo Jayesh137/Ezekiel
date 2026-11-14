@@ -126,3 +126,49 @@ def test_an_invalidated_item_counts_nowhere():
     s = score.score_evidence({"quiet_first_funder": {**entry("quiet_first_funder"),
                                                      "invalid_reason": "busy"}})
     assert s["now"] == s["central"] == s["ceiling"] == -3.0
+
+
+# --- capital: derived from the probe, a modest ranker (model 2026-11-14.1) -----
+# Of 310 casebook suspects on Hyperliquid 23.5% have held $1M and 56% never held
+# $100K; two of his three known wallets held $1M, one never held $100K.
+
+def _probed(peak, now=None, on_hl=True):
+    return {"hl": {"last_ok_at": "2026-11-14T00:00:00+00:00", "on_hl": on_hl,
+                   "life": [[1, 0.0], [2, peak]], "total_value": peak if now is None else now}}
+
+
+def test_capital_is_read_from_the_peak_of_the_last_good_probe():
+    entry = score.capital_entry(_probed(5_000_000.0, now=12.0))
+    assert entry["kind"] == "capital" and entry["strength"] == 5_000_000.0
+    assert entry["facts"] == {"peak_value": 5_000_000.0, "value": 12.0}
+
+
+def test_an_unprobed_or_absent_account_has_no_capital_item():
+    assert score.capital_entry({}) is None
+    assert score.capital_entry({"hl": {"on_hl": True, "life": [[1, 5e6]]}}) is None      # never read OK
+    assert score.capital_entry(_probed(5e6, on_hl=False)) is None
+
+
+def test_capital_bands_for_against_and_silent_between():
+    assert model.band("capital", 1_000_000.0) == (0.1, 0.3, 0.5)
+    assert model.band("capital", 2_000.0) == (-0.4, -0.2, 0.0)
+    assert model.band("capital", 400_000.0) == (0.0, 0.0, 0.0)
+    assert model.band("capital", None) == (0.0, 0.0, 0.0)
+    assert model.band("capital", float("nan")) == (0.0, 0.0, 0.0)
+
+
+def test_a_funded_handoff_outranks_an_empty_one_with_the_same_handoff():
+    handoff = {"h": {"kind": "dormancy_handoff", "status": "current", "strength": 0.8,
+                     "facts": {"score": 0.8}}}
+    cases = {"0xbig": {**_probed(51_000_000.0), "evidence": dict(handoff)},
+             "0xempty": {**_probed(1_900.0), "evidence": dict(handoff)},
+             "0xunread": {"evidence": dict(handoff)}}
+    out = score.score_all(cases, set())
+    assert out["0xbig"]["central"] > out["0xunread"]["central"] > out["0xempty"]["central"]
+    assert out["0xbig"]["families"]["capital"]["central"] == 0.3
+    assert "capital" not in out["0xunread"]["families"]
+
+
+def test_capital_alone_cannot_carry_a_case_far():
+    out = score.score_all({"0xwhale": _probed(200_000_000.0)}, set())
+    assert out["0xwhale"]["p_central"] < 0.003            # the 1-in-1,000 prior, doubled

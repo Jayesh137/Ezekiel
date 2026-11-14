@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 
-MODEL_VERSION = "casebook-model/2026-10-08.1"
+MODEL_VERSION = "casebook-model/2026-11-14.1"
 
 # 1 : 1,000 for a wallet in the casebook before its own evidence is read: the
 # casebook holds O(10^3) suspects and he plausibly has O(1) unknown wallets
@@ -33,6 +33,7 @@ FAMILY_CATEGORY = {
     "behaviour": "behaviour",
     "coactivity": "behaviour",
     "lifecycle": "successor",
+    "capital": "capital",
     "ruling": "ruling",
 }
 FAMILY_CLIP = {"control": (-3.0, 5.0), "ruling": (-3.0, 0.0)}
@@ -126,6 +127,14 @@ KINDS = {
     "dormancy_handoff": _k("lifecycle", "Born inside a silence of his", "score", "assumed",
                            "About 9% of accounts born during his history would land in one of his "
                            "anomalous windows by chance (7 gaps x 3 days of ~240 days)."),
+    # Capital
+    "capital": _k("capital", "Capital it has held on Hyperliquid", "capital", "estimated",
+                  "The most the account has ever held. Of the 310 casebook suspects on "
+                  "Hyperliquid, 73 (23.5%) have held $1M and 174 (56%) never held $100K; of his "
+                  "three known wallets two have held $1M and one never held $100K (2026-11-14). "
+                  "With a count of three the ratio is about 2 for and 1.6 against, so the band "
+                  "is narrow: it orders a funded handoff above an empty one and decides nothing "
+                  "alone."),
     # Tooling
     "study_tooling": _k("tooling", "Makes orders the way he does (candidate study)", "study", "measured",
                         "The candidate study's calibrated likelihood ratio (Clopper-Pearson bound, "
@@ -171,10 +180,13 @@ CONTEXT_KINDS = frozenset(k for k, spec in KINDS.items() if spec["family"] == "c
 _SCALED = {
     "confidence": "confidence c: log10(1+2c) / log10(1+9c) / log10(1+30c)",
     "score": "handoff score s: log10(1+2s) / log10(1+9s) / log10(1+20s)",
+    "capital": "peak value: >= $1M 0.1 / 0.3 / 0.5; < $100K -0.4 / -0.2 / 0; between, or unread, 0",
     "study": "study LR: log10 LR / log10 LR / log10 LR + 0.3 (for), half log10 LR (against)",
     "comovement": "same_hand 0 / 0.2 / 0.5; copier -0.7 / -0.4 / 0; otherwise 0",
 }
 _ZERO = (0.0, 0.0, 0.0)
+CAPITAL_FOR_USD = 1_000_000.0
+CAPITAL_AGAINST_USD = 100_000.0
 
 
 def _unit(value) -> float | None:
@@ -212,6 +224,13 @@ def band(kind: str, strength=None, facts=None) -> tuple[float, float, float]:
             return _ZERO
         top = 30.0 if shape == "confidence" else 20.0
         return _round((math.log10(1 + 2 * x), math.log10(1 + 9 * x), math.log10(1 + top * x)))
+    if shape == "capital":
+        if isinstance(strength, bool) or not isinstance(strength, (int, float)) \
+                or not math.isfinite(strength):
+            return _ZERO                      # unread is unknown, never "holds nothing"
+        if strength >= CAPITAL_FOR_USD:
+            return (0.1, 0.3, 0.5)
+        return (-0.4, -0.2, 0.0) if strength < CAPITAL_AGAINST_USD else _ZERO
     if shape == "study":
         lr = facts.get("lr")
         verdict = facts.get("verdict")

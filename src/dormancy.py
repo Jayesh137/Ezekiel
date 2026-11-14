@@ -42,6 +42,78 @@ ANOMALOUS_GAP_PERCENTILE = 90
 HANDOFF_WINDOW_DAYS = 3
 
 
+# A handoff alone is common. Measured 2026-11-14 over 397 random venue takers,
+# 299 of them born inside his history: 27 (9.0%) scored as a handoff by chance,
+# and every one of them paged CRITICAL, down to accounts holding nothing. What
+# chance does not produce is a handoff WITH capital: 2 of 299 had ever held
+# $100K and 0 of 299 had ever held $1M (Wilson ceiling 1.3%) — and capital
+# arriving is what a migration of his account would look like. So the severity
+# is the size: CRITICAL from $1M, HIGH from $100K, and below that the handoff
+# is recorded (roster, casebook) without paging. A wallet whose value could not
+# be read is HIGH: unmeasured is never assumed harmless.
+HANDOFF_CRITICAL_USD = 1_000_000.0
+HANDOFF_HIGH_USD = 100_000.0
+
+
+def capital(portfolio) -> dict:
+    """{'value', 'peak_value'} from one `portfolio` answer; None where unreadable."""
+    peak = value = newest = None
+    for item in portfolio if isinstance(portfolio, list) else []:
+        if not (isinstance(item, (list, tuple)) and len(item) == 2 and isinstance(item[1], dict)):
+            continue
+        for point in item[1].get("accountValueHistory") or []:
+            try:
+                ts, amount = int(point[0]), float(point[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            if amount != amount:            # NaN
+                continue
+            peak = amount if peak is None else max(peak, amount)
+            if newest is None or ts > newest:
+                newest, value = ts, amount
+    return {"value": value, "peak_value": peak}
+
+
+def handoff_severity(detail: dict) -> str:
+    """CRITICAL / HIGH / INFO for a handoff, by the capital the wallet has held."""
+    peak = (detail or {}).get("peak_value")
+    if isinstance(peak, bool) or not isinstance(peak, (int, float)):
+        return "HIGH"
+    if peak >= HANDOFF_CRITICAL_USD:
+        return "CRITICAL"
+    return "HIGH" if peak >= HANDOFF_HIGH_USD else "INFO"
+
+
+def operator_birth(wallet: str, birth_ms: int, fetch) -> dict:
+    """{'birth_ms', 'master'}: the birth a handoff must be judged on.
+
+    A sub-account is opened by its master, so its own birth says only when an
+    existing operator added an account. Two of the four best-funded handoff
+    leads on 2026-11-14 (`0xeaa5ed54…`, `0xa6727cd1…`) were sub-accounts of
+    firms that long predate the silence they were "born" in. For a
+    sub-account the operator's birth is its master's.
+
+    `fetch` answers in `utils.hl_read`'s shape. Strict: an unreadable role or
+    master raises ValueError, so the wallet is retried rather than judged on a
+    birth that may not be its operator's (rule 5).
+    """
+    from src.hl_identity import parse_birth
+    answer = fetch({"type": "userRole", "user": wallet})
+    role = answer.get("data") if isinstance(answer, dict) and answer.get("ok") else None
+    if not isinstance(role, dict) or not isinstance(role.get("role"), str):
+        raise ValueError((answer or {}).get("error") or "role unreadable")
+    if role["role"] != "subAccount":
+        return {"birth_ms": birth_ms, "master": None}
+    master = str(((role.get("data") or {}).get("master")) or "").lower()
+    if not master.startswith("0x"):
+        raise ValueError("sub-account without a readable master")
+    answer = fetch({"type": "portfolio", "user": master})
+    born = parse_birth(answer.get("data")) if isinstance(answer, dict) and answer.get("ok") else None
+    if not born:
+        raise ValueError("master birth unreadable")
+    return {"birth_ms": min(int(birth_ms), int(born)), "master": master}
+
+
 def active_days(fills) -> list[int]:
     """Sorted whole days on which anything traded."""
     days = set()

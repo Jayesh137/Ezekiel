@@ -3079,3 +3079,49 @@ rows as trace shipped ~19,000 a run. Nothing reads those rows after ingestion
 to the newest `CCTP_OBSERVATION_ROWS` = 5,000. By rows, because `observed_at_ms`
 is the import time — a 3-day bound replayed on that checkpoint dropped nothing.
 Replayed: 46.99 -> 36.93 MB, all 60,710 seeds kept.
+
+## 2026-11-14 — the dormancy handoff measured against chance: it means something only with capital
+
+**The measurement the vector never had.** A handoff is "first active within 3
+days of the start of one of his long silences". Over 397 random venue takers
+(`data/tape/venue_population.json`, one `portfolio` each), 299 were born inside
+his history and **27 of them (9.0%) scored as a handoff by chance** — the 9% the
+casebook had assumed. Every one of those pages CRITICAL: the detector was
+calling 1 new wallet in 11 "something about HIM", down to accounts holding $0.
+What chance does not produce is a handoff with capital: of the same 299,
+2 had ever held $100K and **0 had ever held $1M** (Wilson ceiling 1.3%); among
+all 397, 10.8% had held $100K and 2.5% $1M.
+
+**Changes.**
+- `dormancy.capital` reads current and peak value from the `portfolio` answer
+  the detector already has; `handoff_severity` makes the page follow it:
+  CRITICAL from $1M, HIGH from $100K, INFO (recorded, not routed) below, HIGH
+  when the value could not be read. The cooldown is keyed per severity so a
+  wallet first seen empty pages when it fills. Both callers (dormancy, tape
+  newcomers).
+- `dormancy.operator_birth`: a sub-account is judged on its MASTER's birth.
+  Two of the four best-funded handoff leads were sub-accounts of firms that
+  long predate the silence (`0xeaa5ed54…` under `0x0b8aa35c…`, order gaps of
+  0.07 s; `0xa6727cd1…` under `0x399965e1…`, 0.6 s). Strict: an unreadable
+  role or master defers the wallet.
+- Casebook model `2026-11-14.1`: a `capital` family, derived from each case's
+  own probe at scoring time (never stored, never a headline). In the
+  casebook's own population — 310 suspects on Hyperliquid — 23.5% have held $1M
+  and 56% never held $100K; of his three known wallets two held $1M and
+  `0xf078969e…` peaked at $75,676. With a count of three that is a ratio of
+  about 2 for and 1.6 against, so the band is narrow (+0.3 / -0.2 central).
+  Replayed on the 947 cases: funded handoffs rise (`0xeaa5ed54…` 6th to 3rd),
+  empty ones fall ($2,006: 5th to 11th; $107: 7th to 22nd).
+
+**The four that rose were each put to Hyperliquid: measured no.** Besides the
+two sub-accounts: `0x36715f64…` (since 2023, 1,991 internal transfers out — a
+payout distributor) and `0xf07fc9df…` (a `spotGenesis` deployer; its "transfer
+with the target" was an airdrop of its own token). None runs his script.
+
+**Not changed.** The roster still grants POSSIBLE on a handoff of any size
+(tier semantics are not touched to tidy a list). The phone's Leads tab will
+keep showing small handoffs; the casebook's rank is the order to read them in.
+
+**Rule.** A vector's alarm is sized by its measured chance rate, and a vector
+that fires on 9% of strangers needs the second fact that strangers lack before
+it may say CRITICAL.

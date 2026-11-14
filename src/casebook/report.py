@@ -186,6 +186,10 @@ def family_cells(case_score: dict, case: dict) -> dict:
         held = states.get(spec["family"])
         if held is None or STATUS_ORDER.index(status) < STATUS_ORDER.index(held):
             states[spec["family"]] = status
+    # Capital is derived from the case's own probe at scoring time, not stored
+    # as an item, and is deliberately never a case's headline (`best_item`).
+    if score.capital_entry(case) is not None:
+        states.setdefault("capital", "current")
     return {family: [values.get("now", 0.0), values.get("central", 0.0), values.get("ceiling", 0.0),
                      states.get(family, "cluster")]
             for family, values in (case_score.get("families") or {}).items()}
