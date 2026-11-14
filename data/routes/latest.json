@@ -672,7 +672,7 @@
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "source_chain": "optimism",
       "source_tx": "0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84",
-      "amount_usd": null,
+      "amount_usd": 0.0,
       "ts_ms": 1790739801000,
       "assertion": "observed_transfer",
       "parent_event_ids": [
@@ -1252,7 +1252,7 @@
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "source_chain": "ethereum",
       "source_tx": "0xbf44cda94f0d55d7babafd3c03b590dab772a093fe35820acb0f4db1c9138e10",
-      "amount_usd": null,
+      "amount_usd": 0.18,
       "ts_ms": 1788676499000,
       "assertion": "observed_transfer",
       "parent_event_ids": [
@@ -14483,7 +14483,7 @@
       "source_tx": "0x2f6f50b864657a8f22a5b39f0b70aed0a4a2be0de3f59876eb07eaa819bc40cb",
       "transaction_caller": null,
       "protocol": null,
-      "amount_usd": null,
+      "amount_usd": 0.0,
       "ts_ms": 1794545291000,
       "parent_event_ids": [
         "ethereum:0x2f6f50b864657a8f22a5b39f0b70aed0a4a2be0de3f59876eb07eaa819bc40cb:native:0"
@@ -45401,14 +45401,14 @@
   ],
   "coverage": {
     "transfer_records": 5782,
-    "circle_events": 6786
+    "circle_events": 8372
   },
   "counts": {
     "routes": 3263,
     "unresolved": 2527,
     "discoveries": 2174
   },
-  "computed_at_ms": 1794625087014,
+  "computed_at_ms": 1794634537402,
   "authority": {
     "intervals": [
       {
@@ -51135,6 +51135,42 @@
           "agents:0x67ba5c5ba54e4593b8fe0a80f3ac0f95a07a666b:1794624081084:0xb6d1782fa6699a69540b0cd2fd495acd13899625"
         ],
         "confirms_owner": false
+      },
+      {
+        "account": "0xbf732ea04197942783e34730ed6e0f6099575d58",
+        "authority": "0x49c1d710961e1040f0786ea587b423457832ef2c",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794633396096,
+        "valid_to_ms": 1805456043139,
+        "parent_event_ids": [
+          "agents:0xbf732ea04197942783e34730ed6e0f6099575d58:1794633396096:0x49c1d710961e1040f0786ea587b423457832ef2c"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xbf732ea04197942783e34730ed6e0f6099575d58",
+        "authority": "0xb7dd5ef5698551a9c83c7b7c6441aea2fd5a4abb",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794633396096,
+        "valid_to_ms": 1794779200784,
+        "parent_event_ids": [
+          "agents:0xbf732ea04197942783e34730ed6e0f6099575d58:1794633396096:0xb7dd5ef5698551a9c83c7b7c6441aea2fd5a4abb"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc1a7957515cca6fbb64a6d51ac93f30a84a5db43",
+        "authority": "0x40d07fce3c359eb34c388e77932ac1f27b2b91e4",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794633396096,
+        "valid_to_ms": 1801327739503,
+        "parent_event_ids": [
+          "agents:0xc1a7957515cca6fbb64a6d51ac93f30a84a5db43:1794633396096:0x40d07fce3c359eb34c388e77932ac1f27b2b91e4"
+        ],
+        "confirms_owner": false
       }
     ],
     "shared_authority": [],
@@ -51145,6 +51181,10 @@
   "source_message_reads": {
     "queries": 20,
     "errors": [
+      {
+        "tx": "0x803886beddd19a104dde3adf58621d226c6f00f4d8242da9c013c668db1006ea",
+        "reason": "no validated complete V2 message"
+      },
       {
         "tx": "0xe4247a1c84c49a55e085bd225a6807aa00b06e232e1d04b238f4a36dc00a9d72",
         "reason": "no validated complete V2 message"
@@ -51220,15 +51260,11 @@
       {
         "tx": "0xbe4e4a42b8c51f70ba152169bad810e3479aedba5d55efe83c5c0a956a2522ee",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0x0204e24dacd5dc1753718f2ccc6dcbde6b0b11a24b9182644e543a97c8c56508",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 6786,
+    "circle_rows_read": 8372,
     "store_read_limit": 100000
   }
 }
