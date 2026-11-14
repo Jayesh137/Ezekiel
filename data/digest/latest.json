@@ -1,14 +1,14 @@
 {
-  "day": "2026-11-13",
-  "computed_at": "2026-11-13T07:01:01.434701+00:00",
+  "day": "2026-11-14",
+  "computed_at": "2026-11-14T07:09:20.866335+00:00",
   "target": {
-    "last_fill": "7.3d ago",
-    "silent_days": 7,
+    "last_fill": "8.3d ago",
+    "silent_days": 8,
     "p90": 7,
     "max_gap": 21,
-    "unusual": false,
+    "unusual": true,
     "unprecedented": false,
-    "value": 74438029.93
+    "value": 79777006.6
   },
   "hunt": {
     "tiers": {
@@ -26,17 +26,17 @@
       },
       {
         "address": "0xda0932d2a880bafa82bc2ac41ab0caafc5544f52",
-        "p_now": 0.00498688,
+        "p_now": 0.00199129,
         "on_hl": true,
         "value": 6.0,
         "headline": "Paid his private deposit address 0x8570c2ae... $249,994 (2024-07-31) -"
       },
       {
-        "address": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
-        "p_now": 0.00498688,
-        "on_hl": false,
-        "value": 0.0,
-        "headline": "Money both ways with him - no Hyperliquid account"
+        "address": "0xeaa5ed54c01ba1028116aa5fe8061191f1ebcf65",
+        "p_now": 0.00328602,
+        "on_hl": true,
+        "value": 1174695.035005,
+        "headline": "First active 1 day(s) into a 13-day silence of his (handoff score 0.81"
       }
     ],
     "watched": 3,
@@ -57,7 +57,7 @@
     "handoffs": 8
   },
   "decisions": {
-    "computed_at": "2026-11-13T07:01:01.434701+00:00",
+    "computed_at": "2026-11-14T07:09:20.866335+00:00",
     "pending": [
       {
         "address": "0x793a3e8a1f0e19719bfa39288436958bcd475dc4",
@@ -68,16 +68,6 @@
         "why": "Paid his private deposit address 0x734c9213... $3,500,671 (2025-09-20) - no Hyperliquid account",
         "ask": "Not a Hyperliquid account: only you can say whether it is his \u2014 if it is, every wallet it funds inherits the link.",
         "command": "python scripts/casebook.py rule 0x793a3e8a1f0e19719bfa39288436958bcd475dc4 him|not_him|unsure --note \"...\""
-      },
-      {
-        "address": "0xda0932d2a880bafa82bc2ac41ab0caafc5544f52",
-        "kind": "suspect",
-        "p_now": 0.00499,
-        "on_hl": true,
-        "value": 6.0,
-        "why": "Paid his private deposit address 0x8570c2ae... $249,994 (2024-07-31) - $6 on Hyperliquid, no trades in 30 days",
-        "ask": "On Hyperliquid: rule it, or leave it to the detectors.",
-        "command": "python scripts/casebook.py rule 0xda0932d2a880bafa82bc2ac41ab0caafc5544f52 him|not_him|unsure --note \"...\""
       },
       {
         "address": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
@@ -100,9 +90,19 @@
         "command": "python scripts/casebook.py rule 0x41ba52eedc421bea6a3f59b6473edddd6caa6080 him|not_him|unsure --note \"...\""
       },
       {
+        "address": "0xeaa5ed54c01ba1028116aa5fe8061191f1ebcf65",
+        "kind": "suspect",
+        "p_now": 0.00329,
+        "on_hl": true,
+        "value": 1174695.035005,
+        "why": "First active 1 day(s) into a 13-day silence of his (handoff score 0.81) - $1.2M on Hyperliquid, $26.0M traded in 30 days",
+        "ask": "On Hyperliquid: rule it, or leave it to the detectors.",
+        "command": "python scripts/casebook.py rule 0xeaa5ed54c01ba1028116aa5fe8061191f1ebcf65 him|not_him|unsure --note \"...\""
+      },
+      {
         "address": "0xdd53c5297309130ab5fe5623dc905752e3342b13",
         "kind": "watch_question",
-        "age_days": 63,
+        "age_days": 64,
         "why": "Opened at zero 2026-08-17 22:20, two days into a six-day silence of the target's (his p90 gap is five); $999 to $5.0M in a day and $51.3M in three weeks; matche",
         "ask": "Watched as a question; the watch cannot close it. Rule it or drop it.",
         "command": "python scripts/casebook.py rule 0xdd53c5297309130ab5fe5623dc905752e3342b13 him|not_him|unsure --note \"...\""
@@ -116,33 +116,33 @@
   },
   "execution": {
     "gate_open": true,
-    "ceiling": 0.7229,
-    "attempted": 402,
+    "ceiling": 0.6972,
+    "attempted": 455,
     "comparable": 16,
     "discriminating": 0,
-    "read": 29,
+    "read": 30,
     "candidates": 60,
-    "sketch_wallets": 6656,
-    "tape_ceiling": 0.7229,
+    "sketch_wallets": 3914,
+    "tape_ceiling": 0.6972,
     "cadence_matches": 0,
     "p99": 0.5,
-    "p99_population": 273,
+    "p99_population": 298,
     "p99_source": "tape",
-    "tape_hits": 3,
+    "tape_hits": 2,
     "newcomer_handoffs": 0,
     "tape_source": "sqd",
-    "tape_seconds": 1259.5,
+    "tape_seconds": 1261.3,
     "cofire_hits": 0,
     "cofire_his_windows": 5
   },
   "discovery": {
     "status": "budget_exhausted",
-    "lookups": 5,
+    "lookups": 3,
     "new_wallets": 0,
-    "refreshed": 4,
-    "new_edges": 3696,
-    "pending": 224607,
-    "last_expansion_at": "2026-11-13T05:52:33.794215+00:00"
+    "refreshed": 2,
+    "new_edges": 1363,
+    "pending": 229289,
+    "last_expansion_at": "2026-11-14T06:17:09.537485+00:00"
   },
   "cofire_history": {
     "sessions_read": 300,
@@ -159,12 +159,12 @@
     "agents": 27,
     "outside": 1,
     "reused": 0,
-    "behind_blocks": 339814525,
+    "behind_blocks": 340440000,
     "backfill_complete": false,
     "segments_done": 0
   },
   "treasury": {
-    "sessions_read": 72,
+    "sessions_read": 73,
     "sessions": 70,
     "hits": 0,
     "seen": 20000,
@@ -174,45 +174,48 @@
   },
   "venue": {
     "takers": 20000,
-    "outcome_traders": 217,
-    "program_takers": 106,
-    "outcome_in_sessions": 8,
-    "clients_measured": 18694,
+    "outcome_traders": 224,
+    "program_takers": 88,
+    "outcome_in_sessions": 10,
+    "clients_measured": 18707,
     "his_class": 131,
     "his_class_upper": 0.0083
+  },
+  "screen": {
+    "days_read": 72,
+    "silent_days_read": 71,
+    "pending_days": 179,
+    "hit_wallets": 0,
+    "silent_hit_wallets": [],
+    "target_found_days": 1,
+    "target_measurable_days": 1
   },
   "health": {
     "alerts_healthy": true,
     "undelivered": 0,
     "paged_24h": [
-      "HIGH: Detector Feed Stale (roster)",
-      "HIGH: Detector Feed Stale (dormancy handoff)",
-      "HIGH: Detector Feed Stale (casebook)",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
-      "CRITICAL: Fund Movement Detected ($8,999,999.01 of USDC on a",
-      "CRITICAL: Fund Movement Detected ($4,098,665.13 of USDC on a",
-      "CRITICAL: Target Authorised A New Agent Wallet",
+      "CRITICAL: Target Silent 8 Days (unusual)",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
-      "HIGH: Target Wallet Silent for 7.1 Days",
-      "HIGH: A Hyperliquid Withdrawal Nobody Can Attribute Paid One",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen",
-      "CRITICAL: Fund Movement Detected ($9,899,999.80 of USDC on a",
-      "CRITICAL: New Linked Wallet Detected",
+      "HIGH: Dormancy Handoff - Wallet Born During Target Silence",
+      "HIGH: Dormancy Handoff - Wallet Born During Target Silence",
+      "HIGH: Target Wallet Silent for 8.2 Days",
       "CRITICAL: Dormancy Handoff - Wallet Born During Target Silen"
     ],
     "blind_feeds": [],
     "stale_feeds": [],
-    "data_age": "36m ago",
+    "data_age": "20m ago",
     "risk": "GUARDED",
-    "risk_score": 28.8,
+    "risk_score": 29.5,
     "scan_policy": "OBSERVING"
   },
-  "title": "Ezekiel daily 2026-11-13",
-  "body": "Target: last fill 7.3d ago; silence 7d, normal (p90 7d); value $74.4M.\nHis other wallets: 0xf078969e\u2026 traded 71.7d ago, $444; 0x1419e753\u2026 traded 417.2d ago, $0.\nHunt: 0 confirmed / 0 probable / 21 possible beyond his known wallets; 3 watched; 8 dormancy handoff(s).\nTop suspects: 0x793a3e8a\u2026 0.50% (not on HL); 0xda0932d2\u2026 0.50% (HL $6); 0x160f6ef9\u2026 0.50% (not on HL).\nNeeds your ruling: 0x793a3e8a\u2026 0.50% (not on HL); 0xda0932d2\u2026 0.50% (HL); 0x160f6ef9\u2026 0.50% (not on HL); +2 more \u2014 `python scripts/casebook.py rule <address> him|not_him|unsure`.\nExecution vote gate OPEN: false-match ceiling 72.3% (402 read, 16 comparable); strangers' p99 match 50% of shared clips over 273 controls (tape); 0 rare match(es) among 29 candidates read; 0 paced like his script.\nTape (21 min continuous): 6656 wallets sketched, ceiling 72.3%, 3 program hit(s), 0 co-firing hit(s), 0 newcomer handoff(s).\nHistory co-firing: 300/300 of his sessions read, 0 hit(s), base rate 0.00% of 1127; his known wallets: 0/2 on his tape, 0 co-firing.\nAction history: 13 wallets, 27 agents ever approved, 1 outside destinations, 0 agent(s) reused by another account; feed 6742h behind, history 0 segments in.\nTreasury sessions: 72/70 read, 20000 accounts seen, 0 hit(s); known wallets present in 1/2, 1 hit.\nVenue: 20000 takers sampled, 106 program-shaped, 217 outcome traders (8 in his sessions); clients: 131/18694 in his class (ceiling 0.8%).\nDiscovery: 5 lookup(s) last run, 0 new wallet(s) walked, 4 re-read, 3696 new edge(s), 224607 pending.\nSystem: alerts healthy (0 undelivered); feeds fresh; data 36m ago; risk GUARDED 28.8; behaviour policy OBSERVING.\nPaged last 24h: HIGH: Detector Feed Stale (roster) | HIGH: Detector Feed Stale (dormancy handoff) | HIGH: Detector Feed Stale (casebook) | CRITICAL: Dormancy Handoff - Wallet Born During Target Silen."
+  "title": "Ezekiel daily 2026-11-14",
+  "body": "Target: last fill 8.3d ago; UNUSUAL silence 8d (his p90 7d); value $79.8M.\nHis other wallets: 0xf078969e\u2026 traded 72.7d ago, $444; 0x1419e753\u2026 traded 418.2d ago, $0.\nHunt: 0 confirmed / 0 probable / 21 possible beyond his known wallets; 3 watched; 8 dormancy handoff(s).\nTop suspects: 0x793a3e8a\u2026 0.50% (not on HL); 0xda0932d2\u2026 0.20% (HL $6); 0xeaa5ed54\u2026 0.33% (HL $1.2M).\nNeeds your ruling: 0x793a3e8a\u2026 0.50% (not on HL); 0x160f6ef9\u2026 0.50% (not on HL); 0x41ba52ee\u2026 0.50% (not on HL); +2 more \u2014 `python scripts/casebook.py rule <address> him|not_him|unsure`.\nExecution vote gate OPEN: false-match ceiling 69.7% (455 read, 16 comparable); strangers' p99 match 50% of shared clips over 298 controls (tape); 0 rare match(es) among 30 candidates read; 0 paced like his script.\nTape (21 min continuous): 3914 wallets sketched, ceiling 69.7%, 2 program hit(s), 0 co-firing hit(s), 0 newcomer handoff(s).\nHistory co-firing: 300/300 of his sessions read, 0 hit(s), base rate 0.00% of 1127; his known wallets: 0/2 on his tape, 0 co-firing.\nAction history: 13 wallets, 27 agents ever approved, 1 outside destinations, 0 agent(s) reused by another account; feed 6755h behind, history 0 segments in.\nTreasury sessions: 73/70 read, 20000 accounts seen, 0 hit(s); known wallets present in 1/2, 1 hit.\nVenue: 20000 takers sampled, 88 program-shaped, 224 outcome traders (10 in his sessions); clients: 131/18707 in his class (ceiling 0.8%).\nScript screen: 71 silent + 1 active day(s) read (179 to go); 0 other wallet(s) with his sizes and cadence; found him on 1/1 of his own days.\nDiscovery: 3 lookup(s) last run, 0 new wallet(s) walked, 2 re-read, 1363 new edge(s), 229289 pending.\nSystem: alerts healthy (0 undelivered); feeds fresh; data 20m ago; risk GUARDED 29.5; behaviour policy OBSERVING.\nPaged last 24h: CRITICAL: Dormancy Handoff - Wallet Born During Target Silen | CRITICAL: Dormancy Handoff - Wallet Born During Target Silen | CRITICAL: Target Silent 8 Days (unusual) | CRITICAL: Dormancy Handoff - Wallet Born During Target Silen."
 }
