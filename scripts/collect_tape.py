@@ -275,7 +275,7 @@ def judge_newcomers(rows, target_days, now_day, state, *, fetch, data_dir=None,
     recorded as unread, never as "not a handoff".
     """
     from src.candidate_registry import observe_candidate, valid_wallet
-    from src.dormancy import MS_PER_DAY
+    from src.dormancy import MS_PER_DAY, capital, handoff_severity, operator_birth
     from src.hl_identity import parse_birth
 
     judged, handoffs, unread = [], [], []
@@ -294,10 +294,24 @@ def judge_newcomers(rows, target_days, now_day, state, *, fetch, data_dir=None,
             continue
         birth_day = int(birth) // MS_PER_DAY
         verdict = tc.born_in_silence(target_days, birth_day, now_day, state)
+        master = None
+        if verdict.get("score", 0) > 0:
+            # A sub-account is judged on its master's birth (dormancy.operator_birth).
+            try:
+                operator = operator_birth(wallet, birth, fetch)
+            except ValueError as exc:
+                unread.append({"wallet": wallet, "error": str(exc)[:120]})
+                continue
+            master = operator["master"]
+            if master:
+                birth_day = int(operator["birth_ms"]) // MS_PER_DAY
+                verdict = tc.born_in_silence(target_days, birth_day, now_day, state)
         judged.append({**row, "birth_day": birth_day, **verdict})
         if verdict.get("score", 0) > 0:
             detail = {**verdict, "birth_day": birth_day, "notional_usd": row.get("notional_usd"),
-                      "rare_markets": row.get("rare_markets")}
+                      "rare_markets": row.get("rare_markets"), **capital(response.get("data")),
+                      "master": master}
+            detail["severity"] = handoff_severity(detail)
             observe_candidate(wallet, {
                 "source": "tape_handoff", "positive": True,
                 "event_id": f"tapehandoff:{wallet}", "detail": detail,

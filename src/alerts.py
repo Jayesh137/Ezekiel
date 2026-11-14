@@ -1017,13 +1017,26 @@ Action: look for wallets that STARTED trading in the last few days.
 
 
 def alert_dormancy_handoff(wallet: str, detail: dict) -> bool:
-    """Fire when a wallet's first-ever activity lands inside a target silence."""
-    subject = "[EZEKIEL] CRITICAL: Dormancy Handoff - Wallet Born During Target Silence"
+    """Fire when a wallet's first-ever activity lands inside a target silence.
+
+    The severity is the capital the wallet has held (`dormancy.handoff_severity`):
+    about 1 new wallet in 11 lands in one of his silences by chance, and almost
+    none of those holds real money. A small one is INFO: recorded, not routed.
+    """
+    from src.dormancy import handoff_severity
+    severity = handoff_severity(detail)
+
+    def usd(x):
+        return f"${x:,.0f}" if isinstance(x, (int, float)) and not isinstance(x, bool) else "unread"
+    subject = f"[EZEKIEL] {severity}: Dormancy Handoff - Wallet Born During Target Silence"
     body = f"""A wallet began trading while the target was unusually quiet.
 
 {address_line(wallet, 'Wallet')}
 Its first activity came {detail.get('delay_days')} day(s) into a {detail.get('gap_length')}-day silence.
 Handoff score: {detail.get('score')}
+Holds {usd(detail.get('value'))} now; the most it has held is {usd(detail.get('peak_value'))}.
+(Measured 2026-11-14: 9% of new wallets land in one of his silences by chance;
+0 of 299 did so having ever held $1M, 2 of 299 having ever held $100K.)
 
 This needs no transfer between them, which is exactly why it is worth having:
 it is the one signal that survives funding a fresh wallet from somewhere
@@ -1032,7 +1045,11 @@ unobservable.
 Action: check whether it trades like him, and whether it shares any deposit
 address.
 """
-    return _send_with_cooldown(f"handoff_{wallet.lower()}", 168, subject, body)
+    # One cooldown per severity: a wallet first seen holding nothing must still
+    # page when it fills. CRITICAL keeps the bare key the tape's newcomer path
+    # shares, so the two never page twice for one wallet.
+    key = f"handoff_{wallet.lower()}" + ("" if severity == "CRITICAL" else f"_{severity.lower()}")
+    return _send_with_cooldown(key, 168, subject, body)
 
 
 def alert_casebook_wake(wallet: str, kind: str, detail: dict, row: dict, in_silence: bool) -> bool:

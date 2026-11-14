@@ -9,6 +9,7 @@ export const FAMILY_LABEL = {
 	infrastructure: 'Shared private infrastructure',
 	gap: 'Amount match across a custody gap',
 	lifecycle: 'Born in his silence',
+	capital: 'Capital held',
 	tooling: 'Makes orders like him',
 	behaviour: 'Trading style',
 	association: 'Referral',

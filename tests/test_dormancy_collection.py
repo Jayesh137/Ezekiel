@@ -24,11 +24,14 @@ def test_plausible_birth_requires_observed_trades_and_rejects_older_activity():
     calls = []
     def fetch(body):
         calls.append(body['type'])
+        if body['type'] == 'userRole':
+            return {'ok': True, 'data': {'role': 'user'}}
         return portfolio(21) if body['type'] == 'portfolio' else {'ok': True, 'data': [{'time': DAY}]}
     candidates, coverage = check.collect_candidates(WALLETS[:1], TARGET, {}, fetch=fetch)
-    assert calls == ['portfolio', 'userFills'] and coverage['status'] == 'ok'
+    assert calls == ['portfolio', 'userRole', 'userFills'] and coverage['status'] == 'ok'
     assert check.build_report(TARGET, candidates)['handoffs'] == {}
     candidates, _ = check.collect_candidates(WALLETS[:1], TARGET, {}, fetch=lambda b:
+        {'ok': True, 'data': {'role': 'user'}} if b['type'] == 'userRole' else
         portfolio(21) if b['type'] == 'portfolio' else {'ok': True, 'data': [{'time': 22 * DAY}]})
     assert WALLETS[0] in check.build_report(TARGET, candidates)['handoffs']
 

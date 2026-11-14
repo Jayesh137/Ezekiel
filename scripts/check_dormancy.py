@@ -25,7 +25,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.alerts import alert_dormancy_handoff, alert_target_dormant
-from src.dormancy import active_days, build_report, handoff_score, save
+from src.dormancy import (
+    active_days,
+    build_report,
+    capital,
+    handoff_score,
+    handoff_severity,
+    operator_birth,
+    save,
+)
 from src.fingerprint import load_fills
 from src.hl_budget import ReadBudget, current_budget
 from src.hl_identity import parse_birth
@@ -65,6 +73,8 @@ def collect_candidates(wallets, target_fills, previous, *, fetch=None):
     ordered = sorted(wallets, key=lambda w: (attempts.get(w, 0), w))
     target_days = active_days(target_fills)
     candidates = {}
+    held = {}
+    masters = {}
     coverage = {'requested': len(wallets), 'attempted': 0, 'checked': [],
                 'errors': [], 'last_attempt_ms': attempts}
     for wallet in ordered:
@@ -82,6 +92,14 @@ def collect_candidates(wallets, target_fills, previous, *, fetch=None):
                 # retained fill as a new account's first activity.
                 raise ValueError('no observed portfolio birth')
             got = [{'time': birth}]
+            held[wallet] = capital(response.get('data'))
+            if handoff_score(target_days, active_days(got)).get('score', 0) > 0:
+                # Judge the OPERATOR's birth: a sub-account opened in his
+                # silence by a master that predates it is not a new operator.
+                operator = operator_birth(wallet, birth, fetch)
+                if operator['master']:
+                    masters[wallet] = operator['master']
+                    got = [{'time': operator['birth_ms']}]
             if handoff_score(target_days, active_days(got)).get('score', 0) > 0:
                 # Only this branch needs trading evidence. A retained fill
                 # older than the portfolio point also rules out a false birth.
@@ -101,6 +119,8 @@ def collect_candidates(wallets, target_fills, previous, *, fetch=None):
             coverage['checked'].append(wallet)
         except (ValueError, TypeError, OSError, RuntimeError) as exc:
             coverage['errors'].append({'wallet': wallet, 'error': str(exc)[:200]})
+    coverage['capital'] = held
+    coverage['masters'] = masters
     coverage['deferred'] = len(wallets) - coverage['attempted']
     coverage['status'] = 'partial' if coverage['deferred'] or coverage['errors'] else 'ok'
     if budget:
@@ -121,6 +141,12 @@ def main() -> int:
 
     now_day = int(datetime.now(UTC).timestamp()) // 86_400
     report = build_report(fills, candidates, now_day=now_day)
+    held = coverage.pop('capital', {})
+    for wallet, detail in report['handoffs'].items():
+        detail.update(held.get(wallet) or {})
+        if coverage.get('masters', {}).get(wallet):
+            detail['master'] = coverage['masters'][wallet]
+        detail['severity'] = handoff_severity(detail)
     report['collection'] = coverage
     for wallet, detail in previous.get('handoffs', {}).items():
         if wallet in wallets and wallet not in coverage['checked']:
@@ -152,7 +178,8 @@ def main() -> int:
         if detail.get('stale'):
             continue
         print(f"[dormancy] HANDOFF {wallet} score {detail['score']} — started "
-              f"{detail['delay_days']}d into a {detail['gap_length']}d silence")
+              f"{detail['delay_days']}d into a {detail['gap_length']}d silence; "
+              f"peak value {detail.get('peak_value')} -> {detail.get('severity')}")
         alert_dormancy_handoff(wallet, detail)
     if not handoffs:
         print("[dormancy] no handoff found among successfully checked candidates")

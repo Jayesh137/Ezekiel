@@ -152,11 +152,44 @@ def clusters(cases: dict, cluster_wallets: set) -> dict[str, str]:
     return {a: min(members) for members in groups.values() if len(members) > 1 for a in members}
 
 
+def capital_entry(case: dict) -> dict | None:
+    """The capital item of a case, derived from its last good Hyperliquid probe.
+
+    Derived at scoring time, never stored: the probe is the fact and it is
+    re-read on its own schedule. None when the account was never read or is
+    not on Hyperliquid, so an unread wallet is unknown rather than poor.
+    """
+    hl = case.get("hl") if isinstance(case.get("hl"), dict) else {}
+    if not hl.get("last_ok_at") or not hl.get("on_hl"):
+        return None
+    values = [p[1] for p in (hl.get("life") or [])
+              if isinstance(p, (list, tuple)) and len(p) > 1
+              and isinstance(p[1], (int, float)) and not isinstance(p[1], bool)]
+    now = hl.get("total_value")
+    if isinstance(now, (int, float)) and not isinstance(now, bool):
+        values.append(now)
+    if not values:
+        return None
+    peak = max(values)
+    return {"kind": "capital", "status": "current", "strength": peak,
+            "facts": {"peak_value": peak, "value": now},
+            "summary": f"Has held ${peak:,.0f} on Hyperliquid"}
+
+
+def scored_evidence(case: dict) -> dict:
+    """The case's stored evidence plus its derived capital item."""
+    evidence = dict(case.get("evidence") or {})
+    entry = capital_entry(case)
+    if entry is not None:
+        evidence["capital"] = entry
+    return evidence
+
+
 def score_all(cases: dict, cluster_wallets: set) -> dict[str, dict]:
     """Every case's score. A cluster is one operator: its members share one score over
     the union of their items (per family, the strongest member's value, never a sum)."""
     ids = clusters(cases, cluster_wallets)
-    solo = {a: score_evidence(c.get("evidence") or {}, excluded=bool(c.get("excluded")))
+    solo = {a: score_evidence(scored_evidence(c), excluded=bool(c.get("excluded")))
             for a, c in cases.items()}
     members: dict[str, list] = {}
     for address, cid in ids.items():
@@ -167,7 +200,7 @@ def score_all(cases: dict, cluster_wallets: set) -> dict[str, dict]:
         for m in group:
             if cases[m].get("excluded"):
                 continue
-            for key, entry in (cases[m].get("evidence") or {}).items():
+            for key, entry in scored_evidence(cases[m]).items():
                 merged[f"{m}:{key}"] = entry
         shared[cid] = score_evidence(merged)
     out = {}
