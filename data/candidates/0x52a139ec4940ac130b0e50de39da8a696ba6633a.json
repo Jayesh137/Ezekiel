@@ -1,14 +1,60 @@
 {
   "wallet": "0x52a139ec4940ac130b0e50de39da8a696ba6633a",
-  "last_checked": "2026-11-12T23:02:28.759000+00:00",
+  "last_checked": "2026-11-14T07:52:17.845745+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-10-21T08:35:09.174861+00:00",
   "discovery_sources": [
     "bridge_depositor",
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-12T23:02:28.759000+00:00",
+  "last_successful_read": "2026-11-14T07:52:17.845745+00:00",
   "observations": [
+    {
+      "status": "ok",
+      "next_cursor_ms": 1794524486772,
+      "coverage": {
+        "start_ms": 1792828328859,
+        "end_ms": 1794642728859,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1794524486772,
+        "requested_start_ms": 1792828328859,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794642728859,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-14T07:52:11.047223+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1794642668859,
+      "coverage": {
+        "start_ms": 1791013931048,
+        "end_ms": 1794642731048,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1794642668859,
+        "requested_start_ms": 1791013931048,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1794642731048,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-14T07:52:13.084809+00:00"
+    },
     {
       "status": "ok",
       "next_cursor_ms": 1793113345590,
@@ -471,16 +517,109 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792710146772,
-    "end_ms": 1794524546772,
+    "start_ms": 1791013931048,
+    "end_ms": 1794642731048,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1794313909191,
-    "requested_start_ms": 1792710146772,
+    "fetched_start_ms": 1794642668859,
+    "requested_start_ms": 1791013931048,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_investigated_ms": 1794030066963
+  "last_investigated_ms": 1794030066963,
+  "last_positive_evidence": "2026-11-14T07:52:13.084809+00:00",
+  "last_seen": "2026-11-14T07:52:17.845745+00:00",
+  "last_scored": "2026-11-14T07:52:17.845745+00:00",
+  "best_score": 0.1864,
+  "latest_score": 0.1864,
+  "latest_scoring_schema": "2026-09-26.2",
+  "latest_tier": "BACKGROUND",
+  "latest_evidence": {
+    "tier": "BACKGROUND",
+    "reasons": [],
+    "warnings": [
+      "Weak asset overlap",
+      "Very different account-size bracket",
+      "Too few position episodes to compare holding style"
+    ],
+    "vetoes": [],
+    "asset_overlap": {
+      "overlap": [],
+      "target_only": [
+        "xyz:SP500"
+      ],
+      "candidate_only": [
+        "@107"
+      ],
+      "overlap_count": 0,
+      "rare_overlap": [],
+      "jaccard": 0.0
+    },
+    "market_rarity": {
+      "shared_markets": [],
+      "rare_markets": [],
+      "classification": {},
+      "description": "no shared markets",
+      "sample_sufficient": true,
+      "bonus_applied": 0.0,
+      "score_without_bonus": 0.1864,
+      "explanations": [],
+      "frequencies": {}
+    },
+    "episodes": {
+      "status": "insufficient_data",
+      "promotable": false,
+      "similarity": null,
+      "features": {
+        "relative_size_dispersion": 0.1921,
+        "partial_fills_per_order": 1.0,
+        "round_100_fraction": 1.0,
+        "maker_share": 0.0
+      },
+      "independent_sessions": 1,
+      "confounders": [
+        "shared_execution_software",
+        "market_conditions"
+      ],
+      "parent_event_ids": [
+        "fill::@107:1794551762333:1026280705624041",
+        "fill::@107:1794551762333:417642999281830",
+        "fill::@107:1794551762333:583403956832083",
+        "fill::@107:1794551762333:637155910749641",
+        "fill::@107:1794551777916:859516016901925"
+      ]
+    },
+    "tooling": {
+      "requests": 61.0,
+      "cum_volume_usd": 9166.8,
+      "requests_per_1k_usd": 6.6544
+    }
+  },
+  "score_history": [
+    {
+      "scan_time": "2026-11-14T07:52:17.845745+00:00",
+      "score": 0.1864,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.2425,
+        "hold_duration": null,
+        "account_size": 0.1652,
+        "trade_sequencing": 1.0,
+        "position_sizing": 0.4737,
+        "order_profile": 0.472,
+        "activity": 0.5945,
+        "direction_bias": null,
+        "position_management": 0.4974,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    }
+  ],
+  "status": "ACTIVE",
+  "recent_avg_score": null
 }
