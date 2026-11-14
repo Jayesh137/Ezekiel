@@ -1,6 +1,34 @@
 {
   "routes": [
     {
+      "id": "arbitrum:0xe74a570c5d1ac162d18232a743ac1957c0128988a5e83fd186fe75a5a8f61f65:erc20:0",
+      "original_funder": "0x0000000000000000000000000000000000000000",
+      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
+      "source_chain": "arbitrum",
+      "source_tx": "0xe74a570c5d1ac162d18232a743ac1957c0128988a5e83fd186fe75a5a8f61f65",
+      "amount_usd": 4999999.8,
+      "ts_ms": 1794676376000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "arbitrum:0xe74a570c5d1ac162d18232a743ac1957c0128988a5e83fd186fe75a5a8f61f65:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
+      "id": "arbitrum:0x1a0c7f43836764a011fb846b8280f5bacba183900637c19c617882cd0291913f:erc20:0",
+      "original_funder": "0x0000000000000000000000000000000000000000",
+      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
+      "source_chain": "arbitrum",
+      "source_tx": "0x1a0c7f43836764a011fb846b8280f5bacba183900637c19c617882cd0291913f",
+      "amount_usd": 9899999.8,
+      "ts_ms": 1794676193000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "arbitrum:0x1a0c7f43836764a011fb846b8280f5bacba183900637c19c617882cd0291913f:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "monad:0x85c0157bfdc1c94a637d0eb61778e64d43b1f8d54f456c8bacc399dbdf912144:erc20:0",
       "original_funder": "0x89587ebe7cff64c6527fe2deccc3521d75763e8d",
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
@@ -14365,37 +14393,49 @@
         "arbitrum:0xab3b055a2c951512d4a4418e2b1466419e305d27e3b300bda77b31f7a6b40246:erc20:0"
       ],
       "confirms_owner": false
-    },
-    {
-      "id": "ethereum:0x2db44dab9a1a1e9d918181706ddfb62956e2264c6da43a43c5d11e426b4f770e:erc20:0",
-      "original_funder": "0x75320c40acbd4a7104d769cca3d84488caab21a7",
-      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "ethereum",
-      "source_tx": "0x2db44dab9a1a1e9d918181706ddfb62956e2264c6da43a43c5d11e426b4f770e",
-      "amount_usd": null,
-      "ts_ms": 1753702199000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "ethereum:0x2db44dab9a1a1e9d918181706ddfb62956e2264c6da43a43c5d11e426b4f770e:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "ethereum:0x72ec5ef424a922e840a54cedd6225babe7885788378efb5ac9ea2e512b36ca84:erc20:0",
-      "original_funder": "0x7768a894e6d0160530c0b386c0a963989239f107",
-      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "ethereum",
-      "source_tx": "0x72ec5ef424a922e840a54cedd6225babe7885788378efb5ac9ea2e512b36ca84",
-      "amount_usd": null,
-      "ts_ms": 1753702175000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "ethereum:0x72ec5ef424a922e840a54cedd6225babe7885788378efb5ac9ea2e512b36ca84:erc20:0"
-      ],
-      "confirms_owner": false
     }
   ],
   "unresolved": [
+    {
+      "id": "arbitrum:0xfa10227bbb25b05a2e25d42a899aef30e2a83961c9f87bc54e49456df722e327:erc20:0",
+      "original_funder": "0x45d26f28196d226497130c4bac709d808fed4029",
+      "source_chain": "arbitrum",
+      "source_tx": "0xfa10227bbb25b05a2e25d42a899aef30e2a83961c9f87bc54e49456df722e327",
+      "transaction_caller": null,
+      "protocol": null,
+      "amount_usd": 4999999.8,
+      "ts_ms": 1794676419000,
+      "parent_event_ids": [
+        "arbitrum:0xfa10227bbb25b05a2e25d42a899aef30e2a83961c9f87bc54e49456df722e327:erc20:0"
+      ],
+      "confirms_owner": false,
+      "boundary": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
+      "last_exact_event": "arbitrum:0xfa10227bbb25b05a2e25d42a899aef30e2a83961c9f87bc54e49456df722e327:erc20:0",
+      "reason": "destination_not_joined",
+      "missing_evidence": "recipient/source transaction tied to a protocol identifier",
+      "next_query": "retrieve source receipt and destination message; inspect recipient forwarding",
+      "alternatives": []
+    },
+    {
+      "id": "arbitrum:0xc73973862be8f1392498f82681d84ce8b230d65437959efd50deab729af17867:erc20:0",
+      "original_funder": "0x45d26f28196d226497130c4bac709d808fed4029",
+      "source_chain": "arbitrum",
+      "source_tx": "0xc73973862be8f1392498f82681d84ce8b230d65437959efd50deab729af17867",
+      "transaction_caller": null,
+      "protocol": null,
+      "amount_usd": 9899999.8,
+      "ts_ms": 1794676333000,
+      "parent_event_ids": [
+        "arbitrum:0xc73973862be8f1392498f82681d84ce8b230d65437959efd50deab729af17867:erc20:0"
+      ],
+      "confirms_owner": false,
+      "boundary": "0x160f6ef9fcdde6ff3febc7a57edbfd476a8aab5b",
+      "last_exact_event": "arbitrum:0xc73973862be8f1392498f82681d84ce8b230d65437959efd50deab729af17867:erc20:0",
+      "reason": "destination_not_joined",
+      "missing_evidence": "recipient/source transaction tied to a protocol identifier",
+      "next_query": "retrieve source receipt and destination message; inspect recipient forwarding",
+      "alternatives": []
+    },
     {
       "id": "ethereum:0x79de373ad1ac9d2ba67b2f9014264f995da76a65d4262671ec058ee83b971b5b:erc20:0",
       "original_funder": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
@@ -34355,46 +34395,6 @@
       "missing_evidence": "recipient/source transaction tied to a protocol identifier",
       "next_query": "retrieve source receipt and destination message; inspect recipient forwarding",
       "alternatives": []
-    },
-    {
-      "id": "ethereum:0x2db253607c15939c058c22a05cc8febc5bca954d87f0ebd72086dce1d84a69e1:erc20:0",
-      "original_funder": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "ethereum",
-      "source_tx": "0x2db253607c15939c058c22a05cc8febc5bca954d87f0ebd72086dce1d84a69e1",
-      "transaction_caller": null,
-      "protocol": null,
-      "amount_usd": null,
-      "ts_ms": 1746838379000,
-      "parent_event_ids": [
-        "ethereum:0x2db253607c15939c058c22a05cc8febc5bca954d87f0ebd72086dce1d84a69e1:erc20:0"
-      ],
-      "confirms_owner": false,
-      "boundary": "0x0000000000000000000000000000000000000000",
-      "last_exact_event": "ethereum:0x2db253607c15939c058c22a05cc8febc5bca954d87f0ebd72086dce1d84a69e1:erc20:0",
-      "reason": "destination_not_joined",
-      "missing_evidence": "recipient/source transaction tied to a protocol identifier",
-      "next_query": "retrieve source receipt and destination message; inspect recipient forwarding",
-      "alternatives": []
-    },
-    {
-      "id": "ethereum:0x9e971ba3a8f9861b0ef6912d23c74d12e4d8d0f17ff566a153ba16f228fffa50:erc20:0",
-      "original_funder": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "ethereum",
-      "source_tx": "0x9e971ba3a8f9861b0ef6912d23c74d12e4d8d0f17ff566a153ba16f228fffa50",
-      "transaction_caller": null,
-      "protocol": null,
-      "amount_usd": 395189.41,
-      "ts_ms": 1746838367000,
-      "parent_event_ids": [
-        "ethereum:0x9e971ba3a8f9861b0ef6912d23c74d12e4d8d0f17ff566a153ba16f228fffa50:erc20:0"
-      ],
-      "confirms_owner": false,
-      "boundary": "0x888888888889758f76e7103c6cbf23abbf58f946",
-      "last_exact_event": "ethereum:0x9e971ba3a8f9861b0ef6912d23c74d12e4d8d0f17ff566a153ba16f228fffa50:erc20:0",
-      "reason": "destination_not_joined",
-      "missing_evidence": "recipient/source transaction tied to a protocol identifier",
-      "next_query": "retrieve source receipt and destination message; inspect recipient forwarding",
-      "alternatives": []
     }
   ],
   "discoveries": [
@@ -45400,15 +45400,15 @@
     }
   ],
   "coverage": {
-    "transfer_records": 5782,
-    "circle_events": 14542
+    "transfer_records": 5786,
+    "circle_events": 17342
   },
   "counts": {
-    "routes": 3263,
-    "unresolved": 2527,
+    "routes": 3265,
+    "unresolved": 2529,
     "discoveries": 2174
   },
-  "computed_at_ms": 1794673008493,
+  "computed_at_ms": 1794680938281,
   "authority": {
     "intervals": [
       {
@@ -49104,7 +49104,8 @@
         "valid_from_ms": 1794589421343,
         "valid_to_ms": 1794675160746,
         "parent_event_ids": [
-          "agents:0x00ac03de09a7317240789216c71c4ea6846c1702:1794589421343:0x0d51460c2b07f8e871cd6217f02828bccfdff771"
+          "agents:0x00ac03de09a7317240789216c71c4ea6846c1702:1794589421343:0x0d51460c2b07f8e871cd6217f02828bccfdff771",
+          "agents:0x00ac03de09a7317240789216c71c4ea6846c1702:1794676541519:0x0d51460c2b07f8e871cd6217f02828bccfdff771"
         ],
         "confirms_owner": false
       },
@@ -52036,6 +52037,54 @@
           "agents:0xe5a1edb723972c999a19f6a8398aea967f62aa59:1794672020381:0xf6652c02d09fd8e3ecc35ffd9bed3adf727f52db"
         ],
         "confirms_owner": false
+      },
+      {
+        "account": "0xc3b3bf3960daadbed4f9d6aebb16a86c5925e4e6",
+        "authority": "0xe4205b4cca992e263c6528c304d47d02a9f8fdfd",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794676541519,
+        "valid_to_ms": 1809337668703,
+        "parent_event_ids": [
+          "agents:0xc3b3bf3960daadbed4f9d6aebb16a86c5925e4e6:1794676541519:0xe4205b4cca992e263c6528c304d47d02a9f8fdfd"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc3b3bf3960daadbed4f9d6aebb16a86c5925e4e6",
+        "authority": "0xf51699417d45c323d470e4e886035dbcb926744b",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794676541519,
+        "valid_to_ms": 1794995192283,
+        "parent_event_ids": [
+          "agents:0xc3b3bf3960daadbed4f9d6aebb16a86c5925e4e6:1794676541519:0xf51699417d45c323d470e4e886035dbcb926744b"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xec85bc052ec5b6d6cb2b40f5caa45e39b61a77fe",
+        "authority": "0x66170e05fff74ff69140c08f95c39b2af8334766",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794676541519,
+        "valid_to_ms": 1799345248807,
+        "parent_event_ids": [
+          "agents:0xec85bc052ec5b6d6cb2b40f5caa45e39b61a77fe:1794676541519:0x66170e05fff74ff69140c08f95c39b2af8334766"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xf517639a8872e756ac98d3c65507d2ebc25cc032",
+        "authority": "0x25e9c8d56b52edf7058b8fa44ede4e76b16d227c",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794676541519,
+        "valid_to_ms": 1802451977303,
+        "parent_event_ids": [
+          "agents:0xf517639a8872e756ac98d3c65507d2ebc25cc032:1794676541519:0x25e9c8d56b52edf7058b8fa44ede4e76b16d227c"
+        ],
+        "confirms_owner": false
       }
     ],
     "shared_authority": [],
@@ -52046,6 +52095,10 @@
   "source_message_reads": {
     "queries": 20,
     "errors": [
+      {
+        "tx": "0xa66961f98c5b4bccd753630122dde13cefd44a86ecd5792e7b9a59fd2614a07a",
+        "reason": "no validated complete V2 message"
+      },
       {
         "tx": "0xcf95ed986af9cc9baf4500627206fd5c751bb41b58706556e95ada3623aebad9",
         "reason": "no validated complete V2 message"
@@ -52121,15 +52174,11 @@
       {
         "tx": "0x5c335965b1f4fdb83e969e339b8bec1a9811774ac53979783eda4f267b9e9b43",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0xf0767047d9f2a817a7256679326a1ce94e3b9c0c7188d23c9aecb7d61c2bcb3b",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 14542,
+    "circle_rows_read": 17342,
     "store_read_limit": 100000
   }
 }
