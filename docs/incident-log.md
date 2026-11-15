@@ -3156,6 +3156,18 @@ stamped, so a slow day defers a sentinel to the next run (~11 minutes) instead
 of failing the run. Raising the cap was not the fix: watch's step caps already
 summed to 40 against a 39-minute job ceiling.
 
+**Two faults in the first cut, caught in review before it was pushed.** (a)
+The capped reader stopped deduping a busy wallet's rows once past the cap —
+including the rows it KEEPS, which are the flows the engine sums as his money
+through that wallet, so a record stored twice would have doubled one (rule
+10). The id set now holds the kept rows' ids only, which stays small. (b) The
+rotation's cursor did not survive the run: `select_sentinels` rebuilds every
+configured and candidate entry from scratch and carried only `since`, so
+`swept_at` was dropped, every run swept in address order, and a slow day
+would have deferred the SAME sentinel every time — a rotation without a
+persisted cursor is a fixed order. It now carries `swept_at` like `since`.
+Each has a test that fails without its fix.
+
 **Rule.** A step whose GOOD runs use 85% of its cap is already failing; it
 just has not had a bad day yet. Read the successful runs' durations, not only
 the failures.

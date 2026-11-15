@@ -501,9 +501,12 @@ def records_by_wallet_capped(wallets, cap: int, keep_all=(), *, include_spam: bo
     cannot enforce a step timeout, and every reading of the run was lost.
 
     Same reader and spam rule as its sibling. `total` for a wallet past the
-    cap counts records as read, without the per-wallet id dedupe (the id set
-    is the other thing that grows): it can only over-count, and such a wallet
-    is already busy by definition.
+    cap counts records as read, without the per-wallet id dedupe (an id set
+    over every record is the other thing that grows): it can only over-count,
+    and such a wallet is already busy by definition. The rows it KEEPS stay
+    deduped — they are the flows the engine sums as his money through the
+    wallet, and a substrate record stored twice would double one (rule 10) —
+    so past the cap the id set holds the kept rows' ids only.
     """
     wanted = {(w or "").lower() for w in wallets if w}
     keep_all = {(w or "").lower() for w in keep_all}
@@ -515,7 +518,13 @@ def records_by_wallet_capped(wallets, cap: int, keep_all=(), *, include_spam: bo
     root = Path(TRANSFERS_DIR)
     if not root.exists():
         return {w: ([], 0) for w in wanted}
-    seen: dict[str, set[str] | None] = {w: set() for w in wanted}
+
+    def other_side(rec: dict, side: str) -> str:
+        src = (rec.get("src") or "").lower()
+        return (rec.get("dst") or "").lower() if src == side else src
+
+    seen: dict[str, set[str]] = {w: set() for w in wanted}
+    capped: set[str] = set()
     for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         for path in substrate_files(chain_dir):
             for rec in _load_cached(path):
@@ -527,12 +536,14 @@ def records_by_wallet_capped(wallets, cap: int, keep_all=(), *, include_spam: bo
                 dst = (rec.get("dst") or "").lower()
                 for side in {src, dst} & wanted:
                     ids = seen[side]
-                    if ids is None:                      # past the cap
+                    rid = rec.get("id")
+                    if side in capped:
                         totals[side] += 1
-                        if (dst if side == src else src) in touching:
+                        if other_side(rec, side) in touching and not (rid and rid in ids):
+                            if rid:
+                                ids.add(rid)
                             rows[side].append(rec)
                         continue
-                    rid = rec.get("id")
                     if rid:
                         if rid in ids:
                             continue
@@ -540,11 +551,9 @@ def records_by_wallet_capped(wallets, cap: int, keep_all=(), *, include_spam: bo
                     rows[side].append(rec)
                     totals[side] += 1
                     if side not in keep_all and totals[side] > cap:
-                        rows[side] = [r for r in rows[side]
-                                      if ((r.get("dst") or "").lower()
-                                          if (r.get("src") or "").lower() == side
-                                          else (r.get("src") or "").lower()) in touching]
-                        seen[side] = None
+                        rows[side] = [r for r in rows[side] if other_side(r, side) in touching]
+                        seen[side] = {r["id"] for r in rows[side] if r.get("id")}
+                        capped.add(side)
     return {w: (rows[w], totals[w]) for w in wanted}
 
 

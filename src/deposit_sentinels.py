@@ -181,6 +181,12 @@ def select_sentinels(candidates: dict, paid: dict, classes: dict,
     for addr, entry in sentinels.items():
         prior = ((previous or {}).get("sentinels") or {}).get(addr) or {}
         entry["since"] = prior.get("since") or entry.get("since")
+        # The sweep rotation's cursor (`check_deposit_sentinels.sweep_in_budget`).
+        # Configured and candidate entries are rebuilt above, so without this
+        # every run would sweep in address order and a slow day would defer
+        # the same sentinel every time.
+        if prior.get("swept_at") and not entry.get("swept_at"):
+            entry["swept_at"] = prior["swept_at"]
     return sentinels, pending, excluded
 
 

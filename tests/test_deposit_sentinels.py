@@ -317,3 +317,19 @@ def test_the_deferred_sentinel_goes_first_next_run():
     calls = []
     cds.sweep_in_budget(sentinels, lambda a, s: calls.append(a), "LATER", budget=90.0, clock=lambda: 0.0)
     assert calls[0] == "0xa"
+
+
+def test_the_rotation_cursor_survives_selection_for_every_kind_of_sentinel():
+    """`select_sentinels` rebuilds configured and candidate entries from scratch.
+    Without carrying `swept_at`, every run swept in address order and a slow day
+    deferred the same sentinel every time."""
+    other = "0x" + "04" * 20
+    previous = {"sentinels": {DEPOSIT: {"reason": "conduit", "swept_at": "T1"},
+                              other: {"reason": "configured by the operator", "swept_at": "T2"}}}
+    sentinels, _, _ = ds.select_sentinels(
+        {DEPOSIT: "conduit"}, {DEPOSIT: {"usd": 5_000.0, "chains": {"arbitrum"}}},
+        {DEPOSIT: ds.CLASS_QUIET}, previous, [other])
+    assert sentinels[DEPOSIT]["swept_at"] == "T1"         # a candidate, rebuilt
+    assert sentinels[other]["swept_at"] == "T2"           # configured, rebuilt
+    fresh, _, _ = ds.select_sentinels({}, {}, {}, None, [other])
+    assert "swept_at" not in fresh[other]                 # never swept: swept first

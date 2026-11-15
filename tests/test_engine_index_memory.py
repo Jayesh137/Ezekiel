@@ -45,6 +45,19 @@ def test_a_busy_wallet_never_holds_more_than_the_cap_plus_what_touches_him(tmp_p
     assert total == 52
 
 
+def test_a_busy_wallets_kept_rows_stay_deduped_past_the_cap(tmp_path, monkeypatch):
+    """The kept rows are the flows the engine sums as his money through the
+    wallet: a record stored twice must not double one (rule 10)."""
+    records = [_rec(900, "0xbusy", HIM)]                  # kept before the cap
+    records += [_rec(i, "0xbusy", f"0xc{i}") for i in range(20)]
+    records += [_rec(900, "0xbusy", HIM),                 # its duplicate, after
+                _rec(901, HIM, "0xbusy"), _rec(901, HIM, "0xbusy")]
+    _substrate(tmp_path, monkeypatch, records)
+    rows, total = collect.records_by_wallet_capped(["0xbusy"], cap=10, touching=[HIM])["0xbusy"]
+    assert sorted(r["id"] for r in rows) == ["r900", "r901"]
+    assert total >= 22                                    # over-counting allowed, never under
+
+
 def test_a_keep_all_wallet_is_never_trimmed(tmp_path, monkeypatch):
     _substrate(tmp_path, monkeypatch, [_rec(i, HIM, f"0xc{i}") for i in range(30)])
     rows, total = collect.records_by_wallet_capped([HIM], cap=5, keep_all=[HIM])[HIM]
