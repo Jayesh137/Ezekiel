@@ -152,9 +152,11 @@ jobs:
           BREVO_SMTP_KEY: ${{ secrets.BREVO_SMTP_KEY }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           GITHUB_TOKEN: ${{ github.token }}
-        # Measured locally: 7s cold substrate walk, 0.4s warm; the sweeps are
-        # incremental. Bounded well above that so a hung endpoint costs only
-        # this step.
+        # Measured on the runner 2026-11-15: ~60 s of substrate walk before
+        # the sweeps, 54 s after. The sweeps share one budget that must end
+        # 160 s into the step (check_deposit_sentinels.SWEEP_DEADLINE_SECONDS),
+        # so slow reads defer a sentinel to the next run instead of failing
+        # this step; the cap is the backstop for a hung endpoint.
         timeout-minutes: 5
         run: python scripts/check_deposit_sentinels.py
       # Every Circle transfer into and out of Hyperliquid, both ends named by

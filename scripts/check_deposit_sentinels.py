@@ -41,6 +41,15 @@ READING_SECONDS = 45.0
 # failing the run; what is read is read from the substrate as always.
 SWEEP_BUDGET_SECONDS = 90.0
 MIN_SWEEP_SECONDS = 10.0
+# ...and the sweeps must END by this many seconds into the step, whatever ran
+# before them. A fixed 90 s is still one budget per PHASE: a run that spends
+# its live-reading budget on a new candidate (45 s + a read in flight) and
+# then meets slow Etherscan reads stacks ~60 s of substrate walk + ~75 s of
+# readings + ~120 s of sweeps + ~55 s of second walk past the step's 300 s
+# cap. What follows the sweeps keeps the other 140 s: one read in flight, the
+# second walk, HL reads for a new sender, the save. Measured on the runner
+# 2026-11-15 (run 43686991974): ~60 s before the sweeps, 54 s after.
+SWEEP_DEADLINE_SECONDS = 160.0
 
 
 def _load(path: Path) -> dict:
@@ -129,6 +138,12 @@ def hl_state(address: str, post=None) -> dict:
         return {"read_ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def sweep_budget(elapsed: float) -> float:
+    """Seconds the sweeps may take when they start `elapsed` seconds into the
+    step: the per-run sweep budget, cut short by the step-wide deadline."""
+    return max(0.0, min(SWEEP_BUDGET_SECONDS, SWEEP_DEADLINE_SECONDS - elapsed))
+
+
 def sweep_in_budget(sentinels: dict, sweep_one, now: str, *, budget=None,
                     clock=time.monotonic) -> dict:
     """Sweep sentinels least recently swept first until the budget is spent.
@@ -154,6 +169,7 @@ def sweep_in_budget(sentinels: dict, sweep_one, now: str, *, budget=None,
 
 
 def main() -> int:
+    started = time.monotonic()
     from scripts.check_watchlist import sweep
     from src.alerts import alert_deposit_address_shared
     from src.chain.collect import records_by_wallet
@@ -187,7 +203,8 @@ def main() -> int:
 
     plan_refused: dict = {}
     sweeps = sweep_in_budget(sentinels, lambda addr, seconds: sweep(addr, config, plan_refused,
-                                                                   seconds=seconds), now)
+                                                                   seconds=seconds), now,
+                             budget=sweep_budget(time.monotonic() - started))
     if sweeps["deferred"]:
         print(f"[sentinels] sweep budget spent: {len(sweeps['deferred'])} sentinel(s) left for "
               f"the next run, least recently swept first: {sweeps['deferred']}")
