@@ -333,3 +333,37 @@ def test_the_rotation_cursor_survives_selection_for_every_kind_of_sentinel():
     assert sentinels[other]["swept_at"] == "T2"           # configured, rebuilt
     fresh, _, _ = ds.select_sentinels({}, {}, {}, None, [other])
     assert "swept_at" not in fresh[other]                 # never swept: swept first
+
+
+def test_the_sweeps_must_end_by_the_step_wide_deadline():
+    """A fixed 90 s was one budget per PHASE: slow readings before the sweeps
+    plus slow sweeps stacked past the step's 300 s cap."""
+    from scripts import check_deposit_sentinels as cds
+    assert cds.sweep_budget(60.0) == cds.SWEEP_BUDGET_SECONDS          # a normal run: unchanged
+    assert cds.sweep_budget(cds.SWEEP_DEADLINE_SECONDS - 30.0) == 30.0  # slow start: cut short
+    assert cds.sweep_budget(cds.SWEEP_DEADLINE_SECONDS + 5.0) == 0.0    # past it: none
+    swept = []
+    out = cds.sweep_in_budget({"0xa": {}, "0xb": {}}, lambda a, s: swept.append(a), "NOW",
+                              budget=cds.sweep_budget(200.0), clock=lambda: 0.0)
+    assert swept == [] and out["deferred"] == ["0xa", "0xb"]            # read from the substrate as stored
+
+
+def test_main_hands_the_sweeps_the_time_left_in_the_step(monkeypatch):
+    from scripts import check_deposit_sentinels as cds
+    seen = []
+
+    def fake_sweep_in_budget(sentinels, sweep_one, now, *, budget=None, clock=None):
+        seen.append(budget)
+        raise SystemExit(0)                                             # stop after the sweeps
+    monkeypatch.setattr(cds, "sweep_in_budget", fake_sweep_in_budget)
+    monkeypatch.setattr(cds, "sweep_budget", lambda elapsed: ("budget-for", round(elapsed) >= 0))
+    monkeypatch.setattr(cds, "load_config", lambda: {"target_wallet": T})
+    monkeypatch.setattr(cds, "_load", lambda path: {})
+    monkeypatch.setattr(ds, "save", lambda report, directory=None: None)
+    from src.chain import collect
+    monkeypatch.setattr(collect, "records_by_wallet", lambda wallets, **k: {})
+    try:
+        cds.main()
+    except SystemExit:
+        pass
+    assert seen == [("budget-for", True)]

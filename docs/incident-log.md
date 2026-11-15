@@ -3168,6 +3168,17 @@ would have deferred the SAME sentinel every time — a rotation without a
 persisted cursor is a fixed order. It now carries `swept_at` like `since`.
 Each has a test that fails without its fix.
 
+**Verified live, and one more bound (run 43686991974, the first watch on the
+merged code).** The sentinel step passed in 230 s through two Etherscan read
+timeouts and deferred `0x8570c2ae…` to the next run, as designed. Its
+timestamps showed the remaining exposure: ~60 s of substrate walk before the
+sweeps and 54 s after, so a run that also spent the live-reading budget on a
+new candidate (45 s + a read in flight) would stack ~60 + 75 + 120 + 55 s past
+the 300 s cap. A fixed 90 s sweep budget was still one budget per PHASE. The
+sweeps now must END 160 s into the step (`SWEEP_DEADLINE_SECONDS`;
+`sweep_budget(elapsed)`): a normal run keeps its 90 s, and slow work before
+the sweeps shortens them instead of failing the run.
+
 **Rule.** A step whose GOOD runs use 85% of its cap is already failing; it
 just has not had a bad day yet. Read the successful runs' durations, not only
 the failures.
