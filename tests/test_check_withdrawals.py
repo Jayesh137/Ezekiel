@@ -33,7 +33,10 @@ def _mint(ts, usd, dst, chain="arbitrum", tx="0xm"):
 def _wire(monkeypatch, tmp_path, *, ledger, records, payloads):
     """Every I/O the runner does, answered from memory."""
     monkeypatch.setattr(cw, "load_config", lambda: CONFIG)
-    monkeypatch.setattr(cw, "records_for", lambda w: records.get(w, []))
+    walks = []
+    monkeypatch.setattr(cw, "records_by_wallet",
+                        lambda ws: walks.append(sorted(ws)) or {w: records.get(w, []) for w in ws})
+    monkeypatch.setattr(cw, "WALKS", walks, raising=False)
     monkeypatch.setattr(cw, "load_all_records", lambda d: ledger if d.endswith("ledger")
                         else list(payloads.values()))
     monkeypatch.setattr(cw, "_window_fetcher", lambda config: (lambda t: ([], None)))
@@ -105,3 +108,11 @@ def test_the_unresolved_alert_is_high_and_keyed_on_the_withdrawal(monkeypatch):
 def test_iso_never_raises_on_a_bad_timestamp():
     assert cw._iso(None) is None and cw._iso("x") is None
     assert cw._iso(0) == "1970-01-01T00:00:00+00:00"
+
+
+def test_the_substrate_is_walked_once_for_every_wallet_of_his(monkeypatch, tmp_path):
+    """It was walked once per wallet: 3.5 of the step's 4 minutes on 2026-11-14,
+    and past the cap twice that day, failing the trace run each time."""
+    _wire(monkeypatch, tmp_path, ledger=[], records={}, payloads={})
+    assert cw.main() == 0
+    assert len(cw.WALKS) == 1 and T in cw.WALKS[0] and TR in cw.WALKS[0]

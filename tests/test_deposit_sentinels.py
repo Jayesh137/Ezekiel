@@ -219,7 +219,7 @@ def test_main_baselines_then_alerts_a_new_sender(tmp_path, monkeypatch):
 
     sent = []
     monkeypatch.setattr(collect, "records_by_wallet", by_wallet)
-    monkeypatch.setattr(watch, "sweep", lambda address, config, plan_refused=None: None)
+    monkeypatch.setattr(watch, "sweep", lambda address, config, plan_refused=None, seconds=None: None)
     monkeypatch.setattr(alerts, "alert_deposit_address_shared",
                         lambda row, state=None: sent.append(row) or True)
     monkeypatch.setattr(script, "hl_state", lambda address, post=None: {"read_ok": True})
@@ -288,3 +288,32 @@ def test_a_zero_reading_for_a_sender_is_unmeasured_not_quiet():
     zero = {"is_contract": False, "txs": 0, "token_transfers": 0}
     assert ds.classify([zero], sender=True) == ds.CLASS_UNMEASURED
     assert ds.classify([zero]) == ds.CLASS_QUIET
+
+
+# --- one sweep budget for all sentinels (2026-11-14: 14 of 30 watch runs failed) ---
+
+def test_sentinels_are_swept_least_recently_swept_first_until_the_budget_is_spent():
+    from scripts import check_deposit_sentinels as cds
+    clock = [0.0]
+    sentinels = {"0xa": {"swept_at": "2026-11-14T10:00"}, "0xb": {},
+                 "0xc": {"swept_at": "2026-11-14T09:00"}}
+    calls = []
+
+    def sweep_one(addr, seconds):
+        calls.append((addr, seconds))
+        clock[0] += 50.0                                  # each sweep takes 50 s
+
+    out = cds.sweep_in_budget(sentinels, sweep_one, "NOW", budget=90.0, clock=lambda: clock[0])
+    assert [a for a, _ in calls] == ["0xb", "0xc"]        # never swept, then the oldest
+    assert calls[0][1] == 45.0 and calls[1][1] == 40.0    # capped by what is left
+    assert out == {"swept": ["0xb", "0xc"], "deferred": ["0xa"]}
+    assert sentinels["0xb"]["swept_at"] == "NOW" and sentinels["0xa"]["swept_at"] == "2026-11-14T10:00"
+
+
+def test_the_deferred_sentinel_goes_first_next_run():
+    from scripts import check_deposit_sentinels as cds
+    sentinels = {"0xa": {"swept_at": "2026-11-14T10:00"}, "0xb": {"swept_at": "NOW"},
+                 "0xc": {"swept_at": "NOW"}}
+    calls = []
+    cds.sweep_in_budget(sentinels, lambda a, s: calls.append(a), "LATER", budget=90.0, clock=lambda: 0.0)
+    assert calls[0] == "0xa"
