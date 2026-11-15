@@ -483,6 +483,80 @@ def records_by_wallet(wallets, *, include_spam: bool = False) -> dict[str, list[
     return out
 
 
+def records_by_wallet_capped(wallets, cap: int, keep_all=(), *, include_spam: bool = False,
+                             touching=()) -> dict[str, tuple[list[dict], int]]:
+    """`records_by_wallet` for a caller that will discard a busy wallet's rows.
+
+    Returns {wallet: (rows, total)}. A wallet in `keep_all` gets every record.
+    Any other wallet gets every record until it passes `cap`; from then on
+    only records whose other side is in `touching` are kept, and `total`
+    goes on counting. So a wallet with three million records costs `cap`
+    rows of memory, not three million.
+
+    The trace engine's index asked `records_by_wallet` for every swept wallet
+    (1,188 on 2026-11-14) and trimmed busy ones AFTERWARDS, so the full
+    lists existed first — the shape that took substrate linkage to 15 GB on
+    2026-10-27. On 2026-11-14 run 43550464309 sat 45 minutes inside the
+    engine's 8-minute step until GitHub lost the runner: a starved runner
+    cannot enforce a step timeout, and every reading of the run was lost.
+
+    Same reader and spam rule as its sibling. `total` for a wallet past the
+    cap counts records as read, without the per-wallet id dedupe (an id set
+    over every record is the other thing that grows): it can only over-count,
+    and such a wallet is already busy by definition. The rows it KEEPS stay
+    deduped — they are the flows the engine sums as his money through the
+    wallet, and a substrate record stored twice would double one (rule 10) —
+    so past the cap the id set holds the kept rows' ids only.
+    """
+    wanted = {(w or "").lower() for w in wallets if w}
+    keep_all = {(w or "").lower() for w in keep_all}
+    touching = {(w or "").lower() for w in touching}
+    rows: dict[str, list[dict]] = {w: [] for w in wanted}
+    totals: dict[str, int] = dict.fromkeys(wanted, 0)
+    if not wanted:
+        return {}
+    root = Path(TRANSFERS_DIR)
+    if not root.exists():
+        return {w: ([], 0) for w in wanted}
+
+    def other_side(rec: dict, side: str) -> str:
+        src = (rec.get("src") or "").lower()
+        return (rec.get("dst") or "").lower() if src == side else src
+
+    seen: dict[str, set[str]] = {w: set() for w in wanted}
+    capped: set[str] = set()
+    for chain_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for path in substrate_files(chain_dir):
+            for rec in _load_cached(path):
+                if not isinstance(rec, dict):
+                    continue
+                if rec.get("spam") and not include_spam:
+                    continue
+                src = (rec.get("src") or "").lower()
+                dst = (rec.get("dst") or "").lower()
+                for side in {src, dst} & wanted:
+                    ids = seen[side]
+                    rid = rec.get("id")
+                    if side in capped:
+                        totals[side] += 1
+                        if other_side(rec, side) in touching and not (rid and rid in ids):
+                            if rid:
+                                ids.add(rid)
+                            rows[side].append(rec)
+                        continue
+                    if rid:
+                        if rid in ids:
+                            continue
+                        ids.add(rid)
+                    rows[side].append(rec)
+                    totals[side] += 1
+                    if side not in keep_all and totals[side] > cap:
+                        rows[side] = [r for r in rows[side] if other_side(r, side) in touching]
+                        seen[side] = {r["id"] for r in rows[side] if r.get("id")}
+                        capped.add(side)
+    return {w: (rows[w], totals[w]) for w in wanted}
+
+
 def _blank_chain_result() -> dict:
     return {"records": 0, "spam": 0, "calls": 0, "cursor": 0, "gaps": [],
             "truncated": False, "error": None, "probed_inactive": False,

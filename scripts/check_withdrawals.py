@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.alerts import alert_foreign_destination, alert_unresolved_cctp_withdrawal
-from src.chain.collect import records_for
+from src.chain.collect import records_by_wallet
 from src.hl_actions import ACTIONS_DIR
 from src.utils import DATA_DIR, load_all_records, load_config
 from src.withdrawals import (
@@ -68,13 +68,20 @@ def cctp_payloads(target: str) -> dict:
     return out
 
 
-def circle_report(config: dict, ledger: list[dict], target: str) -> dict:
+def cluster_of(config: dict, target: str) -> set:
+    return {target} | {(w or "").lower() for w in config.get("known_self_wallets", []) or []}
+
+
+def circle_report(config: dict, ledger: list[dict], target: str, rows: dict) -> dict:
     """Pair every Circle withdrawal with its mint at a cluster address, on any
-    chain the substrate reads; resolve the rest from the stored payloads."""
-    cluster = {target} | {(w or "").lower() for w in config.get("known_self_wallets", []) or []}
+    chain the substrate reads; resolve the rest from the stored payloads.
+
+    `rows` is `records_by_wallet` over the cluster, read once by `main`.
+    """
+    cluster = cluster_of(config, target)
     inbound = []
     for w in sorted(cluster):
-        inbound.extend(cctp_inbound(records_for(w), {w}))
+        inbound.extend(cctp_inbound(rows.get(w) or [], {w}))
     inbound.sort(key=lambda r: r["ts"])
     return cctp_report(cctp_withdrawals(ledger, target), inbound, cctp_payloads(target), cluster)
 
@@ -94,11 +101,16 @@ def main() -> int:
 
     ledger = load_all_records(str(DATA_DIR / "ledger"))
     withdrawals = unique_withdrawals(ledger)
-    inbound = bridge_inbound(records_for(target), bridge, target)
+    # ONE walk of the substrate for every wallet of his. It was one walk per
+    # wallet (`records_for` four times): 3.5 of the step's 4 minutes on a good
+    # run on 2026-11-14 and past the cap on two runs that day, each failure
+    # failing the trace run.
+    rows = records_by_wallet(sorted(cluster_of(config, target)))
+    inbound = bridge_inbound(rows.get(target) or [], bridge, target)
     m = match(withdrawals, inbound)
     resolved = resolve_destinations(m["unmatched"], _window_fetcher(config), bridge)
     report = build_report(withdrawals, inbound, resolved)
-    report["cctp"] = circle_report(config, ledger, target)
+    report["cctp"] = circle_report(config, ledger, target, rows)
     save(report)
 
     print(f"[withdrawals] {report['withdrawals']} withdrawal(s), "

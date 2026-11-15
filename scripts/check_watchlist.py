@@ -474,7 +474,8 @@ def busy_flags(hits: list[dict]) -> dict:
     return out
 
 
-def sweep(address: str, config: dict, plan_refused: dict | None = None) -> None:
+def sweep(address: str, config: dict, plan_refused: dict | None = None,
+          seconds: float | None = None) -> None:
     """Bounded multi-chain sweep so its destinations reach the substrate.
 
     `plan_refused` is shared across the wallets of one run so a chain the free
@@ -488,7 +489,8 @@ def sweep(address: str, config: dict, plan_refused: dict | None = None) -> None:
         return
     from src.chain.assets import load_canonical_contracts, load_par_contracts
     from src.chain.spam import ground_truth_addresses
-    budget = CallBudget(max_calls=SWEEP_CALLS, seconds=SWEEP_SECONDS)
+    budget = CallBudget(max_calls=SWEEP_CALLS,
+                        seconds=SWEEP_SECONDS if seconds is None else seconds)
     try:
         result = sweep_wallet(address, enabled_chains(config), budget, cluster=True,
                               canonical=load_canonical_contracts(

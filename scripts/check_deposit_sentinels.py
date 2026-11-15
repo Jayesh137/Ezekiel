@@ -32,6 +32,15 @@ CHAINS = MEASURABLE_CHAINS
 # HTTP calls at a 30s timeout; nesting: this < the step's timeout in watch.yml.
 MAX_LIVE_READINGS = 8
 READING_SECONDS = 45.0
+# One budget for ALL the sentinel sweeps of a run. Each sweep had its own 45 s
+# (`check_watchlist.SWEEP_SECONDS`) plus up to 30 s for a read in flight, so
+# four sentinels took the step to 4.5 of its 5 minutes on a GOOD run and past
+# it whenever Etherscan answered slowly: 14 of 30 watch runs failed on
+# 2026-11-14 at this step. Sentinels are swept least recently swept first, so
+# a slow day leaves one unswept until the next run (~11 minutes) instead of
+# failing the run; what is read is read from the substrate as always.
+SWEEP_BUDGET_SECONDS = 90.0
+MIN_SWEEP_SECONDS = 10.0
 
 
 def _load(path: Path) -> dict:
@@ -120,6 +129,30 @@ def hl_state(address: str, post=None) -> dict:
         return {"read_ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def sweep_in_budget(sentinels: dict, sweep_one, now: str, *, budget=None,
+                    clock=time.monotonic) -> dict:
+    """Sweep sentinels least recently swept first until the budget is spent.
+
+    Stamps `swept_at` on each entry swept, so the order rotates across runs.
+    `sweep_one(address, seconds)` is handed the time left, capped by the
+    per-wallet sweep budget.
+    """
+    from scripts.check_watchlist import SWEEP_SECONDS
+    budget = SWEEP_BUDGET_SECONDS if budget is None else budget
+    deadline = clock() + budget
+    order = sorted(sentinels, key=lambda a: (sentinels[a].get("swept_at") or "", a))
+    swept, deferred = [], []
+    for addr in order:
+        left = deadline - clock()
+        if left < MIN_SWEEP_SECONDS:
+            deferred.append(addr)
+            continue
+        sweep_one(addr, min(float(SWEEP_SECONDS), left))
+        sentinels[addr]["swept_at"] = now
+        swept.append(addr)
+    return {"swept": swept, "deferred": deferred}
+
+
 def main() -> int:
     from scripts.check_watchlist import sweep
     from src.alerts import alert_deposit_address_shared
@@ -153,8 +186,11 @@ def main() -> int:
         entry["since"] = entry.get("since") or now
 
     plan_refused: dict = {}
-    for addr in sorted(sentinels):
-        sweep(addr, config, plan_refused)
+    sweeps = sweep_in_budget(sentinels, lambda addr, seconds: sweep(addr, config, plan_refused,
+                                                                   seconds=seconds), now)
+    if sweeps["deferred"]:
+        print(f"[sentinels] sweep budget spent: {len(sweeps['deferred'])} sentinel(s) left for "
+              f"the next run, least recently swept first: {sweeps['deferred']}")
 
     rows = records_by_wallet(sorted(sentinels))
     found, unvalued = {}, {}

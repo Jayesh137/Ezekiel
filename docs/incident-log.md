@@ -3125,3 +3125,49 @@ keep showing small handoffs; the casebook's rank is the order to read them in.
 **Rule.** A vector's alarm is sized by its measured chance rate, and a vector
 that fires on 9% of strangers needs the second fact that strangers lack before
 it may say CRITICAL.
+
+## 2026-11-15 — three steps that only passed on a good day
+
+On 2026-11-14, 8 of the last 40 trace runs and 14 of 30 watch runs failed
+(issues #321, #324). Three causes, none of them new code; each a step whose
+normal duration had crept up to its cap.
+
+**1. The trace engine starved the runner** (runs 43550464309, 43646085965,
+43568142054: "the hosted runner lost communication with the server", the
+engine step in progress 45 minutes past its 8-minute cap). Its substrate index
+asked `records_by_wallet` for every swept wallet (1,188) and trimmed busy ones
+AFTERWARDS, so every full list existed first — the 2026-10-27 linkage shape.
+A starved runner cannot enforce a step timeout, and the run's readings were
+lost. `collect.records_by_wallet_capped` applies the cap inside the walk: a
+wallet past `max_wallet_records` keeps only records touching his cluster and
+goes on counting its true total (the engine judges busyness on it). No full
+list is ever built. `tests/test_engine_index_memory.py`.
+
+**2. Withdrawal pairing walked the substrate four times** (runs 43616109726,
+43639117059: timed out at 4 minutes). `records_for` for the target and again
+for each wallet of his: 3.5 of the 4 minutes on a GOOD run, with nothing to
+resolve on Etherscan. Now one `records_by_wallet` over the cluster.
+
+**3. The sentinel step gave each of four sweeps its own 45 s** plus up to 30 s
+for a read in flight: 4.5 of 5 minutes on a good run, over it whenever
+Etherscan answered slowly (read timeouts). One budget now covers all sweeps
+(`SWEEP_BUDGET_SECONDS` = 90), least recently swept first with `swept_at`
+stamped, so a slow day defers a sentinel to the next run (~11 minutes) instead
+of failing the run. Raising the cap was not the fix: watch's step caps already
+summed to 40 against a 39-minute job ceiling.
+
+**Two faults in the first cut, caught in review before it was pushed.** (a)
+The capped reader stopped deduping a busy wallet's rows once past the cap —
+including the rows it KEEPS, which are the flows the engine sums as his money
+through that wallet, so a record stored twice would have doubled one (rule
+10). The id set now holds the kept rows' ids only, which stays small. (b) The
+rotation's cursor did not survive the run: `select_sentinels` rebuilds every
+configured and candidate entry from scratch and carried only `since`, so
+`swept_at` was dropped, every run swept in address order, and a slow day
+would have deferred the SAME sentinel every time — a rotation without a
+persisted cursor is a fixed order. It now carries `swept_at` like `since`.
+Each has a test that fails without its fix.
+
+**Rule.** A step whose GOOD runs use 85% of its cap is already failing; it
+just has not had a bad day yet. Read the successful runs' durations, not only
+the failures.

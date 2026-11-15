@@ -455,7 +455,10 @@ def test_the_runner_reads_the_substrate_once_and_trims_busy_wallets(monkeypatch)
                                                 for i in range(2, 30)]}
 
     index = runner.SubstrateIndex({F07}, cap=10)
-    index._read = lambda addrs: scans.append(list(addrs)) or {a: stored.get(a, []) for a in addrs}
+    # The reader's shape since 2026-11-14 (collect.records_by_wallet_capped):
+    # (rows, true total), capped inside the walk.
+    index._read = lambda addrs, cap, keep_all=(), touching=(): scans.append(list(addrs)) or {
+        a: (stored.get(a, []), len(stored.get(a, []))) for a in addrs}
     first = index([F07, busy])
     again = index([F07, busy])
     assert len(scans) == 1 and first == again

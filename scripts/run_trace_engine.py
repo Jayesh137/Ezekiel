@@ -97,20 +97,22 @@ class SubstrateIndex:
     cluster: the engine treats it as busy and never walks the rest.
     """
 
-    def __init__(self, cluster, cap: int):
-        from src.chain.collect import records_by_wallet
-        self._read = records_by_wallet
+    def __init__(self, cluster, cap: int, read=None):
+        from src.chain.collect import records_by_wallet_capped
+        # Capped INSIDE the walk: trimming a busy wallet after its full list
+        # was built is what starved the runner (collect.records_by_wallet_capped).
+        self._read = read or records_by_wallet_capped
         self.cluster = set(cluster)
         self.cap = cap
         self.rows: dict = {}
         self.scans = 0
 
-    def _keep(self, addr, rows):
-        if addr in self.cluster or len(rows) <= self.cap:
+    def _keep(self, addr, rows, total):
+        if addr in self.cluster or total <= self.cap:
             return rows
         kept = Rows(r for r in rows if (r.get("src") or "").lower() in self.cluster
                     or (r.get("dst") or "").lower() in self.cluster)
-        kept.total = len(rows)   # the engine judges busyness on the true size
+        kept.total = total       # the engine judges busyness on the true size
         return kept
 
     def load(self, addresses) -> None:
@@ -118,9 +120,10 @@ class SubstrateIndex:
         if not missing:
             return
         self.scans += 1
-        got = self._read(missing)
+        got = self._read(missing, self.cap, keep_all=self.cluster, touching=self.cluster)
         for a in missing:
-            self.rows[a] = self._keep(a, got.get(a) or [])
+            rows, total = got.get(a) or ([], 0)
+            self.rows[a] = self._keep(a, rows, total)
 
     def __call__(self, addresses):
         self.load(addresses)
