@@ -700,7 +700,7 @@
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "source_chain": "optimism",
       "source_tx": "0x0d2bb24d5623a50871c0162a39756390724e3027a9dfdf25c6a2034d85de6e84",
-      "amount_usd": 0.0,
+      "amount_usd": null,
       "ts_ms": 1790739801000,
       "assertion": "observed_transfer",
       "parent_event_ids": [
@@ -1280,7 +1280,7 @@
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
       "source_chain": "ethereum",
       "source_tx": "0xbf44cda94f0d55d7babafd3c03b590dab772a093fe35820acb0f4db1c9138e10",
-      "amount_usd": 0.18,
+      "amount_usd": null,
       "ts_ms": 1788676499000,
       "assertion": "observed_transfer",
       "parent_event_ids": [
@@ -45401,14 +45401,14 @@
   ],
   "coverage": {
     "transfer_records": 5786,
-    "circle_events": 27539
+    "circle_events": 28366
   },
   "counts": {
     "routes": 3265,
     "unresolved": 2529,
     "discoveries": 2174
   },
-  "computed_at_ms": 1794716706819,
+  "computed_at_ms": 1794724685577,
   "authority": {
     "intervals": [
       {
@@ -52831,6 +52831,42 @@
           "agents:0xda15fb1cdd7223fda16df12e97e75c829dfb2c57:1794715619613:0x49a51f67ce39ad60d26665b50b0a9dc913a73e64"
         ],
         "confirms_owner": false
+      },
+      {
+        "account": "0x44c326040b13734dc96bf88d2fb589615dcdeaef",
+        "authority": "0x061a2ecd20867a46752943495342ef1f844d2fec",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794723593684,
+        "valid_to_ms": 1802273117201,
+        "parent_event_ids": [
+          "agents:0x44c326040b13734dc96bf88d2fb589615dcdeaef:1794723593684:0x061a2ecd20867a46752943495342ef1f844d2fec"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0x44c326040b13734dc96bf88d2fb589615dcdeaef",
+        "authority": "0x49aa6c6a837ea1b46ea210818a29004ea2df043c",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794723593684,
+        "valid_to_ms": 1796960101429,
+        "parent_event_ids": [
+          "agents:0x44c326040b13734dc96bf88d2fb589615dcdeaef:1794723593684:0x49aa6c6a837ea1b46ea210818a29004ea2df043c"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0x4dacd4364d95922c9ec4114f1a474bb0224f726a",
+        "authority": "0x18f02f3c237bd5bad974d6c447600b6a712cb9ee",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794723593684,
+        "valid_to_ms": 1808986312709,
+        "parent_event_ids": [
+          "agents:0x4dacd4364d95922c9ec4114f1a474bb0224f726a:1794723593684:0x18f02f3c237bd5bad974d6c447600b6a712cb9ee"
+        ],
+        "confirms_owner": false
       }
     ],
     "shared_authority": [],
@@ -52841,6 +52877,10 @@
   "source_message_reads": {
     "queries": 20,
     "errors": [
+      {
+        "tx": "0x3b539971680d0243fdc4f226b0d82e63e7c1d67756ebc1b84e8c0a7cb32eb0e2",
+        "reason": "no validated complete V2 message"
+      },
       {
         "tx": "0xd85c1caef6bcedd1665907607d6fd3b6c84bea4c5b7b374089a17cbcd1e74831",
         "reason": "no validated complete V2 message"
@@ -52916,15 +52956,11 @@
       {
         "tx": "0x7d5de4658cc372ecd779180bc69d17e50c977389662bb7e1cb292082ded252f9",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0x72c576e0ad1417c14df82547fe394406cc567614684d296b9d85ab76ce5dabb0",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 27539,
+    "circle_rows_read": 28366,
     "store_read_limit": 100000
   }
 }
