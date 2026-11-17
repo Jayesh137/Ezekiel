@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "id": "ethereum:0x95c68e551cf080eb0caa973cae3b55ceaf78a8f9620d08574e727e8ac99ac983:erc20:0",
+      "original_funder": "0x164478aa7d0dbce3da428401f48e90f177020869",
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "source_chain": "ethereum",
+      "source_tx": "0x95c68e551cf080eb0caa973cae3b55ceaf78a8f9620d08574e727e8ac99ac983",
+      "amount_usd": null,
+      "ts_ms": 1794906479000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "ethereum:0x95c68e551cf080eb0caa973cae3b55ceaf78a8f9620d08574e727e8ac99ac983:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "arbitrum:0xe74a570c5d1ac162d18232a743ac1957c0128988a5e83fd186fe75a5a8f61f65:erc20:0",
       "original_funder": "0x0000000000000000000000000000000000000000",
       "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
@@ -14377,20 +14391,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "arbitrum:0xeecb2c65593d940aeb68628c65edddbd7401a528d571578f489a56d37618c3b7:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "arbitrum:0xab3b055a2c951512d4a4418e2b1466419e305d27e3b300bda77b31f7a6b40246:erc20:0",
-      "original_funder": "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",
-      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
-      "source_chain": "arbitrum",
-      "source_tx": "0xab3b055a2c951512d4a4418e2b1466419e305d27e3b300bda77b31f7a6b40246",
-      "amount_usd": 7999999.0,
-      "ts_ms": 1753902757000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "arbitrum:0xab3b055a2c951512d4a4418e2b1466419e305d27e3b300bda77b31f7a6b40246:erc20:0"
       ],
       "confirms_owner": false
     }
@@ -34399,6 +34399,17 @@
   ],
   "discoveries": [
     {
+      "wallet": "0x164478aa7d0dbce3da428401f48e90f177020869",
+      "source": "funding_route",
+      "positive": true,
+      "event_id": "ethereum:0x95c68e551cf080eb0caa973cae3b55ceaf78a8f9620d08574e727e8ac99ac983:erc20:0",
+      "parent_event_ids": [
+        "ethereum:0x95c68e551cf080eb0caa973cae3b55ceaf78a8f9620d08574e727e8ac99ac983:erc20:0"
+      ],
+      "assertion": "observed_transfer",
+      "confirms_owner": false
+    },
+    {
       "wallet": "0x89587ebe7cff64c6527fe2deccc3521d75763e8d",
       "source": "funding_route",
       "positive": true,
@@ -45386,29 +45397,18 @@
       ],
       "assertion": "observed_transfer",
       "confirms_owner": false
-    },
-    {
-      "wallet": "0xf37bbffd0a28aa561572971d27cf56c86fe4f39f",
-      "source": "funding_route",
-      "positive": true,
-      "event_id": "base:0xaa0422ceb18e2a9662a17f3db0154cee26613a097b7a0b953c8d7a227ab6f02a:erc20:975",
-      "parent_event_ids": [
-        "base:0xaa0422ceb18e2a9662a17f3db0154cee26613a097b7a0b953c8d7a227ab6f02a:erc20:975"
-      ],
-      "assertion": "observed_transfer",
-      "confirms_owner": false
     }
   ],
   "coverage": {
-    "transfer_records": 5786,
-    "circle_events": 47745
+    "transfer_records": 5787,
+    "circle_events": 48992
   },
   "counts": {
-    "routes": 3265,
+    "routes": 3266,
     "unresolved": 2529,
-    "discoveries": 2174
+    "discoveries": 2175
   },
-  "computed_at_ms": 1794912751559,
+  "computed_at_ms": 1794921102727,
   "authority": {
     "intervals": [
       {
@@ -56743,6 +56743,690 @@
           "agents:0x582cfbe5afa824c36f0ec52d17b1aa8172958127:1794911475637:0x518f1ddca1323d909e93c8c51ba2f9114c731ec4"
         ],
         "confirms_owner": false
+      },
+      {
+        "account": "0x7570206ce9891ba4106be650e07ffb94df7ca8ec",
+        "authority": "0x2a4acdd1ced1cfb0dc073c42ea3f3a9abcf53b29",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1808682826337,
+        "parent_event_ids": [
+          "agents:0x7570206ce9891ba4106be650e07ffb94df7ca8ec:1794916241333:0x2a4acdd1ced1cfb0dc073c42ea3f3a9abcf53b29"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0x7570206ce9891ba4106be650e07ffb94df7ca8ec",
+        "authority": "0x6c4747693cb270278d1e9e31c3d9c16a0851ef5b",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1800196050086,
+        "parent_event_ids": [
+          "agents:0x7570206ce9891ba4106be650e07ffb94df7ca8ec:1794916241333:0x6c4747693cb270278d1e9e31c3d9c16a0851ef5b"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0x7570206ce9891ba4106be650e07ffb94df7ca8ec",
+        "authority": "0xccb875ba1afa51bd8b65ea53af41b171e63ddbbb",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1795547625137,
+        "parent_event_ids": [
+          "agents:0x7570206ce9891ba4106be650e07ffb94df7ca8ec:1794916241333:0xccb875ba1afa51bd8b65ea53af41b171e63ddbbb"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0x7570206ce9891ba4106be650e07ffb94df7ca8ec",
+        "authority": "0xf5dc6eb9641e8d60b0091fa4bcaa1ec5364e18bf",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1808682634850,
+        "parent_event_ids": [
+          "agents:0x7570206ce9891ba4106be650e07ffb94df7ca8ec:1794916241333:0xf5dc6eb9641e8d60b0091fa4bcaa1ec5364e18bf"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xb3f0e0be6c406f9a7e54fa5a8ce6ec2c6e1a2844",
+        "authority": "0x5b191319ea9893f6ff51774249b3c5b55446801e",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1795099291068,
+        "parent_event_ids": [
+          "agents:0xb3f0e0be6c406f9a7e54fa5a8ce6ec2c6e1a2844:1794916241333:0x5b191319ea9893f6ff51774249b3c5b55446801e"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xb3f0e0be6c406f9a7e54fa5a8ce6ec2c6e1a2844",
+        "authority": "0xf2a08d2761a573e8049789a722af62a838500c86",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798027116068,
+        "parent_event_ids": [
+          "agents:0xb3f0e0be6c406f9a7e54fa5a8ce6ec2c6e1a2844:1794916241333:0xf2a08d2761a573e8049789a722af62a838500c86"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xbd91435863e920c5c1c6ebd594acb7a34cfe9b50",
+        "authority": "0xb6811d8cb987943fa6f2a84d91d1ffaf802278dc",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1802539728629,
+        "parent_event_ids": [
+          "agents:0xbd91435863e920c5c1c6ebd594acb7a34cfe9b50:1794916241333:0xb6811d8cb987943fa6f2a84d91d1ffaf802278dc"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc132baa99c6baaa2289c45cb8758f368deace964",
+        "authority": "0x668f8189400de889bd4195f6bb2cc0155d4d616e",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1800987083411,
+        "parent_event_ids": [
+          "agents:0xc132baa99c6baaa2289c45cb8758f368deace964:1794916241333:0x668f8189400de889bd4195f6bb2cc0155d4d616e"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x00535eea70537983ef8d5a15c93949e8c3943be7",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163800982,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x00535eea70537983ef8d5a15c93949e8c3943be7"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x041cc97f2809c2d17a676a91f42581761774468c",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798173361605,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x041cc97f2809c2d17a676a91f42581761774468c"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x0a0c3be76ae069891fa9f8549c63a138204eb8bb",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163727159,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x0a0c3be76ae069891fa9f8549c63a138204eb8bb"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x0de7b262e5083d51f1d8f37870e98de73d547525",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163786601,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x0de7b262e5083d51f1d8f37870e98de73d547525"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x117f8ce231347387d1ba0380cfa677ae6f34eab8",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163713627,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x117f8ce231347387d1ba0380cfa677ae6f34eab8"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x162d481acd9383a7ff5f162292a2707d17660e88",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163603418,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x162d481acd9383a7ff5f162292a2707d17660e88"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x16e9a6bb333d7015fba13ada3ee391ddea048b64",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163759418,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x16e9a6bb333d7015fba13ada3ee391ddea048b64"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x17d7f7dc5604f4fdf058f55bc37552244335c0c3",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163636930,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x17d7f7dc5604f4fdf058f55bc37552244335c0c3"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x18646e93fe9615525c8eded37ebc1ef85bfc0bd0",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919521034,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x18646e93fe9615525c8eded37ebc1ef85bfc0bd0"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x197e33e885b0ff3de8c43fee09f4928ef3a4d1de",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163613106,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x197e33e885b0ff3de8c43fee09f4928ef3a4d1de"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x1998ef08e0892fcf146bab0a98af6293586a8d62",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163717773,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x1998ef08e0892fcf146bab0a98af6293586a8d62"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x217852cd824a553a05e5124e5fb68bb3d06adc46",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919512605,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x217852cd824a553a05e5124e5fb68bb3d06adc46"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x218dd5e25b423cb6a69bcaafc2b3c2375a13f1d1",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163594206,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x218dd5e25b423cb6a69bcaafc2b3c2375a13f1d1"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x247079802a394eeb48e247188d9131b895f08f1f",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163598971,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x247079802a394eeb48e247188d9131b895f08f1f"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x26ce7b649c099cc4f7e04f3ceaf6a2207aea20b5",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919508892,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x26ce7b649c099cc4f7e04f3ceaf6a2207aea20b5"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x2a1656082a659a90440bb9c30105d5f63fc54a1d",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163618313,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x2a1656082a659a90440bb9c30105d5f63fc54a1d"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x303cd0b3fca521c48d4db1b7a99af67dda5b8584",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919526253,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x303cd0b3fca521c48d4db1b7a99af67dda5b8584"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x32eac8f23db76fbf8b2d28d39d7099e0cba0a895",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1801087592968,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x32eac8f23db76fbf8b2d28d39d7099e0cba0a895"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x33f1e3e660017b915b042630575aa7d44e0a47c8",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163834583,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x33f1e3e660017b915b042630575aa7d44e0a47c8"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x342021f3893cda30c8abd921e56e00726176e8bb",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798173368952,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x342021f3893cda30c8abd921e56e00726176e8bb"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x377cce40372faf9efe4fc6d11bbfb6db5282c56f",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163584385,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x377cce40372faf9efe4fc6d11bbfb6db5282c56f"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x386e05e844ba41fb3ba92a86c17bbc2c1569fe6b",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163864028,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x386e05e844ba41fb3ba92a86c17bbc2c1569fe6b"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x3d60171ee4a81e82e4c79fe2939f5777a4cb46b2",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163504463,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x3d60171ee4a81e82e4c79fe2939f5777a4cb46b2"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x3fe582a754c989ceb2ab19ab10237d50039556f8",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163608679,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x3fe582a754c989ceb2ab19ab10237d50039556f8"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x415c1c1f9df0ac0b6be6abc25ff5bc35b33178bc",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163651890,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x415c1c1f9df0ac0b6be6abc25ff5bc35b33178bc"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x41bc37d44bbd2ad0e6b363d51cd3608b24efb796",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163661375,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x41bc37d44bbd2ad0e6b363d51cd3608b24efb796"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x48431bc7e04630c6d3274b00152ba15311e9dd96",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163656428,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x48431bc7e04630c6d3274b00152ba15311e9dd96"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x48f9592178041ba97a3311d768d68d92854bd55a",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163768458,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x48f9592178041ba97a3311d768d68d92854bd55a"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x49feef779aaf6ebcaf60ee2895a0ea599416fc68",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919562470,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x49feef779aaf6ebcaf60ee2895a0ea599416fc68"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x4afb3b21d57f28db3b1d78c59b6640c7035ba695",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798173373435,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x4afb3b21d57f28db3b1d78c59b6640c7035ba695"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x4f1c65047f4fd5807440f3c9d5011e5efe102263",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163741160,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x4f1c65047f4fd5807440f3c9d5011e5efe102263"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x53817ffe5c7d17c7eef02e685f556f0b9a190791",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163665491,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x53817ffe5c7d17c7eef02e685f556f0b9a190791"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x5681c1e79a4b31fbcce28f3a49591f375e332470",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163791585,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x5681c1e79a4b31fbcce28f3a49591f375e332470"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x587f7ae8bdc7674d2299568581b66ff5459607c5",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798173386534,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x587f7ae8bdc7674d2299568581b66ff5459607c5"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x593d7f6453cb700b2dd12094ba4a32fdc65e6286",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919492236,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x593d7f6453cb700b2dd12094ba4a32fdc65e6286"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x59adb68f3dfb9d656d26185de9dae0bf8f30ceca",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163559997,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x59adb68f3dfb9d656d26185de9dae0bf8f30ceca"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x59b8cd578592073e65f183387088242fc6ff677d",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919570398,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x59b8cd578592073e65f183387088242fc6ff677d"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x5c37b1c163e994564ac735cfbea92d779a7d3368",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163541296,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x5c37b1c163e994564ac735cfbea92d779a7d3368"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x5dcfab218e12478c0223ed6800709d5330512a85",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163532127,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x5dcfab218e12478c0223ed6800709d5330512a85"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x60c7edff0a5f625dfae356e91914124dbb73d842",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163679279,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x60c7edff0a5f625dfae356e91914124dbb73d842"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x69561ded60c1c89e5b5500031996b23daa19c812",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163754831,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x69561ded60c1c89e5b5500031996b23daa19c812"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x6db0fff8f483c0ee0c1775e424179846f94afce9",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163819218,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x6db0fff8f483c0ee0c1775e424179846f94afce9"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x72b226e0a75df11281930a00f2f97d5222e53efe",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163839334,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x72b226e0a75df11281930a00f2f97d5222e53efe"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x74310dfcd608b702537e2e08426c5868db93a8c1",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163845289,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x74310dfcd608b702537e2e08426c5868db93a8c1"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x7485e162f7a017ef3bc67ad18cb376a0fca3c574",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163536263,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x7485e162f7a017ef3bc67ad18cb376a0fca3c574"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x74f1f16be0bc9d4aa9d65eff045c68abe74c907d",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163736107,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x74f1f16be0bc9d4aa9d65eff045c68abe74c907d"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x7718cf626c6c4053c9521c6c3e7500f0aed1eff0",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919535548,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x7718cf626c6c4053c9521c6c3e7500f0aed1eff0"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x777ab4de6d4b9885bd56b495317abfb790192b6e",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1797919543413,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x777ab4de6d4b9885bd56b495317abfb790192b6e"
+        ],
+        "confirms_owner": false
+      },
+      {
+        "account": "0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3",
+        "authority": "0x7c3c12ea31c0893750bee16c204ccd6a293ed120",
+        "relationship": "approve_agent",
+        "boundaries_observed_only": true,
+        "valid_from_ms": 1794916241333,
+        "valid_to_ms": 1798163731568,
+        "parent_event_ids": [
+          "agents:0xc926ddba8b7617dbc65712f20cf8e1b58b8598d3:1794916241333:0x7c3c12ea31c0893750bee16c204ccd6a293ed120"
+        ],
+        "confirms_owner": false
       }
     ],
     "shared_authority": [],
@@ -56753,6 +57437,10 @@
   "source_message_reads": {
     "queries": 20,
     "errors": [
+      {
+        "tx": "0xe4247a1c84c49a55e085bd225a6807aa00b06e232e1d04b238f4a36dc00a9d72",
+        "reason": "no validated complete V2 message"
+      },
       {
         "tx": "0x120251e0c8662cca9be66f2fefb3feec58ba1f4a1320a22895f8806218cc3798",
         "reason": "no validated complete V2 message"
@@ -56828,15 +57516,11 @@
       {
         "tx": "0x0204e24dacd5dc1753718f2ccc6dcbde6b0b11a24b9182644e543a97c8c56508",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0x803886beddd19a104dde3adf58621d226c6f00f4d8242da9c013c668db1006ea",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 47745,
+    "circle_rows_read": 48992,
     "store_read_limit": 100000
   }
 }
