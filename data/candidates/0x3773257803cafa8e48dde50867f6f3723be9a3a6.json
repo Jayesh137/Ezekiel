@@ -1,12 +1,12 @@
 {
   "wallet": "0x3773257803cafa8e48dde50867f6f3723be9a3a6",
-  "last_checked": "2026-11-16T04:12:59.186955+00:00",
+  "last_checked": "2026-11-18T14:06:46.178715+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-11-14T00:59:59.461420+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-11-16T04:12:59.186955+00:00",
+  "last_successful_read": "2026-11-18T14:06:46.178715+00:00",
   "observations": [
     {
       "status": "ok",
@@ -30,6 +30,29 @@
       "source": "bridge_depositor",
       "positive": true,
       "observed_at": "2026-11-16T04:12:54.463713+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1793196400442,
+      "coverage": {
+        "start_ms": 1793196400442,
+        "end_ms": 1795010800442,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793196400442,
+        "requested_start_ms": 1793196400442,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795010800442,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-18T14:06:41.419737+00:00"
     },
     {
       "status": "ok",
@@ -79,29 +102,32 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1792987962689,
-    "end_ms": 1794802362689,
+    "start_ms": 1793196400442,
+    "end_ms": 1795010800442,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1794617939462,
-    "requested_start_ms": 1792987962689,
+    "fetched_start_ms": 1793196400442,
+    "requested_start_ms": 1793196400442,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1794618671891,
-  "last_positive_evidence": "2026-11-16T04:12:54.463713+00:00",
-  "last_seen": "2026-11-16T04:12:59.186955+00:00",
-  "last_scored": "2026-11-16T04:12:59.186955+00:00",
-  "best_score": 0.2451,
-  "latest_score": 0.2451,
+  "last_positive_evidence": "2026-11-18T14:06:41.419737+00:00",
+  "last_seen": "2026-11-18T14:06:46.178715+00:00",
+  "last_scored": "2026-11-18T14:06:46.178715+00:00",
+  "best_score": 0.3205,
+  "latest_score": 0.3205,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Similar market/limit execution style"
+      "Shares rare HIP-3 markets: xyz:SP500",
+      "Similar market/limit execution style",
+      "Similar account-size bracket",
+      "xyz:SP500: traded by ~10.3% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
       "Weak asset overlap",
@@ -109,44 +135,56 @@
     ],
     "vetoes": [],
     "asset_overlap": {
-      "overlap": [],
+      "overlap": [
+        "xyz:SP500"
+      ],
       "target_only": [
         "DOGE",
         "GRAM",
         "TIA",
-        "XRP",
-        "xyz:SP500"
+        "XRP"
       ],
       "candidate_only": [
         "xyz:GOLD",
         "xyz:SPCX"
       ],
-      "overlap_count": 0,
-      "rare_overlap": [],
-      "jaccard": 0.0
+      "overlap_count": 1,
+      "rare_overlap": [
+        "xyz:SP500"
+      ],
+      "jaccard": 0.1429
     },
     "market_rarity": {
-      "shared_markets": [],
+      "shared_markets": [
+        "xyz:SP500"
+      ],
       "rare_markets": [],
-      "classification": {},
-      "description": "no shared markets",
+      "classification": {
+        "xyz:SP500": "COMMON"
+      },
+      "description": "xyz:SP500 (common, ~10.3% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2451,
-      "explanations": [],
-      "frequencies": {}
+      "score_without_bonus": 0.3205,
+      "explanations": [
+        "xyz:SP500: traded by ~10.3% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      ],
+      "frequencies": {
+        "xyz:SP500": 0.10256
+      }
     },
     "episodes": {
       "status": "insufficient_data",
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.1452,
+        "relative_size_dispersion": 0.1499,
         "partial_fills_per_order": 1.0,
+        "pacing_seconds": 0.0,
         "round_100_fraction": 1.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 2,
+      "independent_sessions": 3,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -172,6 +210,29 @@
         "fill::xyz:GOLD:1794800929339:916817323887706",
         "fill::xyz:GOLD:1794800929339:950216215432636",
         "fill::xyz:GOLD:1794800929339:986085486437694",
+        "fill::xyz:GOLD:1794853515725:1115674440801229",
+        "fill::xyz:GOLD:1794853515725:16586489802158",
+        "fill::xyz:GOLD:1794853515725:171218321823992",
+        "fill::xyz:GOLD:1794853515725:206379554849901",
+        "fill::xyz:GOLD:1794853515725:245731650179468",
+        "fill::xyz:GOLD:1794853515725:287191330398992",
+        "fill::xyz:GOLD:1794853515725:465290880341406",
+        "fill::xyz:GOLD:1794853515725:584217105539841",
+        "fill::xyz:GOLD:1794853515725:601276073612746",
+        "fill::xyz:GOLD:1794853515725:688316159725714",
+        "fill::xyz:GOLD:1794853515725:772059849689442",
+        "fill::xyz:GOLD:1794853515725:787245097281410",
+        "fill::xyz:GOLD:1794853515725:875895957349187",
+        "fill::xyz:SP500:1794853529626:1040100011573272",
+        "fill::xyz:SP500:1794853529626:134133510993377",
+        "fill::xyz:SP500:1794853529626:169212685705043",
+        "fill::xyz:SP500:1794853529626:199087833553029",
+        "fill::xyz:SP500:1794853529626:26152481105405",
+        "fill::xyz:SP500:1794853529626:350701967662622",
+        "fill::xyz:SP500:1794853529626:690815362892080",
+        "fill::xyz:SP500:1794853529626:713901230980682",
+        "fill::xyz:SP500:1794853529626:822575478172952",
+        "fill::xyz:SP500:1794922206072:563617880203018",
         "fill::xyz:SPCX:1794633162346:1047098708606748",
         "fill::xyz:SPCX:1794633162346:116427067266498",
         "fill::xyz:SPCX:1794633162346:128177368717408",
@@ -194,9 +255,9 @@
       ]
     },
     "tooling": {
-      "requests": 12.0,
-      "cum_volume_usd": 419999.28,
-      "requests_per_1k_usd": 0.0286
+      "requests": 17.0,
+      "cum_volume_usd": 610332.42,
+      "requests_per_1k_usd": 0.0279
     }
   },
   "score_history": [
@@ -217,6 +278,27 @@
         "activity": 0.3845,
         "direction_bias": 0.0,
         "position_management": 0.7521,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-18T14:06:46.178715+00:00",
+      "score": 0.3205,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": null,
+        "leverage_profile": 0.135,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.701,
+        "trade_sequencing": 0.3049,
+        "position_sizing": 0.5,
+        "order_profile": 0.9713,
+        "activity": 0.4482,
+        "direction_bias": 0.2041,
+        "position_management": 0.7734,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
