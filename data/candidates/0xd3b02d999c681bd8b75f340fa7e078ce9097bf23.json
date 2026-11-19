@@ -1,14 +1,14 @@
 {
   "wallet": "0xd3b02d999c681bd8b75f340fa7e078ce9097bf23",
-  "last_checked": "2026-11-16T20:03:19.418412+00:00",
+  "last_checked": "2026-11-19T04:07:47.464653+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-11-16T17:44:05.982754+00:00",
   "discovery_sources": [
     "bridge_depositor",
     "leaderboard"
   ],
-  "last_successful_read": "2026-11-16T20:03:19.418412+00:00",
-  "last_positive_evidence": "2026-11-16T20:03:10.779755+00:00",
+  "last_successful_read": "2026-11-19T04:07:47.464653+00:00",
+  "last_positive_evidence": "2026-11-19T04:07:26.740889+00:00",
   "observations": [
     {
       "status": "ok",
@@ -55,35 +55,57 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-16T20:03:10.779755+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1793246835244,
+      "coverage": {
+        "start_ms": 1793246835244,
+        "end_ms": 1795061235244,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793246835244,
+        "requested_start_ms": 1793246835244,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795061235244,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-19T04:07:26.740889+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793044989569,
-    "end_ms": 1794859389569,
+    "start_ms": 1793246835244,
+    "end_ms": 1795061235244,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793044989569,
-    "requested_start_ms": 1793044989569,
+    "fetched_start_ms": 1793246835244,
+    "requested_start_ms": 1793246835244,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-16T20:03:19.418412+00:00",
-  "last_scored": "2026-11-16T20:03:19.418412+00:00",
-  "best_score": 0.3219,
-  "latest_score": 0.288,
+  "last_seen": "2026-11-19T04:07:47.464653+00:00",
+  "last_scored": "2026-11-19T04:07:47.464653+00:00",
+  "best_score": 0.3653,
+  "latest_score": 0.3653,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Matching trade frequency and cadence",
+      "Similar account-size bracket",
       "Similar scaling/TWAP/clip-size habits"
     ],
     "warnings": [
-      "Weak asset overlap",
-      "Too few position episodes to compare holding style"
+      "Weak asset overlap"
     ],
     "vetoes": [],
     "asset_overlap": {
@@ -99,6 +121,7 @@
         "BNB",
         "BTC",
         "LIT",
+        "UNI",
         "ZEC"
       ],
       "overlap_count": 0,
@@ -112,7 +135,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.288,
+      "score_without_bonus": 0.3653,
       "explanations": [],
       "frequencies": {}
     },
@@ -375,6 +398,7 @@
         "fill::BTC:1793312670169:726855506966032",
         "fill::BTC:1793312696320:845317675291124",
         "fill::BTC:1793312969612:135455304642491",
+        "fill::BTC:1794912589601:925634306981867",
         "fill::LIT:1794825680004:1029232182419552",
         "fill::LIT:1794825680004:1065727804658039",
         "fill::LIT:1794825680004:1080200270644752",
@@ -387,9 +411,13 @@
         "fill::LIT:1794825680004:35552573773564",
         "fill::LIT:1794825680004:370533004435118",
         "fill::LIT:1794825680004:374517800087166",
-        "fill::LIT:1794825680004:374596547958131",
-        "fill::LIT:1794825680004:424247918688261"
+        "fill::LIT:1794825680004:374596547958131"
       ]
+    },
+    "tooling": {
+      "requests": 1604.0,
+      "cum_volume_usd": 24763245.06,
+      "requests_per_1k_usd": 0.0648
     }
   },
   "score_history": [
@@ -431,6 +459,27 @@
         "activity": 0.8787,
         "direction_bias": 0.0,
         "position_management": 0.9492,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-19T04:07:47.464653+00:00",
+      "score": 0.3653,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.135,
+        "entry_exit_style": 0.3744,
+        "hold_duration": 0.8491,
+        "account_size": 0.9404,
+        "trade_sequencing": 0.4907,
+        "position_sizing": 0.7397,
+        "order_profile": 0.722,
+        "activity": 0.7429,
+        "direction_bias": 0.0,
+        "position_management": 0.9734,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
