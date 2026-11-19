@@ -1,14 +1,15 @@
 {
-  "computed_at": "2026-11-19T18:48:40.993483+00:00",
+  "computed_at": "2026-11-19T19:43:16.805238+00:00",
   "wallets": 1,
   "records": 4,
-  "spam_suppressed": 4,
+  "spam_suppressed": 5,
   "unpriced": 2,
   "spam_by_reason": {
     "lookalike": 2,
-    "zero_value": 2
+    "zero_value": 2,
+    "symbol_forgery": 1
   },
-  "calls": 31,
+  "calls": 33,
   "possible_gaps": 0,
   "incomplete": {},
   "degraded_sources": [
@@ -119,19 +120,19 @@
         },
         "polygon": {
           "records": 0,
-          "spam": 0,
-          "calls": 3,
+          "spam": 1,
+          "calls": 5,
           "cursor": 79283383,
           "gaps": [],
           "truncated": false,
           "error": "Invalid API Key (#err2)",
           "probed_inactive": false,
           "unpriced": 0,
-          "spam_by_reason": {},
+          "spam_by_reason": {
+            "symbol_forgery": 1
+          },
           "errors_by_kind": {
-            "erc20": "Invalid API Key (#err2)",
-            "native": "Invalid API Key (#err2)",
-            "internal": "Invalid API Key (#err2)"
+            "native": "Invalid API Key (#err2)"
           },
           "cursor_by_kind": {
             "erc20": 79283383,
@@ -139,7 +140,10 @@
             "internal": 0
           },
           "incomplete_kinds": {},
-          "unverified_kinds": {},
+          "unverified_kinds": {
+            "erc20": "Invalid API Key (#err2)",
+            "internal": "Invalid API Key (#err2)"
+          },
           "reader": "etherscan"
         },
         "bsc": {
