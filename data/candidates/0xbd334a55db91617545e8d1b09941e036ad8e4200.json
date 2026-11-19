@@ -1,18 +1,17 @@
 {
   "wallet": "0xbd334a55db91617545e8d1b09941e036ad8e4200",
   "first_seen": "2026-10-14T21:49:20.717552+00:00",
-  "last_seen": "2026-11-17T00:21:57.582080+00:00",
-  "last_checked": "2026-11-19T16:23:27.336719+00:00",
-  "last_successful_read": "2026-11-17T00:21:57.582080+00:00",
-  "last_scored": "2026-11-17T00:21:57.582080+00:00",
+  "last_seen": "2026-11-19T18:37:44.845046+00:00",
+  "last_checked": "2026-11-19T18:37:44.845046+00:00",
+  "last_successful_read": "2026-11-19T18:37:44.845046+00:00",
+  "last_scored": "2026-11-19T18:37:44.845046+00:00",
   "best_score": 0.3181,
-  "latest_score": 0.2778,
+  "latest_score": 0.2426,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
     "reasons": [
-      "Matching trade frequency and cadence",
       "Matching long/short bias",
       "Similar scaling/TWAP/clip-size habits"
     ],
@@ -39,6 +38,7 @@
         "xyz:MU",
         "xyz:NBIS",
         "xyz:NVDA",
+        "xyz:SOXL",
         "xyz:XYZ100"
       ],
       "overlap_count": 0,
@@ -52,7 +52,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2778,
+      "score_without_bonus": 0.2426,
       "explanations": [],
       "frequencies": {}
     },
@@ -61,7 +61,7 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.14,
+        "relative_size_dispersion": 0.1438,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 0.0,
@@ -605,16 +605,37 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-19T18:37:44.845046+00:00",
+      "score": 0.2426,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": 0.494,
+        "entry_exit_style": 0.1523,
+        "hold_duration": 0.2362,
+        "account_size": 0.2058,
+        "trade_sequencing": 0.7384,
+        "position_sizing": 0.0898,
+        "order_profile": null,
+        "activity": 0.7303,
+        "direction_bias": 0.9342,
+        "position_management": 0.8354,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2189,
+  "recent_avg_score": 0.2121,
   "last_investigated_ms": 1794840332657,
-  "last_read_status": "partial",
+  "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_positive_evidence": "2026-11-17T00:21:47.236640+00:00",
+  "last_positive_evidence": "2026-11-19T18:37:34.237463+00:00",
   "observations": [
     {
       "status": "ok",
@@ -893,6 +914,29 @@
       "observed_at": "2026-11-17T00:21:47.236640+00:00"
     },
     {
+      "status": "ok",
+      "next_cursor_ms": 1794968925630,
+      "coverage": {
+        "start_ms": 1793299029359,
+        "end_ms": 1795113429359,
+        "pages": 3,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1794825936536,
+        "requested_start_ms": 1793299029359,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795113429359,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-19T18:37:34.237463+00:00"
+    },
+    {
       "status": "partial",
       "next_cursor_ms": 1794825936536,
       "coverage": {
@@ -950,14 +994,14 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793290946497,
-    "end_ms": 1795105346497,
-    "pages": 6,
-    "complete_available_window": false,
+    "start_ms": 1793299029359,
+    "end_ms": 1795113429359,
+    "pages": 3,
+    "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793290946497,
-    "requested_start_ms": 1793290946497,
+    "fetched_start_ms": 1794825936536,
+    "requested_start_ms": 1793299029359,
     "cached": true,
     "local_retention_fills": 50000
   }
