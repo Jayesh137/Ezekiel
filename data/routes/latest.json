@@ -1,6 +1,36 @@
 {
   "routes": [
     {
+      "id": "arbitrum:0xdc16ebcad72c307a475e6e007a267897339255318666618b0de5b6608e63602a:erc20:0",
+      "original_funder": "0x45d26f28196d226497130c4bac709d808fed4029",
+      "source_chain": "arbitrum",
+      "source_tx": "0xdc16ebcad72c307a475e6e007a267897339255318666618b0de5b6608e63602a",
+      "transaction_caller": null,
+      "protocol": null,
+      "amount_usd": 7999999.8,
+      "ts_ms": 1795193855000,
+      "parent_event_ids": [
+        "arbitrum:0xdc16ebcad72c307a475e6e007a267897339255318666618b0de5b6608e63602a:erc20:0"
+      ],
+      "confirms_owner": false,
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "assertion": "internal_route"
+    },
+    {
+      "id": "arbitrum:0x2f086b22441616eec85d985d68e2d6ed2711baf70a5e9a50ff5ae13d053410af:erc20:0",
+      "original_funder": "0x0000000000000000000000000000000000000000",
+      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
+      "source_chain": "arbitrum",
+      "source_tx": "0x2f086b22441616eec85d985d68e2d6ed2711baf70a5e9a50ff5ae13d053410af",
+      "amount_usd": 7999999.8,
+      "ts_ms": 1795193771000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "arbitrum:0x2f086b22441616eec85d985d68e2d6ed2711baf70a5e9a50ff5ae13d053410af:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "ethereum:0x658b5916606d170694587a0f3f439145f25d0e87c0a53bb105a15d2d35ec07e4:erc20:0",
       "original_funder": "0x71c9e5ef759d18478e5a1eb0fd27cfdac2fa2ae4",
       "recipient": "0x1419e75330c71ce463102e6a1eb62fe80b412d5f",
@@ -14363,34 +14393,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "base:0xf31dba860bfb7762104cbaf3edd732dd44c8cf1c610f9df829a0e204b9563f75:erc20:35"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "ethereum:0x1f9a0be79ba1de65582090c59747185f21bf3ac48544a0644d50fc34b6a46771:erc20:0",
-      "original_funder": "0xffd62ae3f497135f3d04e6c94c78d391f9391636",
-      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "ethereum",
-      "source_tx": "0x1f9a0be79ba1de65582090c59747185f21bf3ac48544a0644d50fc34b6a46771",
-      "amount_usd": 4217002.25,
-      "ts_ms": 1753960031000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "ethereum:0x1f9a0be79ba1de65582090c59747185f21bf3ac48544a0644d50fc34b6a46771:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "ethereum:0xa7305f6bf6b502a39bd9b1e9a100bb90bffd8623f90b160220391abde10da234:erc20:0",
-      "original_funder": "0x0000000000000000000000000000000000000000",
-      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
-      "source_chain": "ethereum",
-      "source_tx": "0xa7305f6bf6b502a39bd9b1e9a100bb90bffd8623f90b160220391abde10da234",
-      "amount_usd": null,
-      "ts_ms": 1753958483000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "ethereum:0xa7305f6bf6b502a39bd9b1e9a100bb90bffd8623f90b160220391abde10da234:erc20:0"
       ],
       "confirms_owner": false
     }
@@ -45400,15 +45402,15 @@
     }
   ],
   "coverage": {
-    "transfer_records": 5789,
-    "circle_events": 48319
+    "transfer_records": 5791,
+    "circle_events": 51433
   },
   "counts": {
-    "routes": 3268,
+    "routes": 3270,
     "unresolved": 2529,
     "discoveries": 2177
   },
-  "computed_at_ms": 1795193835266,
+  "computed_at_ms": 1795202329363,
   "authority": {
     "intervals": [
       {
@@ -57474,6 +57476,10 @@
     "queries": 20,
     "errors": [
       {
+        "tx": "0x0fd514cfce69b4ce06541760a2bbe8073e57bb2930360324a16c8bc0b0e1d8cd",
+        "reason": "no validated complete V2 message"
+      },
+      {
         "tx": "0x7d5de4658cc372ecd779180bc69d17e50c977389662bb7e1cb292082ded252f9",
         "reason": "no validated complete V2 message"
       },
@@ -57548,15 +57554,11 @@
       {
         "tx": "0x52fb8df2d4973fc20da4093f1935fa7da6a288b42439b5320fe437fc18ec905b",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0x5d7f050a3bc45fe7dbe67cf01ef58d45203993b3e85ccaf0160f4b98ad27739c",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 48319,
+    "circle_rows_read": 51433,
     "store_read_limit": 100000
   }
 }
