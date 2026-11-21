@@ -1,13 +1,14 @@
 {
   "wallet": "0x00b43bdee2d3fa676ab06739bf1d52f4bad6591e",
-  "last_checked": "2026-11-20T21:29:33.358712+00:00",
+  "last_checked": "2026-11-21T14:14:27.850586+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-11-20T21:29:25.270135+00:00",
   "discovery_sources": [
+    "leaderboard",
     "public_trades"
   ],
-  "last_successful_read": "2026-11-20T21:29:33.358712+00:00",
-  "last_positive_evidence": "2026-11-20T21:29:25.270135+00:00",
+  "last_successful_read": "2026-11-21T14:14:27.850586+00:00",
+  "last_positive_evidence": "2026-11-21T14:14:23.936346+00:00",
   "observations": [
     {
       "status": "ok",
@@ -31,29 +32,54 @@
       "source": "public_trades",
       "positive": true,
       "observed_at": "2026-11-20T21:29:25.270135+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1793456063494,
+      "coverage": {
+        "start_ms": 1793456063494,
+        "end_ms": 1795270463494,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793456063494,
+        "requested_start_ms": 1793456063494,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795270463494,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-21T14:14:23.936346+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793395765087,
-    "end_ms": 1795210165087,
+    "start_ms": 1793456063494,
+    "end_ms": 1795270463494,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793395765087,
-    "requested_start_ms": 1793395765087,
+    "fetched_start_ms": 1793456063494,
+    "requested_start_ms": 1793456063494,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-20T21:29:33.358712+00:00",
-  "last_scored": "2026-11-20T21:29:33.358712+00:00",
+  "last_seen": "2026-11-21T14:14:27.850586+00:00",
+  "last_scored": "2026-11-21T14:14:27.850586+00:00",
   "best_score": 0.238,
-  "latest_score": 0.238,
+  "latest_score": 0.199,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
     "tier": "BACKGROUND",
-    "reasons": [],
+    "reasons": [
+      "Similar account-size bracket"
+    ],
     "warnings": [
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
@@ -85,7 +111,7 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.238,
+      "score_without_bonus": 0.199,
       "explanations": [],
       "frequencies": {}
     },
@@ -94,9 +120,10 @@
       "promotable": false,
       "similarity": null,
       "features": {
-        "relative_size_dispersion": 0.2535,
+        "relative_size_dispersion": 0.2526,
         "partial_fills_per_order": 1.0,
-        "round_100_fraction": 0.0774,
+        "pacing_seconds": 0.2397,
+        "round_100_fraction": 0.0625,
         "maker_share": 0.0
       },
       "independent_sessions": 4,
@@ -362,11 +389,6 @@
         "fill::@107:1794663708322:886744826834699",
         "fill::@107:1794663715219:425448468533468"
       ]
-    },
-    "tooling": {
-      "requests": 222.0,
-      "cum_volume_usd": 13064743.81,
-      "requests_per_1k_usd": 0.017
     }
   },
   "score_history": [
@@ -387,6 +409,27 @@
         "activity": 0.3676,
         "direction_bias": null,
         "position_management": 0.6639,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-21T14:14:27.850586+00:00",
+      "score": 0.199,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.3382,
+        "hold_duration": null,
+        "account_size": 0.8304,
+        "trade_sequencing": 0.6401,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.5445,
+        "direction_bias": null,
+        "position_management": 0.6658,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
