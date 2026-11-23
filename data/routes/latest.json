@@ -1,6 +1,20 @@
 {
   "routes": [
     {
+      "id": "polygon:0x86eb3021a3718232e825220ed431e0e87f94c21547c202160ef8bfc754101ab4:erc20:0",
+      "original_funder": "0x6248150739d5df7a873439e7c3ec84459f3c6343",
+      "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
+      "source_chain": "polygon",
+      "source_tx": "0x86eb3021a3718232e825220ed431e0e87f94c21547c202160ef8bfc754101ab4",
+      "amount_usd": null,
+      "ts_ms": 1795393777000,
+      "assertion": "observed_transfer",
+      "parent_event_ids": [
+        "polygon:0x86eb3021a3718232e825220ed431e0e87f94c21547c202160ef8bfc754101ab4:erc20:0"
+      ],
+      "confirms_owner": false
+    },
+    {
       "id": "polygon:0x08f499a5e9b51fd1156cddd305dbc6cb4b57b424ae4586963558c8a08a959ab8:erc20:0",
       "original_funder": "0xd8a26e8624e7f11719821cab39dd8aadd222ebcb",
       "recipient": "0xf078969e55cabf9ae3f26afeb5ec627b4430f19e",
@@ -14379,20 +14393,6 @@
       "assertion": "observed_transfer",
       "parent_event_ids": [
         "ethereum:0xada1d5dd1c5577caa3064615f92f79389a4f5fd12ace6896ad01befe28f4115a:erc20:0"
-      ],
-      "confirms_owner": false
-    },
-    {
-      "id": "arbitrum:0x95c6822ad51ee309c9cc2bc7b6141b746e0ca2ccf7f853b3c315b91e96e468ee:erc20:0",
-      "original_funder": "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",
-      "recipient": "0x45d26f28196d226497130c4bac709d808fed4029",
-      "source_chain": "arbitrum",
-      "source_tx": "0x95c6822ad51ee309c9cc2bc7b6141b746e0ca2ccf7f853b3c315b91e96e468ee",
-      "amount_usd": 3999999.0,
-      "ts_ms": 1754036345000,
-      "assertion": "observed_transfer",
-      "parent_event_ids": [
-        "arbitrum:0x95c6822ad51ee309c9cc2bc7b6141b746e0ca2ccf7f853b3c315b91e96e468ee:erc20:0"
       ],
       "confirms_owner": false
     }
@@ -34401,6 +34401,17 @@
   ],
   "discoveries": [
     {
+      "wallet": "0x6248150739d5df7a873439e7c3ec84459f3c6343",
+      "source": "funding_route",
+      "positive": true,
+      "event_id": "polygon:0x86eb3021a3718232e825220ed431e0e87f94c21547c202160ef8bfc754101ab4:erc20:0",
+      "parent_event_ids": [
+        "polygon:0x86eb3021a3718232e825220ed431e0e87f94c21547c202160ef8bfc754101ab4:erc20:0"
+      ],
+      "assertion": "observed_transfer",
+      "confirms_owner": false
+    },
+    {
       "wallet": "0xd8a26e8624e7f11719821cab39dd8aadd222ebcb",
       "source": "funding_route",
       "positive": true,
@@ -45388,29 +45399,18 @@
       ],
       "assertion": "observed_transfer",
       "confirms_owner": false
-    },
-    {
-      "wallet": "0x2df1c51e09aecf9cacb7bc98cb1742757f163df7",
-      "source": "funding_route",
-      "positive": true,
-      "event_id": "arbitrum:0x3fca933411bbdfbc65c80848ae984fcff5a63b9a753ba95ccc4c69ed65fda7be:erc20:0",
-      "parent_event_ids": [
-        "arbitrum:0x3fca933411bbdfbc65c80848ae984fcff5a63b9a753ba95ccc4c69ed65fda7be:erc20:0"
-      ],
-      "assertion": "observed_transfer",
-      "confirms_owner": false
     }
   ],
   "coverage": {
-    "transfer_records": 5793,
-    "circle_events": 31211
+    "transfer_records": 5794,
+    "circle_events": 31863
   },
   "counts": {
-    "routes": 3272,
+    "routes": 3273,
     "unresolved": 2529,
-    "discoveries": 2179
+    "discoveries": 2180
   },
-  "computed_at_ms": 1795394047211,
+  "computed_at_ms": 1795402865792,
   "authority": {
     "intervals": [
       {
@@ -45445,7 +45445,8 @@
         "valid_from_ms": 1794573630858,
         "valid_to_ms": 1795396792185,
         "parent_event_ids": [
-          "agents:0x000b2944639b001a70c7776a39b4600ac4ebb13e:1794573630858:0x53fda34f3b07ffa92ee624c5d551d8e016d78347"
+          "agents:0x000b2944639b001a70c7776a39b4600ac4ebb13e:1794573630858:0x53fda34f3b07ffa92ee624c5d551d8e016d78347",
+          "agents:0x000b2944639b001a70c7776a39b4600ac4ebb13e:1795401655069:0x53fda34f3b07ffa92ee624c5d551d8e016d78347"
         ],
         "confirms_owner": false
       },
@@ -57483,6 +57484,10 @@
     "queries": 20,
     "errors": [
       {
+        "tx": "0x803886beddd19a104dde3adf58621d226c6f00f4d8242da9c013c668db1006ea",
+        "reason": "no validated complete V2 message"
+      },
+      {
         "tx": "0xe4247a1c84c49a55e085bd225a6807aa00b06e232e1d04b238f4a36dc00a9d72",
         "reason": "no validated complete V2 message"
       },
@@ -57557,15 +57562,11 @@
       {
         "tx": "0xbe4e4a42b8c51f70ba152169bad810e3479aedba5d55efe83c5c0a956a2522ee",
         "reason": "no validated complete V2 message"
-      },
-      {
-        "tx": "0x0204e24dacd5dc1753718f2ccc6dcbde6b0b11a24b9182644e543a97c8c56508",
-        "reason": "no validated complete V2 message"
       }
     ]
   },
   "retention": {
-    "circle_rows_read": 31211,
+    "circle_rows_read": 31863,
     "store_read_limit": 100000
   }
 }
