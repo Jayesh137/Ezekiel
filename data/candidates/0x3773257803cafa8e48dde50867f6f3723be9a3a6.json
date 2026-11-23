@@ -1,12 +1,12 @@
 {
   "wallet": "0x3773257803cafa8e48dde50867f6f3723be9a3a6",
-  "last_checked": "2026-11-21T09:20:18.110231+00:00",
+  "last_checked": "2026-11-23T20:21:52.798993+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-11-14T00:59:59.461420+00:00",
   "discovery_sources": [
     "bridge_depositor"
   ],
-  "last_successful_read": "2026-11-21T09:20:18.110231+00:00",
+  "last_successful_read": "2026-11-23T20:21:52.798993+00:00",
   "observations": [
     {
       "status": "ok",
@@ -79,6 +79,29 @@
     },
     {
       "status": "ok",
+      "next_cursor_ms": 1793650895312,
+      "coverage": {
+        "start_ms": 1793650895312,
+        "end_ms": 1795465295312,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793650895312,
+        "requested_start_ms": 1793650895312,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795465295312,
+      "source": "bridge_depositor",
+      "positive": true,
+      "observed_at": "2026-11-23T20:21:47.028661+00:00"
+    },
+    {
+      "status": "ok",
       "next_cursor_ms": 1792803588226,
       "coverage": {
         "start_ms": 1792803588226,
@@ -125,23 +148,23 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793438401266,
-    "end_ms": 1795252801266,
+    "start_ms": 1793650895312,
+    "end_ms": 1795465295312,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793438401266,
-    "requested_start_ms": 1793438401266,
+    "fetched_start_ms": 1793650895312,
+    "requested_start_ms": 1793650895312,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1794618671891,
-  "last_positive_evidence": "2026-11-21T09:20:12.930027+00:00",
-  "last_seen": "2026-11-21T09:20:18.110231+00:00",
-  "last_scored": "2026-11-21T09:20:18.110231+00:00",
+  "last_positive_evidence": "2026-11-23T20:21:47.028661+00:00",
+  "last_seen": "2026-11-23T20:21:52.798993+00:00",
+  "last_scored": "2026-11-23T20:21:52.798993+00:00",
   "best_score": 0.3205,
-  "latest_score": 0.2908,
+  "latest_score": 0.2973,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -150,7 +173,8 @@
       "Shares rare HIP-3 markets: xyz:SP500",
       "Similar market/limit execution style",
       "Similar account-size bracket",
-      "xyz:SP500: traded by ~12.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
+      "Similar scaling/TWAP/clip-size habits",
+      "xyz:SP500: traded by ~11.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
       "Weak asset overlap"
@@ -168,6 +192,8 @@
         "xyz:ANT"
       ],
       "candidate_only": [
+        "xyz:BRENTOIL",
+        "xyz:CL",
         "xyz:GOLD",
         "xyz:SPCX",
         "xyz:XYZ100"
@@ -176,7 +202,7 @@
       "rare_overlap": [
         "xyz:SP500"
       ],
-      "jaccard": 0.1111
+      "jaccard": 0.0909
     },
     "market_rarity": {
       "shared_markets": [
@@ -186,34 +212,83 @@
       "classification": {
         "xyz:SP500": "COMMON"
       },
-      "description": "xyz:SP500 (common, ~12.5% of wallets)",
+      "description": "xyz:SP500 (common, ~11.5% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.2908,
+      "score_without_bonus": 0.2973,
       "explanations": [
-        "xyz:SP500: traded by ~12.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
+        "xyz:SP500: traded by ~11.5% of scanned wallets \u2014 too common to be evidence (no bonus)"
       ],
       "frequencies": {
-        "xyz:SP500": 0.125
+        "xyz:SP500": 0.1147
       }
     },
     "episodes": {
-      "status": "insufficient_data",
+      "status": "research",
       "promotable": false,
-      "similarity": null,
+      "similarity": 0.452,
       "features": {
-        "relative_size_dispersion": 0.1511,
+        "relative_size_dispersion": 0.2601,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
         "round_100_fraction": 0.0,
         "maker_share": 1.0
       },
-      "independent_sessions": 4,
+      "independent_sessions": 5,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
+        "fill::xyz:BRENTOIL:1795397532528:1113879928057327",
+        "fill::xyz:BRENTOIL:1795397532528:121791403363768",
+        "fill::xyz:BRENTOIL:1795397532528:193203882525903",
+        "fill::xyz:BRENTOIL:1795397532528:228016409602362",
+        "fill::xyz:BRENTOIL:1795397532528:280939838860754",
+        "fill::xyz:BRENTOIL:1795397532528:293032076339206",
+        "fill::xyz:BRENTOIL:1795397532528:309841087776353",
+        "fill::xyz:BRENTOIL:1795397532528:48990172930144",
+        "fill::xyz:BRENTOIL:1795397532528:57760217192236",
+        "fill::xyz:BRENTOIL:1795397532528:581230761376790",
+        "fill::xyz:BRENTOIL:1795397532528:599362575275876",
+        "fill::xyz:BRENTOIL:1795397532528:615509181321904",
+        "fill::xyz:BRENTOIL:1795397532528:636841589286851",
+        "fill::xyz:BRENTOIL:1795397532528:698219033912280",
+        "fill::xyz:BRENTOIL:1795397532528:74955334538786",
+        "fill::xyz:BRENTOIL:1795397532528:751653106754976",
+        "fill::xyz:BRENTOIL:1795397532528:754895117385688",
+        "fill::xyz:BRENTOIL:1795397532528:800360427131681",
+        "fill::xyz:BRENTOIL:1795397532528:830859121016765",
+        "fill::xyz:BRENTOIL:1795397532528:849409529952628",
+        "fill::xyz:BRENTOIL:1795397532528:861252199349168",
+        "fill::xyz:BRENTOIL:1795397532528:877841651916281",
+        "fill::xyz:BRENTOIL:1795397532528:922395468423896",
+        "fill::xyz:BRENTOIL:1795397532528:943912358733768",
+        "fill::xyz:BRENTOIL:1795447509586:132175119955292",
+        "fill::xyz:BRENTOIL:1795447509586:393647680011342",
+        "fill::xyz:BRENTOIL:1795447509586:499509696060653",
+        "fill::xyz:BRENTOIL:1795447509586:765116737012173",
+        "fill::xyz:BRENTOIL:1795447509586:789845323693638",
+        "fill::xyz:BRENTOIL:1795447509586:924484893166600",
+        "fill::xyz:BRENTOIL:1795447509586:973731344977940",
+        "fill::xyz:CL:1795397547630:1077942094594829",
+        "fill::xyz:CL:1795397547630:1111034584903434",
+        "fill::xyz:CL:1795397547630:179427576354962",
+        "fill::xyz:CL:1795397547630:242666179925373",
+        "fill::xyz:CL:1795397547630:367575730584197",
+        "fill::xyz:CL:1795397547630:416459774027479",
+        "fill::xyz:CL:1795397547630:469103136365046",
+        "fill::xyz:CL:1795397547630:531931049458324",
+        "fill::xyz:CL:1795397547630:55184763684470",
+        "fill::xyz:CL:1795397547630:574777359874809",
+        "fill::xyz:CL:1795397547630:60202266934388",
+        "fill::xyz:CL:1795397547630:646052096511273",
+        "fill::xyz:CL:1795397547630:673611262741612",
+        "fill::xyz:CL:1795397547630:751205768652319",
+        "fill::xyz:CL:1795397547630:875749586901219",
+        "fill::xyz:CL:1795397547630:967822348362171",
+        "fill::xyz:CL:1795447529458:355191565124191",
+        "fill::xyz:CL:1795447529458:995907630015278",
         "fill::xyz:GOLD:1794800929339:1091906854098657",
         "fill::xyz:GOLD:1794800929339:14158159409730",
         "fill::xyz:GOLD:1794800929339:203867988417186",
@@ -302,6 +377,30 @@
         "fill::xyz:SP500:1795140560573:959010227742699",
         "fill::xyz:SP500:1795227863967:503397162436939",
         "fill::xyz:SP500:1795227863967:799735258663229",
+        "fill::xyz:SP500:1795350983957:171666574384723",
+        "fill::xyz:SP500:1795350983957:239698431899144",
+        "fill::xyz:SP500:1795350983957:249117538158821",
+        "fill::xyz:SP500:1795350983957:332505324924839",
+        "fill::xyz:SP500:1795350983957:342774605798287",
+        "fill::xyz:SP500:1795350983957:355287128747202",
+        "fill::xyz:SP500:1795350983957:516881231826471",
+        "fill::xyz:SP500:1795350983957:658270748825858",
+        "fill::xyz:SP500:1795350983957:96674710054530",
+        "fill::xyz:SP500:1795397570776:1071856822024721",
+        "fill::xyz:SP500:1795397570776:140950288302292",
+        "fill::xyz:SP500:1795397570776:18944190927803",
+        "fill::xyz:SP500:1795397570776:309987769588939",
+        "fill::xyz:SP500:1795397570776:433394485784329",
+        "fill::xyz:SP500:1795397570776:595322493398980",
+        "fill::xyz:SP500:1795397570776:631694618548822",
+        "fill::xyz:SP500:1795397570776:731208181566153",
+        "fill::xyz:SP500:1795397570776:768136557726456",
+        "fill::xyz:SP500:1795397570776:777778039877635",
+        "fill::xyz:SP500:1795397570776:79565792180617",
+        "fill::xyz:SP500:1795397570776:815761861353773",
+        "fill::xyz:SP500:1795435473618:66932804736439",
+        "fill::xyz:SP500:1795447556008:352928131482535",
+        "fill::xyz:SP500:1795447556008:482901552520222",
         "fill::xyz:SPCX:1794633162346:1047098708606748",
         "fill::xyz:SPCX:1794633162346:116427067266498",
         "fill::xyz:SPCX:1794633162346:128177368717408",
@@ -358,13 +457,15 @@
         "fill::xyz:XYZ100:1795140547017:475003145614968",
         "fill::xyz:XYZ100:1795140547017:482527451265527",
         "fill::xyz:XYZ100:1795140547017:498435167137885",
-        "fill::xyz:XYZ100:1795140547017:541482867784840"
+        "fill::xyz:XYZ100:1795140547017:541482867784840",
+        "fill::xyz:XYZ100:1795350973123:1089666161075632",
+        "fill::xyz:XYZ100:1795350973123:786108762046312"
       ]
     },
     "tooling": {
-      "requests": 27.0,
-      "cum_volume_usd": 895967.7,
-      "requests_per_1k_usd": 0.0301
+      "requests": 39.0,
+      "cum_volume_usd": 1132216.9,
+      "requests_per_1k_usd": 0.0344
     }
   },
   "score_history": [
@@ -427,6 +528,27 @@
         "activity": 0.4399,
         "direction_bias": 0.25,
         "position_management": 0.7932,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-23T20:21:52.798993+00:00",
+      "score": 0.2973,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0909,
+        "timing_profile": null,
+        "leverage_profile": 0.135,
+        "entry_exit_style": 1.0,
+        "hold_duration": 0.2037,
+        "account_size": 0.729,
+        "trade_sequencing": 0.4083,
+        "position_sizing": 0.5,
+        "order_profile": 0.9131,
+        "activity": 0.5267,
+        "direction_bias": 0.2414,
+        "position_management": 0.8138,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
