@@ -1,7 +1,7 @@
 {
   "wallet": "0x9df286bcee3b6b20eddcbe763ddd3a30ef3bc665",
-  "last_checked": "2026-11-24T13:59:53.838225+00:00",
-  "last_read_status": "partial",
+  "last_checked": "2026-11-24T16:38:46.855099+00:00",
+  "last_read_status": "ok",
   "first_seen": "2026-11-14T09:55:11.525767+00:00",
   "discovery_sources": [
     "roster_lead"
@@ -98,6 +98,29 @@
       "source": "roster_lead",
       "positive": true,
       "observed_at": "2026-11-21T23:31:24.573066+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1795532645070,
+      "coverage": {
+        "start_ms": 1793723861380,
+        "end_ms": 1795538261380,
+        "pages": 5,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1795054713792,
+        "requested_start_ms": 1793723861380,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795538261380,
+      "source": "roster_lead",
+      "positive": true,
+      "observed_at": "2026-11-24T16:38:30.603514+00:00"
     },
     {
       "status": "partial",
@@ -241,24 +264,24 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793714321962,
-    "end_ms": 1795528721962,
-    "pages": 6,
-    "complete_available_window": false,
+    "start_ms": 1793723861380,
+    "end_ms": 1795538261380,
+    "pages": 5,
+    "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793714321962,
-    "requested_start_ms": 1793714321962,
+    "fetched_start_ms": 1795054713792,
+    "requested_start_ms": 1793723861380,
     "cached": true,
     "local_retention_fills": 50000
   },
   "last_investigated_ms": 1794650848199,
-  "last_successful_read": "2026-11-21T23:31:36.593374+00:00",
-  "last_positive_evidence": "2026-11-21T23:31:24.573066+00:00",
-  "last_seen": "2026-11-21T23:31:36.593374+00:00",
-  "last_scored": "2026-11-21T23:31:36.593374+00:00",
-  "best_score": 0.3491,
-  "latest_score": 0.3244,
+  "last_successful_read": "2026-11-24T16:38:46.855099+00:00",
+  "last_positive_evidence": "2026-11-24T16:38:30.603514+00:00",
+  "last_seen": "2026-11-24T16:38:46.855099+00:00",
+  "last_scored": "2026-11-24T16:38:46.855099+00:00",
+  "best_score": 0.3831,
+  "latest_score": 0.3831,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -266,15 +289,12 @@
     "reasons": [
       "Shares rare HIP-3 markets: xyz:ANT",
       "Similar scaling/TWAP/clip-size habits",
-      "xyz:ANT: traded by ~20.5% of scanned wallets \u2014 too common to be evidence (no bonus)",
-      "Market bonus withheld: style veto in force"
+      "xyz:ANT: traded by ~26.3% of scanned wallets \u2014 too common to be evidence (no bonus)"
     ],
     "warnings": [
       "Weak asset overlap"
     ],
-    "vetoes": [
-      "Incompatible hold style: 71% vs 9% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
       "overlap": [
         "xyz:ANT"
@@ -289,12 +309,17 @@
       "candidate_only": [
         "ASTER",
         "ATOM",
+        "BTC",
         "LIT",
+        "ONDO",
         "TAO",
         "UNI",
+        "VVV",
         "ZEC",
         "xyz:EUR",
+        "xyz:IREN",
         "xyz:MU",
+        "xyz:NBIS",
         "xyz:NVDA",
         "xyz:SNDK"
       ],
@@ -302,7 +327,7 @@
       "rare_overlap": [
         "xyz:ANT"
       ],
-      "jaccard": 0.0625
+      "jaccard": 0.0476
     },
     "market_rarity": {
       "shared_markets": [
@@ -312,30 +337,29 @@
       "classification": {
         "xyz:ANT": "COMMON"
       },
-      "description": "xyz:ANT (common, ~20.5% of wallets)",
+      "description": "xyz:ANT (common, ~26.3% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3244,
+      "score_without_bonus": 0.3831,
       "explanations": [
-        "xyz:ANT: traded by ~20.5% of scanned wallets \u2014 too common to be evidence (no bonus)",
-        "Market bonus withheld: style veto in force"
+        "xyz:ANT: traded by ~26.3% of scanned wallets \u2014 too common to be evidence (no bonus)"
       ],
       "frequencies": {
-        "xyz:ANT": 0.20495
+        "xyz:ANT": 0.26296
       }
     },
     "episodes": {
-      "status": "insufficient_data",
+      "status": "research",
       "promotable": false,
-      "similarity": null,
+      "similarity": 0.4498,
       "features": {
-        "relative_size_dispersion": 0.1648,
+        "relative_size_dispersion": 0.2821,
         "partial_fills_per_order": 1.0,
-        "pacing_seconds": 0.1084,
-        "round_100_fraction": 0.9773,
+        "pacing_seconds": 0.1237,
+        "round_100_fraction": 0.8431,
         "maker_share": 0.0
       },
-      "independent_sessions": 4,
+      "independent_sessions": 5,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -409,6 +433,41 @@
         "fill::ASTER:1795239846262:343297669337544",
         "fill::ASTER:1795239847012:344127499216606",
         "fill::ASTER:1795239847012:978993753222669",
+        "fill::ASTER:1795376181596:1081472773193634",
+        "fill::ASTER:1795376181596:288439223025689",
+        "fill::ASTER:1795376181596:357400813316135",
+        "fill::ASTER:1795376181596:418557428382935",
+        "fill::ASTER:1795376181596:457272448475506",
+        "fill::ASTER:1795376181596:580961489799381",
+        "fill::ASTER:1795376181596:712506538712442",
+        "fill::ASTER:1795376181596:737938575895007",
+        "fill::ASTER:1795376181596:975011839038169",
+        "fill::ASTER:1795376181596:983845141877509",
+        "fill::ASTER:1795376181727:899882529736004",
+        "fill::ASTER:1795386654259:339045546946856",
+        "fill::ASTER:1795404670821:1015266788757614",
+        "fill::ASTER:1795404670821:146435032975500",
+        "fill::ASTER:1795404670821:193279264875517",
+        "fill::ASTER:1795404670821:222965866750528",
+        "fill::ASTER:1795404670821:67576260466734",
+        "fill::ASTER:1795404670821:740137575804505",
+        "fill::ASTER:1795404670821:879861939017941",
+        "fill::ASTER:1795404670821:918412321434047",
+        "fill::ASTER:1795425397884:66199184757977",
+        "fill::ASTER:1795430401986:195773089874491",
+        "fill::ASTER:1795444221299:391909798873460",
+        "fill::ASTER:1795444221376:532465964659976",
+        "fill::ASTER:1795474232084:542322057767484",
+        "fill::ASTER:1795474232084:551442933656429",
+        "fill::ASTER:1795518069243:1124422408300695",
+        "fill::ASTER:1795519198532:889023135061778",
+        "fill::ASTER:1795519248669:608760404972451",
+        "fill::ASTER:1795519248743:583434086845252",
+        "fill::ASTER:1795519479133:685540592648114",
+        "fill::ASTER:1795526082374:168429244462223",
+        "fill::ASTER:1795526082374:441884704818161",
+        "fill::ASTER:1795526082374:445374112723341",
+        "fill::ASTER:1795526082374:823866775159380",
         "fill::ATOM:1794841278413:469853367522326",
         "fill::ATOM:1794841278413:614196576694098",
         "fill::ATOM:1794841278413:710190560290312",
@@ -561,48 +620,13 @@
         "fill::ATOM:1794844621232:359084037587111",
         "fill::ATOM:1794844621232:510231804188822",
         "fill::ATOM:1794844621232:683551165127565",
-        "fill::ATOM:1794844621287:1053344410413502",
-        "fill::ATOM:1794844621287:452040199379161",
-        "fill::ATOM:1794844820687:345351306670522",
-        "fill::ATOM:1794844844396:298458516238697",
-        "fill::ATOM:1794845078473:320179823949837",
-        "fill::ATOM:1794845079741:910687717806079",
-        "fill::ATOM:1794845079741:959824157433805",
-        "fill::ATOM:1794845128526:998735322492433",
-        "fill::ATOM:1794845129062:278958562048627",
-        "fill::ATOM:1794845129132:367670742779003",
-        "fill::ATOM:1794845129196:475792258977779",
-        "fill::ATOM:1794845187039:85628571975722",
-        "fill::ATOM:1794845187170:305909990862299",
-        "fill::ATOM:1794845203162:497411525179159",
-        "fill::ATOM:1794845228108:1106305141121304",
-        "fill::ATOM:1794845228108:263191328296636",
-        "fill::ATOM:1794845248309:608665343630541",
-        "fill::ATOM:1794845248974:40112989597769",
-        "fill::ATOM:1794845248974:494753086599898",
-        "fill::ATOM:1794845249063:870605858829252",
-        "fill::ATOM:1794845250427:374632431120192",
-        "fill::ATOM:1794845250427:640241227923583",
-        "fill::ATOM:1794845250427:995093494004107",
-        "fill::ATOM:1794845274535:753539774721194",
-        "fill::ATOM:1794845274535:845415702812798",
-        "fill::ATOM:1794845274535:952867146924194",
-        "fill::ATOM:1794845485925:1039379962201497",
-        "fill::ATOM:1794845485925:1080004566228830",
-        "fill::ATOM:1794845485925:291748181180574",
-        "fill::ATOM:1794845485925:519940454704502",
-        "fill::ATOM:1794845485925:536175741464425",
-        "fill::ATOM:1794845485925:625787854819429",
-        "fill::ATOM:1794845485925:740071570053427",
-        "fill::ATOM:1794845485925:758346805348689",
-        "fill::ATOM:1794845485925:977946202281212",
-        "fill::ATOM:1794845581904:651184847647873"
+        "fill::ATOM:1794844621287:1053344410413502"
       ]
     },
     "tooling": {
-      "requests": 873020.0,
-      "cum_volume_usd": 87072617.18,
-      "requests_per_1k_usd": 10.0263
+      "requests": 907795.0,
+      "cum_volume_usd": 88483018.47,
+      "requests_per_1k_usd": 10.2595
     }
   },
   "score_history": [
@@ -686,6 +710,27 @@
         "activity": 0.5117,
         "direction_bias": 0.0,
         "position_management": 0.8092,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-24T16:38:46.855099+00:00",
+      "score": 0.3831,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0476,
+        "timing_profile": null,
+        "leverage_profile": 0.9406,
+        "entry_exit_style": 0.5587,
+        "hold_duration": 0.5419,
+        "account_size": 0.6038,
+        "trade_sequencing": 0.5125,
+        "position_sizing": 0.7686,
+        "order_profile": 0.4841,
+        "activity": 0.6409,
+        "direction_bias": 0.0,
+        "position_management": 0.8683,
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
