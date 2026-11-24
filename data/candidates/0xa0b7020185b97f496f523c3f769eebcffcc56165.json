@@ -1,12 +1,12 @@
 {
   "wallet": "0xa0b7020185b97f496f523c3f769eebcffcc56165",
   "first_seen": "2026-11-05T17:04:32.304484+00:00",
-  "last_seen": "2026-11-21T00:10:32.071592+00:00",
-  "last_checked": "2026-11-21T00:10:32.071592+00:00",
-  "last_successful_read": "2026-11-21T00:10:32.071592+00:00",
-  "last_scored": "2026-11-21T00:10:32.071592+00:00",
+  "last_seen": "2026-11-24T11:26:15.345402+00:00",
+  "last_checked": "2026-11-24T11:26:15.345402+00:00",
+  "last_successful_read": "2026-11-24T11:26:15.345402+00:00",
+  "last_scored": "2026-11-24T11:26:15.345402+00:00",
   "best_score": 0.2704,
-  "latest_score": 0.1922,
+  "latest_score": 0.2357,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -19,7 +19,7 @@
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 8x apart (2.33 vs 0.29 position episodes/day)"
+      "Decision frequency 5x apart (1.75 vs 0.33 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [],
@@ -45,48 +45,27 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.1922,
+      "score_without_bonus": 0.2357,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
-      "status": "insufficient_data",
+      "status": "research",
       "promotable": false,
-      "similarity": null,
+      "similarity": 0.2773,
       "features": {
-        "relative_size_dispersion": 0.1863,
+        "relative_size_dispersion": 0.3213,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
-        "round_100_fraction": 0.0851,
+        "round_100_fraction": 0.065,
         "maker_share": 0.0
       },
-      "independent_sessions": 4,
+      "independent_sessions": 5,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::SOL:1793641587337:278674005010857",
-        "fill::SOL:1793641587337:314522942008972",
-        "fill::SOL:1793641587337:393890423482471",
-        "fill::SOL:1793641587337:476573795308244",
-        "fill::SOL:1793641587337:635975569278635",
-        "fill::SOL:1793648405176:104290197009289",
-        "fill::SOL:1793648405176:1073278802803169",
-        "fill::SOL:1793648405176:736894993432204",
-        "fill::SOL:1793648405176:740791157292452",
-        "fill::SOL:1793648405176:97743907854085",
-        "fill::SOL:1793648405241:1039679893467490",
-        "fill::SOL:1793648405241:1058500544758878",
-        "fill::SOL:1793648405241:203789238983476",
-        "fill::SOL:1793648405241:260055480020162",
-        "fill::SOL:1793648405241:300083540393574",
-        "fill::SOL:1793648405241:555937131832543",
-        "fill::SOL:1793648405241:656399204226498",
-        "fill::SOL:1793648405241:849477282438367",
-        "fill::SOL:1793648405241:904830716260890",
-        "fill::SOL:1793648405241:934128302028467",
-        "fill::SOL:1793648405241:961902829129713",
         "fill::SOL:1793719847330:690727190489664",
         "fill::SOL:1793719882936:691527302683844",
         "fill::SOL:1793719882936:76017124315581",
@@ -321,7 +300,28 @@
         "fill::SOL:1793791887718:703949058733479",
         "fill::SOL:1793791887718:819562801669555",
         "fill::SOL:1793803406671:11700679160386",
-        "fill::SOL:1793803406671:127733485460086"
+        "fill::SOL:1793803406671:127733485460086",
+        "fill::SOL:1793803406671:148288679790654",
+        "fill::SOL:1793803406671:317602419366718",
+        "fill::SOL:1793803406671:448764120169306",
+        "fill::SOL:1793803406671:512509585744635",
+        "fill::SOL:1793803406671:540836728484952",
+        "fill::SOL:1793803406671:651962766568436",
+        "fill::SOL:1793803406671:657023746772070",
+        "fill::SOL:1793803406671:684205756697990",
+        "fill::SOL:1793803406671:728676294535017",
+        "fill::SOL:1793803406671:785492172497866",
+        "fill::SOL:1793803406671:80459971441821",
+        "fill::SOL:1793803406671:854833840725292",
+        "fill::SOL:1793803462137:108335109933142",
+        "fill::SOL:1793811949369:1018118147536952",
+        "fill::SOL:1793811949369:1030399853793260",
+        "fill::SOL:1793811949369:10594783932160",
+        "fill::SOL:1793811949369:1113780287817915",
+        "fill::SOL:1793811949369:128905626634820",
+        "fill::SOL:1793811949369:150541466365804",
+        "fill::SOL:1793811949369:421327992533595",
+        "fill::SOL:1793811949369:443530887753084"
       ]
     }
   },
@@ -472,16 +472,37 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-24T11:26:15.345402+00:00",
+      "score": 0.2357,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.2829,
+        "hold_duration": null,
+        "account_size": 0.5821,
+        "trade_sequencing": 0.7756,
+        "position_sizing": 0.2516,
+        "order_profile": null,
+        "activity": 0.5202,
+        "direction_bias": 0.0,
+        "position_management": 0.9435,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.2179,
+  "recent_avg_score": 0.223,
   "last_investigated_ms": 1793898406877,
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard"
   ],
-  "last_positive_evidence": "2026-11-21T00:10:25.263010+00:00",
+  "last_positive_evidence": "2026-11-24T11:26:08.774716+00:00",
   "observations": [
     {
       "status": "ok",
@@ -620,17 +641,40 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-21T00:10:25.263010+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1793705156856,
+      "coverage": {
+        "start_ms": 1793705156856,
+        "end_ms": 1795519556856,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793705156856,
+        "requested_start_ms": 1793705156856,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795519556856,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-24T11:26:08.774716+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793405422896,
-    "end_ms": 1795219822896,
+    "start_ms": 1793705156856,
+    "end_ms": 1795519556856,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793405422896,
-    "requested_start_ms": 1793405422896,
+    "fetched_start_ms": 1793705156856,
+    "requested_start_ms": 1793705156856,
     "cached": true,
     "local_retention_fills": 50000
   }
