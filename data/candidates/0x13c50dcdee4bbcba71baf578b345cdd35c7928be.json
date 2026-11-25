@@ -1,12 +1,12 @@
 {
   "wallet": "0x13c50dcdee4bbcba71baf578b345cdd35c7928be",
   "first_seen": "2026-10-14T11:04:42.753976+00:00",
-  "last_seen": "2026-11-21T21:10:44.760297+00:00",
-  "last_checked": "2026-11-21T21:10:44.760297+00:00",
-  "last_successful_read": "2026-11-21T21:10:44.760297+00:00",
-  "last_scored": "2026-11-21T21:10:44.760297+00:00",
+  "last_seen": "2026-11-25T10:47:31.802207+00:00",
+  "last_checked": "2026-11-25T10:47:31.802207+00:00",
+  "last_successful_read": "2026-11-25T10:47:31.802207+00:00",
+  "last_scored": "2026-11-25T10:47:31.802207+00:00",
   "best_score": 0.2768,
-  "latest_score": 0.1706,
+  "latest_score": 0.1789,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -16,9 +16,7 @@
       "Weak asset overlap",
       "Too few position episodes to compare holding style"
     ],
-    "vetoes": [
-      "Incompatible hold style: 71% vs 0% of holds under 1h"
-    ],
+    "vetoes": [],
     "asset_overlap": {
       "overlap": [],
       "target_only": [
@@ -44,22 +42,22 @@
       "description": "no shared markets",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.1706,
+      "score_without_bonus": 0.1789,
       "explanations": [],
       "frequencies": {}
     },
     "episodes": {
-      "status": "insufficient_data",
+      "status": "research",
       "promotable": false,
-      "similarity": null,
+      "similarity": 0.2696,
       "features": {
-        "relative_size_dispersion": 0.1444,
+        "relative_size_dispersion": 0.2483,
         "partial_fills_per_order": 1.0,
-        "pacing_seconds": 0.09,
+        "pacing_seconds": 0.0995,
         "round_100_fraction": 0.0,
         "maker_share": 0.0
       },
-      "independent_sessions": 4,
+      "independent_sessions": 5,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
@@ -597,17 +595,38 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-25T10:47:31.802207+00:00",
+      "score": 0.1789,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.0,
+        "timing_profile": null,
+        "leverage_profile": null,
+        "entry_exit_style": 0.0959,
+        "hold_duration": null,
+        "account_size": 0.449,
+        "trade_sequencing": 0.7189,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.5817,
+        "direction_bias": null,
+        "position_management": 0.6055,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.1629,
+  "recent_avg_score": 0.1635,
   "last_investigated_ms": 1794740477906,
   "last_read_status": "ok",
   "discovery_sources": [
     "leaderboard",
     "public_trades"
   ],
-  "last_positive_evidence": "2026-11-21T21:10:40.481890+00:00",
+  "last_positive_evidence": "2026-11-25T10:47:27.847007+00:00",
   "observations": [
     {
       "status": "ok",
@@ -887,6 +906,29 @@
     },
     {
       "status": "ok",
+      "next_cursor_ms": 1793789247216,
+      "coverage": {
+        "start_ms": 1793789247216,
+        "end_ms": 1795603647216,
+        "pages": 1,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793789247216,
+        "requested_start_ms": 1793789247216,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795603647216,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-25T10:47:27.847007+00:00"
+    },
+    {
+      "status": "ok",
       "next_cursor_ms": 1791614705144,
       "coverage": {
         "start_ms": 1791614705144,
@@ -956,14 +998,14 @@
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793481040084,
-    "end_ms": 1795295440084,
+    "start_ms": 1793789247216,
+    "end_ms": 1795603647216,
     "pages": 1,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793481040084,
-    "requested_start_ms": 1793481040084,
+    "fetched_start_ms": 1793789247216,
+    "requested_start_ms": 1793789247216,
     "cached": true,
     "local_retention_fills": 50000
   }
