@@ -1,5 +1,5 @@
 {
-  "computed_at": "2026-11-26T19:42:19.686246+00:00",
+  "computed_at": "2026-11-26T20:03:10.187866+00:00",
   "base_rate": {
     "read": 29997,
     "measured": 18319,
@@ -8,13 +8,29 @@
     "upper": 0.0087,
     "labels": {
       "sdk_ioc_loop": 135,
-      "cloid_bot": 5694,
-      "mixed": 9372,
       "web_ui": 1458,
-      "maker": 1660
+      "cloid_bot": 5694,
+      "maker": 1660,
+      "mixed": 9372
     }
   },
   "his_class_wallets": [
+    {
+      "wallet": "0xef37631c83c38b07a8c60d5bdf58f6ff2af20ce1",
+      "t": 1795723241758,
+      "n": 1037,
+      "sd": 11.86,
+      "ioc": 1.0,
+      "fe": 0.0,
+      "cl": 0.0,
+      "rs": 0.0,
+      "rd": 0.0656,
+      "runs": 19,
+      "opa": 1.0,
+      "cp": [],
+      "lab": "sdk_ioc_loop",
+      "his": true
+    },
     {
       "wallet": "0xcc34a385bfdf725987e3c83720866581974d5df5",
       "cl": 0.0,
@@ -810,22 +826,6 @@
       "runs": 6,
       "sd": 9.86,
       "t": 1795220707907
-    },
-    {
-      "wallet": "0x2d869cb4360b34439af4bba88eb56c1debaa0de6",
-      "cl": 0.0,
-      "cp": [],
-      "fe": 0.0,
-      "his": true,
-      "ioc": 0.992,
-      "lab": "sdk_ioc_loop",
-      "n": 1501,
-      "opa": 1.0,
-      "rd": 0.8914,
-      "rs": 0.004,
-      "runs": 2,
-      "sd": 51.12,
-      "t": 1795219490190
     }
   ],
   "controls": {
@@ -900,19 +900,26 @@
   },
   "run": {
     "candidates": 40,
-    "read": 40,
-    "failed": [],
-    "his_class_new": [],
+    "read": 25,
+    "failed": [
+      {
+        "wallet": "0x0a031d88732b13e855964bc11cf2f3747314ffdc",
+        "error": "time_budget"
+      }
+    ],
+    "his_class_new": [
+      "0xef37631c83c38b07a8c60d5bdf58f6ff2af20ce1"
+    ],
     "budget": {
-      "calls": 41,
-      "weight": 1014,
+      "calls": 26,
+      "weight": 1586,
       "failed_reads": 0,
       "incomplete_histories": 0,
-      "elapsed_seconds": 99.62,
-      "stopped_reason": null,
+      "elapsed_seconds": 147.07,
+      "stopped_reason": "time_budget",
       "phases": {},
-      "status": "ok"
+      "status": "partial"
     }
   },
-  "population_pending": 15695
+  "population_pending": 15711
 }
