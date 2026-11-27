@@ -1,6 +1,6 @@
 {
   "wallet": "0x4ba3979955f52158c0e4e3378b18985475182ce2",
-  "last_checked": "2026-11-23T08:14:27.811483+00:00",
+  "last_checked": "2026-11-27T01:11:58.824333+00:00",
   "last_read_status": "ok",
   "first_seen": "2026-09-27T15:06:25.745553+00:00",
   "discovery_sources": [
@@ -8,8 +8,8 @@
     "leaderboard",
     "newborn"
   ],
-  "last_successful_read": "2026-11-23T08:14:27.811483+00:00",
-  "last_positive_evidence": "2026-11-23T08:14:20.834048+00:00",
+  "last_successful_read": "2026-11-27T01:11:58.824333+00:00",
+  "last_positive_evidence": "2026-11-27T01:11:52.207070+00:00",
   "observations": [
     {
       "status": "ok",
@@ -1156,24 +1156,47 @@
       "source": "leaderboard",
       "positive": true,
       "observed_at": "2026-11-23T08:14:20.834048+00:00"
+    },
+    {
+      "status": "ok",
+      "next_cursor_ms": 1795098286031,
+      "coverage": {
+        "start_ms": 1793927463620,
+        "end_ms": 1795741863620,
+        "pages": 5,
+        "complete_available_window": true,
+        "server_retention_limit": 10000,
+        "older_history_available": null,
+        "fetched_start_ms": 1793927463620,
+        "requested_start_ms": 1793927463620,
+        "cached": true,
+        "local_retention_fills": 50000
+      },
+      "saturation": false,
+      "gaps": [],
+      "error": null,
+      "last_successful_end_ms": 1795741863620,
+      "source": "leaderboard",
+      "positive": true,
+      "observed_at": "2026-11-27T01:11:52.207070+00:00"
     }
   ],
   "last_read_coverage": {
-    "start_ms": 1793607212166,
-    "end_ms": 1795421612166,
+    "start_ms": 1793927463620,
+    "end_ms": 1795741863620,
     "pages": 5,
     "complete_available_window": true,
     "server_retention_limit": 10000,
     "older_history_available": null,
-    "fetched_start_ms": 1793607212166,
-    "requested_start_ms": 1793607212166,
+    "fetched_start_ms": 1793927463620,
+    "requested_start_ms": 1793927463620,
     "cached": true,
     "local_retention_fills": 50000
   },
-  "last_seen": "2026-11-23T08:14:27.811483+00:00",
-  "last_scored": "2026-11-23T08:14:27.811483+00:00",
+  "last_seen": "2026-11-27T01:11:58.824333+00:00",
+  "last_scored": "2026-11-27T01:11:58.824333+00:00",
   "best_score": 0.401,
-  "latest_score": 0.3514,
+  "latest_score": 0.3677,
   "latest_scoring_schema": "2026-09-26.2",
   "latest_tier": "BACKGROUND",
   "latest_evidence": {
@@ -1182,7 +1205,8 @@
       "Shares rare HIP-3 markets: xyz:ANT",
       "Similar market/limit execution style",
       "Similar account-size bracket",
-      "xyz:ANT: traded by ~23.2% of scanned wallets \u2014 too common to be evidence (no bonus)",
+      "Similar scaling/TWAP/clip-size habits",
+      "xyz:ANT: traded by ~28.0% of scanned wallets \u2014 too common to be evidence (no bonus)",
       "Market bonus withheld: style veto in force"
     ],
     "warnings": [
@@ -1190,7 +1214,7 @@
       "Too few position episodes to compare holding style"
     ],
     "vetoes": [
-      "Decision frequency 6x apart (1.75 vs 0.27 position episodes/day)"
+      "Decision frequency 6x apart (1.40 vs 0.22 position episodes/day)"
     ],
     "asset_overlap": {
       "overlap": [
@@ -1204,14 +1228,13 @@
         "xyz:SP500"
       ],
       "candidate_only": [
-        "PONS",
         "io:ANTH"
       ],
       "overlap_count": 1,
       "rare_overlap": [
         "xyz:ANT"
       ],
-      "jaccard": 0.125
+      "jaccard": 0.1429
     },
     "market_rarity": {
       "shared_markets": [
@@ -1221,107 +1244,35 @@
       "classification": {
         "xyz:ANT": "COMMON"
       },
-      "description": "xyz:ANT (common, ~23.2% of wallets)",
+      "description": "xyz:ANT (common, ~28.0% of wallets)",
       "sample_sufficient": true,
       "bonus_applied": 0.0,
-      "score_without_bonus": 0.3514,
+      "score_without_bonus": 0.3677,
       "explanations": [
-        "xyz:ANT: traded by ~23.2% of scanned wallets \u2014 too common to be evidence (no bonus)",
+        "xyz:ANT: traded by ~28.0% of scanned wallets \u2014 too common to be evidence (no bonus)",
         "Market bonus withheld: style veto in force"
       ],
       "frequencies": {
-        "xyz:ANT": 0.23188
+        "xyz:ANT": 0.28016
       }
     },
     "episodes": {
       "status": "research",
       "promotable": false,
-      "similarity": 0.4137,
+      "similarity": 0.6141,
       "features": {
-        "relative_size_dispersion": 0.3125,
+        "relative_size_dispersion": 0.432,
         "partial_fills_per_order": 1.0,
         "pacing_seconds": 0.0,
-        "round_100_fraction": 0.756,
-        "maker_share": 0.0
+        "round_100_fraction": 0.6385,
+        "maker_share": 1.0
       },
-      "independent_sessions": 5,
+      "independent_sessions": 6,
       "confounders": [
         "shared_execution_software",
         "market_conditions"
       ],
       "parent_event_ids": [
-        "fill::PONS:1793708790319:33438749776637",
-        "fill::PONS:1793708790319:340808814932971",
-        "fill::PONS:1793708790319:366695243412525",
-        "fill::PONS:1793708790319:579156263962407",
-        "fill::PONS:1793708790319:667572370607741",
-        "fill::PONS:1793708790319:731444052307001",
-        "fill::PONS:1793708790319:743096777491813",
-        "fill::PONS:1793708790319:841982698448219",
-        "fill::PONS:1793708790755:383066027711247",
-        "fill::PONS:1793708790957:242884270510448",
-        "fill::PONS:1793708791260:504090523184549",
-        "fill::PONS:1793708791342:635016261038049",
-        "fill::PONS:1793708791342:650722311212548",
-        "fill::PONS:1793708791342:675730023045248",
-        "fill::PONS:1793708791463:604016639479962",
-        "fill::PONS:1793708791550:89148469323506",
-        "fill::PONS:1793708791751:1033888343877331",
-        "fill::PONS:1793708791952:217651685003534",
-        "fill::PONS:1793893873742:14958530838442",
-        "fill::PONS:1793893873742:651496301023912",
-        "fill::PONS:1793893873742:858090308587148",
-        "fill::PONS:1793893873742:879053259133265",
-        "fill::PONS:1793893873742:90671136734691",
-        "fill::PONS:1793893873742:966570714497092",
-        "fill::PONS:1793893875064:239723815256437",
-        "fill::PONS:1793893875064:277233221589475",
-        "fill::PONS:1793893875064:326009728062216",
-        "fill::PONS:1793893875064:467835416662137",
-        "fill::PONS:1793893875064:678843712730199",
-        "fill::PONS:1793893875262:1101965818727673",
-        "fill::PONS:1793893875262:118814526723987",
-        "fill::PONS:1793893875262:139834114599653",
-        "fill::PONS:1793893875262:531900443019003",
-        "fill::PONS:1793893875347:1090433173356548",
-        "fill::PONS:1793893875347:1094945717491973",
-        "fill::PONS:1793893875347:152461096361718",
-        "fill::PONS:1793893875347:438220983345120",
-        "fill::PONS:1793893875347:571770909662319",
-        "fill::PONS:1793893875347:993318694751154",
-        "fill::PONS:1793893875610:361704977125031",
-        "fill::PONS:1793893875610:364286695168287",
-        "fill::PONS:1793893875610:462200887454154",
-        "fill::PONS:1793893875866:25380107050537",
-        "fill::PONS:1793893875866:873692502065128",
-        "fill::PONS:1793893876016:369979538475307",
-        "fill::PONS:1793893878474:133022060704673",
-        "fill::PONS:1793893878689:384164168709718",
-        "fill::PONS:1793893878689:394946693795183",
-        "fill::PONS:1793893878689:903203281999460",
-        "fill::PONS:1793893878881:1066736699786641",
-        "fill::PONS:1793893878881:1099574087016387",
-        "fill::PONS:1793893878881:466316615993286",
-        "fill::PONS:1793893878881:796508586422793",
-        "fill::PONS:1793893878881:809537847579072",
-        "fill::PONS:1793893879002:12745245380969",
-        "fill::PONS:1793893879002:687627047858187",
-        "fill::PONS:1793893879088:1099689609984080",
-        "fill::PONS:1793893879277:1070989884439995",
-        "fill::PONS:1793893879277:56878560612436",
-        "fill::PONS:1793893879277:695787868019622",
-        "fill::PONS:1793893879407:45917760564716",
-        "fill::PONS:1793893879407:647613572069766",
-        "fill::PONS:1793893879480:1055115587985163",
-        "fill::PONS:1793893879480:463990371830125",
-        "fill::PONS:1793893879644:756054882866968",
-        "fill::PONS:1793893879711:564412313310939",
-        "fill::PONS:1793893879810:330318688593193",
-        "fill::PONS:1793893879810:837153426769180",
-        "fill::PONS:1793893880018:444730729525391",
-        "fill::PONS:1793893880018:67197660255903",
-        "fill::PONS:1793893880018:831972305246666",
-        "fill::PONS:1793893880018:979738309253801",
         "fill::io:ANTH:1794128270760:63501715102367",
         "fill::io:ANTH:1794128274824:1006969200321164",
         "fill::io:ANTH:1794128278915:447758626450442",
@@ -1505,7 +1456,79 @@
         "fill::io:ANTH:1794129435799:28955901378885",
         "fill::io:ANTH:1794129452370:40400134129023",
         "fill::io:ANTH:1794129482613:236327524769213",
-        "fill::io:ANTH:1794129482613:493876804459002"
+        "fill::io:ANTH:1794129482613:493876804459002",
+        "fill::io:ANTH:1794129482613:848639871226906",
+        "fill::io:ANTH:1794129482613:924993101328449",
+        "fill::io:ANTH:1794129499238:111260909615632",
+        "fill::io:ANTH:1794129515891:1008479794443033",
+        "fill::io:ANTH:1794129515891:585958837885413",
+        "fill::io:ANTH:1794129515891:824274845133451",
+        "fill::io:ANTH:1794129520557:1076434879759898",
+        "fill::io:ANTH:1794129524812:634130475280171",
+        "fill::io:ANTH:1794129528959:189345640673037",
+        "fill::io:ANTH:1794129528959:296466029876064",
+        "fill::io:ANTH:1794129528959:345796197588598",
+        "fill::io:ANTH:1794129545136:855322430287896",
+        "fill::io:ANTH:1794129545136:88162108175154",
+        "fill::io:ANTH:1794129555751:119608543441730",
+        "fill::io:ANTH:1794129555751:154176005028333",
+        "fill::io:ANTH:1794129555751:256296526102964",
+        "fill::io:ANTH:1794129555751:386427332601477",
+        "fill::io:ANTH:1794129555751:583165636210387",
+        "fill::io:ANTH:1794129555751:877517983868453",
+        "fill::io:ANTH:1794129555751:932400547657048",
+        "fill::io:ANTH:1794129563400:580252858169250",
+        "fill::io:ANTH:1794129567908:273541335363270",
+        "fill::io:ANTH:1794129567908:705185447106267",
+        "fill::io:ANTH:1794129581071:484830187576612",
+        "fill::io:ANTH:1794129585701:972133504490448",
+        "fill::io:ANTH:1794129589884:11677270117877",
+        "fill::io:ANTH:1794129594145:1067220340814197",
+        "fill::io:ANTH:1794129594145:843410434313786",
+        "fill::io:ANTH:1794129598262:808960463784777",
+        "fill::io:ANTH:1794129602382:211174246157871",
+        "fill::io:ANTH:1794129606525:952689824478334",
+        "fill::io:ANTH:1794129613621:794270558285487",
+        "fill::io:ANTH:1794129618268:707306630628730",
+        "fill::io:ANTH:1794129622377:278206575643232",
+        "fill::io:ANTH:1794129629526:1119471885359058",
+        "fill::io:ANTH:1794129643082:305656732311696",
+        "fill::io:ANTH:1794129647771:286209325599092",
+        "fill::io:ANTH:1794129647771:496466879517766",
+        "fill::io:ANTH:1794129647771:713478249453781",
+        "fill::io:ANTH:1794129651917:1065870513559071",
+        "fill::io:ANTH:1794129651917:779322003435427",
+        "fill::io:ANTH:1794129651917:829896123995874",
+        "fill::io:ANTH:1794129651917:941581661578519",
+        "fill::io:ANTH:1794129656058:517543478993051",
+        "fill::io:ANTH:1794129656058:73266383206385",
+        "fill::io:ANTH:1794129660193:282984846225391",
+        "fill::io:ANTH:1794129660193:499224613627054",
+        "fill::io:ANTH:1794129660193:569716537527303",
+        "fill::io:ANTH:1794129664337:461898601187803",
+        "fill::io:ANTH:1794129680461:324581081827226",
+        "fill::io:ANTH:1794129680461:535117458336846",
+        "fill::io:ANTH:1794129680461:567390242017916",
+        "fill::io:ANTH:1794129680461:893961128945560",
+        "fill::io:ANTH:1794129697277:1075532896011975",
+        "fill::io:ANTH:1794129701938:6717355617607",
+        "fill::io:ANTH:1794129706162:583966016094107",
+        "fill::io:ANTH:1794129710381:422954133165783",
+        "fill::io:ANTH:1794129717489:999786114622685",
+        "fill::io:ANTH:1794129722227:507738769767405",
+        "fill::io:ANTH:1794129727404:900554191916344",
+        "fill::io:ANTH:1794129731874:388210044319440",
+        "fill::io:ANTH:1794129731874:82827630326943",
+        "fill::io:ANTH:1794129745054:1003438749683798",
+        "fill::io:ANTH:1794129745054:282854989507912",
+        "fill::io:ANTH:1794129764736:799430892730041",
+        "fill::io:ANTH:1794129781402:482036735799224",
+        "fill::io:ANTH:1794129789039:487499158922323",
+        "fill::io:ANTH:1794129789039:782151611845698",
+        "fill::io:ANTH:1794129793775:129107264860137",
+        "fill::io:ANTH:1794129797924:626373513222190",
+        "fill::io:ANTH:1794129802211:1020678783665326",
+        "fill::io:ANTH:1794129806358:562987844339112"
       ]
     }
   },
@@ -2559,9 +2582,30 @@
         "loss_handling": null
       },
       "scoring_schema": "2026-09-26.2"
+    },
+    {
+      "scan_time": "2026-11-27T01:11:58.824333+00:00",
+      "score": 0.3677,
+      "tier": "BACKGROUND",
+      "dimensions": {
+        "asset_preferences": 0.1429,
+        "timing_profile": null,
+        "leverage_profile": 0.4049,
+        "entry_exit_style": 1.0,
+        "hold_duration": null,
+        "account_size": 0.9135,
+        "trade_sequencing": 0.7661,
+        "position_sizing": 0.5,
+        "order_profile": null,
+        "activity": 0.5725,
+        "direction_bias": 0.7104,
+        "position_management": 0.8282,
+        "loss_handling": null
+      },
+      "scoring_schema": "2026-09-26.2"
     }
   ],
   "status": "COOLING",
-  "recent_avg_score": 0.356,
+  "recent_avg_score": 0.3608,
   "last_investigated_ms": 1793882108050
 }
